@@ -94,6 +94,7 @@ h1 { margin: 0 0 10px; font-size: 40px; letter-spacing: -0.5px; }
 
 .brand { display: flex; align-items: center; gap: 9px; font-size: 18px; font-weight: 800; }
 .brand-icon { color: var(--pink); display: inline-flex; }
+.brand-logo { height: 26px; width: auto; display: block; }
 
 .btn {
   border: 1px solid var(--line);
