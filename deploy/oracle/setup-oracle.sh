@@ -110,7 +110,8 @@ done
 [ -e /tmp/.X11-unix/X99 ]  && echo "    Pantalla virtual OK" || echo "    AVISO: pantalla virtual no inició (ver: journalctl -u xvfb)"
 [ -e /tmp/pulse-native ]   && echo "    Audio virtual OK"    || echo "    AVISO: audio virtual no inició (ver: journalctl -u pulse)"
 
-systemctl enable --now huddle.service
+systemctl enable huddle.service
+systemctl restart huddle.service   # reiniciar SIEMPRE: cargar entorno nuevo
 echo "==> Arrancando Huddle ..."
 OK=""
 for i in $(seq 1 20); do
