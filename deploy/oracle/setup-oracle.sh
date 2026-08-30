@@ -38,7 +38,7 @@ echo "==> Instalando paquetes del sistema (2-3 min) ..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
 # nombres de librerías cambian entre versiones de Ubuntu (sufijo t64)
-for p in git curl xvfb pulseaudio pulseaudio-utils fonts-liberation \
+for p in git curl unzip xvfb pulseaudio pulseaudio-utils fonts-liberation \
          fonts-dejavu-core libnss3 libnspr4 libatk1.0-0t64 libatk-bridge2.0-0t64 \
          libcups2t64 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
          libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2t64 libatspi2.0-0t64; do
@@ -71,16 +71,23 @@ sudo -u "$APP_USER" env HOME="$APP_HOME" npm install --no-audit --no-fund
 # build ARM y descarga un binario x86 que no arranca en Oracle ARM (verificado).
 # 154.0.8034.0 sí trae chrome-linux-arm64 de verdad.
 CHROME_ARM_VER=154.0.8034.0
-# IMPORTANTE: el instalador incluido en puppeteer 24 descarga un binario x86
-# aunque le pidas ARM (verificado). El @puppeteer/browsers nuevo sí baja el
-# chrome-linux-arm64 real. Instalamos con --path fijo y leemos la ruta exacta.
-CHROME_OUT="$(sudo -u "$APP_USER" env HOME="$APP_HOME" npx --yes @puppeteer/browsers@latest install "chrome@$CHROME_ARM_VER" --path "$APP_HOME/.cache/puppeteer" 2>/dev/null | tail -n1)"
-CHROME_BIN="$(echo "$CHROME_OUT" | awk '{print $2}')"
-if [ -n "$CHROME_BIN" ] && [ -x "$CHROME_BIN" ]; then
+# IMPORTANTE: los instaladores de puppeteer (24 y @puppeteer/browsers) bajan
+# binario x86 aunque pidas ARM. Descarga DIRECTA de Google del Chrome ARM real.
+CHROME_PARENT="$APP_HOME/.cache/puppeteer/chrome/linux_arm-$CHROME_ARM_VER"
+CHROME_BIN="$CHROME_PARENT/chrome-linux-arm64/chrome"
+if [ ! -x "$CHROME_BIN" ]; then
+  echo "==> Descargando Chrome ARM real (${CHROME_ARM_VER}) directo de Google (~187 MB) ..."
+  curl -fsSL --retry 3 -o /tmp/chrome-arm.zip \
+    "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_ARM_VER}/linux-arm64/chrome-linux-arm64.zip"
+  mkdir -p "$CHROME_PARENT"
+  (cd "$CHROME_PARENT" && (unzip -q -o /tmp/chrome-arm.zip 2>/dev/null || python3 -m zipfile -e /tmp/chrome-arm.zip .))
+  rm -f /tmp/chrome-arm.zip
+fi
+chown -R "$APP_USER":"$APP_USER" "$APP_HOME/.cache/puppeteer" 2>/dev/null || true
+if [ -x "$CHROME_BIN" ]; then
   echo "    Chrome ARM (${CHROME_ARM_VER}) en: $CHROME_BIN"
 else
-  echo "    AVISO: Chrome ARM no quedó instalado (salida: $CHROME_OUT)"
-  echo "           El espejo podría fallar — avísanos"
+  echo "    AVISO: Chrome ARM no quedó instalado — el espejo fallará, avísanos"
 fi
 
 # ---- 5) servicios del sistema (auto-arranque y auto-reinicio) -----------
