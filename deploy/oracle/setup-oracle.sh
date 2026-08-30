@@ -71,12 +71,16 @@ sudo -u "$APP_USER" env HOME="$APP_HOME" npm install --no-audit --no-fund
 # build ARM y descarga un binario x86 que no arranca en Oracle ARM (verificado).
 # 154.0.8034.0 sí trae chrome-linux-arm64 de verdad.
 CHROME_ARM_VER=154.0.8034.0
-sudo -u "$APP_USER" env HOME="$APP_HOME" npx puppeteer browsers install "chrome@$CHROME_ARM_VER"
-CHROME_BIN="$(find "$APP_HOME/.cache/puppeteer/chrome" -path "*${CHROME_ARM_VER}*" -name chrome -type f 2>/dev/null | head -1)"
-if [ -n "$CHROME_BIN" ]; then
-  echo "    Chrome (${CHROME_ARM_VER}) en: $CHROME_BIN"
+# IMPORTANTE: el instalador incluido en puppeteer 24 descarga un binario x86
+# aunque le pidas ARM (verificado). El @puppeteer/browsers nuevo sí baja el
+# chrome-linux-arm64 real. Instalamos con --path fijo y leemos la ruta exacta.
+CHROME_OUT="$(sudo -u "$APP_USER" env HOME="$APP_HOME" npx --yes @puppeteer/browsers@latest install "chrome@$CHROME_ARM_VER" --path "$APP_HOME/.cache/puppeteer" 2>/dev/null | tail -n1)"
+CHROME_BIN="$(echo "$CHROME_OUT" | awk '{print $2}')"
+if [ -n "$CHROME_BIN" ] && [ -x "$CHROME_BIN" ]; then
+  echo "    Chrome ARM (${CHROME_ARM_VER}) en: $CHROME_BIN"
 else
-  echo "    AVISO: no se encontró el binario Chrome ${CHROME_ARM_VER} (el espejo podría fallar)"
+  echo "    AVISO: Chrome ARM no quedó instalado (salida: $CHROME_OUT)"
+  echo "           El espejo podría fallar — avísanos"
 fi
 
 # ---- 5) servicios del sistema (auto-arranque y auto-reinicio) -----------
