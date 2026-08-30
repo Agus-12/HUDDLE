@@ -1,0 +1,16 @@
+[Unit]
+Description=Huddle - salas sincronizadas con espejo
+After=network-online.target xvfb.service pulse.service
+Wants=network-online.target xvfb.service pulse.service
+
+[Service]
+User=__APP_USER__
+WorkingDirectory=__APP_HOME__/huddle
+Environment=NODE_ENV=production
+Environment=MIRROR_MAX=8
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

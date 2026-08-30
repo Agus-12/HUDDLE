@@ -1,0 +1,15 @@
+[Unit]
+Description=Huddle - PulseAudio (sink virtual para el audio del espejo)
+After=local-fs.target
+
+[Service]
+User=__APP_USER__
+# romper DBus evita que el demonio se quede colgado (entorno sin sesión)
+Environment=DBUS_SYSTEM_BUS_ADDRESS=unix:path=/noexistente
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/noexistente
+ExecStart=/usr/bin/pulseaudio -n -F __APP_HOME__/huddle/pulse.conf --exit-idle-time=-1 --daemonize=no --log-target=stderr --log-level=1
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

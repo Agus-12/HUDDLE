@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Test de fluidez</title>
+<style>
+body{font-family:sans-serif;background:#111;color:#fff;margin:0;height:100vh;overflow:hidden}
+.caja{position:absolute;width:120px;height:120px;border-radius:20px;
+  background:linear-gradient(135deg,#ff3ec8,#29e0ff);animation:mueve 3s ease-in-out infinite alternate}
+@keyframes mueve{from{left:5%;top:15%}to{left:80%;top:65%}}
+.marca{position:absolute;right:12px;bottom:8px;opacity:.7;font-size:12px}
+</style></head>
+<body>
+<div class="caja"></div>
+<div id="fps" class="marca">—</div>
+<script>
+let n=0;const t0=performance.now();
+(function loop(){n++;document.getElementById('fps').textContent=
+  Math.round(n/((performance.now()-t0)/1000))+' fps · frame '+n;
+  requestAnimationFrame(loop);})();
+</script>
+</body></html>
