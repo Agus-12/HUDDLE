@@ -47,10 +47,14 @@
 6. Espera ~1 min a que quede **RUNNING** y anota la **Public IP Address**
    (ej. `140.238.10.20`). Es la dirección de tu servidor.
 
-> 💡 Si sale **"Out of capacity"**: es normal, esa forma gratis se agota a
-> veces. Clic en **Create** de nuevo (y de nuevo). Si insisten, intenta
-> cambiar la zona de disponibilidad (Availability Domain) o inténtalo en
-> otra hora.
+> ⚠️ Si sale **"Out of capacity"**: es MUY común ahora en todas las regiones.
+> Solución en orden:
+> 1. Clic en **Create** de nuevo, varias veces (a veces cae una máquina libre)
+> 2. Cambia la zona de disponibilidad (Availability Domain) y reintenta
+> 3. **La solución definitiva:** actualiza tu cuenta a **Pay As You Go**
+>    (menú → Billing). Sigue siendo 100% gratis mientras te mantengas en
+>    2 OCPU/12GB — PAYG solo cobra si te PASAS de los límites gratis.
+>    Con PAYG el error "out of capacity" desaparece casi siempre.
 
 ## PARTE 3 — Abrir el puerto 3000 (5 min)
 
