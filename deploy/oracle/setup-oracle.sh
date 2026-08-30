@@ -67,15 +67,27 @@ netfilter-persistent save 2>/dev/null || iptables-save >/etc/iptables/rules.v4 2
 echo "==> Instalando dependencias y Chrome (3-5 min, descarga ~160 MB) ..."
 cd "$APP_DIR"
 sudo -u "$APP_USER" env HOME="$APP_HOME" npm install --no-audit --no-fund
-# descarga explícita de Chrome para ARM (idempotente: si ya está, no hace nada)
-sudo -u "$APP_USER" env HOME="$APP_HOME" npx puppeteer browsers install chrome
+# Chrome con binario ARM REAL: la versión que pinnea puppeteer (148) no trae
+# build ARM y descarga un binario x86 que no arranca en Oracle ARM (verificado).
+# 154.0.8034.0 sí trae chrome-linux-arm64 de verdad.
+CHROME_ARM_VER=154.0.8034.0
+sudo -u "$APP_USER" env HOME="$APP_HOME" npx puppeteer browsers install "chrome@$CHROME_ARM_VER"
+CHROME_BIN="$(find "$APP_HOME/.cache/puppeteer/chrome" -path "*${CHROME_ARM_VER}*" -name chrome -type f 2>/dev/null | head -1)"
+if [ -n "$CHROME_BIN" ]; then
+  echo "    Chrome (${CHROME_ARM_VER}) en: $CHROME_BIN"
+else
+  echo "    AVISO: no se encontró el binario Chrome ${CHROME_ARM_VER} (el espejo podría fallar)"
+fi
 
 # ---- 5) servicios del sistema (auto-arranque y auto-reinicio) -----------
 echo "==> Instalando servicios del sistema ..."
 for unit in xvfb pulse huddle; do
   sed -e "s|__APP_USER__|$APP_USER|g" -e "s|__APP_HOME__|$APP_HOME|g" \
+      -e "s|__CHROME_BIN__|${CHROME_BIN:-}|g" \
       "$APP_DIR/deploy/oracle/$unit.service" > "/etc/systemd/system/$unit.service"
 done
+# si no se encontró Chrome, quitar la línea CHROME_PATH vacía
+sed -i '\|^Environment=CHROME_PATH=$|d' /etc/systemd/system/huddle.service
 systemctl daemon-reload
 
 systemctl enable --now xvfb.service pulse.service

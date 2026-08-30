@@ -8,6 +8,7 @@ User=__APP_USER__
 WorkingDirectory=__APP_HOME__/huddle
 Environment=NODE_ENV=production
 Environment=MIRROR_MAX=8
+Environment=CHROME_PATH=__CHROME_BIN__
 ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=3
