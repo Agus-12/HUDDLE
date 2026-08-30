@@ -50,7 +50,7 @@ input { font-family: inherit; }
   background: var(--panel-solid);
   backdrop-filter: blur(16px);
 }
-.logo-big { font-size: 52px; margin-bottom: 4px; }
+.logo-big { display: flex; justify-content: center; margin-bottom: 10px; }
 h1 { margin: 0 0 10px; font-size: 40px; letter-spacing: -0.5px; }
 .gradient-text {
   background: linear-gradient(90deg, var(--pink), var(--violet) 45%, var(--cyan));
@@ -431,6 +431,6 @@ input[type="range"]:disabled { opacity: 0.35; cursor: not-allowed; }
   .vol { width: 60px; }
 }
 
-.carita-big { height: 92px; width: auto; display: block; }
+.carita-big { height: 76px; width: auto; display: block; }
 .logo-letras { height: 48px; width: auto; display: block; }
 .landing-title { display: flex; justify-content: center; }
