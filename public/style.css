@@ -575,3 +575,22 @@ html { background: #0a0713; } /* borde a borde en la app instalada (viewport-fit
 @media (max-width: 950px), (max-height: 520px) {
   .blob { display: none !important; }
 }
+
+/* ---------- v23: contenido FUERA de la barra de estado/muesca (iOS) ----------
+ * con viewport-fit=cover la página se pinta debajo del reloj/notch y la barra
+ * de la sala quedaba arriba del todo, traslapada con la hora/batería.
+ * Se empuja el contenido normal bajo el área segura; a pantalla completa el
+ * video sigue cubriendo de borde a borde (position:fixed ignora este padding). */
+body {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+/* botones flotantes: también bajan para no caer bajo la muesca (arriba) */
+.video-shell.pseudo-fs #fitToggle,
+.video-shell:fullscreen #fitToggle,
+.video-shell:-webkit-full-screen #fitToggle { top: calc(12px + env(safe-area-inset-top, 0px)); }
+.video-shell.pseudo-fs #fsExit,
+.video-shell:fullscreen #fsExit,
+.video-shell:-webkit-full-screen #fsExit { top: calc(12px + env(safe-area-inset-top, 0px)); }
+/* toasts: no chocar con la barrita de inicio (gesture bar) */
+.toasts { bottom: calc(22px + env(safe-area-inset-bottom, 0px)); }
