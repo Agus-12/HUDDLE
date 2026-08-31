@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v31';
+const APP_VERSION = 'v32';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1110,25 +1110,39 @@ function initLanding() {
     av.style.setProperty('--h', hashHue(S.profile.name));
     pollRooms();
   } else {
-    try { $('#userNick').focus(); } catch {}
+    const inpU = $('#userNick');
+    inpU.value = ''; // v32: sin el nombre viejo pegado tras "cambiar"
+    try { inpU.focus(); } catch {}
   }
 }
 
 async function loginNombre() {
   const name = $('#userNick').value.trim().replace(/\s+/g, ' ');
   if (name.length < 3) { toast('El nombre necesita al menos 3 letras'); return; }
+  /* v32: si este dispositivo ya tuvo ese nombre, mandamos su token para
+   * volver a entrar sin que diga "ya está tomado" (tras usar "cambiar") */
+  let savedTok = '';
+  try {
+    const all = JSON.parse(localStorage.getItem('rr-profiles') || '{}');
+    savedTok = (all[name.toLowerCase()] || {}).token || '';
+  } catch {}
   $('#btnLogin').disabled = true;
   try {
     const r = await fetch('/api/login', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, token: savedTok }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { toast(d.error || 'No se pudo registrar el nombre'); return; }
     S.profile = { name: d.name, token: d.token };
     localStorage.setItem('rr-profile', JSON.stringify(S.profile));
+    try {
+      const all = JSON.parse(localStorage.getItem('rr-profiles') || '{}');
+      all[d.name.toLowerCase()] = { name: d.name, token: d.token };
+      localStorage.setItem('rr-profiles', JSON.stringify(all));
+    } catch {}
     initLanding();
-    toast(d.reclaimed ? `¡Bienvenido de vuelta, ${d.name}!` : `¡Listo, ${d.name}! Ese nombre es tuyo 🎉`, 4200);
+    toast(d.resumed ? `¡De vuelta, ${d.name}!` : (d.reclaimed ? `¡Bienvenido de vuelta, ${d.name}!` : `¡Listo, ${d.name}! Ese nombre es tuyo 🎉`), 4200);
   } catch { toast('Sin conexión con el servidor'); }
   finally { $('#btnLogin').disabled = false; }
 }
@@ -1141,6 +1155,18 @@ $('#btnSwitch').addEventListener('click', () => {
 });
 
 /* ---- salas en vivo con preview (estilo Rave) ---- */
+/* v32: logo del sitio espejado para la tarjeta (o null si no lo tenemos) */
+const SITE_LOGOS = {
+  'cuevana.mov': '/sites/cuevana.png',
+  'gopelis.com': '/sites/gopelis.png',
+  'youtube.com': '/sites/youtube.png',
+};
+function siteLogoFor(host) {
+  const h = String(host || '').replace(/^www\./, '').toLowerCase();
+  if (SITE_LOGOS[h]) return SITE_LOGOS[h];
+  for (const k of Object.keys(SITE_LOGOS)) if (h.endsWith('.' + k)) return SITE_LOGOS[k];
+  return null;
+}
 let roomsTimer = null;
 async function pollRooms() {
   const landing = $('#landing');
@@ -1155,8 +1181,10 @@ async function pollRooms() {
     (d.rooms || []).forEach((rm) => {
       const card = document.createElement('button');
       card.className = 'room-card';
-      const prev = rm.frame
-        ? '<img src="' + rm.frame + '" alt="">'
+      /* v32: preview ligera — el logo del sitio donde están (sin fotogramas) */
+      const logo = rm.isMirror ? siteLogoFor(rm.host) : null;
+      const prev = logo
+        ? '<img src="' + logo + '" class="site-logo-big" alt="">'
         : '<span class="room-emoji">' + (rm.isMirror ? '🪞' : (rm.watching ? '🎬' : '💬')) + '</span>';
       card.innerHTML =
         '<div class="room-prev">' + prev + '<span class="room-live"><span class="live-dot"></span>' + rm.count + '</span></div>' +

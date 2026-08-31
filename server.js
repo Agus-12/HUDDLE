@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v31'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v32'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 2 * 60 * 60 * 1000; // salas vacías se borran a las 2 h
@@ -806,9 +806,15 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const name = String(body.name || '').trim().replace(/\s+/g, ' ');
       if (!NAME_RE.test(name)) return json(res, 400, { ok: false, error: 'Nombre inválido: 3-20 letras, números o _' });
+      const token = String(body.token || '');
       const key = name.toLowerCase();
       const existing = users.get(key);
       if (existing) {
+        /* v32: volver a entrar con un perfil guardado en este dispositivo */
+        if (token && existing.token === token) {
+          existing.lastSeenAt = Date.now(); saveUsers();
+          return json(res, 200, { ok: true, name: existing.name, token: existing.token, resumed: true });
+        }
         if (Date.now() - (existing.lastSeenAt || 0) > NAME_RECLAIM_MS) {
           existing.token = uid(); existing.lastSeenAt = Date.now(); saveUsers();
           return json(res, 200, { ok: true, name: existing.name, token: existing.token, reclaimed: true });
@@ -828,14 +834,16 @@ const server = http.createServer(async (req, res) => {
         .slice(0, 12)
         .map((r) => {
           const m = mirrors.get(r.code);
-          let watching = null, isMirror = false, frame = null;
-          if (m) { isMirror = true; watching = 'Espejando ' + hostOf(m.url || ''); frame = (m.frame && m.frame.d) || null; }
+          /* v32: sin fotograma en el lobby (volvió lenta la app) — solo el host
+           * del sitio espejado: la tarjeta muestra su logo */
+          let watching = null, isMirror = false, host = null;
+          if (m) { isMirror = true; host = hostOf(m.url || ''); watching = 'Espejando ' + host; }
           else if (r.videoTitle) watching = r.videoTitle;
           return {
             code: r.code,
             users: [...r.users.values()].slice(0, 8).map((u) => u.name),
             count: r.users.size,
-            watching, isMirror, frame,
+            watching, isMirror, host,
             since: r.createdAt,
           };
         });
