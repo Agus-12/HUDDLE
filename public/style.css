@@ -556,3 +556,14 @@ body.mirroring .picker { display: none; }
   body.mirroring .picker .picker-foot { display: none; }
   body.mirroring .picker #mirrorStopRow { display: flex; }
 }
+
+/* ---------- v20: el reproductor jamás mide más que la ventana ----------
+ * en horizontal, el 16:9 a todo ancho (448px) no cabía en la pantalla (~330px)
+ * y rompía el layout; ahora se encoge hasta caber */
+.video-shell { max-height: calc(100vh - 132px); max-height: calc(100dvh - 132px); }
+.video-shell:fullscreen, .video-shell:-webkit-full-screen,
+.video-shell.pseudo-fs { max-height: none; }
+
+/* v20: en horizontal los botones no caen bajo la muesca/notch del iPhone */
+#fitToggle { right: calc(14px + env(safe-area-inset-right, 0px)); }
+#fsExit { left: calc(14px + env(safe-area-inset-left, 0px)); }

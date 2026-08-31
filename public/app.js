@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v19';
+const APP_VERSION = 'v20';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -812,13 +812,22 @@ function exitFullscreen() {
   $('#fitToggleTxt').textContent = 'Llenar';
 }
 function enterPseudoFs() {
-  videoShellEl.classList.remove('fit-cover');
-  $('#fitToggleTxt').textContent = 'Llenar';
   videoShellEl.classList.add('pseudo-fs');
   document.body.classList.add('fs-lock');
 }
+/* v20: al entrar a pantalla completa, el ajuste ideal depende de la orientación:
+ * horizontal → llenar la pantalla (sin barras laterales); vertical → ver todo */
+function applyDefaultFsFit() {
+  const landscape = window.matchMedia('(orientation: landscape)').matches;
+  videoShellEl.classList.toggle('fit-cover', landscape);
+  $('#fitToggleTxt').textContent = landscape ? 'Ver todo' : 'Llenar';
+}
+window.addEventListener('orientationchange', () => {
+  if (fsActive()) setTimeout(applyDefaultFsFit, 200); // al girar, reajustar
+});
 function toggleFullscreen() {
   if (fsActive()) return exitFullscreen();
+  applyDefaultFsFit();
   const rf = videoShellEl.requestFullscreen || videoShellEl.webkitRequestFullscreen;
   if (rf) {
     const p = rf.call(videoShellEl);
