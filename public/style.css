@@ -567,3 +567,11 @@ body.mirroring .picker { display: none; }
 /* v20: en horizontal los botones no caen bajo la muesca/notch del iPhone */
 #fitToggle { right: calc(14px + env(safe-area-inset-right, 0px)); }
 #fsExit { left: calc(14px + env(safe-area-inset-left, 0px)); }
+
+/* ---------- v21: círculos decorativos fuera de TODA pantalla de celular ----------
+ * antes solo se ocultaban con ancho ≤700px, pero el celular en HORIZONTAL mide
+ * ~812px de ancho → los círculos se colaban por los lados como bandas feas */
+html { background: #0a0713; } /* borde a borde en la app instalada (viewport-fit=cover) */
+@media (max-width: 950px), (max-height: 520px) {
+  .blob { display: none !important; }
+}

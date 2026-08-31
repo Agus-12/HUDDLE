@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v20';
+const APP_VERSION = 'v21';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -579,6 +579,29 @@ $('#audioChip').addEventListener('click', async () => {
   if (ctx) { try { await ctx.resume(); } catch {} }
   $('#audioChip').classList.add('hidden');
 });
+
+/* ---------- v21: resync automático al volver a la app ----------
+ * cuando la app pasa al fondo (cambias de app, bloqueas el celular), iOS congela
+ * la página: el flujo de audio y frames del espejo se sigue generando en el
+ * servidor y llega viejo. Al volver, el cliente reproducía todo ese pasado
+ * atrasado → audio desfazado. Solución: si estuve fuera más de 2.5 s,
+ * reconecto el flujo (llega TODO fresco: estado, frames y audio desde AHORA)
+ * y limpio el colchón de audio viejo que quedó en el worklet. */
+let rrHiddenAt = 0;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { rrHiddenAt = Date.now(); return; }
+  const gap = rrHiddenAt ? Date.now() - rrHiddenAt : 0;
+  rrHiddenAt = 0;
+  if (S.code && S.es && gap > 2500) {
+    try { if (AU.node) AU.node.port.postMessage({ clear: true }); } catch {} // fuera audio viejo
+    try { S.es.close(); } catch {}
+    connect(S.code, localStorage.getItem('rr-nick') || 'Anónimo', {}); // mismo uid → sin duplicados
+  } else if (S.mirror.active && AU.needAudio && AU.ctx && AU.ctx.state === 'suspended') {
+    AU.ctx.resume().catch(() => {}); // ausencia corta: solo reactivar el audio
+  }
+});
+/* al volver desde el bfcache ( Safari "atrás" ) el estado puede ser fossils: recargar */
+window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); });
 
 /* clic sobre la página espejada → coordenadas de la página real */
 $('#mirrorImg').addEventListener('click', (e) => {
