@@ -527,3 +527,32 @@ body.mirroring .picker { display: none; }
   }
   .join-inline .btn { flex: 0 0 auto; }
 }
+
+/* ---------- v19: fila "unirme" — el botón .big ya no aplasta el input ---------- */
+.join-inline .btn { width: auto; flex: 0 0 auto; }
+
+/* v19: pantalla completa simulada llena DE VERDAD — sin barra ni pista del espejo */
+.video-shell.pseudo-fs .mirror-bar,
+.video-shell.pseudo-fs .mirror-hint { display: none !important; }
+#fitToggle, #fsExit { z-index: 60; }
+
+/* v19: en móvil la barra del espejo (URL/Ir/Detener) no roba espacio al reproductor;
+ * detener el espejo se hace desde las opciones (#mirrorStopRow) */
+#mirrorStopRow { display: none; }
+
+@media (max-width: 700px) {
+  /* unirme: input grande arriba, botón normal abajo (ya no conviven en una fila) */
+  .join-inline { flex-direction: column; }
+  .landing-card { padding: 26px 20px; }
+  h1 { font-size: 32px; }
+
+  .mirror-bar, .mirror-hint { display: none !important; }
+
+  /* mientras espeja: las opciones muestran solo la fila de detener el espejo */
+  body.mirroring .picker { display: block; }
+  body.mirroring .picker .picker-row,
+  body.mirroring .picker .samples,
+  body.mirroring .picker .divider,
+  body.mirroring .picker .picker-foot { display: none; }
+  body.mirroring .picker #mirrorStopRow { display: flex; }
+}

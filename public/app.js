@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v18';
+const APP_VERSION = 'v19';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -638,6 +638,11 @@ $('#btnMirrorStop').addEventListener('click', () => {
   if (S.canControl) sendAction({ type: 'mirror', op: 'stop' });
   else toast('Solo el anfitrión controla el espejo');
 });
+/* v19: en móvil la barra del espejo se oculta; este botón (en las opciones) la reemplaza */
+$('#btnMirrorStop2').addEventListener('click', () => {
+  if (S.canControl) sendAction({ type: 'mirror', op: 'stop' });
+  else toast('Solo el anfitrión controla el espejo');
+});
 
 /* detener el video en curso: devuelve las opciones de cargar/espejar */
 $('#btnStopVideo').addEventListener('click', () => {
@@ -673,6 +678,7 @@ function updateControlUi() {
   document.body.classList.toggle('playing', videoOn);
   $('#stopRow').classList.toggle('hidden', !videoOn);
   $('#btnStopVideo').disabled = !S.canControl;
+  $('#btnMirrorStop2').disabled = !S.canControl;
   $('#btnPlay').disabled = !S.canControl || !S.currentUrl || mirrorOn;
   $('#seek').disabled = !S.canControl || !S.currentUrl || mirrorOn;
   $('#btnLoad').disabled = !S.canControl || mirrorOn;
