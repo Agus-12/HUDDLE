@@ -608,21 +608,13 @@ body {
  * no arrastre la página nuestra sino la espejada); sin menú al mantener pulsado */
 #mirrorImg { touch-action: none; -webkit-touch-callout: none; }
 
-/* botón teclado (móvil con espejo activo) y su barra de escritura */
-.mirror-kb {
-  position: absolute; left: 12px;
-  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-  z-index: 20; display: none;
-}
+/* v29: barra de escritura (se abre sola al tocar un cuadro de texto espejado) */
 .mk-bar {
   position: absolute; left: 10px; right: 10px;
   bottom: calc(10px + env(safe-area-inset-bottom, 0px));
   z-index: 21; display: flex; gap: 8px;
 }
 .mk-bar .input { flex: 1; font-size: 16px; } /* 16px: iOS no hace zoom raro */
-@media (max-width: 980px) {
-  body.mirroring .mirror-kb { display: inline-flex; }
-}
 
 /* ---------- v28: tira de mensajes en pantalla completa (estilo Rave) ----------
  * delgada, abajo, semitransparente: el mensaje entra por la derecha con el

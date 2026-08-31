@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v28'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v29'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 2 * 60 * 60 * 1000; // salas vacías se borran a las 2 h
@@ -593,7 +593,23 @@ async function handleAction(req, res, body) {
       const m = mirrors.get(room.code);
       if (!m) return json(res, 404, { ok: false, error: 'El espejo no está activo' });
 
-      if (op === 'click') await m.page.mouse.click(Math.max(0, +action.x || 0), Math.max(0, +action.y || 0));
+      if (op === 'click') {
+        await m.page.mouse.click(Math.max(0, +action.x || 0), Math.max(0, +action.y || 0));
+        /* v29: ¿el toque dejó el foco en un cuadro de texto? (la página puede
+         * mover el foco un instante después: darle un momento) */
+        await new Promise((r) => setTimeout(r, 350));
+        let typing = false;
+        for (const fr of m.page.frames()) {
+          try {
+            typing = await fr.evaluate(() => {
+              const el = document.activeElement;
+              return !!(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable));
+            });
+          } catch {}
+          if (typing) break;
+        }
+        return json(res, 200, { ok: true, typing });
+      }
       else if (op === 'type') await m.page.keyboard.type(String(action.text || '').slice(0, 60));
       else if (op === 'press') await m.page.keyboard.press(String(action.key || 'Enter').slice(0, 20));
       else if (op === 'scroll') await m.page.mouse.wheel({ deltaY: +action.deltaY || 0 });

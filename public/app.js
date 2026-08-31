@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v28';
+const APP_VERSION = 'v29';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -206,7 +206,11 @@ async function sendAction(action) {
         headers: Object.assign({ 'Content-Type': 'application/json' }, EXTRA_HEADERS),
         body: JSON.stringify({ room: S.code, userId: S.userId, action }),
       });
-      if (r.ok) return { ok: true }; // entregada
+      if (r.ok) {
+        /* v29: devolver el cuerpo completo (trae datos como typing del espejo) */
+        const d = await r.json().catch(() => null);
+        return (d && typeof d === 'object') ? d : { ok: true };
+      }
       const d = await r.json().catch(() => null);
       if (d && d.error) return falla(d.error); // error de lógica del servidor
       console.warn('[Huddle] POST devolvió HTTP ' + r.status + ' sin formato conocido; probando GET…');
@@ -224,7 +228,8 @@ async function sendAction(action) {
     if (r2.ok) {
       if (!S.useGet) console.log('[Huddle] usando GET para acciones (POST bloqueado)');
       S.useGet = true;
-      return { ok: true };
+      const d2 = await r2.json().catch(() => null);
+      return (d2 && typeof d2 === 'object') ? d2 : { ok: true };
     }
     const d2 = await r2.json().catch(() => null);
     if (d2 && d2.error) return falla(d2.error);
@@ -405,6 +410,7 @@ function applyMirrorState(ms) {
     try { const c = $('#mirrorImg'); c.getContext('2d').clearRect(0, 0, c.width, c.height); } catch {}
     $('#mirrorLoading').classList.add('hidden');
     stopMirrorAudio();
+    cerrarTecladoEspejo(); // v29: sin espejo no hay teclado abierto
   }
   updateControlUi();
   updateBadge();
@@ -667,36 +673,49 @@ window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload();
     if (t > 600) return; // presión larga sin mover: ignorar
     if (!S.canControl) { toast('Solo el anfitrión controla el espejo'); return; }
     const p = toPage(e.clientX, e.clientY);
-    if (p) sendAction({ type: 'mirror', op: 'click', x: p.x, y: p.y });
+    if (!p) return;
+    /* v29: el servidor contesta si el toque dejó el foco en un cuadro de
+     * texto de la página → abrimos (o cerramos) el teclado automáticamente */
+    sendAction({ type: 'mirror', op: 'click', x: p.x, y: p.y })
+      .then((r) => {
+        if (!r || typeof r.typing !== 'boolean') return;
+        if (r.typing) abrirTecladoEspejo();
+        else cerrarTecladoEspejo();
+      })
+      .catch(() => {});
   };
   img.addEventListener('pointerup', soltar);
   img.addEventListener('pointercancel', () => { pStart = null; last = null; pid = null; dragging = false; accDy = 0; });
 })();
 
-/* v27: teclado del celular → escribir en la página espejada */
-$('#mirrorKb').addEventListener('click', () => {
-  $('#mkBar').classList.remove('hidden');
+/* v29: teclado inteligente — sin botón: se abre solo cuando el toque cayó en
+ * un cuadro de texto de la página espejada y se cierra al tocar otra cosa */
+let mkPrevio = '';
+function abrirTecladoEspejo() {
+  /* en escritorio manda el teclado físico directo: nada que abrir */
+  if (!window.matchMedia('(pointer: coarse)').matches && window.innerWidth > 980) return;
   const inp = $('#mirrorKeys');
-  inp.value = ''; inp.focus();
-});
-$('#mkDone').addEventListener('click', () => {
+  $('#mkBar').classList.remove('hidden');
+  inp.value = ''; mkPrevio = '';
+  inp.focus(); // si el navegador lo permite, el teclado del celular sube solo
+}
+function cerrarTecladoEspejo() {
   $('#mkBar').classList.add('hidden');
   $('#mirrorKeys').blur();
-  $('#mirrorLayer').focus();
-});
+}
+$('#mkDone').addEventListener('click', cerrarTecladoEspejo);
 (function () {
-  let previo = '';
   const inp = $('#mirrorKeys');
   inp.addEventListener('input', () => {
     if (!S.mirror.active || !S.canControl) return;
     const v = inp.value;
-    if (v.length > previo.length) {
-      for (const ch of v.slice(previo.length)) sendAction({ type: 'mirror', op: 'type', text: ch });
+    if (v.length > mkPrevio.length) {
+      for (const ch of v.slice(mkPrevio.length)) sendAction({ type: 'mirror', op: 'type', text: ch });
     } else {
-      for (let i = v.length; i < previo.length; i++) sendAction({ type: 'mirror', op: 'press', key: 'Backspace' });
+      for (let i = v.length; i < mkPrevio.length; i++) sendAction({ type: 'mirror', op: 'press', key: 'Backspace' });
     }
-    previo = v;
-    if (v.length > 40) { inp.value = ''; previo = ''; } // que no crezca sin fin
+    mkPrevio = v;
+    if (v.length > 40) { inp.value = ''; mkPrevio = ''; } // que no crezca sin fin
   });
   inp.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
