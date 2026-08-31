@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v23';
+const APP_VERSION = 'v24';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -759,6 +759,8 @@ function addChat(msg) {
     div.appendChild(b); div.appendChild(sp);
   }
   log.appendChild(div);
+  /* v24: no acumular mensajes viejos en pantalla (el servidor igual guarda 100) */
+  while (log.children.length > 80) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
 }
 

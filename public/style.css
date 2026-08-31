@@ -594,3 +594,10 @@ body {
 .video-shell:-webkit-full-screen #fsExit { top: calc(12px + env(safe-area-inset-top, 0px)); }
 /* toasts: no chocar con la barrita de inicio (gesture bar) */
 .toasts { bottom: calc(22px + env(safe-area-inset-bottom, 0px)); }
+
+/* ---------- v24: el chat ya no crece sin fin en celular ----------
+ * cada mensaje estiraba la tarjeta más y más; ahora la tarjeta tiene tope
+ * (~6 mensajes visibles) y los viejos quedan arriba, accesibles con scroll */
+@media (max-width: 980px) {
+  .chat-card { max-height: 340px; min-height: 200px; }
+}
