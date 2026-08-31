@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v21';
+const APP_VERSION = 'v22';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -928,17 +928,20 @@ $('#chatForm').addEventListener('submit', (e) => {
 
 $('#btnCopy').addEventListener('click', async () => {
   const link = location.origin + '/#' + S.code;
+  /* v22: mensaje listo para pegar — el link SOLO en su línea hace que
+   * WhatsApp lo reconozca como link (dominio + https, ver GUIA-HTTPS.md) */
+  const msg = `¡Únete a mi sala en Huddle! 🎬\n${link}`;
   let ok = false;
   try {
     const ta = document.createElement('textarea');
-    ta.value = link;
+    ta.value = msg;
     ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.opacity = '0';
     document.body.appendChild(ta);
     ta.focus(); ta.select();
     ok = document.execCommand('copy');
     ta.remove();
   } catch {}
-  if (!ok) { try { await navigator.clipboard.writeText(link); ok = true; } catch {} }
+  if (!ok) { try { await navigator.clipboard.writeText(msg); ok = true; } catch {} }
   toast(ok ? 'Invitación copiada — pégala en WhatsApp o donde quieras' : 'Tu invitación: ' + link, ok ? 3600 : 8000);
 });
 
