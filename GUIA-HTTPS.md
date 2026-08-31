@@ -1,4 +1,4 @@
-# 🌐 Huddle con HTTPS y dominio propio (2 minutos, gratis)
+# 🌐 Huddle con HTTPS y dominio propio (gratis)
 
 ## ¿Por qué?
 
@@ -9,7 +9,7 @@ http://158.101.12.34:3000/#ABC12
 **WhatsApp no convierte eso en link** (no es un dominio, y no tiene HTTPS), así que
 llega como texto plano y nadie puede tocarlo. Con un dominio y HTTPS queda así:
 ```
-https://mi-huddle.duckdns.org/#ABC12
+https://158-101-12-34.sslip.io/#ABC12
 ```
 → llega como **link tocable con tarjetita de vista previa** 🎉
 
@@ -18,13 +18,7 @@ y la pantalla completa funciona mejor en algunos navegadores.
 
 ---
 
-## Paso 1 · Crea tu subdominio gratis (1 minuto)
-
-1. Entra a **https://duckdns.org** e inicia sesión con Google o GitHub
-2. En el recuadro crea un subdominio, por ejemplo `mi-huddle`
-3. Copia tu **token** (cadena larga que aparece arriba a la izquierda)
-
-## Paso 2 · Abre los puertos 80 y 443 en Oracle (1 minuto)
+## Paso 1 · Abre los puertos 80 y 443 en Oracle (1 minuto)
 
 En la consola de Oracle Cloud:
 
@@ -37,23 +31,38 @@ En la consola de Oracle Cloud:
 
 *(son los mismos pasos que seguiste para abrir el 3000 cuando instalaste)*
 
-## Paso 3 · Corre el script (1 minuto)
+## Paso 2 · Elige tu modo
 
-En tu servidor:
+### 🅰️ Modo AUTO — sin cuentas, sin páginas externas (recomendado)
 
 ```bash
 cd ~/HUDDLE && git pull
+sudo bash deploy/oracle/https.sh auto
+```
+
+Detecta tu IP y arma el dominio solo: `https://158-101-12-34.sslip.io`
+(sslip.io es un DNS público que convierte IPs en dominios — gratis, sin registro).
+
+- Si sslip.io está saturado, el script intenta automáticamente con `nip.io` (equivalente)
+- ¿Cambió tu IP? Corre el script de nuevo y listo
+
+### 🅱️ Modo DUCKDNS — nombre más bonito (si el auto no te convence)
+
+1. Entra a **https://duckdns.org** e inicia sesión con Google o GitHub
+   - *(si no abre: prueba con datos móviles en vez de WiFi, o cambia tu DNS a 1.1.1.1 — el sitio suele estar arriba)*
+2. Crea un subdominio, por ejemplo `mi-huddle`
+3. Copia tu **token** y corre:
+
+```bash
 sudo bash deploy/oracle/https.sh mi-huddle.duckdns.org TU_TOKEN
 ```
 
-Si todo sale bien verás **✅ ¡LISTO!** y tu Huddle quedará en `https://mi-huddle.duckdns.org`.
-
 ## Después de instalar
 
-- Entra **desde el nuevo dominio** y comparte las salas desde ahí
+- Entra **desde el nuevo dominio** (`https://...`) y comparte las salas desde ahí
 - El puerto 3000 viejo sigue funcionando por si acaso; cuando confirmes
   que el dominio te gusta, puedes cerrar el 3000 en la Security List
-- DuckDNS renueva tu IP solo; el certificado HTTPS se renueva solo (Caddy)
+- El certificado HTTPS se renueva solo (Caddy)
 - ¿Se te olvidó la IP? No importa: el dominio siempre apunta a tu servidor
 
 ## Si algo falla
@@ -63,7 +72,7 @@ Si todo sale bien verás **✅ ¡LISTO!** y tu Huddle quedará en `https://mi-hu
 journalctl -u caddy --no-pager | tail -30
 
 # probar a mano
-curl -v https://mi-huddle.duckdns.org/api/health
+curl -v https://TU-DOMINIO/api/health
 ```
 
-Lo más común: olvidar abrir 80/443 en la **Security List de Oracle** (paso 2).
+Lo más común: olvidar abrir 80/443 en la **Security List de Oracle** (paso 1).
