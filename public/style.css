@@ -32,15 +32,29 @@ input { font-family: inherit; }
   position: fixed; border-radius: 50%; filter: blur(90px);
   opacity: 0.35; pointer-events: none; z-index: 0;
 }
-.blob-a { width: 480px; height: 480px; background: var(--pink); top: -140px; left: -120px; animation: float1 14s ease-in-out infinite alternate; }
-.blob-b { width: 420px; height: 420px; background: var(--cyan); bottom: -140px; right: -100px; animation: float2 17s ease-in-out infinite alternate; }
+.blob-a { width: 520px; height: 520px; background: var(--violet); top: -160px; left: -140px; animation: float1 16s ease-in-out infinite alternate; }
+.blob-b { width: 460px; height: 460px; background: var(--cyan); bottom: -160px; right: -120px; animation: float2 19s ease-in-out infinite alternate; }
+.blob-c { width: 380px; height: 380px; background: #3b82f6; top: 40%; left: 55%; animation: float3 23s ease-in-out infinite alternate; }
 
 /* en pantallas chicas los blobs se ven como una franja fea: fuera */
 @media (max-width: 700px) {
   .blob { display: none; }
 }
-@keyframes float1 { to { transform: translate(120px, 90px) scale(1.15); } }
-@keyframes float2 { to { transform: translate(-110px, -80px) scale(1.1); } }
+@keyframes float1 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(140px, 80px) scale(1.18); }
+  100% { transform: translate(60px, 160px) scale(1.05); }
+}
+@keyframes float2 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-120px, -90px) scale(1.15); }
+  100% { transform: translate(-50px, -150px) scale(1.08); }
+}
+@keyframes float3 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-160px, 60px) scale(1.2); }
+  100% { transform: translate(80px, -120px) scale(1.1); }
+}
 
 /* ---------- pantalla de inicio ---------- */
 .screen.landing, #landing {
@@ -642,3 +656,51 @@ body {
 }
 #msgTickerName { color: var(--cyan); font-size: 14px; }
 #msgTickerBody { color: var(--txt); font-size: 14px; }
+
+
+/* ---------- v31: identidad + salas en vivo ---------- */
+#profileBox { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.profile-chip {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin-bottom: 8px;
+}
+.profile-hi { font-size: 15px; color: var(--dim); }
+.profile-hi b { color: var(--txt); }
+.rooms-head {
+  display: flex; align-items: center; gap: 8px;
+  margin: 20px 0 10px;
+  color: var(--dim); font-size: 11.5px; font-weight: 700;
+  letter-spacing: 1.5px; text-transform: uppercase;
+}
+.rooms-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px; max-height: 320px; overflow-y: auto; padding-right: 4px;
+}
+.room-card {
+  text-align: left; padding: 0; cursor: pointer; color: var(--txt);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.room-card:hover { border-color: var(--cyan); transform: translateY(-2px); }
+.room-prev {
+  position: relative; aspect-ratio: 16 / 9; background: #0c0817;
+  display: flex; align-items: center; justify-content: center;
+}
+.room-prev img { width: 100%; height: 100%; object-fit: cover; }
+.room-emoji { font-size: 34px; }
+.room-live {
+  position: absolute; top: 8px; right: 8px;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(10, 7, 19, 0.82); border-radius: 999px;
+  padding: 3px 9px; font-size: 11.5px; font-weight: 700;
+}
+.room-info { padding: 9px 11px 11px; }
+.room-watch {
+  font-size: 13px; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.room-users {
+  font-size: 11.5px; color: var(--dim); margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}

@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v30'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v31'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 2 * 60 * 60 * 1000; // salas vacías se borran a las 2 h
@@ -76,6 +76,27 @@ function guessTitle(url) {
 /* ---------------------- salas ---------------------- */
 
 const rooms = new Map(); // code -> room
+
+/* ---------------------- usuarios (v31) ----------------------
+ * registro global de nombres ÚNICOS, persistido en data/users.json.
+ * sin contraseñas: el token vive en el dispositivo del usuario;
+ * un nombre sin uso por 30 días puede ser reclamado por otro. */
+const DATA_DIR = path.join(__dirname, 'data');
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+const users = new Map(); // nombreLower -> { name, token, createdAt, lastSeenAt }
+try {
+  const raw = JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+  for (const [k, v] of Object.entries(raw || {})) users.set(k, v);
+} catch {}
+function saveUsers() {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(USERS_FILE, JSON.stringify(Object.fromEntries(users)));
+  } catch (e) { console.warn('⚠️ no pude guardar usuarios:', e.message); }
+}
+const NAME_RE = /^[\p{L}\p{N}_ ]{3,20}$/u;
+const NAME_RECLAIM_MS = 30 * 24 * 3600 * 1000;
+function hostOf(u) { try { return new URL(u).host.replace(/^www\./, ''); } catch { return String(u).slice(0, 30); } }
 
 function getOrCreateRoom(code) {
   if (rooms.has(code)) return rooms.get(code);
@@ -417,7 +438,16 @@ const SSE_HEADERS = {
 function handleEvents(req, res, url) {
   const code = (url.searchParams.get('room') || '').toUpperCase();
   const uidParam = url.searchParams.get('uid') || '';
-  const name = (url.searchParams.get('name') || '').trim().slice(0, 20) || 'Anónimo';
+  const name = (url.searchParams.get('name') || '').trim().slice(0, 20);
+  const tok = url.searchParams.get('tok') || '';
+  const urec = users.get(name.toLowerCase());
+  if (!name || !urec || urec.token !== tok) {
+    res.writeHead(200, SSE_HEADERS);
+    send(res, 'badName', { error: 'Nombre de usuario no válido — vuelve a entrar' });
+    res.end();
+    return;
+  }
+  urec.lastSeenAt = Date.now();
 
   if (!/^[A-Z0-9]{4,8}$/.test(code)) { res.writeHead(400); res.end('código de sala inválido'); return; }
 
@@ -771,6 +801,45 @@ const server = http.createServer(async (req, res) => {
         srvVersion: UI_VERSION,
         room: { code: room.code, users: usersOf(room), state: stateOf(room), mirror: mirrorState(room) },
       });
+    }
+    if (url.pathname === '/api/login' && req.method === 'POST') {
+      const body = await readBody(req);
+      const name = String(body.name || '').trim().replace(/\s+/g, ' ');
+      if (!NAME_RE.test(name)) return json(res, 400, { ok: false, error: 'Nombre inválido: 3-20 letras, números o _' });
+      const key = name.toLowerCase();
+      const existing = users.get(key);
+      if (existing) {
+        if (Date.now() - (existing.lastSeenAt || 0) > NAME_RECLAIM_MS) {
+          existing.token = uid(); existing.lastSeenAt = Date.now(); saveUsers();
+          return json(res, 200, { ok: true, name: existing.name, token: existing.token, reclaimed: true });
+        }
+        return json(res, 409, { ok: false, error: 'Ese nombre ya está tomado — elige otro' });
+      }
+      const rec = { name, token: uid(), createdAt: Date.now(), lastSeenAt: Date.now() };
+      users.set(key, rec); saveUsers();
+      console.log(`[usuarios] + ${name}`);
+      return json(res, 200, { ok: true, name, token: rec.token });
+    }
+    if (url.pathname === '/api/rooms') {
+      /* v31: salas en vivo con gente, qué ven y preview del espejo (estilo Rave) */
+      const list = [...rooms.values()]
+        .filter((r) => r.users.size > 0)
+        .sort((a, b) => b.users.size - a.users.size)
+        .slice(0, 12)
+        .map((r) => {
+          const m = mirrors.get(r.code);
+          let watching = null, isMirror = false, frame = null;
+          if (m) { isMirror = true; watching = 'Espejando ' + hostOf(m.url || ''); frame = (m.frame && m.frame.d) || null; }
+          else if (r.videoTitle) watching = r.videoTitle;
+          return {
+            code: r.code,
+            users: [...r.users.values()].slice(0, 8).map((u) => u.name),
+            count: r.users.size,
+            watching, isMirror, frame,
+            since: r.createdAt,
+          };
+        });
+      return json(res, 200, { ok: true, rooms: list, srvVersion: UI_VERSION });
     }
     if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size });
     return serveStatic(req, res, url.pathname);

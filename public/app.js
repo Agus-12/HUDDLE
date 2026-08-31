@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v30';
+const APP_VERSION = 'v31';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -34,6 +34,7 @@ const SYNC_TOLERANCE = 0.75; // segundos de desvío antes de re-sincronizar
 
 const S = {
   code: null,
+  profile: null,
   userId: null,
   room: null,
   es: null,
@@ -104,11 +105,12 @@ function maybeReload(srvVersion) {
 
 /* ======================= conexión / protocolo ======================= */
 
-function connect(code, nick, opts = {}) {
+function connect(code, opts = {}) {
+  if (!S.profile) { showScreen('landing'); initLanding(); toast('Primero elige tu nombre de usuario'); return; }
   S.code = code.toUpperCase();
   const uid = sessionStorage.getItem('rr-uid-' + S.code) || '';
   const extra = opts.mustExist ? '&join=1' : ''; // Unirme: la sala debe existir ya
-  const es = new EventSource(`/api/events?room=${S.code}&name=${encodeURIComponent(nick)}&uid=${encodeURIComponent(uid)}&v=${APP_VERSION}${extra}`);
+  const es = new EventSource(`/api/events?room=${S.code}&name=${encodeURIComponent(S.profile.name)}&tok=${encodeURIComponent(S.profile.token)}&uid=${encodeURIComponent(uid)}&v=${APP_VERSION}${extra}`);
   S.es = es;
 
   es.addEventListener('noRoom', (e) => {
@@ -116,12 +118,19 @@ function connect(code, nick, opts = {}) {
     toast('No encontramos esa sala — revisa el código', 5000);
   });
 
+  es.addEventListener('badName', (e) => { // v31: el nombre dejó de ser válido
+    try { es.close(); } catch {}
+    S.profile = null;
+    localStorage.removeItem('rr-profile');
+    initLanding();
+    toast('Tu nombre de usuario ya no es válido — elige otro', 6000);
+  });
+
   es.addEventListener('hello', (e) => {
     const d = JSON.parse(e.data);
     S.userId = d.userId;
     sessionStorage.setItem('rr-uid-' + S.code, S.userId);
     S.room = d.room;
-    localStorage.setItem('rr-nick', nick);
 
     $('#chatLog').innerHTML = '';
     (d.room.chat || []).forEach(addChat);
@@ -256,7 +265,7 @@ async function pollRoom() {
     if (rm.users && !rm.users.some((u) => u.id === S.userId)) {
       console.warn('[Huddle] desconectado de la sala; reconectando…');
       try { if (S.es) S.es.close(); } catch {}
-      connect(S.code, localStorage.getItem('rr-nick') || 'Anónimo');
+      connect(S.code);
       return;
     }
 
@@ -592,7 +601,7 @@ document.addEventListener('visibilitychange', () => {
   if (S.code && S.es && gap > 2500) {
     try { if (AU.node) AU.node.port.postMessage({ clear: true }); } catch {} // fuera audio viejo
     try { S.es.close(); } catch {}
-    connect(S.code, localStorage.getItem('rr-nick') || 'Anónimo', {}); // mismo uid → sin duplicados
+    connect(S.code, {}); // mismo uid → sin duplicados
   } else if (S.mirror.active && AU.needAudio && AU.ctx && AU.ctx.state === 'suspended') {
     AU.ctx.resume().catch(() => {}); // ausencia corta: solo reactivar el audio
   }
@@ -1080,29 +1089,103 @@ $('#btnLeave').addEventListener('click', () => {
   location.reload();
 });
 
-/* ======================= pantalla de inicio ======================= */
+/* ======================= pantalla de inicio (v31) =======================
+ * identidad: nombre de usuario único recordado por dispositivo */
 
-function getNick() {
-  return $('#nick').value.trim() || 'Invitado' + Math.floor(100 + Math.random() * 900);
+const escapeHtml = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function loadProfile() {
+  try { return JSON.parse(localStorage.getItem('rr-profile') || 'null') || null; } catch { return null; }
 }
 
+function initLanding() {
+  S.profile = loadProfile();
+  const tiene = !!S.profile;
+  $('#profileBox').classList.toggle('hidden', tiene);
+  $('#homeBox').classList.toggle('hidden', !tiene);
+  if (tiene) {
+    $('#profileName').textContent = S.profile.name;
+    const av = $('#profileAvatar');
+    av.textContent = (S.profile.name[0] || '?').toUpperCase();
+    av.style.setProperty('--h', hashHue(S.profile.name));
+    pollRooms();
+  } else {
+    try { $('#userNick').focus(); } catch {}
+  }
+}
+
+async function loginNombre() {
+  const name = $('#userNick').value.trim().replace(/\s+/g, ' ');
+  if (name.length < 3) { toast('El nombre necesita al menos 3 letras'); return; }
+  $('#btnLogin').disabled = true;
+  try {
+    const r = await fetch('/api/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) { toast(d.error || 'No se pudo registrar el nombre'); return; }
+    S.profile = { name: d.name, token: d.token };
+    localStorage.setItem('rr-profile', JSON.stringify(S.profile));
+    initLanding();
+    toast(d.reclaimed ? `¡Bienvenido de vuelta, ${d.name}!` : `¡Listo, ${d.name}! Ese nombre es tuyo 🎉`, 4200);
+  } catch { toast('Sin conexión con el servidor'); }
+  finally { $('#btnLogin').disabled = false; }
+}
+$('#btnLogin').addEventListener('click', loginNombre);
+$('#userNick').addEventListener('keydown', (e) => { if (e.key === 'Enter') loginNombre(); });
+$('#btnSwitch').addEventListener('click', () => {
+  S.profile = null;
+  localStorage.removeItem('rr-profile');
+  initLanding();
+});
+
+/* ---- salas en vivo con preview (estilo Rave) ---- */
+let roomsTimer = null;
+async function pollRooms() {
+  const landing = $('#landing');
+  if (!landing || landing.classList.contains('hidden')) return;
+  try {
+    const r = await fetch('/api/rooms');
+    const d = await r.json();
+    if (!d.ok) return;
+    const box = $('#liveRooms');
+    box.innerHTML = '';
+    $('#noRooms').classList.toggle('hidden', (d.rooms || []).length > 0);
+    (d.rooms || []).forEach((rm) => {
+      const card = document.createElement('button');
+      card.className = 'room-card';
+      const prev = rm.frame
+        ? '<img src="' + rm.frame + '" alt="">'
+        : '<span class="room-emoji">' + (rm.isMirror ? '🪞' : (rm.watching ? '🎬' : '💬')) + '</span>';
+      card.innerHTML =
+        '<div class="room-prev">' + prev + '<span class="room-live"><span class="live-dot"></span>' + rm.count + '</span></div>' +
+        '<div class="room-info">' +
+          '<div class="room-watch">' + (rm.watching ? escapeHtml(rm.watching) : 'Solo charlando') + '</div>' +
+          '<div class="room-users">' + rm.users.map(escapeHtml).join(' · ') + '</div>' +
+        '</div>';
+      card.addEventListener('click', () => connect(rm.code, { mustExist: true }));
+      box.appendChild(card);
+    });
+  } catch {}
+}
+roomsTimer = setInterval(pollRooms, 5000);
+
 $('#btnCreate').addEventListener('click', () => {
+  if (!S.profile) { toast('Primero elige tu nombre de usuario'); initLanding(); return; }
   const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
-  connect(code, getNick());
+  connect(code);
 });
 
 function joinFromInput() {
   const code = $('#joinCode').value.trim().toUpperCase();
   if (!/^[A-Z0-9]{4,8}$/.test(code)) { toast('Código inválido (4-8 letras/números)'); return; }
-  connect(code, getNick(), { mustExist: true });
+  connect(code, { mustExist: true });
 }
 $('#btnJoin').addEventListener('click', joinFromInput);
 $('#joinCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinFromInput(); });
 
 /* estado inicial */
-$('#nick').value = localStorage.getItem('rr-nick') || '';
+initLanding();
 const hashMatch = /^#([A-Za-z0-9]{4,8})$/.exec(location.hash);
-if (hashMatch) {
-  $('#joinCode').value = hashMatch[1].toUpperCase();
-  $('#nick').focus();
-}
+if (hashMatch) $('#joinCode').value = hashMatch[1].toUpperCase();

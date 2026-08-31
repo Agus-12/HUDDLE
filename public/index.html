@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
-<link rel="stylesheet" href="/style.css?v=30">
+<link rel="stylesheet" href="/style.css?v=31">
 <script defer src="/vendor/hls.min.js"></script>
 </head>
 <body>
@@ -20,6 +20,7 @@
   <div id="landing" class="screen">
     <div class="blob blob-a"></div>
     <div class="blob blob-b"></div>
+    <div class="blob blob-c"></div>
     <div class="card landing-card">
       <div class="logo-big">
 <img src="/carita.png" class="carita-big" alt="Carita de Huddle">
@@ -27,20 +28,40 @@
       <h1 class="landing-title"><img src="/logo-letras.png" class="logo-letras" alt="Huddle"></h1>
       <p class="tagline">Crea una sala, comparte el link y mira videos <b>sincronizados</b> con tu gente — tu propio cine en línea.</p>
 
-      <input id="nick" class="input" placeholder="Tu nombre o apodo" maxlength="20" autocomplete="off">
-
-      <div class="join-row">
-        <button id="btnCreate" class="btn primary big">
-          <svg class="icon icon-16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9z"/><path d="M19 15l.9 2.6 2.6.9-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9z" opacity=".7"/></svg>
-          Crear sala
+      <!-- v31: identidad — tu nombre de usuario es tuyo, único y te recuerda -->
+      <div id="profileBox" class="hidden">
+        <input id="userNick" class="input" placeholder="Elige tu nombre de usuario" maxlength="20" autocomplete="off">
+        <button id="btnLogin" class="btn primary big">
+          <svg class="icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/></svg>
+          Entrar
         </button>
-        <div class="or">o únete con código</div>
-        <div class="join-inline">
-          <input id="joinCode" class="input code" placeholder="ABC12" maxlength="8" autocomplete="off" spellcheck="false" autocapitalize="characters" autocorrect="off">
-          <button id="btnJoin" class="btn big">Unirme</button>
-        </div>
+        <p class="hint">Nadie más puede usar tu nombre — y te recordamos en este dispositivo</p>
       </div>
-      <p class="hint">Soporta videos directos (.mp4 / .webm) y streams HLS (.m3u8)</p>
+
+      <!-- v31: menú principal (con sesión iniciada) -->
+      <div id="homeBox" class="hidden">
+        <div class="profile-chip">
+          <span id="profileAvatar" class="avatar">?</span>
+          <span class="profile-hi">Hola, <b id="profileName"></b></span>
+          <button id="btnSwitch" class="btn small ghost" title="Usar otro nombre">cambiar</button>
+        </div>
+        <div class="join-row">
+          <button id="btnCreate" class="btn primary big">
+            <svg class="icon icon-16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9z"/><path d="M19 15l.9 2.6 2.6.9-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9z" opacity=".7"/></svg>
+            Crear sala
+          </button>
+          <div class="or">o únete con código</div>
+          <div class="join-inline">
+            <input id="joinCode" class="input code" placeholder="ABC12" maxlength="8" autocomplete="off" spellcheck="false" autocapitalize="characters" autocorrect="off">
+            <button id="btnJoin" class="btn big">Unirme</button>
+          </div>
+        </div>
+
+        <!-- v31: salas en vivo ahora, con preview de lo que ven -->
+        <div class="rooms-head"><span class="live-dot"></span> En vivo ahora</div>
+        <div id="liveRooms" class="rooms-grid"></div>
+        <p id="noRooms" class="hint hidden">No hay nadie en salas por ahora — crea la tuya y comparte el link 👀</p>
+      </div>
     </div>
   </div>
 
@@ -49,7 +70,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v30</span>
+        <span class="ver" id="verBadge">v31</span>
       </div>
       <div class="top-actions">
         <span id="connBadge" class="conn ok"><span class="live-dot"></span><span id="connText">En vivo</span></span>
@@ -223,6 +244,6 @@
   </div>
 
   <div id="toasts" class="toasts"></div>
-  <script src="/app.js?v=30"></script>
+  <script src="/app.js?v=31"></script>
 </body>
 </html>
