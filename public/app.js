@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v26';
+const APP_VERSION = 'v27';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -603,30 +603,114 @@ document.addEventListener('visibilitychange', () => {
 /* al volver desde el bfcache ( Safari "atrás" ) el estado puede ser fossils: recargar */
 window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload(); });
 
-/* clic sobre la página espejada → coordenadas de la página real */
-$('#mirrorImg').addEventListener('click', (e) => {
-  // cualquier clic es un gesto de usuario: desbloquea el audio si estaba pendiente
-  if (S.mirror.active && AU.needAudio && AU.ctx && AU.ctx.state === 'suspended') {
-    AU.ctx.resume().catch(() => {});
-    $('#audioChip').classList.add('hidden');
-  }
-  if (!S.mirror.active) return;
-  if (!S.canControl) { toast('Solo el anfitrión controla el espejo'); return; }
-  const img = e.target;
-  const rect = img.getBoundingClientRect();
-  // la imagen usa object-fit: contain → calculamos el área realmente visible
-  const scale = Math.min(rect.width / S.mirror.w, rect.height / S.mirror.h);
-  const drawW = S.mirror.w * scale, drawH = S.mirror.h * scale;
-  const offX = (rect.width - drawW) / 2, offY = (rect.height - drawH) / 2;
-  const px = e.clientX - rect.left - offX, py = e.clientY - rect.top - offY;
-  if (px < 0 || py < 0 || px > drawW || py > drawH) return; // clic en el borde negro
-  const x = Math.round(px / scale), y = Math.round(py / scale);
-  sendAction({ type: 'mirror', op: 'click', x, y });
+/* v27: navegación del espejo unificada — TOCAR = clic, ARRASTRAR = desplazarse
+ * (antes solo había clic y rueda del mouse: en celular era imposible moverse) */
+(function () {
+  const img = $('#mirrorImg');
+  let pStart = null, last = null, dragging = false, accDy = 0, lastSent = 0, pid = null;
+
+  const unlockAudio = () => {
+    if (S.mirror.active && AU.needAudio && AU.ctx && AU.ctx.state === 'suspended') {
+      AU.ctx.resume().catch(() => {});
+      $('#audioChip').classList.add('hidden');
+    }
+  };
+  const toPage = (cx, cy) => {
+    if (!S.mirror.w || !S.mirror.h) return null;
+    const rect = img.getBoundingClientRect();
+    const scale = Math.min(rect.width / S.mirror.w, rect.height / S.mirror.h);
+    const drawW = S.mirror.w * scale, drawH = S.mirror.h * scale;
+    const offX = (rect.width - drawW) / 2, offY = (rect.height - drawH) / 2;
+    const px = cx - rect.left - offX, py = cy - rect.top - offY;
+    if (px < 0 || py < 0 || px > drawW || py > drawH) return null; // borde negro
+    return { x: Math.round(px / scale), y: Math.round(py / scale), scale };
+  };
+
+  img.addEventListener('pointerdown', (e) => {
+    if (!S.mirror.active) return;
+    pid = e.pointerId;
+    pStart = { x: e.clientX, y: e.clientY, t: Date.now() };
+    last = { x: e.clientX, y: e.clientY };
+    dragging = false; accDy = 0; lastSent = 0;
+  });
+
+  img.addEventListener('pointermove', (e) => {
+    if (pStart === null || e.pointerId !== pid) return;
+    if (!dragging && Math.hypot(e.clientX - pStart.x, e.clientY - pStart.y) > 12) {
+      dragging = true;
+      try { img.setPointerCapture(pid); } catch {}
+    }
+    if (!dragging) return;
+    const rect = img.getBoundingClientRect();
+    const scale = (S.mirror.w && S.mirror.h) ? Math.min(rect.width / S.mirror.w, rect.height / S.mirror.h) : 1;
+    accDy += -(e.clientY - last.y) / scale; // dedo arriba → página baja (scroll natural)
+    last = { x: e.clientX, y: e.clientY };
+    const now = Date.now();
+    if (now - lastSent > 90 && Math.abs(accDy) >= 10) {
+      sendAction({ type: 'mirror', op: 'scroll', deltaY: Math.round(accDy) });
+      accDy = 0; lastSent = now;
+    }
+  });
+
+  const soltar = (e) => {
+    if (pStart === null || e.pointerId !== pid) return;
+    const fueArrastre = dragging;
+    const t = Date.now() - pStart.t;
+    pStart = null; last = null; pid = null;
+    if (fueArrastre) {
+      if (Math.abs(accDy) >= 10 && S.canControl) sendAction({ type: 'mirror', op: 'scroll', deltaY: Math.round(accDy) });
+      accDy = 0;
+      return; // fue desplazamiento, no clic
+    }
+    unlockAudio();
+    if (!S.mirror.active) return;
+    if (t > 600) return; // presión larga sin mover: ignorar
+    if (!S.canControl) { toast('Solo el anfitrión controla el espejo'); return; }
+    const p = toPage(e.clientX, e.clientY);
+    if (p) sendAction({ type: 'mirror', op: 'click', x: p.x, y: p.y });
+  };
+  img.addEventListener('pointerup', soltar);
+  img.addEventListener('pointercancel', () => { pStart = null; last = null; pid = null; dragging = false; accDy = 0; });
+})();
+
+/* v27: teclado del celular → escribir en la página espejada */
+$('#mirrorKb').addEventListener('click', () => {
+  $('#mkBar').classList.remove('hidden');
+  const inp = $('#mirrorKeys');
+  inp.value = ''; inp.focus();
 });
+$('#mkDone').addEventListener('click', () => {
+  $('#mkBar').classList.add('hidden');
+  $('#mirrorKeys').blur();
+  $('#mirrorLayer').focus();
+});
+(function () {
+  let previo = '';
+  const inp = $('#mirrorKeys');
+  inp.addEventListener('input', () => {
+    if (!S.mirror.active || !S.canControl) return;
+    const v = inp.value;
+    if (v.length > previo.length) {
+      for (const ch of v.slice(previo.length)) sendAction({ type: 'mirror', op: 'type', text: ch });
+    } else {
+      for (let i = v.length; i < previo.length; i++) sendAction({ type: 'mirror', op: 'press', key: 'Backspace' });
+    }
+    previo = v;
+    if (v.length > 40) { inp.value = ''; previo = ''; } // que no crezca sin fin
+  });
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (S.mirror.active && S.canControl) sendAction({ type: 'mirror', op: 'press', key: 'Enter' });
+    }
+  });
+})();
 
 /* teclado → se reenvía a la página espejada */
 $('#mirrorLayer').addEventListener('keydown', (e) => {
   if (!S.mirror.active || !S.canControl) return;
+  /* v27: si se está escribiendo en el input del teclado móvil, no reenviar dos veces */
+  if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
   const k = e.key;
   if (e.ctrlKey || e.metaKey || e.altKey) return; // atajos del navegador se respetan
   if (k === 'F5' || k === 'F12') return;
