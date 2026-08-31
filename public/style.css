@@ -169,18 +169,39 @@ h1 { margin: 0 0 10px; font-size: 40px; letter-spacing: -0.5px; }
   border: 1px solid var(--line);
   box-shadow: 0 0 44px rgba(255, 62, 200, 0.14), 0 0 90px rgba(41, 224, 255, 0.07);
 }
-.video-shell:fullscreen {
+/* --- pantalla completa: llena más (v13) --- */
+.video-shell:fullscreen, .video-shell:-webkit-full-screen {
   border-radius: 0;
   border: none;
   aspect-ratio: auto; /* llena toda la pantalla sin forzar 16:9 */
 }
-.video-shell:fullscreen #video { object-fit: contain; }
+/* en pantalla completa se esconde todo lo que roba espacio */
+.video-shell:fullscreen .mirror-bar,
+.video-shell:fullscreen .mirror-hint,
+.video-shell:fullscreen .video-empty,
+.video-shell:fullscreen .video-title,
+.video-shell:-webkit-full-screen .mirror-bar,
+.video-shell:-webkit-full-screen .mirror-hint,
+.video-shell:-webkit-full-screen .video-empty,
+.video-shell:-webkit-full-screen .video-title { display: none !important; }
+.video-shell:fullscreen #video,
+.video-shell:-webkit-full-screen #video { object-fit: contain; width: 100%; height: 100%; }
+.video-shell:fullscreen #mirrorImg,
+.video-shell:-webkit-full-screen #mirrorImg { object-fit: contain; }
+/* modo «Llenar»: cubre 100% de la pantalla (recorta apenas los bordes) */
+.video-shell:fullscreen.fit-cover #video,
+.video-shell:fullscreen.fit-cover #mirrorImg,
+.video-shell:-webkit-full-screen.fit-cover #video,
+.video-shell:-webkit-full-screen.fit-cover #mirrorImg { object-fit: cover; }
 #video:fullscreen, #video:-webkit-full-screen {
   width: 100%;
   height: 100%;
-  object-fit: contain; /* nunca se recorta: bandas negras si hace falta */
+  object-fit: contain;
   background: #000;
 }
+#fitToggle { position: absolute; top: 12px; right: 14px; z-index: 40; display: none; }
+.video-shell:fullscreen #fitToggle,
+.video-shell:-webkit-full-screen #fitToggle { display: inline-flex; }
 .chip.amber { top: 54px; }
 #video { width: 100%; height: 100%; display: block; background: #000; }
 .video-empty {

@@ -8,7 +8,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
-<link rel="stylesheet" href="/style.css?v=12">
+<link rel="stylesheet" href="/style.css?v=13">
 <script defer src="/vendor/hls.min.js"></script>
 </head>
 <body>
@@ -46,7 +46,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v12</span>
+        <span class="ver" id="verBadge">v13</span>
       </div>
       <div class="top-actions">
         <span id="connBadge" class="conn ok"><span class="live-dot"></span><span id="connText">En vivo</span></span>
@@ -103,6 +103,12 @@
             </div>
             <div class="mirror-hint">Navegador espejado — haz clic o escribe sobre la página: todos ven lo mismo</div>
           </div>
+
+          <!-- botón de ajuste (solo visible en pantalla completa) -->
+          <button id="fitToggle" class="btn small fit-btn" title="Cambiar entre ver todo y llenar la pantalla">
+            <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+            <span id="fitToggleTxt">Llenar</span>
+          </button>
         </div>
 
         <div class="controls card">
@@ -173,6 +179,6 @@
   </div>
 
   <div id="toasts" class="toasts"></div>
-  <script src="/app.js?v=12"></script>
+  <script src="/app.js?v=13"></script>
 </body>
 </html>
