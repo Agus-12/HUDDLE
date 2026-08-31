@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v16'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v17'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 2 * 60 * 60 * 1000; // salas vacías se borran a las 2 h
@@ -390,6 +390,15 @@ function handleEvents(req, res, url) {
   const name = (url.searchParams.get('name') || '').trim().slice(0, 20) || 'Anónimo';
 
   if (!/^[A-Z0-9]{4,8}$/.test(code)) { res.writeHead(400); res.end('código de sala inválido'); return; }
+
+  /* si entramos con "join=1" (botón Unirme), la sala debe existir ya:
+     evita entrar por error de tipeo a una sala vacía recién creada */
+  if (url.searchParams.get('join') === '1' && !rooms.has(code)) {
+    res.writeHead(200, SSE_HEADERS);
+    send(res, 'noRoom', { error: 'No encontramos esa sala. Revisa el código.' });
+    res.end();
+    return;
+  }
 
   const room = getOrCreateRoom(code); // si entras con un código, la sala existe
   const isNew = !room.users.has(uidParam);

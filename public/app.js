@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v16';
+const APP_VERSION = 'v17';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -112,11 +112,17 @@ function maybeReload(srvVersion) {
 
 /* ======================= conexión / protocolo ======================= */
 
-function connect(code, nick) {
+function connect(code, nick, opts = {}) {
   S.code = code.toUpperCase();
   const uid = sessionStorage.getItem('rr-uid-' + S.code) || '';
-  const es = new EventSource(`/api/events?room=${S.code}&name=${encodeURIComponent(nick)}&uid=${encodeURIComponent(uid)}&v=${APP_VERSION}`);
+  const extra = opts.mustExist ? '&join=1' : ''; // Unirme: la sala debe existir ya
+  const es = new EventSource(`/api/events?room=${S.code}&name=${encodeURIComponent(nick)}&uid=${encodeURIComponent(uid)}&v=${APP_VERSION}${extra}`);
   S.es = es;
+
+  es.addEventListener('noRoom', (e) => {
+    try { es.close(); } catch {}
+    toast('No encontramos esa sala — revisa el código', 5000);
+  });
 
   es.addEventListener('hello', (e) => {
     const d = JSON.parse(e.data);
@@ -839,12 +845,18 @@ $('#chatForm').addEventListener('submit', (e) => {
 
 $('#btnCopy').addEventListener('click', async () => {
   const link = location.origin + '/#' + S.code;
+  let ok = false;
   try {
-    await navigator.clipboard.writeText(link);
-    toast('Invitación copiada: ' + link, 4200);
-  } catch {
-    prompt('Copia tu link de invitación:', link);
-  }
+    const ta = document.createElement('textarea');
+    ta.value = link;
+    ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    ok = document.execCommand('copy');
+    ta.remove();
+  } catch {}
+  if (!ok) { try { await navigator.clipboard.writeText(link); ok = true; } catch {} }
+  toast(ok ? 'Invitación copiada — pégala en WhatsApp o donde quieras' : 'Tu invitación: ' + link, ok ? 3600 : 8000);
 });
 
 $('#btnLeave').addEventListener('click', () => {
@@ -867,7 +879,7 @@ $('#btnCreate').addEventListener('click', () => {
 function joinFromInput() {
   const code = $('#joinCode').value.trim().toUpperCase();
   if (!/^[A-Z0-9]{4,8}$/.test(code)) { toast('Código inválido (4-8 letras/números)'); return; }
-  connect(code, getNick());
+  connect(code, getNick(), { mustExist: true });
 }
 $('#btnJoin').addEventListener('click', joinFromInput);
 $('#joinCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinFromInput(); });

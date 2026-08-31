@@ -34,6 +34,11 @@ input { font-family: inherit; }
 }
 .blob-a { width: 480px; height: 480px; background: var(--pink); top: -140px; left: -120px; animation: float1 14s ease-in-out infinite alternate; }
 .blob-b { width: 420px; height: 420px; background: var(--cyan); bottom: -140px; right: -100px; animation: float2 17s ease-in-out infinite alternate; }
+
+/* en pantallas chicas los blobs se ven como una franja fea: fuera */
+@media (max-width: 700px) {
+  .blob { display: none; }
+}
 @keyframes float1 { to { transform: translate(120px, 90px) scale(1.15); } }
 @keyframes float2 { to { transform: translate(-110px, -80px) scale(1.1); } }
 
@@ -134,7 +139,14 @@ h1 { margin: 0 0 10px; font-size: 40px; letter-spacing: -0.5px; }
   border-bottom: 1px solid var(--line);
 }
 .brand { font-size: 18px; font-weight: 800; }
-.top-actions { display: flex; align-items: center; gap: 10px; }
+.top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* móvil: la barra de arriba se acomoda en varias filas, sin desplazar la pantalla */
+@media (max-width: 700px) {
+  .topbar { flex-wrap: wrap; row-gap: 8px; padding: 10px 12px; }
+  .top-actions { gap: 8px; }
+  .room-chip { padding: 5px 8px; }
+}
 .room-chip {
   font-size: 13px; color: var(--dim);
   border: 1px dashed var(--line); border-radius: 8px; padding: 6px 10px;
