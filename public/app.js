@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v29';
+const APP_VERSION = 'v30';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -29,13 +29,6 @@ const EXTRA_HEADERS = (() => {
   return {};
 })();
 
-const SAMPLES = [
-  { title: 'Big Buck Bunny · 10s', url: '/videos/bunny.mp4' },
-  { title: 'Sintel · 10s', url: '/videos/sintel.mp4' },
-  { title: 'Jellyfish · 10s', url: '/videos/jellyfish.mp4' },
-  { title: 'Flower · 20s', url: '/videos/flower.mp4' },
-];
-
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const SYNC_TOLERANCE = 0.75; // segundos de desvío antes de re-sincronizar
 
@@ -51,7 +44,6 @@ const S = {
   dragging: false,
   lastTarget: 0,
   offset: 0,      // reloj del servidor - reloj local
-  samplesReady: false,
   mirror: { active: false, url: '', w: 0, h: 0, gotFrame: false },
   lastActionAt: 0,
   useGet: false,     // se activa si el entorno bloquea POST
@@ -137,7 +129,6 @@ function connect(code, nick, opts = {}) {
     $('#roomCodeLbl').textContent = d.room.code;
     history.replaceState(null, '', '#' + d.room.code);
     showScreen('room');
-    renderSamples();
     applyMirrorState(d.room.mirror || { active: false, url: '' });
     applyState(d.room.state);
 
@@ -795,6 +786,15 @@ function startMirrorFromPicker() {
 $('#btnMirror').addEventListener('click', startMirrorFromPicker);
 $('#mirrorUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') startMirrorFromPicker(); });
 
+/* v30: sitios recomendados — un toque y arranca el espejo directo */
+document.querySelectorAll('.site-chip').forEach((b) => {
+  b.addEventListener('click', () => {
+    if (!S.canControl) { toast('Solo el anfitrión puede espejar'); return; }
+    $('#mirrorUrl').value = b.dataset.url;
+    startMirrorFromPicker();
+  });
+});
+
 function updateControlUi() {
   const isHost = S.room && S.room.hostId === S.userId;
   const mirrorOn = S.mirror.active;
@@ -1027,19 +1027,6 @@ $('#chkControl').addEventListener('change', (e) => {
 });
 
 /* ======================= selector de video ======================= */
-
-function renderSamples() {
-  if (S.samplesReady) return;
-  S.samplesReady = true;
-  const box = $('#samples');
-  SAMPLES.forEach((s) => {
-    const b = document.createElement('button');
-    b.className = 'sample-btn';
-    b.textContent = s.title;
-    b.addEventListener('click', () => loadVideoFor(s.url, s.title));
-    box.appendChild(b);
-  });
-}
 
 function loadVideoFor(url, title) {
   if (!S.canControl) { toast('Solo el anfitrión puede cambiar el video'); return; }
