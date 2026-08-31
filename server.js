@@ -143,6 +143,10 @@ function sysMsg(room, text) {
 
 let PUPPETEER = null; // require perezoso
 const mirrors = new Map(); // roomCode -> mirror
+
+/* v25: errores que significan que la página espejada murió (crash o el sitio
+ * la cerró). Se detectan y el espejo se reabre solo, sin errores técnicos. */
+const PAGE_DEAD = /session closed|target closed|page closed|browser has disconnected|browser closed|session destroyed|detached|protocol error \(input\.|protocol error \(page\.|target created/i;
 const MIRROR_MAX = +(process.env.MIRROR_MAX || 2); // espejos simultáneos (RAM; en Oracle MIRROR_MAX=8)
 const MIRROR_SEND_MS = 45;          // máx. ~20 fps hacia los clientes
 const MIRROR_IDLE_MS = 90 * 1000; // se cierra si la sala queda vacía 90 s
@@ -257,6 +261,8 @@ async function startMirror(room, rawUrl, userId) {
   /* v14: comodidad — si el reproductor queda abajo, acercarlo a la vista
      (muchas paginas cargan el video solo cuando el reproductor es visible) */
   const viva = () => mirrors.get(room.code) === m;
+  /* v25: si Chrome entero muere, reabrir el espejo en automático */
+  browser.on('disconnected', () => { if (viva()) recoverMirror(room.code, 'Chrome desconectado').catch(() => {}); });
   const scrollToPlayer = () => m.page.evaluate(() => {
     const cands = document.querySelectorAll('video, [class*="player" i], [id*="player" i], iframe[src*="embed" i]');
     if (!cands.length) return;
@@ -321,6 +327,8 @@ async function startMirror(room, rawUrl, userId) {
   m.stats = { bytes: 0, frames: 0, at: Date.now() };
   m.timer = setInterval(() => {
     const now = Date.now();
+    /* v25: si la página murió, reabrir sola (sin esperar que un clic falle) */
+    if (m.page.isClosed()) { recoverMirror(room.code, 'página cerrada (watchdog)').catch(() => {}); return; }
     if (m.dirty && m.frame) {
       m.dirty = false;
       broadcast(room, 'mirror-frame', m.frame);
@@ -365,6 +373,28 @@ async function stopMirror(roomOrCode) {
   console.log(`[${new Date().toISOString()}] 🪞 espejo detenido en sala ${code}`);
   const room = rooms.get(code);
   if (room) broadcast(room, 'mirror-state', { active: false, url: '' });
+}
+
+/* v25: si la página espejada muere, antes el espejo quedaba "zombie" (imagen
+ * congelada y clics que fallaban con errores en inglés). Ahora se reabre sola
+ * la misma URL; si no se puede, se detiene con un aviso claro en el chat. */
+async function recoverMirror(code, reason) {
+  const m = mirrors.get(code);
+  const room = rooms.get(code);
+  if (!m || !room) return false;
+  if (m.recovering) return true; // ya se está reabriendo
+  m.recovering = true;
+  const url = m.url || '';
+  const owner = m.ownerId;
+  console.log(`[${new Date().toISOString()}] 🪞♻️ página espejada muerta en ${code} (${String(reason).slice(0, 90)}) — reabriendo ${url}`);
+  sysMsg(room, '🪞 La página se cayó — reabriendo sola…');
+  try { await stopMirror(code); } catch {}
+  if (url) {
+    try { await startMirror(room, url, owner); return true; }
+    catch (e) { console.error(`[${new Date().toISOString()}] 🪞 no se pudo reabrir el espejo en ${code}:`, e.message || e); }
+  }
+  sysMsg(room, '🪞 No se pudo reabrir la página — espejo detenido');
+  return false;
 }
 
 function normalizeWebUrl(url) {
@@ -571,8 +601,15 @@ async function handleAction(req, res, body) {
 
       return json(res, 200, { ok: true });
     } catch (e) {
-      console.error(`[acción] 💥 error de espejo en ${code}:`, e.message || e);
-      return json(res, 500, { ok: false, error: 'No se pudo espejar: ' + (e.message || e) });
+      const msg = String(e.message || e);
+      console.error(`[acción] 💥 error de espejo en ${code}:`, msg);
+      /* v25: página muerta → se reabre sola y el usuario ve un mensaje humano */
+      if (PAGE_DEAD.test(msg)) {
+        json(res, 200, { ok: false, error: 'La página se cayó — reabriéndola automáticamente…' });
+        recoverMirror(code, msg).catch(() => {});
+        return;
+      }
+      return json(res, 500, { ok: false, error: 'No se pudo espejar: ' + msg.slice(0, 120) });
     }
   }
 
