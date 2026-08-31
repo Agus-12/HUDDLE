@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v15';
+const APP_VERSION = 'v16';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -387,6 +387,8 @@ function applyMirrorState(ms) {
   if (S.mirror.active) {
     $('#mirrorUrlBar').value = S.mirror.url;
     AU.needAudio = !!ms.audio; // el servidor indica si hay audio disponible
+    // si el audio quedó suspendido de una sesión anterior, reactivarlo
+    if (AU.needAudio && AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume().catch(() => {});
     // pantalla de carga hasta que llegue el primer frame
     if (!S.mirror.gotFrame) $('#mirrorLoading').classList.remove('hidden');
   } else {
@@ -472,6 +474,43 @@ class MirrorPlayer extends AudioWorkletProcessor {
 registerProcessor('mirror-player', MirrorPlayer);
 `;
 
+/* alternativa sin AudioWorklet: AudioWorklet solo existe en HTTPS,
+   asi que en HTTP usamos ScriptProcessor (funciona en todos los navegadores) */
+function makeFallbackNode(ctx) {
+  if (!ctx.createScriptProcessor) return null;
+  const q = []; let qn = 0, off = 0, on = false;
+  const pre = Math.round(0.25 * ctx.sampleRate); // mismo colchón anti-jitter
+  const node = ctx.createScriptProcessor(4096, 0, 1);
+  const stats = { llamadas: 0, muestras: 0 };
+  const port = {
+    onmessage: null,
+    postMessage(msg) {
+      if (msg.clear) { q.length = 0; qn = 0; off = 0; on = false; }
+      else if (msg.pcm) { q.push(msg.pcm); qn += msg.pcm.length; }
+    }
+  };
+  node.onaudioprocess = (e) => {
+    const out = e.outputBuffer.getChannelData(0);
+    stats.llamadas++;
+    if (!on && qn >= pre) on = true;
+    if (!on) { out.fill(0); return; }
+    let i = 0;
+    while (i < out.length && q.length) {
+      const c = q[0];
+      const take = Math.min(c.length - off, out.length - i);
+      out.set(c.subarray(off, off + take), i);
+      i += take; off += take;
+      if (off >= c.length) { q.shift(); qn -= c.length; off = 0; }
+    }
+    if (i < out.length) out.fill(0, i);
+    stats.muestras += i;
+    if (!q.length) on = false; // se vació → re-almacenar colchón
+  };
+  node.connect(ctx.destination);
+  node._stats = stats;
+  return { node, port, fallback: true };
+}
+
 async function ensureAudioCtx() {
   if (AU.ctx) return AU.ctx;
   const AC = window.AudioContext || window.webkitAudioContext;
@@ -479,13 +518,14 @@ async function ensureAudioCtx() {
   try { AU.ctx = new AC({ sampleRate: AU.rate }); }
   catch { AU.ctx = new AC(); }
   try {
+    if (!AU.ctx.audioWorklet) throw new Error('AudioWorklet no disponible (HTTP)');
     const url = URL.createObjectURL(new Blob([WORKLET_CODE], { type: 'text/javascript' }));
     await AU.ctx.audioWorklet.addModule(url);
     AU.node = new AudioWorkletNode(AU.ctx, 'mirror-player', { outputChannelCount: [1] });
     AU.node.connect(AU.ctx.destination);
   } catch (e) {
-    console.warn('[Huddle] AudioWorklet no disponible', e);
-    AU.node = null;
+    console.warn('[Huddle] AudioWorklet no disponible, usando alternativa', e);
+    AU.node = makeFallbackNode(AU.ctx);
   }
   return AU.ctx;
 }
