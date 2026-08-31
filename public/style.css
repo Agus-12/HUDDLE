@@ -470,3 +470,60 @@ input[type="range"]:disabled { opacity: 0.35; cursor: not-allowed; }
 .carita-big { height: 76px; width: auto; display: block; }
 .logo-letras { height: 48px; width: auto; display: block; }
 .landing-title { display: flex; justify-content: center; }
+
+/* ---------- v18: pantalla completa simulada (iPhones no la soportan en divs) ---------- */
+.video-shell.pseudo-fs {
+  position: fixed; inset: 0; z-index: 2000;
+  width: 100vw; height: 100vh; height: 100dvh;
+  max-width: none; aspect-ratio: auto;
+  border-radius: 0; border: none;
+}
+.video-shell.pseudo-fs .video-empty,
+.video-shell.pseudo-fs .video-title { display: none !important; }
+.video-shell.pseudo-fs #mirrorImg { object-fit: contain; }
+.video-shell.pseudo-fs #video { object-fit: contain; }
+.video-shell.pseudo-fs.fit-cover #video,
+.video-shell.pseudo-fs.fit-cover #mirrorImg { object-fit: cover; }
+.video-shell.pseudo-fs #fitToggle { display: inline-flex; }
+body.fs-lock { overflow: hidden; }
+/* la barra superior crea su propio contexto de apilamiento y quedaría ENCIMA
+ * del reproductor a pantalla completa simulada (robándose los toques): fuera */
+body.fs-lock .topbar { display: none; }
+#fsExit {
+  position: absolute; top: 12px; left: 14px; z-index: 41;
+  display: none; padding: 8px 10px;
+}
+.video-shell:fullscreen #fsExit,
+.video-shell:-webkit-full-screen #fsExit,
+.video-shell.pseudo-fs #fsExit { display: inline-flex; }
+
+/* ---------- v18: opciones escondidas mientras hay video o espejo activo ---------- */
+body.playing .picker .picker-row:not(.stop-row),
+body.playing .picker .samples,
+body.playing .picker .divider { display: none; }
+body.mirroring .picker { display: none; }
+.stop-row { justify-content: space-between; align-items: center; }
+.stop-lbl {
+  display: inline-flex; align-items: center; gap: 8px;
+  color: var(--dim); font-size: 13px;
+}
+.stop-lbl .icon { color: var(--pink); }
+.btn.danger {
+  border-color: rgba(255, 82, 99, 0.5);
+  color: #ff9aa5;
+}
+.btn.danger:hover { border-color: rgba(255, 82, 99, 0.85); background: rgba(255, 82, 99, 0.12); }
+
+/* ---------- v18: móvil — código de sala grande y sin zoom raro de iOS ---------- */
+@media (max-width: 700px) {
+  .layout { padding: 8px; gap: 10px; }
+  /* iOS hace zoom automático al enfocar inputs con fuente < 16px */
+  .input { font-size: 16px; }
+  .mirror-bar .input { font-size: 16px; }
+  .join-inline .input.code {
+    font-size: 24px;
+    letter-spacing: 6px;
+    padding: 14px 16px;
+  }
+  .join-inline .btn { flex: 0 0 auto; }
+}

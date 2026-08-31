@@ -46,7 +46,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v17</span>
+        <span class="ver" id="verBadge">v18</span>
       </div>
       <div class="top-actions">
         <span id="connBadge" class="conn ok"><span class="live-dot"></span><span id="connText">En vivo</span></span>
@@ -109,6 +109,10 @@
             <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
             <span id="fitToggleTxt">Llenar</span>
           </button>
+          <!-- salir de pantalla completa (visible en pantalla completa real o simulada) -->
+          <button id="fsExit" class="btn small fit-btn" title="Salir de pantalla completa">
+            <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
         </div>
 
         <div class="controls card">
@@ -131,6 +135,17 @@
         </div>
 
         <div class="picker card">
+          <!-- fila visible solo cuando hay un video en curso: detenerlo devuelve las opciones -->
+          <div class="picker-row stop-row hidden" id="stopRow">
+            <span class="stop-lbl">
+              <svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
+              <span>Video en curso — deténlo para cargar otro</span>
+            </span>
+            <button id="btnStopVideo" class="btn danger">
+              <svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+              Detener
+            </button>
+          </div>
           <div class="picker-row">
             <input id="videoUrl" class="input" placeholder="URL del video — https://…/video.mp4 o …/stream.m3u8" autocomplete="off" spellcheck="false">
             <button id="btnLoad" class="btn primary">

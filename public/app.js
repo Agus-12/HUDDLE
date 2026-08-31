@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v17';
+const APP_VERSION = 'v18';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -301,6 +301,7 @@ function applyState(st) {
     v.removeAttribute('src');
     v.load();
     $('#videoTitle').classList.add('hidden');
+    $('#videoEmpty').classList.remove('hidden'); // v18: al detener, vuelve la pantalla de inicio de sala
   } else if (!st.videoUrl && !S.currentUrl && !S.mirror.active) {
     $('#videoEmpty').classList.remove('hidden');
   }
@@ -638,6 +639,12 @@ $('#btnMirrorStop').addEventListener('click', () => {
   else toast('Solo el anfitrión controla el espejo');
 });
 
+/* detener el video en curso: devuelve las opciones de cargar/espejar */
+$('#btnStopVideo').addEventListener('click', () => {
+  if (!S.canControl) { toast('Solo el anfitrión controla la reproducción'); return; }
+  sendAction({ type: 'video', url: '' });
+});
+
 /* iniciar espejo desde el selector */
 function startMirrorFromPicker() {
   if (!S.canControl) { toast('Solo el anfitrión puede espejar'); return; }
@@ -660,6 +667,12 @@ $('#mirrorUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') star
 function updateControlUi() {
   const isHost = S.room && S.room.hostId === S.userId;
   const mirrorOn = S.mirror.active;
+  /* con un video en curso, las opciones de cargar/espejar se esconden:
+   * vuelven cuando el usuario detiene el video (igual que el espejo) */
+  const videoOn = !!S.currentUrl && !mirrorOn;
+  document.body.classList.toggle('playing', videoOn);
+  $('#stopRow').classList.toggle('hidden', !videoOn);
+  $('#btnStopVideo').disabled = !S.canControl;
   $('#btnPlay').disabled = !S.canControl || !S.currentUrl || mirrorOn;
   $('#seek').disabled = !S.canControl || !S.currentUrl || mirrorOn;
   $('#btnLoad').disabled = !S.canControl || mirrorOn;
@@ -772,14 +785,46 @@ $('#volume').addEventListener('input', (e) => { v.volume = Number(e.target.value
 $('#btnMute').addEventListener('click', () => { v.muted = !v.muted; });
 
 /* pantalla completa: en modo video se maximiza el propio <video> (el navegador
- * lo ajusta con bandas negras, nunca se recorta); en modo espejo, el contenedor */
+ * lo ajusta con bandas negras, nunca se recorta); en modo espejo, el contenedor.
+ * iPhones no soportan la API de pantalla completa en divs (solo en <video>),
+ * así que al espejar usamos una pantalla completa simulada: el reproductor
+ * se fija cubriendo toda la ventana, con botón ✕ para salir. */
+const videoShellEl = $('#videoShell');
+function fsActive() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement ||
+    videoShellEl.classList.contains('pseudo-fs'));
+}
+function exitFullscreen() {
+  const d = document;
+  if (d.fullscreenElement || d.webkitFullscreenElement) {
+    const xf = d.exitFullscreen || d.webkitExitFullscreen;
+    if (xf) { try { xf.call(d); } catch {} }
+  }
+  videoShellEl.classList.remove('pseudo-fs');
+  document.body.classList.remove('fs-lock');
+  videoShellEl.classList.remove('fit-cover');
+  $('#fitToggleTxt').textContent = 'Llenar';
+}
+function enterPseudoFs() {
+  videoShellEl.classList.remove('fit-cover');
+  $('#fitToggleTxt').textContent = 'Llenar';
+  videoShellEl.classList.add('pseudo-fs');
+  document.body.classList.add('fs-lock');
+}
 function toggleFullscreen() {
-  const el = $('#videoShell');
-  const rf = el.requestFullscreen || el.webkitRequestFullscreen;
-  if (rf) { const p = rf.call(el); if (p && p.catch) p.catch(() => {}); }
-  else if (!S.mirror.active && v.webkitEnterFullscreen) v.webkitEnterFullscreen(); // iPhone
+  if (fsActive()) return exitFullscreen();
+  const rf = videoShellEl.requestFullscreen || videoShellEl.webkitRequestFullscreen;
+  if (rf) {
+    const p = rf.call(videoShellEl);
+    if (p && p.catch) p.catch(() => enterPseudoFs()); // si el navegador la rechaza, simulada
+  } else if (!S.mirror.active && v.webkitEnterFullscreen && v.currentSrc) {
+    v.webkitEnterFullscreen(); // iPhone con video: reproductor nativo
+  } else {
+    enterPseudoFs(); // iPhone espejando (o navegador sin la API): simulada
+  }
 }
 $('#btnFs').addEventListener('click', toggleFullscreen);
+$('#fsExit').addEventListener('click', exitFullscreen);
 
 /* botón «Llenar / Ver todo»: solo visible en pantalla completa */
 $('#fitToggle').addEventListener('click', () => {

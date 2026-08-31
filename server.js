@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v17'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v18'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 2 * 60 * 60 * 1000; // salas vacías se borran a las 2 h
@@ -596,6 +596,17 @@ async function handleAction(req, res, body) {
     case 'video': {
       const url = String(action.url || '').trim();
       const title = String(action.title || '').slice(0, 80).trim();
+      if (!url) {
+        // v18: detener — quitar el video de la sala (devuelve las opciones a todos)
+        room.videoUrl = '';
+        room.videoTitle = '';
+        room.position = 0;
+        room.isPlaying = false;
+        room.updatedAt = now;
+        if (mirrors.has(room.code)) stopMirror(room).catch(() => {});
+        sysMsg(room, `${room.users.get(userId).name} detuvo el video`);
+        break;
+      }
       if (!/^https?:\/\//i.test(url) && !url.startsWith('/')) {
         console.warn(`[acción] ❌ URL inválida: "${url}"`);
         return json(res, 400, { ok: false, error: 'URL inválida (debe ser http(s) o una ruta local)' });
