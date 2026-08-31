@@ -623,3 +623,27 @@ body {
 @media (max-width: 980px) {
   body.mirroring .mirror-kb { display: inline-flex; }
 }
+
+/* ---------- v28: tira de mensajes en pantalla completa (estilo Rave) ----------
+ * delgada, abajo, semitransparente: el mensaje entra por la derecha con el
+ * nombre en color y se desliza hasta salir por la izquierda; luego se oculta */
+.msg-ticker {
+  position: absolute; left: 12px; right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 45; display: none; overflow: hidden;
+  background: rgba(10, 7, 19, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 18px;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}
+.video-shell.pseudo-fs .msg-ticker.run,
+.video-shell:fullscreen .msg-ticker.run,
+.video-shell:-webkit-full-screen .msg-ticker.run { display: block; }
+#msgTickerInner {
+  position: absolute; left: 100%; top: 0; bottom: 0;
+  display: flex; align-items: center; white-space: nowrap; will-change: transform;
+}
+#msgTickerName { color: var(--cyan); font-size: 14px; }
+#msgTickerBody { color: var(--txt); font-size: 14px; }

@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v27';
+const APP_VERSION = 'v28';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -846,7 +846,44 @@ function addChat(msg) {
   /* v24: no acumular mensajes viejos en pantalla (el servidor igual guarda 100) */
   while (log.children.length > 80) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
+  /* v28: en pantalla completa no se ve el chat → tira deslizante abajo (estilo Rave) */
+  if (fsActive()) ticker.push(msg);
 }
+
+/* v28: la tira de mensajes de pantalla completa — cada mensaje entra por la
+ * derecha con el nombre en color y sale por la izquierda; uno a la vez */
+const ticker = {
+  q: [], busy: false,
+  push(msg) {
+    const nombre = msg.system ? '' : (msg.name || '');
+    const texto = String(msg.system ? '⚡ ' + (msg.text || '') : (msg.text || '')).slice(0, 220);
+    this.q.push({ nombre, texto });
+    if (this.q.length > 5) this.q = this.q.slice(-5); // sin acumular atrasos
+    this.run();
+  },
+  async run() {
+    if (this.busy) return;
+    this.busy = true;
+    const strip = $('#msgTicker'), inner = $('#msgTickerInner');
+    while (this.q.length) {
+      const { nombre, texto } = this.q.shift();
+      $('#msgTickerName').textContent = nombre ? nombre + ':' : '';
+      $('#msgTickerBody').textContent = ' ' + texto;
+      strip.classList.add('run');
+      // medir cuánto debe viajar: ancho de la tira + ancho del texto
+      const dist = strip.clientWidth + inner.offsetWidth + 12;
+      const dur = Math.max(5000, (dist / 80) * 1000); // ~80 px/s: lectura cómoda
+      const anim = inner.animate(
+        [{ transform: 'translateX(0)' }, { transform: `translateX(-${dist}px)` }],
+        { duration: dur, easing: 'linear' }
+      );
+      await anim.finished.catch(() => {});
+      try { anim.cancel(); } catch {}
+    }
+    strip.classList.remove('run');
+    this.busy = false;
+  },
+};
 
 /* ======================= controles ======================= */
 
