@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v13'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v14'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 2 * 60 * 60 * 1000; // salas vacías se borran a las 2 h
@@ -206,13 +206,23 @@ async function startMirror(room, rawUrl, userId) {
     args: [
       '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
       '--autoplay-policy=no-user-gesture-required',
-    ].concat(useXvfb ? ['--window-size=1280,800', '--no-first-run', '--disable-infobars', '--start-maximized'] : []),
+    ].concat(useXvfb ? ['--window-size=1280,720', '--no-first-run', '--disable-infobars', '--start-maximized'] : []),
     env: Object.assign({}, process.env, AUDIO_READY ? { PULSE_SERVER, DISPLAY: ':99' } : {}),
   }).catch((e) => { throw new Error('no se pudo lanzar Chrome: ' + e.message); });
 
   const page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 800, deviceScaleFactor: 1 });
+  await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 });
   await page.setUserAgent(MIRROR_UA).catch(() => {});
+  /* v14: sin ventanas emergentes de anuncios dentro del espejo */
+  await page.evaluateOnNewDocument(() => {
+    try { window.open = function () { return null; }; } catch {}
+    document.addEventListener('click', (e) => {
+      try {
+        const a = e.target && e.target.closest && e.target.closest('a[target="_blank"]');
+        if (a) a.target = '_self';
+      } catch {}
+    }, true);
+  }).catch(() => {});
   const cdp = await page.createCDPSession();
 
   const m = { browser, page, cdp, url, frame: null, dirty: false, timer: null, emptySince: null, ownerId: userId, startedAt: Date.now() };
@@ -222,7 +232,7 @@ async function startMirror(room, rawUrl, userId) {
     m.frame = {
       d: 'data:image/jpeg;base64,' + ev.data,
       w: (ev.metadata && ev.metadata.deviceWidth) || 1280,
-      h: (ev.metadata && ev.metadata.deviceHeight) || 800,
+      h: (ev.metadata && ev.metadata.deviceHeight) || 720,
     };
     m.dirty = true;
     try { await cdp.send('Page.screencastFrameAck', { sessionId: ev.sessionId }); } catch {}
@@ -237,7 +247,48 @@ async function startMirror(room, rawUrl, userId) {
 
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {});
   m.quality = 52;
-  await cdp.send('Page.startScreencast', { format: 'jpeg', quality: m.quality, maxWidth: 1200, maxHeight: 750, everyNthFrame: 1 });
+  await cdp.send('Page.startScreencast', { format: 'jpeg', quality: m.quality, maxWidth: 1200, maxHeight: 675, everyNthFrame: 1 });
+
+  /* v14: comodidad — si el reproductor queda abajo, acercarlo a la vista
+     (muchas paginas cargan el video solo cuando el reproductor es visible) */
+  const viva = () => mirrors.get(room.code) === m;
+  const scrollToPlayer = () => m.page.evaluate(() => {
+    const cands = document.querySelectorAll('video, [class*="player" i], [id*="player" i], iframe[src*="embed" i]');
+    if (!cands.length) return;
+    let best = null, bestArea = -1;
+    for (const el of cands) {
+      const r = el.getBoundingClientRect();
+      const area = r.width * r.height;
+      if (area > bestArea) { bestArea = area; best = el; }
+    }
+    if (!best) return;
+    const r = best.getBoundingClientRect();
+    const cy = r.y + r.height / 2;
+    if (cy > innerHeight * 0.55 || r.y < -40) best.scrollIntoView({ block: 'center' });
+  }).catch(() => {});
+
+  /* v14: intentar dar play solo (paginas de peliculas lo necesitan);
+     se reintenta un rato y se detiene en cuanto algo suena */
+  const intentoPlay = async (n) => {
+    if (!viva() || n > 20) return;
+    let sonando = false;
+    try { await scrollToPlayer(); } catch {}
+    try {
+      for (const fr of m.page.frames()) {
+        const r = await fr.evaluate(() => {
+          let ok = false;
+          document.querySelectorAll('video, audio').forEach((v) => {
+            if (v.readyState >= 2) { try { if (v.paused) v.play().catch(() => {}); } catch {} }
+            if (!v.paused && v.currentTime > 0) ok = true;
+          });
+          return ok;
+        }).catch(() => false);
+        if (r) sonando = true;
+      }
+    } catch {}
+    if (!sonando) setTimeout(() => intentoPlay(n + 1), 5000);
+  };
+  setTimeout(() => intentoPlay(0), 3000);
 
   /* audio: capturar el monitor del sink virtual y difundirlo en trozos de 100 ms
    * (los trozos de silencio no se envían → ancho de banda casi cero en reposo) */

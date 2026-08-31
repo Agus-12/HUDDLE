@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v13';
+const APP_VERSION = 'v14';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -380,6 +380,7 @@ function applyMirrorState(ms) {
   if (!ms) return;
   S.mirror.active = !!ms.active;
   S.mirror.url = ms.url || '';
+  document.body.classList.toggle('mirroring', !!ms.active);
   $('#mirrorLayer').classList.toggle('hidden', !S.mirror.active);
   $('#video').classList.toggle('hidden', S.mirror.active);
   $('#videoEmpty').classList.toggle('hidden', S.mirror.active || !!S.currentUrl);

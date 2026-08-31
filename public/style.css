@@ -189,6 +189,8 @@ h1 { margin: 0 0 10px; font-size: 40px; letter-spacing: -0.5px; }
 .video-shell:fullscreen #mirrorImg,
 .video-shell:-webkit-full-screen #mirrorImg { object-fit: contain; }
 /* modo «Llenar»: cubre 100% de la pantalla (recorta apenas los bordes) */
+.video-shell.fit-cover #video,
+.video-shell.fit-cover #mirrorImg,
 .video-shell:fullscreen.fit-cover #video,
 .video-shell:fullscreen.fit-cover #mirrorImg,
 .video-shell:-webkit-full-screen.fit-cover #video,
@@ -200,6 +202,7 @@ h1 { margin: 0 0 10px; font-size: 40px; letter-spacing: -0.5px; }
   background: #000;
 }
 #fitToggle { position: absolute; top: 12px; right: 14px; z-index: 40; display: none; }
+body.mirroring #fitToggle,
 .video-shell:fullscreen #fitToggle,
 .video-shell:-webkit-full-screen #fitToggle { display: inline-flex; }
 .chip.amber { top: 54px; }
