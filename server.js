@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v14'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v15'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 2 * 60 * 60 * 1000; // salas vacías se borran a las 2 h
@@ -206,6 +206,7 @@ async function startMirror(room, rawUrl, userId) {
     args: [
       '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
       '--autoplay-policy=no-user-gesture-required',
+      '--disable-blink-features=AutomationControlled',
     ].concat(useXvfb ? ['--window-size=1280,720', '--no-first-run', '--disable-infobars', '--start-maximized'] : []),
     env: Object.assign({}, process.env, AUDIO_READY ? { PULSE_SERVER, DISPLAY: ':99' } : {}),
   }).catch((e) => { throw new Error('no se pudo lanzar Chrome: ' + e.message); });
@@ -216,6 +217,10 @@ async function startMirror(room, rawUrl, userId) {
   /* v14: sin ventanas emergentes de anuncios dentro del espejo */
   await page.evaluateOnNewDocument(() => {
     try { window.open = function () { return null; }; } catch {}
+    /* parecer un navegador normal: algunos reproductores bloquean automatizacion */
+    try { Object.defineProperty(navigator, 'webdriver', { get: () => false }); } catch {}
+    try { Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] }); } catch {}
+    try { Object.defineProperty(navigator, 'languages', { get: () => ['es-MX', 'es', 'en'] }); } catch {}
     document.addEventListener('click', (e) => {
       try {
         const a = e.target && e.target.closest && e.target.closest('a[target="_blank"]');
