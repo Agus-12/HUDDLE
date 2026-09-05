@@ -11,8 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
-<link rel="stylesheet" href="/style.css?v=32">
-<script defer src="/vendor/hls.min.js"></script>
+<link rel="stylesheet" href="/style.css?v=33">
 </head>
 <body>
 
@@ -70,14 +69,27 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v32</span>
+        <span class="ver" id="verBadge">v33</span>
       </div>
       <div class="top-actions">
         <span id="connBadge" class="conn ok"><span class="live-dot"></span><span id="connText">En vivo</span></span>
-        <span class="room-chip">Sala <b id="roomCodeLbl">—</b></span>
+        <!-- v33: gente en la sala — icono + número; el detalle se despliega al tocar -->
+        <button id="btnUsers" class="btn small users-chip" title="Quién está en la sala">
+          <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span id="userCountTop">0</span>
+        </button>
+        <div id="usersDrop" class="users-drop hidden">
+          <h4>En la sala</h4>
+          <ul id="userList" class="user-list"></ul>
+        </div>
         <button id="btnCopy" class="btn small" title="Copiar el link de invitación">
           <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
           Copiar invitación
+        </button>
+        <!-- v33: detener el espejo vive aquí, junto a Salir -->
+        <button id="btnStopMirrorTop" class="btn small danger" title="Detener el espejo">
+          <svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          Detener espejo
         </button>
         <button id="btnLeave" class="btn small ghost" title="Salir de la sala">
           <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
@@ -90,23 +102,17 @@
       <!-- columna del reproductor -->
       <section class="player-col">
         <div class="video-shell" id="videoShell">
-          <video id="video" playsinline></video>
           <div id="videoEmpty" class="video-empty">
             <div class="big-emoji">
-              <svg class="icon icon-52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/></svg>
+              <svg class="icon icon-52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
             </div>
-            <p class="ve-title">No hay video todavía</p>
-            <p class="ve-sub">Carga una URL o elige un clip de ejemplo abajo</p>
+            <p class="ve-title">Nada en pantalla todavía</p>
+            <p class="ve-sub">Elige una página abajo para empezar a ver juntos</p>
           </div>
-          <button id="unmuteChip" class="chip hidden" title="El navegador silenció el video">
-            <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z" fill="currentColor" stroke="none"/><path d="m16 9 6 6M22 9l-6 6"/></svg>
-            El navegador silenció el video — tocar para activar sonido
-          </button>
           <button id="audioChip" class="chip amber hidden" title="El navegador bloquea el audio hasta que hagas clic">
             <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z" fill="currentColor" stroke="none"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
             Toca aquí para activar el audio del espejo
           </button>
-          <div id="videoTitle" class="video-title hidden"></div>
 
           <!-- modo espejo: navegador remoto compartido -->
           <div id="mirrorLayer" class="mirror-layer hidden" tabindex="0">
@@ -122,16 +128,16 @@
               <input id="mirrorKeys" class="input" placeholder="Escribe — se manda a la página espejada…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
               <button id="mkDone" class="btn small">Listo</button>
             </div>
-            <div class="mirror-bar">
-              <span class="mirror-dot" title="Espejo activo"></span>
-              <input id="mirrorUrlBar" class="input" placeholder="https://…" autocomplete="off" spellcheck="false">
-              <button id="btnMirrorGo" class="btn small">Ir</button>
-              <button id="btnMirrorStop" class="btn small ghost" title="Detener el espejo">
-                <svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-                Detener
+            <!-- v33: navegar como en un navegador normal — atrás / adelante -->
+            <div class="mirror-nav" id="mirrorNav">
+              <button id="btnMBack" class="btn small nav-btn" title="Volver a la página anterior">
+                <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+              </button>
+              <button id="btnMFwd" class="btn small nav-btn" title="Avanzar">
+                <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
               </button>
             </div>
-            <div class="mirror-hint">Navegador espejado — haz clic o escribe sobre la página: todos ven lo mismo</div>
+            <div class="mirror-hint">Navegador espejado — haz clic, arrastra o escribe sobre la página: todos ven lo mismo</div>
           </div>
 
           <!-- botón de ajuste (solo visible en pantalla completa) -->
@@ -149,87 +155,35 @@
           </div>
         </div>
 
-        <div class="controls card">
-          <button id="btnPlay" class="ctrl-btn" title="Reproducir / pausar (se sincroniza con todos)">
-            <svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
-          </button>
-          <span id="timeLbl" class="time">0:00 / 0:00</span>
-          <input id="seek" class="seek" type="range" min="0" max="1000" value="0" disabled>
-          <span id="syncBadge" class="badge">
-            <svg class="icon icon-12" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg>
-            <span>—</span>
-          </span>
-          <input id="volume" class="vol" type="range" min="0" max="1" step="0.05" value="1" title="Volumen (solo para ti)">
-          <button id="btnMute" class="ctrl-btn" title="Silenciar (solo para ti)">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z" fill="currentColor" stroke="none"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
-          </button>
-          <button id="btnFs" class="ctrl-btn" title="Pantalla completa">
-            <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
-          </button>
-        </div>
-
+        <!-- v33: barra única — elegir página (desplegable), URL propia y pantalla completa -->
         <div class="picker card">
-          <!-- fila visible solo cuando hay un video en curso: detenerlo devuelve las opciones -->
-          <div class="picker-row stop-row hidden" id="stopRow">
-            <span class="stop-lbl">
-              <svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>
-              <span>Video en curso — deténlo para cargar otro</span>
-            </span>
-            <button id="btnStopVideo" class="btn danger">
-              <svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-              Detener
-            </button>
-          </div>
-          <!-- móvil: mientras espeja, esta fila reemplaza a la barra del espejo (que se oculta) -->
-          <div class="picker-row stop-row" id="mirrorStopRow">
-            <span class="stop-lbl">
-              <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-              <span>Espejo activo — deténlo para cargar un video</span>
-            </span>
-            <button id="btnMirrorStop2" class="btn danger">
-              <svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-              Detener espejo
+          <div class="picker-row">
+            <select id="siteSel" class="input" title="Elegir página para espejar">
+              <option value="">Elige una página…</option>
+            </select>
+            <button id="btnFs" class="btn fs-btn" title="Pantalla completa">
+              <svg class="icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+              Ampliar
             </button>
           </div>
           <div class="picker-row">
-            <input id="videoUrl" class="input" placeholder="URL del video — https://…/video.mp4 o …/stream.m3u8" autocomplete="off" spellcheck="false">
-            <button id="btnLoad" class="btn primary">
-              <svg class="icon icon-16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
-              Cargar
-            </button>
-          </div>
-          <div class="divider"><span>o espeja una página web completa</span></div>
-          <div class="picker-row">
-            <input id="mirrorUrl" class="input" placeholder="https://es.wikipedia.org" autocomplete="off" spellcheck="false">
-            <button id="btnMirror" class="btn">
+            <input id="mirrorUrl" class="input" placeholder="…o escribe aquí la URL de la página" autocomplete="off" spellcheck="false">
+            <button id="btnMirror" class="btn primary">
               <svg class="icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
               Espejar
             </button>
           </div>
-          <!-- v30: sitios recomendados para espejear (se ocultan al espejar/cargar) -->
-          <div class="site-chips" id="siteChips">
-            <button class="site-chip" data-url="https://cuevana.mov/inicio"><img src="/sites/cuevana.png" alt="" class="site-logo">Cuevana</button>
-            <button class="site-chip" data-url="https://gopelis.com/"><img src="/sites/gopelis.png" alt="" class="site-logo">GoPelis</button>
-            <button class="site-chip" data-url="https://www.youtube.com/"><img src="/sites/youtube.png" alt="" class="site-logo">YouTube</button>
-          </div>
           <div class="picker-foot">
             <label class="mode-lbl" title="Solo el anfitrión puede cambiar esto">
-              <input type="checkbox" id="chkControl"> Cualquiera puede controlar la reproducción
+              <input type="checkbox" id="chkControl"> Cualquiera puede controlar el espejo
             </label>
             <span id="lockHint"></span>
           </div>
         </div>
       </section>
 
-      <!-- panel lateral -->
+      <!-- panel lateral: solo el chat (la gente está en la barra de arriba) -->
       <aside class="side">
-        <div class="card users-card">
-          <h3>
-            <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            En la sala <span id="userCount" class="count">0</span>
-          </h3>
-          <ul id="userList" class="user-list"></ul>
-        </div>
         <div class="card chat-card">
           <div id="chatLog" class="chat-log"></div>
           <form id="chatForm" class="chat-form">
@@ -244,6 +198,6 @@
   </div>
 
   <div id="toasts" class="toasts"></div>
-  <script src="/app.js?v=32"></script>
+  <script src="/app.js?v=33"></script>
 </body>
 </html>

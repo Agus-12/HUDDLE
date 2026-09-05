@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v32';
+const APP_VERSION = 'v33';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -50,8 +50,6 @@ const S = {
   useGet: false,     // se activa si el entorno bloquea POST
   helloSent: false,
 };
-
-const v = $('#video');
 
 /* ======================= utilidades ======================= */
 
@@ -135,7 +133,7 @@ function connect(code, opts = {}) {
     $('#chatLog').innerHTML = '';
     (d.room.chat || []).forEach(addChat);
     renderUsers(d.room.users);
-    $('#roomCodeLbl').textContent = d.room.code;
+    /* v33: el numero de sala ya no se muestra (la invitacion basta) */
     history.replaceState(null, '', '#' + d.room.code);
     showScreen('room');
     applyMirrorState(d.room.mirror || { active: false, url: '' });
@@ -257,9 +255,6 @@ async function pollRoom() {
     // espejo: reconciliar si difiere de lo que muestra la interfaz
     const act = !!(rm.mirror && rm.mirror.active);
     if (act !== S.mirror.active) applyMirrorState(rm.mirror);
-    else if (act && rm.mirror.url && document.activeElement !== $('#mirrorUrlBar')) {
-      $('#mirrorUrlBar').value = rm.mirror.url;
-    }
 
     // usuarios: si el servidor ya no nos tiene, nuestra conexión murió → reconectar
     if (rm.users && !rm.users.some((u) => u.id === S.userId)) {
@@ -267,18 +262,6 @@ async function pollRoom() {
       try { if (S.es) S.es.close(); } catch {}
       connect(S.code);
       return;
-    }
-
-    // reproducción: reconciliar solo si difiere de verdad y no acabamos de actuar
-    if (Date.now() - S.lastActionAt > 3000 && rm.state) {
-      const st = rm.state;
-      const playing = !!st.isPlaying;
-      const target = playing ? st.position + (Date.now() + S.offset - st.updatedAt) / 1000 : st.position;
-      const differs =
-        playing !== S.playState ||
-        (st.videoUrl || '') !== S.currentUrl ||
-        (st.videoUrl && isFinite(target) && Math.abs(v.currentTime - target) > 2.5);
-      if (differs) applyState(st);
     }
   } catch { /* sin respuesta: el badge de conexión lo reflejará el SSE */ }
 }
@@ -289,102 +272,15 @@ setInterval(pollRoom, 4000);
 function applyState(st) {
   if (!st) return;
   S.offset = st.serverNow - Date.now();
-  S.playState = !!st.isPlaying;
   if (S.room) S.room.anyoneCanControl = !!st.anyoneCanControl;
-
-  // cambio de video
-  if (st.videoUrl && st.videoUrl !== S.currentUrl) {
-    S.currentUrl = st.videoUrl;
-    loadVideo(st.videoUrl, st.videoTitle);
-    $('#videoEmpty').classList.add('hidden');
-  } else if (st.videoUrl && S.currentUrl && S.mirror.active) {
-    // el video se cargó mientras el espejo estaba activo: el espejo ya se apagó
-    $('#videoEmpty').classList.add('hidden');
-  } else if (!st.videoUrl && S.currentUrl) {
-    S.currentUrl = '';
-    destroyHls();
-    v.removeAttribute('src');
-    v.load();
-    $('#videoTitle').classList.add('hidden');
-    $('#videoEmpty').classList.remove('hidden'); // v18: al detener, vuelve la pantalla de inicio de sala
-  } else if (!st.videoUrl && !S.currentUrl && !S.mirror.active) {
-    $('#videoEmpty').classList.remove('hidden');
-  }
-
   S.canControl = !!st.anyoneCanControl || (S.room && S.room.hostId === S.userId);
   updateControlUi();
-
-  if (st.videoUrl) {
-    const nowServidor = Date.now() + S.offset;
-    const target = st.isPlaying
-      ? st.position + (nowServidor - st.updatedAt) / 1000
-      : st.position;
-    S.lastTarget = target;
-
-    if (!S.dragging && isFinite(target) && Math.abs(v.currentTime - target) > SYNC_TOLERANCE) {
-      try { v.currentTime = target; } catch {}
-    }
-    if (st.isPlaying) tryPlay();
-    else if (!v.paused) v.pause();
-  }
-
-  $('#btnPlay').innerHTML = st.isPlaying ? ICONS.pause : ICONS.play;
   updateBadge();
 }
 
-function loadVideo(url, title) {
-  destroyHls();
-  v.removeAttribute('src');
-  v.load();
-  $('#videoEmpty').classList.add('hidden');
-
-  const isHls = /\.m3u8($|\?)/i.test(url);
-  if (isHls && window.Hls && Hls.isSupported()) {
-    S.hls = new Hls();
-    S.hls.loadSource(url);
-    S.hls.attachMedia(v);
-    S.hls.on(Hls.Events.ERROR, (_evt, data) => {
-      if (data && data.fatal) toast('Error al cargar el stream HLS (revisa la URL o el CORS del servidor)');
-    });
-  } else if (isHls && !window.Hls) {
-    v.src = url; // Safari lo reproduce nativo; otros navegadores sin hls.js fallarán
-    v.load();
-  } else {
-    v.src = url;
-    v.load();
-  }
-
-  const t = title || guessTitle(url);
-  const el = $('#videoTitle');
-  el.textContent = t;
-  el.classList.toggle('hidden', !t);
-}
-
-function destroyHls() {
-  if (S.hls) { try { S.hls.destroy(); } catch {} S.hls = null; }
-}
-
-async function tryPlay() {
-  if (!v.paused) return;
-  try { await v.play(); }
-  catch {
-    // Política de autoplay: reintentamos silenciado y ofrecemos activar sonido.
-    v.muted = true;
-    try {
-      await v.play();
-      $('#unmuteChip').classList.remove('hidden');
-    } catch {}
-  }
-}
-
-function updateBadge() {
-  const b = $('#syncBadge');
-  if (!S.currentUrl || S.mirror.active) { b.innerHTML = ICONS.monitor + '<span>espejo</span>'; b.className = 'badge'; return; }
-  if (!S.playState) { b.innerHTML = ICONS.pause + '<span>en pausa</span>'; b.className = 'badge'; return; }
-  const drift = Math.abs(v.currentTime - S.lastTarget);
-  b.innerHTML = ICONS.bolt + `<span>sync ±${drift.toFixed(1)}s</span>`;
-  b.className = 'badge ' + (drift < 0.6 ? 'ok' : 'warn');
-}
+/* v33: la app ya no reproduce videos por URL — solo espeja páginas.
+ * El badge de sync vivía en la barra del reproductor, que ya no existe. */
+function updateBadge() {}
 
 /* ======================= modo espejo (navegador remoto) ======================= */
 
@@ -394,10 +290,8 @@ function applyMirrorState(ms) {
   S.mirror.url = ms.url || '';
   document.body.classList.toggle('mirroring', !!ms.active);
   $('#mirrorLayer').classList.toggle('hidden', !S.mirror.active);
-  $('#video').classList.toggle('hidden', S.mirror.active);
-  $('#videoEmpty').classList.toggle('hidden', S.mirror.active || !!S.currentUrl);
+  $('#videoEmpty').classList.toggle('hidden', S.mirror.active);
   if (S.mirror.active) {
-    $('#mirrorUrlBar').value = S.mirror.url;
     AU.needAudio = !!ms.audio; // el servidor indica si hay audio disponible
     // si el audio quedó suspendido de una sesión anterior, reactivarlo
     if (AU.needAudio && AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume().catch(() => {});
@@ -751,32 +645,25 @@ $('#mirrorLayer').addEventListener('wheel', (e) => {
   sendAction({ type: 'mirror', op: 'scroll', deltaY: Math.round(e.deltaY) });
 }, { passive: false });
 
-/* barra de URL del espejo */
-function mirrorNav() {
+/* v33: detener el espejo vive en la barra de arriba, junto a Salir */
+$('#btnStopMirrorTop').addEventListener('click', () => {
+  if (S.canControl) sendAction({ type: 'mirror', op: 'stop' });
+  else toast('Solo el anfitrión controla el espejo');
+});
+
+/* v33: navegar el espejo como un navegador normal — atrás / adelante */
+$('#btnMBack').addEventListener('click', () => {
+  if (!S.mirror.active) return;
   if (!S.canControl) { toast('Solo el anfitrión controla el espejo'); return; }
-  const url = $('#mirrorUrlBar').value.trim();
-  if (url) sendAction({ type: 'mirror', op: 'nav', url });
-  $('#mirrorLayer').focus();
-}
-$('#btnMirrorGo').addEventListener('click', mirrorNav);
-$('#mirrorUrlBar').addEventListener('keydown', (e) => { if (e.key === 'Enter') mirrorNav(); });
-$('#btnMirrorStop').addEventListener('click', () => {
-  if (S.canControl) sendAction({ type: 'mirror', op: 'stop' });
-  else toast('Solo el anfitrión controla el espejo');
+  sendAction({ type: 'mirror', op: 'back' });
 });
-/* v19: en móvil la barra del espejo se oculta; este botón (en las opciones) la reemplaza */
-$('#btnMirrorStop2').addEventListener('click', () => {
-  if (S.canControl) sendAction({ type: 'mirror', op: 'stop' });
-  else toast('Solo el anfitrión controla el espejo');
+$('#btnMFwd').addEventListener('click', () => {
+  if (!S.mirror.active) return;
+  if (!S.canControl) { toast('Solo el anfitrión controla el espejo'); return; }
+  sendAction({ type: 'mirror', op: 'fwd' });
 });
 
-/* detener el video en curso: devuelve las opciones de cargar/espejar */
-$('#btnStopVideo').addEventListener('click', () => {
-  if (!S.canControl) { toast('Solo el anfitrión controla la reproducción'); return; }
-  sendAction({ type: 'video', url: '' });
-});
-
-/* iniciar espejo desde el selector */
+/* iniciar espejo desde el selector (o cambiar de página sin detener) */
 function startMirrorFromPicker() {
   if (!S.canControl) { toast('Solo el anfitrión puede espejar'); return; }
   const url = $('#mirrorUrl').value.trim();
@@ -795,36 +682,44 @@ function startMirrorFromPicker() {
 $('#btnMirror').addEventListener('click', startMirrorFromPicker);
 $('#mirrorUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') startMirrorFromPicker(); });
 
-/* v30: sitios recomendados — un toque y arranca el espejo directo */
-document.querySelectorAll('.site-chip').forEach((b) => {
-  b.addEventListener('click', () => {
-    if (!S.canControl) { toast('Solo el anfitrión puede espejar'); return; }
-    $('#mirrorUrl').value = b.dataset.url;
-    startMirrorFromPicker();
+/* v33: páginas recomendadas en lista desplegable — se puede cambiar de página
+ * sin detener el espejo, y agregar más páginas después sin alargar la barra */
+const SITES = [
+  { name: 'Cuevana — películas y series', url: 'https://cuevana.mov/inicio' },
+  { name: 'GoPelis — películas', url: 'https://gopelis.com/' },
+  { name: 'AnimeD23 — animes', url: 'https://animed23.com/' },
+  { name: 'YouTube — videos', url: 'https://www.youtube.com/' },
+  { name: 'Otra página (escribe la URL)…', url: '' },
+];
+(function llenarSitios() {
+  const sel = $('#siteSel');
+  if (!sel) return;
+  SITES.forEach((s) => {
+    const o = document.createElement('option');
+    o.value = s.url;
+    o.textContent = s.name;
+    sel.appendChild(o);
   });
-});
+  sel.addEventListener('change', () => {
+    if (!sel.value) { $('#mirrorUrl').focus(); return; } // "otra página": a escribir
+    if (!S.canControl) { toast('Solo el anfitrión puede espejar'); sel.value = ''; return; }
+    $('#mirrorUrl').value = sel.value;
+    startMirrorFromPicker();
+    sel.value = '';
+  });
+})();
 
 function updateControlUi() {
   const isHost = S.room && S.room.hostId === S.userId;
-  const mirrorOn = S.mirror.active;
-  /* con un video en curso, las opciones de cargar/espejar se esconden:
-   * vuelven cuando el usuario detiene el video (igual que el espejo) */
-  const videoOn = !!S.currentUrl && !mirrorOn;
-  document.body.classList.toggle('playing', videoOn);
-  $('#stopRow').classList.toggle('hidden', !videoOn);
-  $('#btnStopVideo').disabled = !S.canControl;
-  $('#btnMirrorStop2').disabled = !S.canControl;
-  $('#btnPlay').disabled = !S.canControl || !S.currentUrl || mirrorOn;
-  $('#seek').disabled = !S.canControl || !S.currentUrl || mirrorOn;
-  $('#btnLoad').disabled = !S.canControl || mirrorOn;
-  $('#videoUrl').disabled = !S.canControl || mirrorOn;
+  $('#siteSel').disabled = !S.canControl;
   $('#btnMirror').disabled = !S.canControl;
-  $('#mirrorUrl').disabled = !S.canControl || mirrorOn;
-  $('#btnMirrorGo').disabled = !S.canControl;
-  $('#btnMirrorStop').disabled = !S.canControl;
+  $('#mirrorUrl').disabled = !S.canControl;
+  $('#btnStopMirrorTop').disabled = !S.canControl;
+  $('#btnMBack').disabled = !S.canControl;
+  $('#btnMFwd').disabled = !S.canControl;
   $('#chkControl').checked = !!(S.room && S.room.anyoneCanControl);
   $('#chkControl').disabled = !isHost;
-  $('#lockHint').textContent = S.canControl ? '' : 'Solo el anfitrión controla la reproducción';
+  $('#lockHint').textContent = S.canControl ? '' : 'Solo el anfitrión controla el espejo';
   $('#mirrorLayer').classList.toggle('locked', !S.canControl);
 }
 
@@ -850,9 +745,21 @@ function renderUsers(users) {
     if (u.isHost) { const c = document.createElement('span'); c.className = 'crown'; c.title = 'Anfitrión'; c.innerHTML = ICONS.crown; li.appendChild(c); }
     list.appendChild(li);
   });
-  $('#userCount').textContent = users ? users.length : 0;
+  $('#userCountTop').textContent = users ? users.length : 0;
   updateControlUi();
 }
+
+/* v33: la lista de gente se despliega desde el chip de la barra de arriba */
+$('#btnUsers').addEventListener('click', (e) => {
+  e.stopPropagation();
+  $('#usersDrop').classList.toggle('hidden');
+});
+document.addEventListener('click', (e) => {
+  const drop = $('#usersDrop');
+  if (!drop.classList.contains('hidden') && !drop.contains(e.target) && e.target.id !== 'btnUsers') {
+    drop.classList.add('hidden');
+  }
+});
 
 function addChat(msg) {
   const log = $('#chatLog');
@@ -915,60 +822,12 @@ const ticker = {
 
 /* ======================= controles ======================= */
 
-function togglePlay() {
-  if (!S.currentUrl) { toast('Primero carga un video'); return; }
-  if (!S.canControl) { toast('Solo el anfitrión controla la reproducción'); return; }
-  if (v.paused) { tryPlay(); sendAction({ type: 'play' }); }
-  else { v.pause(); sendAction({ type: 'pause' }); }
-}
+/* v33: sin video propio — la pausa y el avance se hacen sobre la página espejada */
 
-$('#btnPlay').addEventListener('click', togglePlay);
-v.addEventListener('click', togglePlay);
-v.addEventListener('dblclick', toggleFullscreen);
-
-const seek = $('#seek');
-seek.addEventListener('pointerdown', () => { S.dragging = true; });
-seek.addEventListener('input', () => {
-  if (isFinite(v.duration)) $('#timeLbl').textContent = `${fmt((seek.value / 1000) * v.duration)} / ${fmt(v.duration)}`;
-});
-seek.addEventListener('change', () => {
-  S.dragging = false;
-  if (!S.canControl || !isFinite(v.duration)) return;
-  const pos = (seek.value / 1000) * v.duration;
-  try { v.currentTime = pos; } catch {}
-  sendAction({ type: 'seek', position: pos });
-});
-
-v.addEventListener('timeupdate', () => {
-  if (!S.dragging && isFinite(v.duration) && v.duration > 0) {
-    seek.value = String(Math.round((v.currentTime / v.duration) * 1000));
-  }
-  $('#timeLbl').textContent = `${fmt(v.currentTime)} / ${fmt(v.duration)}`;
-  updateBadge();
-});
-
-v.addEventListener('loadedmetadata', () => {
-  if (S.lastTarget > 0 && Math.abs(v.currentTime - S.lastTarget) > SYNC_TOLERANCE) {
-    try { v.currentTime = S.lastTarget; } catch {}
-  }
-});
-v.addEventListener('canplay', () => { if (S.playState) tryPlay(); });
-v.addEventListener('ended', () => { if (S.currentUrl && S.userId) sendAction({ type: 'ended', position: v.duration || 0 }); });
-v.addEventListener('error', () => {
-  if (S.currentUrl && !S.hls) toast('No se pudo cargar el video (enlace caído, CORS o formato no soportado)');
-});
-v.addEventListener('volumechange', () => {
-  $('#btnMute').innerHTML = (v.muted || v.volume === 0) ? ICONS.volMute : (v.volume < 0.5 ? ICONS.volLow : ICONS.volHigh);
-});
-
-$('#volume').addEventListener('input', (e) => { v.volume = Number(e.target.value); v.muted = Number(e.target.value) === 0; });
-$('#btnMute').addEventListener('click', () => { v.muted = !v.muted; });
-
-/* pantalla completa: en modo video se maximiza el propio <video> (el navegador
- * lo ajusta con bandas negras, nunca se recorta); en modo espejo, el contenedor.
- * iPhones no soportan la API de pantalla completa en divs (solo en <video>),
- * así que al espejar usamos una pantalla completa simulada: el reproductor
- * se fija cubriendo toda la ventana, con botón ✕ para salir. */
+/* pantalla completa (v33: solo espejo — sin video propio): el contenedor se
+ * maximiza. iPhones no soportan la API de pantalla completa en divs, así que
+ * usamos una pantalla completa simulada: el reproductor se fija cubriendo
+ * toda la ventana, con botón para salir. */
 const videoShellEl = $('#videoShell');
 function fsActive() {
   return !!(document.fullscreenElement || document.webkitFullscreenElement ||
@@ -1006,10 +865,8 @@ function toggleFullscreen() {
   if (rf) {
     const p = rf.call(videoShellEl);
     if (p && p.catch) p.catch(() => enterPseudoFs()); // si el navegador la rechaza, simulada
-  } else if (!S.mirror.active && v.webkitEnterFullscreen && v.currentSrc) {
-    v.webkitEnterFullscreen(); // iPhone con video: reproductor nativo
   } else {
-    enterPseudoFs(); // iPhone espejando (o navegador sin la API): simulada
+    enterPseudoFs(); // iPhone (o navegador sin la API): pantalla completa simulada
   }
 }
 $('#btnFs').addEventListener('click', toggleFullscreen);
@@ -1029,29 +886,9 @@ const _fsReset = () => {
 };
 document.addEventListener('fullscreenchange', _fsReset);
 document.addEventListener('webkitfullscreenchange', _fsReset);
-$('#unmuteChip').addEventListener('click', () => { v.muted = false; $('#unmuteChip').classList.add('hidden'); });
-
 $('#chkControl').addEventListener('change', (e) => {
   sendAction({ type: 'mode', anyoneCanControl: e.target.checked });
 });
-
-/* ======================= selector de video ======================= */
-
-function loadVideoFor(url, title) {
-  if (!S.canControl) { toast('Solo el anfitrión puede cambiar el video'); return; }
-  sendAction({ type: 'video', url, title });
-}
-
-$('#btnLoad').addEventListener('click', () => {
-  const url = $('#videoUrl').value.trim();
-  if (!/^https?:\/\/.+/i.test(url) && !url.startsWith('/')) {
-    toast('Pega una URL válida (http/https)');
-    return;
-  }
-  loadVideoFor(url, guessTitle(url));
-  $('#videoUrl').value = '';
-});
-$('#videoUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#btnLoad').click(); });
 
 /* ======================= chat ======================= */
 
@@ -1060,6 +897,11 @@ $('#chatForm').addEventListener('submit', (e) => {
   const input = $('#chatInput');
   const text = input.value.trim();
   if (text) { sendAction({ type: 'chat', text }); input.value = ''; }
+  /* v33: en celular, al enviar con Enter el teclado se cierra para que
+   * la película vuelva a ocupar la pantalla; se reabre al tocar el cuadro */
+  if (text && window.matchMedia && matchMedia('(pointer: coarse)').matches) {
+    try { input.blur(); } catch {}
+  }
 });
 
 /* ======================= topbar ======================= */
@@ -1160,6 +1002,7 @@ const SITE_LOGOS = {
   'cuevana.mov': '/sites/cuevana.png',
   'gopelis.com': '/sites/gopelis.png',
   'youtube.com': '/sites/youtube.png',
+  'animed23.com': '/sites/animed23.png',
 };
 function siteLogoFor(host) {
   const h = String(host || '').replace(/^www\./, '').toLowerCase();

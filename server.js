@@ -21,10 +21,10 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v32'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v33'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
-const ROOM_TTL_MS = 2 * 60 * 60 * 1000; // salas vacías se borran a las 2 h
+const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 /* Audio del espejo: Chrome suena en un sink virtual de PulseAudio
@@ -170,7 +170,7 @@ const mirrors = new Map(); // roomCode -> mirror
 const PAGE_DEAD = /session closed|target closed|page closed|browser has disconnected|browser closed|session destroyed|detached|protocol error \(input\.|protocol error \(page\.|target created/i;
 const MIRROR_MAX = +(process.env.MIRROR_MAX || 2); // espejos simultáneos (RAM; en Oracle MIRROR_MAX=8)
 const MIRROR_SEND_MS = 45;          // máx. ~20 fps hacia los clientes
-const MIRROR_IDLE_MS = 90 * 1000; // se cierra si la sala queda vacía 90 s
+const MIRROR_IDLE_MS = 20 * 1000; // la sala queda vacía → el espejo se apaga en 20 s
 const MIRROR_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
 function mirrorState(room) {
@@ -481,6 +481,7 @@ function handleEvents(req, res, url) {
   res.write(':ok\n\n');
   res.rrUserId = userId;
   room.clients.add(res);
+  room.emptyAt = 0; // hay gente: se resetea el contador de sala vacía
 
   send(res, 'hello', {
     userId,
@@ -522,6 +523,7 @@ function handleEvents(req, res, url) {
   req.on('close', () => {
     clearInterval(heartbeat);
     room.clients.delete(res);
+    if (room.clients.size === 0) room.emptyAt = Date.now(); // sala vacía: empieza la cuenta
 
     // Esperamos 10 s por si es una reconexión del mismo usuario.
     setTimeout(() => {
@@ -642,6 +644,8 @@ async function handleAction(req, res, body) {
       }
       else if (op === 'type') await m.page.keyboard.type(String(action.text || '').slice(0, 60));
       else if (op === 'press') await m.page.keyboard.press(String(action.key || 'Enter').slice(0, 20));
+      else if (op === 'back') await m.page.goBack({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+      else if (op === 'fwd') await m.page.goForward({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
       else if (op === 'scroll') await m.page.mouse.wheel({ deltaY: +action.deltaY || 0 });
       else return json(res, 400, { ok: false, error: 'Operación de espejo desconocida' });
 
@@ -868,9 +872,11 @@ setInterval(() => {
 setInterval(() => {
   const now = Date.now();
   for (const [code, room] of rooms) {
-    if (room.clients.size === 0 && now - room.createdAt > ROOM_TTL_MS) {
-      if (mirrors.has(code)) stopMirror(room).catch(() => {});
+    /* v33: se borra la sala que pasó 40 min CON 0 PERSONAS (no desde su creación) */
+    if (room.clients.size === 0 && room.emptyAt && now - room.emptyAt > ROOM_TTL_MS) {
+      if (mirrors.has(code)) stopMirror(code).catch(() => {});
       rooms.delete(code);
+      console.log(`[sala] ${code} vacía más de 40 min — eliminada para liberar memoria`);
     }
   }
 }, 60000);

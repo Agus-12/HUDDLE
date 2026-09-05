@@ -514,11 +514,7 @@ body.fs-lock .topbar { display: none; }
 .video-shell:-webkit-full-screen #fsExit,
 .video-shell.pseudo-fs #fsExit { display: inline-flex; }
 
-/* ---------- v18: opciones escondidas mientras hay video o espejo activo ---------- */
-body.playing .picker .picker-row:not(.stop-row),
-body.playing .picker .site-chips,
-body.playing .picker .divider { display: none; }
-body.mirroring .picker { display: none; }
+/* ---------- v18 (v33: el selector ya no se esconde — cambia de página en vivo) ---------- */
 .stop-row { justify-content: space-between; align-items: center; }
 .stop-lbl {
   display: inline-flex; align-items: center; gap: 8px;
@@ -563,15 +559,7 @@ body.mirroring .picker { display: none; }
   .landing-card { padding: 26px 20px; }
   h1 { font-size: 32px; }
 
-  .mirror-bar, .mirror-hint { display: none !important; }
-
-  /* mientras espeja: las opciones muestran solo la fila de detener el espejo */
-  body.mirroring .picker { display: block; }
-  body.mirroring .picker .picker-row,
-  body.mirroring .picker .site-chips,
-  body.mirroring .picker .divider,
-  body.mirroring .picker .picker-foot { display: none; }
-  body.mirroring .picker #mirrorStopRow { display: flex; }
+  .mirror-hint { display: none !important; }
 }
 
 /* ---------- v20: el reproductor jamás mide más que la ventana ----------
@@ -616,9 +604,6 @@ body {
  * antes: en escritorio cada mensaje estiraba la columna y la página se hacía
  * larguísima. Tope general según la altura de tu ventana, y en celular más bajo. */
 .chat-card { max-height: clamp(240px, calc(100vh - 230px), 560px); }
-@media (max-width: 980px) {
-  .chat-card { max-height: 340px; min-height: 200px; }
-}
 
 /* ---------- v27: navegar el espejo con el dedo ----------
  * arrastrar = desplazarse por la página (touch-action none para que el dedo
@@ -710,4 +695,63 @@ body {
   width: 44px; height: 44px;
   object-fit: contain; border-radius: 10px;
   background: rgba(255, 255, 255, 0.07); padding: 7px;
+}
+
+/* ======================= v33: sala compacta, todo a la mano ======================= */
+
+/* detener el espejo: vive en la barra de arriba (solo aparece al espejar) */
+#btnStopMirrorTop { display: none; }
+body.mirroring #btnStopMirrorTop { display: inline-flex; }
+
+/* chip de gente + lista desplegable */
+.users-chip { font-weight: 700; }
+.users-drop {
+  position: absolute; top: calc(100% + 6px); right: 12px; z-index: 60;
+  min-width: 210px; max-width: 280px;
+  background: #14101f; border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 12px; box-shadow: 0 14px 44px rgba(0, 0, 0, 0.55);
+}
+.users-drop h4 {
+  margin: 0 0 8px; font-size: 11px; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--dim);
+}
+
+/* navegar el espejo: atras / adelante sobre la esquina del video */
+.mirror-nav {
+  position: absolute; top: 10px; left: 10px; z-index: 30;
+  display: none; gap: 8px;
+}
+body.mirroring .mirror-nav { display: flex; }
+.mirror-nav .nav-btn { background: rgba(10, 7, 19, 0.82); backdrop-filter: blur(8px); }
+/* en pantalla completa no chocan con el boton de salir */
+.video-shell:fullscreen .mirror-nav,
+.video-shell:-webkit-full-screen .mirror-nav,
+.video-shell.pseudo-fs .mirror-nav { left: 58px; top: calc(10px + env(safe-area-inset-top, 0px)); }
+
+/* selector de paginas con flechita propia (sin estilo por defecto del sistema) */
+select.input {
+  appearance: none; -webkit-appearance: none; cursor: pointer;
+  padding-right: 32px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%238b84a3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+}
+.fs-btn { white-space: nowrap; }
+
+/* ---------- v33: en pantallas chicas TODO cabe sin hacer scroll ----------
+ * el chat queda a la vista junto al video: se escribe sin perder de vista
+ * la pelicula; los mensajes viejos hacen scroll DENTRO del chat. */
+@media (max-width: 980px) {
+  #room { display: flex; flex-direction: column; min-height: 100dvh; }
+  .topbar { flex: none; }
+  .layout {
+    flex: 1; min-height: 0;
+    display: flex; flex-direction: column;
+    gap: 10px; padding: 10px;
+  }
+  .player-col { flex: none; gap: 10px; }
+  .picker { flex: none; padding: 10px; gap: 8px; }
+  .side { flex: 1; min-height: 0; display: flex; }
+  .chat-card { flex: 1; min-height: 150px; max-height: none; }
+  .chat-log { flex: 1; min-height: 0; }
+  .chat-form { flex: none; }
 }
