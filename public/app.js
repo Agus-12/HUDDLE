@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v41';
+const APP_VERSION = 'v42';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -294,6 +294,7 @@ function applyMirrorState(ms) {
   if (S.mirror.active) {
     AU.needAudio = !!ms.audio; // el servidor indica si hay audio disponible
     if (window.__setPagePick) window.__setPagePick(S.mirror.url);
+    pedirPantallaActiva(); // v42: mientras se mira, la pantalla no se apaga
     // si el audio quedó suspendido de una sesión anterior, reactivarlo
     if (AU.needAudio && AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume().catch(() => {});
     // pantalla de carga hasta que llegue el primer frame
@@ -302,6 +303,7 @@ function applyMirrorState(ms) {
     /* v36: al detener NO se resetea el botón — la página elegida se queda
        mostrada, lista para volver a espejar con un toque */
     S.mirror.gotFrame = false;
+    soltarPantallaActiva(); // v42: sin espejo, la pantalla puede apagarse normal
     AU.needAudio = false;
     S.frameSeq++;
     try { const c = $('#mirrorImg'); c.getContext('2d').clearRect(0, 0, c.width, c.height); } catch {}
@@ -777,6 +779,13 @@ function renderUsers(users) {
     const host = users.find((u) => u.isHost);
     if (host) S.room.hostId = host.id;
   }
+  /* v42: aviso sonoro suave cuando ENTRA alguien nuevo
+     (la primera lista no suena — es el estado inicial de la sala) */
+  if (Array.isArray(users)) {
+    const nombres = users.map((u) => u.name);
+    if (prevUsers && nombres.some((n) => !prevUsers.includes(n))) sonidoEntrada();
+    prevUsers = nombres;
+  }
   const list = $('#userList');
   list.innerHTML = '';
   (users || []).forEach((u) => {
@@ -1129,3 +1138,48 @@ if (window.visualViewport) {
     setTimeout(() => { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch {} }, 250);
   });
 });
+
+/* ======================= v42: pantalla activa + aviso de entrada ======================= */
+
+/* mientras se mira el espejo, la pantalla del celular no se apaga
+   (Wake Lock — necesita HTTPS, que ya tenemos con el dominio) */
+function pedirPantallaActiva() {
+  try {
+    if ('wakeLock' in navigator && !S.wakeLock && document.visibilityState === 'visible') {
+      navigator.wakeLock.request('screen').then((wl) => {
+        S.wakeLock = wl;
+        wl.addEventListener('release', () => { S.wakeLock = null; });
+      }).catch(() => {});
+    }
+  } catch {}
+}
+function soltarPantallaActiva() {
+  try { if (S.wakeLock) S.wakeLock.release().catch(() => {}); } catch {}
+  S.wakeLock = null;
+}
+/* si el celular se sale y vuelve a la app, re-pedir el bloqueo */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && S.mirror.active) pedirPantallaActiva();
+});
+
+/* "pop" suave de dos notitas cuando entra alguien a la sala */
+let popCtx = null;
+function sonidoEntrada() {
+  try {
+    popCtx = popCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (popCtx.state === 'suspended') popCtx.resume().catch(() => {});
+    const t = popCtx.currentTime;
+    const o = popCtx.createOscillator();
+    const g = popCtx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(587, t);
+    o.frequency.setValueAtTime(784, t + 0.08);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.09, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+    o.connect(g).connect(popCtx.destination);
+    o.start(t);
+    o.stop(t + 0.3);
+  } catch {}
+}
+let prevUsers = null;

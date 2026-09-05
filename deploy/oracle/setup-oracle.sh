@@ -45,6 +45,21 @@ for p in git curl unzip xvfb pulseaudio pulseaudio-utils fonts-liberation \
   apt-get install -y -qq "$p" 2>/dev/null || apt-get install -y -qq "${p%t64}" 2>/dev/null || true
 done
 
+# ---- 1b) actualizaciones de seguridad automáticas (v42) -----------------
+# Ubuntu instala solo los parches de seguridad, sin reiniciar el servidor
+# (para no cortar una película a medias).
+echo "==> Activando actualizaciones de seguridad automáticas ..."
+apt-get install -y -qq unattended-upgrades >/dev/null 2>&1 || true
+cat > /etc/apt/apt.conf.d/20auto-upgrades <<'AUTEOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+AUTEOF
+cat > /etc/apt/apt.conf.d/51huddle-local <<'AUTEOF'
+// Huddle: parchear seguridad pero JAMÁS reiniciar solo el servidor
+Unattended-Upgrade::Automatic-Reboot "false";
+AUTEOF
+echo "    Actualizaciones de seguridad automáticas: activadas"
+
 # ---- 2) Node.js 22 (ARM64) --------------------------------------------
 if ! command -v node >/dev/null || [ "$(node -v | cut -c2- | cut -d. -f1)" -lt 18 ]; then
   echo "==> Instalando Node.js 22 ..."
