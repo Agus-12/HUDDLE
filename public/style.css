@@ -709,6 +709,8 @@ body.mirroring #btnStopMirrorTop { display: inline-flex; }
 .users-drop {
   position: absolute; top: calc(100% + 6px); right: 12px; z-index: 60;
   min-width: 210px; max-width: 280px;
+  /* nunca más ancho que la pantalla, vaya donde vaya el botón */
+  max-width: min(280px, calc(100vw - 12px));
   background: #14101f; border: 1px solid var(--line); border-radius: 12px;
   padding: 10px 12px; box-shadow: 0 14px 44px rgba(0, 0, 0, 0.55);
 }
