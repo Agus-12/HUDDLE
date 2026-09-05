@@ -716,17 +716,10 @@ body.mirroring #btnStopMirrorTop { display: inline-flex; }
   letter-spacing: 1px; color: var(--dim);
 }
 
-/* navegar el espejo: atras / adelante sobre la esquina del video */
-.mirror-nav {
-  position: absolute; top: 10px; left: 10px; z-index: 30;
-  display: none; gap: 8px;
-}
+/* navegar el espejo: atras / adelante (v34: posición y estilo en el bloque v34) */
+.mirror-nav { display: none; }
 body.mirroring .mirror-nav { display: flex; }
 .mirror-nav .nav-btn { background: rgba(10, 7, 19, 0.82); backdrop-filter: blur(8px); }
-/* en pantalla completa no chocan con el boton de salir */
-.video-shell:fullscreen .mirror-nav,
-.video-shell:-webkit-full-screen .mirror-nav,
-.video-shell.pseudo-fs .mirror-nav { left: 58px; top: calc(10px + env(safe-area-inset-top, 0px)); }
 
 /* selector de paginas con flechita propia (sin estilo por defecto del sistema) */
 select.input {
@@ -755,3 +748,66 @@ select.input {
   .chat-log { flex: 1; min-height: 0; }
   .chat-form { flex: none; }
 }
+
+/* ======================= v34: barra compacta de un solo renglón ======================= */
+
+/* botones de puro icono, mismo tamaño entre sí */
+.btn.icon-only { padding: 7px 9px; }
+.icon-only + .icon-only { margin-left: 0; }
+
+/* la barra de arriba nunca se parte en dos: el logo a la izquierda,
+   los iconos a la derecha, en UNA fila */
+.topbar { flex-wrap: nowrap !important; }
+.top-actions { flex-wrap: nowrap !important; }
+.brand-logo { height: 24px; width: auto; }
+@media (max-width: 700px) {
+  .topbar { padding: 8px 10px; }
+  .top-actions { gap: 6px; }
+  .conn { padding: 4px 8px; font-size: 11px; }
+  .btn.small { padding: 7px 8px; }
+  .ver { display: none; } /* en celular, cada pixel de la barra cuenta */
+}
+
+/* ---------- desplegable de páginas con logos ---------- */
+.page-pick { position: relative; flex: 1; min-width: 0; }
+.page-pick-btn {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; text-align: left; cursor: pointer;
+}
+.page-pick-btn .chev { margin-left: auto; flex: none; opacity: 0.7; }
+.page-pick-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.page-drop {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 55;
+  background: #14101f; border: 1px solid var(--line); border-radius: 12px;
+  padding: 6px; box-shadow: 0 14px 44px rgba(0, 0, 0, 0.55);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.page-opt {
+  display: flex; align-items: center; gap: 10px;
+  background: none; border: 0; color: var(--txt);
+  font: inherit; font-size: 14px; text-align: left;
+  padding: 9px 10px; border-radius: 8px; cursor: pointer;
+}
+.page-opt:hover { background: rgba(255, 255, 255, 0.07); }
+.page-opt .site-logo { width: 20px; height: 20px; border-radius: 5px; flex: none; }
+.page-opt .icon { color: var(--dim); flex: none; }
+.page-pick-btn .site-logo { width: 20px; height: 20px; border-radius: 5px; flex: none; }
+
+/* ---------- botones de navegación del espejo: discretos, esquina derecha ---------- */
+.mirror-nav {
+  position: absolute; top: 10px; right: 14px; z-index: 30;
+  display: none; gap: 6px;
+}
+body.mirroring .mirror-nav { display: flex; }
+.nav-btn { opacity: 0.45; transition: opacity 0.15s; }
+.nav-btn:hover, .nav-btn:active { opacity: 1; }
+/* en pantalla completa se ponen a la izquierda del botón Llenar (nada junto a la ✕) */
+.video-shell:fullscreen .mirror-nav,
+.video-shell:-webkit-full-screen .mirror-nav,
+.video-shell.pseudo-fs .mirror-nav {
+  right: calc(112px + env(safe-area-inset-right, 0px));
+  top: calc(10px + env(safe-area-inset-top, 0px));
+}
+
+/* fila de URL solo cuando se pide "otra página" */
+#customRow { animation: none; }

@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v33';
+const APP_VERSION = 'v34';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -293,11 +293,13 @@ function applyMirrorState(ms) {
   $('#videoEmpty').classList.toggle('hidden', S.mirror.active);
   if (S.mirror.active) {
     AU.needAudio = !!ms.audio; // el servidor indica si hay audio disponible
+    if (window.__setPagePick) window.__setPagePick(S.mirror.url);
     // si el audio quedó suspendido de una sesión anterior, reactivarlo
     if (AU.needAudio && AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume().catch(() => {});
     // pantalla de carga hasta que llegue el primer frame
     if (!S.mirror.gotFrame) $('#mirrorLoading').classList.remove('hidden');
   } else {
+    if (window.__setPagePick && !S.mirror.url) window.__setPagePick(''); // v34: al detener, vuelve a "elige una pagina"
     S.mirror.gotFrame = false;
     AU.needAudio = false;
     S.frameSeq++;
@@ -678,40 +680,79 @@ function startMirrorFromPicker() {
     if (r && r.ok === false) applyMirrorState({ active: false, url: '' });
   });
   $('#mirrorUrl').value = '';
+  $('#customRow').classList.add('hidden'); // la fila de URL solo se usa al escribirla
 }
 $('#btnMirror').addEventListener('click', startMirrorFromPicker);
 $('#mirrorUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') startMirrorFromPicker(); });
 
-/* v33: páginas recomendadas en lista desplegable — se puede cambiar de página
- * sin detener el espejo, y agregar más páginas después sin alargar la barra */
+/* v34: páginas recomendadas en desplegable propio CON LOGOS — un toque y a ver;
+   la fila de URL solo aparece al elegir "Otra página" */
 const SITES = [
-  { name: 'Cuevana — películas y series', url: 'https://cuevana.mov/inicio' },
-  { name: 'GoPelis — películas', url: 'https://gopelis.com/' },
-  { name: 'AnimeD23 — animes', url: 'https://animed23.com/' },
-  { name: 'YouTube — videos', url: 'https://www.youtube.com/' },
-  { name: 'Otra página (escribe la URL)…', url: '' },
+  { name: 'Cuevana', full: 'Cuevana — películas y series', url: 'https://cuevana.mov/inicio', logo: '/sites/cuevana.png' },
+  { name: 'GoPelis', full: 'GoPelis — películas', url: 'https://gopelis.com/', logo: '/sites/gopelis.png' },
+  { name: 'AnimeD23', full: 'AnimeD23 — animes', url: 'https://animed23.com/', logo: '/sites/animed23.png' },
+  { name: 'YouTube', full: 'YouTube — videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
 ];
-(function llenarSitios() {
-  const sel = $('#siteSel');
-  if (!sel) return;
-  SITES.forEach((s) => {
-    const o = document.createElement('option');
-    o.value = s.url;
-    o.textContent = s.name;
-    sel.appendChild(o);
+(function montarPaginas() {
+  const btn = $('#pagePickBtn');
+  const drop = $('#pageDrop');
+  if (!btn || !drop) return;
+
+  const setBtn = (logo, texto) => {
+    const im = $('#pagePickLogo');
+    if (logo) { im.src = logo; im.hidden = false; } else { im.hidden = true; im.removeAttribute('src'); }
+    $('#pagePickName').textContent = texto;
+  };
+
+  const opciones = SITES.map((s) =>
+    `<button class="page-opt" type="button" data-url="${s.url}" data-logo="${s.logo}" data-name="${s.name}">
+      <img src="${s.logo}" class="site-logo" alt=""><span>${s.full}</span>
+    </button>`
+  ).join('') +
+  `<button class="page-opt" type="button" data-url="" data-name="otra">
+     <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+     <span>Otra página (escribe la URL)…</span>
+   </button>`;
+  drop.innerHTML = opciones;
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    drop.classList.toggle('hidden');
   });
-  sel.addEventListener('change', () => {
-    if (!sel.value) { $('#mirrorUrl').focus(); return; } // "otra página": a escribir
-    if (!S.canControl) { toast('Solo el anfitrión puede espejar'); sel.value = ''; return; }
-    $('#mirrorUrl').value = sel.value;
+  drop.addEventListener('click', (e) => {
+    const opt = e.target.closest('.page-opt');
+    if (!opt) return;
+    drop.classList.add('hidden');
+    if (!opt.dataset.url) {
+      /* "otra página": mostramos la fila de URL para escribir la dirección */
+      $('#customRow').classList.remove('hidden');
+      $('#mirrorUrl').value = '';
+      $('#mirrorUrl').focus();
+      setBtn('', 'Otra página…');
+      return;
+    }
+    $('#customRow').classList.add('hidden');
+    if (!S.canControl) { toast('Solo el anfitrión puede espejar'); return; }
+    setBtn(opt.dataset.logo, opt.dataset.name);
+    $('#mirrorUrl').value = opt.dataset.url;
     startMirrorFromPicker();
-    sel.value = '';
   });
+  document.addEventListener('click', (e) => {
+    if (!drop.classList.contains('hidden') && !e.target.closest('#pagePick')) drop.classList.add('hidden');
+  });
+
+  /* mientras se espeja, el botón muestra el sitio en pantalla */
+  window.__setPagePick = (url) => {
+    const s = SITES.find((x) => url && url.startsWith(x.url.replace(/\/$/, '')));
+    if (s) setBtn(s.logo, s.name);
+    else if (url) setBtn('', 'Página actual');
+    else setBtn('', 'Elige una página…');
+  };
 })();
 
 function updateControlUi() {
   const isHost = S.room && S.room.hostId === S.userId;
-  $('#siteSel').disabled = !S.canControl;
+  $('#pagePickBtn').disabled = !S.canControl;
   $('#btnMirror').disabled = !S.canControl;
   $('#mirrorUrl').disabled = !S.canControl;
   $('#btnStopMirrorTop').disabled = !S.canControl;

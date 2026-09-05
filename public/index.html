@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
-<link rel="stylesheet" href="/style.css?v=33">
+<link rel="stylesheet" href="/style.css?v=34">
 </head>
 <body>
 
@@ -69,12 +69,12 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v33</span>
+        <span class="ver" id="verBadge">v34</span>
       </div>
       <div class="top-actions">
         <span id="connBadge" class="conn ok"><span class="live-dot"></span><span id="connText">En vivo</span></span>
         <!-- v33: gente en la sala — icono + número; el detalle se despliega al tocar -->
-        <button id="btnUsers" class="btn small users-chip" title="Quién está en la sala">
+        <button id="btnUsers" class="btn small icon-only" title="Quién está en la sala">
           <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <span id="userCountTop">0</span>
         </button>
@@ -82,18 +82,15 @@
           <h4>En la sala</h4>
           <ul id="userList" class="user-list"></ul>
         </div>
-        <button id="btnCopy" class="btn small" title="Copiar el link de invitación">
+        <button id="btnCopy" class="btn small icon-only" title="Copiar el link de invitación">
           <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
-          Copiar invitación
         </button>
-        <!-- v33: detener el espejo vive aquí, junto a Salir -->
-        <button id="btnStopMirrorTop" class="btn small danger" title="Detener el espejo">
+        <!-- v33: detener el espejo vive aquí, junto a Salir (icono, igual que los demás) -->
+        <button id="btnStopMirrorTop" class="btn small icon-only danger" title="Detener el espejo">
           <svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-          Detener espejo
         </button>
-        <button id="btnLeave" class="btn small ghost" title="Salir de la sala">
+        <button id="btnLeave" class="btn small icon-only ghost" title="Salir de la sala">
           <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
-          Salir
         </button>
       </div>
     </header>
@@ -155,19 +152,25 @@
           </div>
         </div>
 
-        <!-- v33: barra única — elegir página (desplegable), URL propia y pantalla completa -->
+        <!-- v34: elegir página — desplegable propio con logos; la URL solo aparece
+             si eliges "Otra página" (lo normal es un toque y a ver) -->
         <div class="picker card">
           <div class="picker-row">
-            <select id="siteSel" class="input" title="Elegir página para espejar">
-              <option value="">Elige una página…</option>
-            </select>
+            <div class="page-pick" id="pagePick">
+              <button id="pagePickBtn" class="input page-pick-btn" type="button" title="Elegir página para espejar">
+                <img id="pagePickLogo" class="site-logo" alt="" hidden>
+                <span id="pagePickName">Elige una página…</span>
+                <svg class="chev" viewBox="0 0 12 8" width="12" height="8"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </button>
+              <div id="pageDrop" class="page-drop hidden"></div>
+            </div>
             <button id="btnFs" class="btn fs-btn" title="Pantalla completa">
               <svg class="icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
               Ampliar
             </button>
           </div>
-          <div class="picker-row">
-            <input id="mirrorUrl" class="input" placeholder="…o escribe aquí la URL de la página" autocomplete="off" spellcheck="false">
+          <div class="picker-row hidden" id="customRow">
+            <input id="mirrorUrl" class="input" placeholder="Pega aquí la URL de la página" autocomplete="off" spellcheck="false">
             <button id="btnMirror" class="btn primary">
               <svg class="icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
               Espejar
@@ -198,6 +201,6 @@
   </div>
 
   <div id="toasts" class="toasts"></div>
-  <script src="/app.js?v=33"></script>
+  <script src="/app.js?v=34"></script>
 </body>
 </html>
