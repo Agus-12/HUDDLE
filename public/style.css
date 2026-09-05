@@ -735,7 +735,14 @@ select.input {
  * el chat queda a la vista junto al video: se escribe sin perder de vista
  * la pelicula; los mensajes viejos hacen scroll DENTRO del chat. */
 @media (max-width: 980px) {
+  /* v37: tamaño FIJO — al deslizar, la barra de Safari ya no re-estira el
+     dashboard. 100svh = altura estable de la ventana. Con el teclado
+     abierto (body.teclado) sí dejamos crecer la página para poder escribir. */
   #room { display: flex; flex-direction: column; min-height: 100dvh; }
+  @supports (height: 100svh) {
+    #room { height: 100svh; min-height: 0; }
+    body.teclado #room { height: auto; min-height: 100svh; }
+  }
   .topbar { flex: none; }
   .layout {
     flex: 1; min-height: 0;
@@ -813,14 +820,14 @@ body.mirroring .mirror-nav { display: flex; }
 /* ======================= v36: logo + botones arriba, en vivo/detener abajo, sin márgenes ======================= */
 
 @media (max-width: 980px) {
-  /* fila 1: logo Huddle con gente, invitar y salir a su lado */
+  /* fila 1 (v37): gente, invitar y salir a la IZQUIERDA; el logo Huddle después */
   .topbar {
     flex-wrap: wrap; row-gap: 6px;
     padding: calc(7px + env(safe-area-inset-top, 0px)) 5px 5px;
   }
-  .brand { flex: none; min-width: 0; }
+  .brand { flex: none; min-width: 0; order: 0; margin-left: 7px; }
   .brand-logo { height: 22px; }
-  .top-quick { margin-left: 6px; gap: 6px; }
+  .top-quick { order: -1; margin-left: 0; gap: 6px; }
 
   /* botones gemelos: mismos tamaño y forma, tocables */
   .top-quick .btn.icon-only, #btnUsers {
@@ -865,3 +872,8 @@ body.mirroring .mirror-nav { display: flex; }
 /* sin zoom con los dedos (el meta viewport no basta en iPhone) */
 html { touch-action: manipulation; }
 body { overscroll-behavior-y: contain; }
+
+/* v37: botón de enviar con buen tamaño táctil */
+@media (max-width: 980px) {
+  .chat-form .btn { min-width: 44px; }
+}

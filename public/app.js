@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v36';
+const APP_VERSION = 'v37';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1112,4 +1112,20 @@ if (hashMatch) $('#joinCode').value = hashMatch[1].toUpperCase();
    hay que cancelar el gesto de pellizco a mano */
 ['gesturestart', 'gesturechange', 'gestureend'].forEach((ev) => {
   document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+});
+
+/* v37: dashboard de tamaño fijo — al deslizar no se re-estira; cuando el
+   teclado del celular se abre, dejamos crecer la página y centramos el campo */
+if (window.visualViewport) {
+  const ajustarTeclado = () => {
+    document.body.classList.toggle('teclado', window.innerHeight - window.visualViewport.height > 120);
+  };
+  window.visualViewport.addEventListener('resize', ajustarTeclado);
+  ajustarTeclado();
+}
+['#chatInput', '#mirrorUrl'].forEach((sel) => {
+  const el = document.querySelector(sel);
+  if (el) el.addEventListener('focus', () => {
+    setTimeout(() => { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch {} }, 250);
+  });
 });
