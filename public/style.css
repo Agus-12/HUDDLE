@@ -839,8 +839,8 @@ body.mirroring .mirror-nav { display: flex; }
     border-radius: 11px;
   }
   .top-quick .btn.icon-only:active { transform: scale(0.94); }
-  /* el detalle de gente cae debajo del botón, hacia la izquierda */
-  .users-drop { left: 0; right: auto; }
+  /* el detalle de gente abre hacia DENTRO (el botón está a la derecha) */
+  .users-drop { left: auto; right: 0; }
 
   /* fila 2: en vivo a la izquierda; Detener DEBAJO de los otros tres
      botones, es decir pegado al lado derecho de su propia fila */
