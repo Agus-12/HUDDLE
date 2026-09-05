@@ -842,11 +842,13 @@ body.mirroring .mirror-nav { display: flex; }
   /* el detalle de gente cae debajo del botón, hacia la izquierda */
   .users-drop { left: 0; right: auto; }
 
-  /* fila 2: en vivo + detener (con texto) */
+  /* fila 2: en vivo a la izquierda; Detener DEBAJO de los otros tres
+     botones, es decir pegado al lado derecho de su propia fila */
   .top-live { flex: 1 1 100%; }
   #connBadge { height: 34px; display: inline-flex; align-items: center; padding: 0 12px; }
   #btnStopMirrorTop {
     height: 34px; padding: 0 12px; font-size: 13px; font-weight: 700;
+    margin-left: auto;
     background: rgba(255, 62, 110, 0.16);
     border-color: rgba(255, 62, 110, 0.42);
     color: #ff92b4;
