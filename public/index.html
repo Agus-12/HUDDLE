@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Huddle">
@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
-<link rel="stylesheet" href="/style.css?v=34">
+<link rel="stylesheet" href="/style.css?v=35">
 </head>
 <body>
 
@@ -69,7 +69,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v34</span>
+        <span class="ver" id="verBadge">v35</span>
       </div>
       <div class="top-actions">
         <span id="connBadge" class="conn ok"><span class="live-dot"></span><span id="connText">En vivo</span></span>
@@ -85,12 +85,12 @@
         <button id="btnCopy" class="btn small icon-only" title="Copiar el link de invitación">
           <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
         </button>
-        <!-- v33: detener el espejo vive aquí, junto a Salir (icono, igual que los demás) -->
-        <button id="btnStopMirrorTop" class="btn small icon-only danger" title="Detener el espejo">
-          <svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-        </button>
         <button id="btnLeave" class="btn small icon-only ghost" title="Salir de la sala">
           <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
+        </button>
+        <!-- v35: detener aparece al final de la fila de botones, solo mientras se espeja -->
+        <button id="btnStopMirrorTop" class="btn small icon-only danger" title="Detener el espejo">
+          <svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
         </button>
       </div>
     </header>
@@ -201,6 +201,6 @@
   </div>
 
   <div id="toasts" class="toasts"></div>
-  <script src="/app.js?v=34"></script>
+  <script src="/app.js?v=35"></script>
 </body>
 </html>

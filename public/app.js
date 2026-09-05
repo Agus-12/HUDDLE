@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v34';
+const APP_VERSION = 'v35';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1101,3 +1101,9 @@ $('#joinCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') joinF
 initLanding();
 const hashMatch = /^#([A-Za-z0-9]{4,8})$/.exec(location.hash);
 if (hashMatch) $('#joinCode').value = hashMatch[1].toUpperCase();
+
+/* v35: sin zoom con los dedos — en iPhone el meta viewport se ignora,
+   hay que cancelar el gesto de pellizco a mano */
+['gesturestart', 'gesturechange', 'gestureend'].forEach((ev) => {
+  document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
+});
