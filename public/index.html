@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
-<link rel="stylesheet" href="/style.css?v=35">
+<link rel="stylesheet" href="/style.css?v=36">
 </head>
 <body>
 
@@ -69,11 +69,10 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v35</span>
+        <span class="ver" id="verBadge">v36</span>
       </div>
-      <div class="top-actions">
-        <span id="connBadge" class="conn ok"><span class="live-dot"></span><span id="connText">En vivo</span></span>
-        <!-- v33: gente en la sala — icono + número; el detalle se despliega al tocar -->
+      <!-- v36: gente, invitar y salir viven JUNTO al logo -->
+      <div class="top-quick">
         <button id="btnUsers" class="btn small icon-only" title="Quién está en la sala">
           <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <span id="userCountTop">0</span>
@@ -88,9 +87,13 @@
         <button id="btnLeave" class="btn small icon-only ghost" title="Salir de la sala">
           <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>
         </button>
-        <!-- v35: detener aparece al final de la fila de botones, solo mientras se espeja -->
-        <button id="btnStopMirrorTop" class="btn small icon-only danger" title="Detener el espejo">
+      </div>
+      <!-- v36: fila de abajo — en vivo y detener (con texto, solo mientras se espeja) -->
+      <div class="top-live">
+        <span id="connBadge" class="conn ok"><span class="live-dot"></span><span id="connText">En vivo</span></span>
+        <button id="btnStopMirrorTop" class="btn small danger stop-btn" title="Detener el espejo">
           <svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+          Detener
         </button>
       </div>
     </header>
@@ -201,6 +204,6 @@
   </div>
 
   <div id="toasts" class="toasts"></div>
-  <script src="/app.js?v=35"></script>
+  <script src="/app.js?v=36"></script>
 </body>
 </html>

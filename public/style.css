@@ -146,19 +146,20 @@ h1 { margin: 0 0 10px; font-size: 40px; letter-spacing: -0.5px; }
 /* ---------- topbar ---------- */
 .topbar {
   position: sticky; top: 0; z-index: 20;
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: flex-start;
   padding: 12px 18px;
   background: rgba(10, 7, 19, 0.8);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
 }
 .brand { font-size: 18px; font-weight: 800; }
-.top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+/* v36: gente/invitar/salir junto al logo; en vivo + detener en su propia fila */
+.top-quick { display: flex; align-items: center; gap: 8px; margin-left: auto; position: relative; }
+.top-live { display: flex; align-items: center; gap: 8px; }
 
 /* móvil: la barra de arriba se acomoda en varias filas, sin desplazar la pantalla */
 @media (max-width: 700px) {
   .topbar { flex-wrap: wrap; row-gap: 8px; padding: 10px 12px; }
-  .top-actions { gap: 8px; }
   .room-chip { padding: 5px 8px; }
 }
 .room-chip {
@@ -760,7 +761,6 @@ select.input {
 .brand-logo { height: 24px; width: auto; }
 @media (max-width: 700px) {
   .topbar { padding: 8px 10px; }
-  .top-actions { gap: 6px; }
   .conn { padding: 4px 8px; font-size: 11px; }
   .btn.small { padding: 7px 8px; }
   .ver { display: none; } /* en celular, cada pixel de la barra cuenta */
@@ -810,44 +810,54 @@ body.mirroring .mirror-nav { display: flex; }
 /* fila de URL solo cuando se pide "otra página" */
 #customRow { animation: none; }
 
-/* ======================= v35: barra en dos filas + chat compacto ======================= */
+/* ======================= v36: logo + botones arriba, en vivo/detener abajo, sin márgenes ======================= */
 
-/* en el celular: el logo Huddle va solito arriba y los botones debajo,
-   a la izquierda, al nivel de "En vivo" — nada aplastado */
 @media (max-width: 980px) {
-  .topbar { flex-wrap: wrap; row-gap: 8px; padding: 10px 12px 8px; }
-  .brand { flex: 1 1 100%; min-width: 0; }
+  /* fila 1: logo Huddle con gente, invitar y salir a su lado */
+  .topbar {
+    flex-wrap: wrap; row-gap: 6px;
+    padding: calc(7px + env(safe-area-inset-top, 0px)) 5px 5px;
+  }
+  .brand { flex: none; min-width: 0; }
   .brand-logo { height: 22px; }
-  .top-actions { flex: 1 1 100%; justify-content: flex-start; gap: 8px; }
+  .top-quick { margin-left: 6px; gap: 6px; }
 
   /* botones gemelos: mismos tamaño y forma, tocables */
-  .top-actions .btn.icon-only, #btnUsers {
-    width: 40px; height: 36px; padding: 0;
+  .top-quick .btn.icon-only, #btnUsers {
+    width: 38px; height: 34px; padding: 0;
     display: inline-flex; align-items: center; justify-content: center;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid var(--line);
     border-radius: 11px;
   }
-  .top-actions .btn.icon-only:active { transform: scale(0.94); }
-  #connBadge { height: 36px; display: inline-flex; align-items: center; }
-  /* detener: rojo suave para distinguirlo en la fila */
+  .top-quick .btn.icon-only:active { transform: scale(0.94); }
+  /* el detalle de gente cae debajo del botón, hacia la izquierda */
+  .users-drop { left: 0; right: auto; }
+
+  /* fila 2: en vivo + detener (con texto) */
+  .top-live { flex: 1 1 100%; }
+  #connBadge { height: 34px; display: inline-flex; align-items: center; padding: 0 12px; }
   #btnStopMirrorTop {
+    height: 34px; padding: 0 12px; font-size: 13px; font-weight: 700;
     background: rgba(255, 62, 110, 0.16);
     border-color: rgba(255, 62, 110, 0.42);
     color: #ff92b4;
   }
 
-  /* chat más pequeño para que el campo de escribir siempre quede a la vista */
-  .chat-card { padding: 9px; }
-  .chat-log { gap: 4px; }
-  .msg { font-size: 12.5px; line-height: 1.4; padding: 5px 9px; border-radius: 9px; }
-  .msg.system { font-size: 11px; }
-  .chat-form { gap: 6px; margin-top: 7px; }
-  .chat-form .input, .picker .input { font-size: 16px; } /* 16px = iOS no zoomea al escribir */
-  .chat-form .btn { padding: 9px 14px; }
+  /* márgenes laterales mínimos: el contenido casi toca los bordes */
+  .layout { margin: 0 !important; padding: 3px; gap: 6px; padding-bottom: calc(3px + env(safe-area-inset-bottom, 0px)); }
+  .chat-card { padding: 5px; }
+  .picker { padding: 6px; gap: 6px; }
 
-  /* selector de página más compacto */
-  .picker { padding: 9px; gap: 7px; }
+  /* chat compacto: el botón de enviar siempre al alcance */
+  .chat-log { gap: 3px; }
+  .msg { font-size: 12px; line-height: 1.38; padding: 4px 8px; border-radius: 9px; }
+  .msg.system { font-size: 11px; }
+  .chat-form { gap: 5px; margin-top: 6px; }
+  .chat-form .input, .picker .input { font-size: 16px; padding: 8px 10px; } /* 16px = iOS no zoomea al escribir */
+  .chat-form .btn { padding: 9px 12px; font-size: 13px; }
+
+  /* selector de página compacto */
   .picker-foot { font-size: 11.5px; }
   .page-opt { font-size: 13.5px; padding: 8px 9px; }
 }

@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v35';
+const APP_VERSION = 'v36';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -299,7 +299,8 @@ function applyMirrorState(ms) {
     // pantalla de carga hasta que llegue el primer frame
     if (!S.mirror.gotFrame) $('#mirrorLoading').classList.remove('hidden');
   } else {
-    if (window.__setPagePick && !S.mirror.url) window.__setPagePick(''); // v34: al detener, vuelve a "elige una pagina"
+    /* v36: al detener NO se resetea el botón — la página elegida se queda
+       mostrada, lista para volver a espejar con un toque */
     S.mirror.gotFrame = false;
     AU.needAudio = false;
     S.frameSeq++;
@@ -741,11 +742,16 @@ const SITES = [
     if (!drop.classList.contains('hidden') && !e.target.closest('#pagePick')) drop.classList.add('hidden');
   });
 
-  /* mientras se espeja, el botón muestra el sitio en pantalla */
+  /* mientras se espeja, el botón muestra el sitio en pantalla;
+     si es una URL propia, muestra su nombre de dominio */
   window.__setPagePick = (url) => {
     const s = SITES.find((x) => url && url.startsWith(x.url.replace(/\/$/, '')));
     if (s) setBtn(s.logo, s.name);
-    else if (url) setBtn('', 'Página actual');
+    else if (url) {
+      let host = 'Página actual';
+      try { host = new URL(url).hostname.replace(/^www\./, ''); } catch {}
+      setBtn('', host);
+    }
     else setBtn('', 'Elige una página…');
   };
 })();
