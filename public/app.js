@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v44';
+const APP_VERSION = 'v45';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1415,3 +1415,90 @@ $('#btnCreateGo').addEventListener('click', () => {
   const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
   connect(code);
 });
+
+/* v45: buscador — busca en la web (DuckDuckGo/Bing vía el server) y muestra
+ * resultados listos para crear la sala o navegar el espejo */
+function renderResultados(box, results, alElegir, etiqueta) {
+  box.innerHTML = '';
+  results.forEach((res) => {
+    const row = document.createElement('button');
+    row.className = 'sr-row';
+    row.type = 'button';
+    row.innerHTML = `
+      <img class="sr-logo" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(res.domain)}&sz=64" alt="" loading="lazy">
+      <span class="sr-txt"><span class="sr-title"></span><span class="sr-dom"></span></span>
+      <span class="sr-go">${etiqueta}</span>`;
+    row.querySelector('.sr-title').textContent = res.title;
+    row.querySelector('.sr-dom').textContent = res.domain;
+    row.addEventListener('click', () => alElegir(res));
+    box.appendChild(row);
+  });
+}
+
+async function buscarEnServer(q) {
+  const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+  return r.json();
+}
+
+async function buscarInicio() {
+  const q = $('#homeSearch').value.trim();
+  const box = $('#searchResults');
+  if (!q) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  box.classList.remove('hidden');
+  box.innerHTML = '<div class="sr-info"><div class="spinner"></div> Buscando…</div>';
+  try {
+    const d = await buscarEnServer(q);
+    if (!d.ok || !d.results || !d.results.length) {
+      box.innerHTML = `<div class="sr-info">${(d && d.error) || 'No encontré nada — prueba con otras palabras'}</div>`;
+      return;
+    }
+    renderResultados(box, d.results, (res) => {
+      S.pendingStart = { url: res.url, name: res.domain };
+      const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+      connect(code);
+    }, 'Crear sala');
+  } catch {
+    box.innerHTML = '<div class="sr-info">Sin conexión con el servidor</div>';
+  }
+}
+$('#btnHomeSearch').addEventListener('click', buscarInicio);
+$('#homeSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); buscarInicio(); } });
+
+/* v45: buscar otra página SIN salir de la sala (mientras se espeja) */
+function cerrarBuscarSala() {
+  $('#msBar').classList.add('hidden');
+  $('#msResults').classList.add('hidden');
+}
+async function buscarEnSala() {
+  const q = $('#msInput').value.trim();
+  const box = $('#msResults');
+  if (!q) { cerrarBuscarSala(); return; }
+  box.classList.remove('hidden');
+  box.innerHTML = '<div class="sr-info"><div class="spinner"></div> Buscando…</div>';
+  try {
+    const d = await buscarEnServer(q);
+    if (!d.ok || !d.results || !d.results.length) {
+      box.innerHTML = `<div class="sr-info">${(d && d.error) || 'No encontré nada — prueba con otras palabras'}</div>`;
+      return;
+    }
+    renderResultados(box, d.results, (res) => {
+      cerrarBuscarSala();
+      if (!S.canControl) { toast('Solo el anfitrión puede cambiar de página'); return; }
+      toast(`Abriendo ${res.domain}…`);
+      $('#mirrorUrl').value = res.url;
+      startMirrorFromPicker();
+    }, 'Abrir');
+  } catch {
+    box.innerHTML = '<div class="sr-info">Sin conexión con el servidor</div>';
+  }
+}
+$('#btnMSearch').addEventListener('click', () => {
+  const bar = $('#msBar');
+  if (bar.classList.contains('hidden')) {
+    bar.classList.remove('hidden');
+    $('#msInput').focus();
+  } else cerrarBuscarSala();
+});
+$('#msGo').addEventListener('click', buscarEnSala);
+$('#msClose').addEventListener('click', cerrarBuscarSala);
+$('#msInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); buscarEnSala(); } });

@@ -1035,3 +1035,26 @@ body { overscroll-behavior-y: contain; }
 .home-top .profile-chip .avatar { flex: none; }
 .home-top .profile-chip .btn { flex: none; }
 .home-top .profile-hi { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- v45: buscador (inicio + sala) ---------- */
+.home-search { display: flex; gap: 8px; margin-top: 16px; width: 100%; }
+.home-search .input { flex: 1; min-width: 0; font-size: 16px; } /* 16px: iOS sin zoom raro */
+.sr { margin: 18px 0 4px; display: flex; flex-direction: column; gap: 8px; }
+.sr-info { color: var(--dim); padding: 12px 4px; font-size: 14px; display: flex; align-items: center; gap: 10px; }
+.sr-info .spinner { width: 16px; height: 16px; }
+.sr-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 12px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); cursor: pointer; color: var(--txt); font-family: inherit; }
+.sr-row:active { background: rgba(255, 255, 255, 0.1); }
+.sr-logo { width: 28px; height: 28px; border-radius: 8px; flex: none; background: rgba(255, 255, 255, 0.06); object-fit: contain; }
+.sr-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sr-title { font-size: 14px; font-weight: 600; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sr-dom { font-size: 12px; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sr-go { flex: none; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--cyan); border: 1px solid rgba(41, 224, 255, 0.35); background: rgba(41, 224, 255, 0.08); border-radius: 999px; padding: 5px 10px; }
+/* resultados dentro del espejo: panel flotante sobre la barra de búsqueda */
+.ms-results { position: absolute; left: 10px; right: 10px; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); max-height: 46%; overflow-y: auto; -webkit-overflow-scrolling: touch; background: rgba(10, 7, 19, 0.94); border: 1px solid var(--line); border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 8px; z-index: 22; backdrop-filter: blur(10px); }
+.ms-results .sr-row { background: rgba(255, 255, 255, 0.05); }
+@media (max-width: 640px) {
+  .home-search { flex-direction: row; } /* input + botón en una fila, botón compacto */
+  .home-search .btn { flex: none; }
+}
+/* v45b: el botón Buscar no hereda el width:100% de .btn.big */
+.home-search .btn { width: auto; flex: none; }

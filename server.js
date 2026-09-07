@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v44'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v45'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -882,6 +882,56 @@ async function agregarSitio(urlRaw) {
 
 /* ---------------------- servidor ---------------------- */
 
+/* v45: búsqueda web (DuckDuckGo con respaldo en Bing) para el buscador de la app */
+async function buscarWeb(q) {
+  const resultados = [];
+  const vistos = new Set();
+  const push = (titulo, href) => {
+    try {
+      const u = new URL(href);
+      if (!/^https?:$/.test(u.protocol)) return;
+      if (/\.pdf($|\?)/i.test(u.pathname)) return;
+      const dom = u.hostname.replace(/^www\./, '');
+      if (!dom || dom.length > 60) return;
+      if (vistos.has(dom)) return;
+      vistos.add(dom);
+      let t = String(titulo || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+      if (t.length > 90) t = t.slice(0, 90).trim() + '…';
+      if (!t) t = dom;
+      resultados.push({ title: t, url: u.href, domain: dom });
+    } catch {}
+  };
+  /* 1) DuckDuckGo — versión HTML sin JavaScript */
+  try {
+    const r = await fetchSeguro(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`, 8000);
+    if (r.ok) {
+      const html = (await r.text()).slice(0, 700000);
+      const re = /<a[^>]+class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+      let m;
+      while ((m = re.exec(html)) && resultados.length < 10) {
+        let href = m[1].replace(/&amp;/g, '&');
+        const uddg = /[?&]uddg=([^&]+)/.exec(href); // enlaces de redirección de DDG
+        if (uddg) { try { href = decodeURIComponent(uddg[1]); } catch {} }
+        push(m[2], href);
+      }
+    }
+  } catch {}
+  /* 2) respaldo: Bing */
+  if (resultados.length < 3) {
+    try {
+      const r = await fetchSeguro(`https://www.bing.com/search?q=${encodeURIComponent(q)}&setlang=es`, 8000);
+      if (r.ok) {
+        const html = (await r.text()).slice(0, 700000);
+        const re = /<h2><a[^>]+href="(https?:[^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+        let m;
+        while ((m = re.exec(html)) && resultados.length < 10) push(m[2], m[1].replace(/&amp;/g, '&'));
+      }
+    } catch {}
+  }
+  console.log(`[buscar] "${q}" → ${resultados.length} resultados`);
+  return resultados.slice(0, 8);
+}
+
 function readBody(req) {
   return new Promise((resolve) => {
     const chunks = [];
@@ -922,6 +972,13 @@ const server = http.createServer(async (req, res) => {
       });
     }
     /* v43: directorio de páginas — ver, agregar y quitar */
+    if (url.pathname === '/api/search' && req.method === 'GET') {
+      const q = (url.searchParams.get('q') || '').trim().slice(0, 120);
+      if (!q) return json(res, 400, { ok: false, error: 'Escribe qué quieren ver' });
+      const results = await buscarWeb(q);
+      if (!results.length) return json(res, 200, { ok: true, results: [], error: 'No encontré resultados — prueba con otras palabras' });
+      return json(res, 200, { ok: true, results });
+    }
     if (url.pathname === '/api/sites' && req.method === 'GET') {
       return json(res, 200, { ok: true, sites: sitesList() });
     }

@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
-<link rel="stylesheet" href="/style.css?v=44">
+<link rel="stylesheet" href="/style.css?v=45">
 </head>
 <body>
 
@@ -65,7 +65,17 @@
                 <button id="btnJoin" class="btn big">Unirme</button>
               </div>
             </div>
+            <div class="home-search">
+              <input id="homeSearch" class="input" placeholder="Busca la película o serie…" autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off">
+              <button id="btnHomeSearch" class="btn primary big" type="button">
+                <svg class="icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                Buscar
+              </button>
+            </div>
           </div>
+
+          <!-- v45: resultados de búsqueda del inicio -->
+          <div id="searchResults" class="sr hidden"></div>
 
           <!-- v31: salas en vivo ahora, con preview de lo que ven -->
           <div class="rooms-head"><span class="live-dot"></span> En vivo ahora</div>
@@ -170,6 +180,18 @@
               <button id="btnMFwd" class="btn small nav-btn" title="Avanzar">
                 <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
               </button>
+              <button id="btnMSearch" class="btn small nav-btn" title="Buscar otra cosa sin salir de la sala">
+                <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              </button>
+            </div>
+            <!-- v45: buscar dentro de la sala — resultados sobre la barra -->
+            <div id="msResults" class="ms-results hidden"></div>
+            <div id="msBar" class="mk-bar hidden">
+              <input id="msInput" class="input" placeholder="Busca otra película o serie…" autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off">
+              <button id="msGo" class="btn small primary" type="button">Buscar</button>
+              <button id="msClose" class="btn small ghost" type="button" title="Cerrar la búsqueda">
+                <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
             </div>
             <div class="mirror-hint">Navegador espejado — haz clic, arrastra o escribe sobre la página: todos ven lo mismo</div>
           </div>
@@ -238,6 +260,6 @@
   </div>
 
   <div id="toasts" class="toasts"></div>
-  <script src="/app.js?v=44"></script>
+  <script src="/app.js?v=45"></script>
 </body>
 </html>
