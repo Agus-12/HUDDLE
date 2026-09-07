@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v60'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v61'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -165,6 +165,28 @@ function sysMsg(room, text) {
 let PUPPETEER = null; // require perezoso
 const mirrors = new Map(); // roomCode -> mirror
 
+/* v61: difunde la posición de la peli (barrita con tiempo) cada 2 s */
+setInterval(async () => {
+  for (const [code, m] of mirrors) {
+    const room = rooms.get(code);
+    if (!room || (!m.ready && !m.playing)) continue;
+    try {
+      for (const fr of m.page.frames()) {
+        const r = await fr.evaluate(() => {
+          const vs = [...document.querySelectorAll('video')].filter((v) => v.duration > 1);
+          if (!vs.length) return null;
+          vs.sort((a, b) => (b.videoWidth * b.videoHeight) - (a.videoWidth * a.videoHeight));
+          return { t: vs[0].currentTime, d: vs[0].duration };
+        }).catch(() => null);
+        if (r && r.d > 1) {
+          broadcast(room, 'mirror-time', { t: Math.round(r.t * 10) / 10, d: Math.round(r.d) });
+          break;
+        }
+      }
+    } catch {}
+  }
+}, 2000);
+
 /* v25: errores que significan que la página espejada murió (crash o el sitio
  * la cerró). Se detectan y el espejo se reabre solo, sin errores técnicos. */
 const PAGE_DEAD = /session closed|target closed|page closed|browser has disconnected|browser closed|session destroyed|detached|protocol error \(input\.|protocol error \(page\.|target created/i;
@@ -176,8 +198,8 @@ const MIRROR_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 
 function mirrorState(room) {
   const m = mirrors.get(room.code);
   return m
-    ? { active: true, url: m.url || '', audio: AUDIO_READY, playing: !!m.playing }
-    : { active: false, url: '', audio: false, playing: false };
+    ? { active: true, url: m.url || '', audio: AUDIO_READY, playing: !!m.playing, ready: !!m.ready }
+    : { active: false, url: '', audio: false, playing: false, ready: false };
 }
 
 async function startMirror(room, rawUrl, userId) {
@@ -305,14 +327,15 @@ async function startMirror(room, rawUrl, userId) {
      reproductor aparece hasta que alguien le pica. En páginas de
      PELÍCULA lo tocamos por ti: la película empieza directa.
      (Series quedan manuales a propósito, mecanismo propio después.) */
-  const esPagPelicula = () => /\/(wp-)?pelicula\/[a-z0-9-]+/i.test(m.url || '');
+  /* v61: páginas de "cine" = películas Y episodios de serie (cine-calidad) */
+  const esPagCine = () => /\/(wp-)?pelicula\/[a-z0-9-]+|\/episode\//i.test(m.url || '');
   let avisoPlay = false;
   /* v59: pantalla completa — cuando la película arranca, el video llena
    * todo el espejo (sin el decorado de la página alrededor) */
   const pantallaCompleta = async () => {
     try {
       await m.page.evaluate(() => {
-        const sel = ['.TPlayer iframe', '.TPlayerCn iframe', 'iframe[src*="goodstream"]', 'iframe[src*="embed"]'];
+        const sel = ['#tviframe', '.TPlayer iframe', '.TPlayerCn iframe', 'iframe[src*="goodstream"]', 'iframe[src*="embed"]'];
         let f = null;
         for (const s of sel) { f = document.querySelector(s); if (f) break; }
         if (!f) f = [...document.querySelectorAll('iframe')].filter((x) => { const r = x.getBoundingClientRect(); return r.width > 300 && r.height > 150; }).sort((a, b) => (b.width * b.height) - (a.width * a.height))[0];
@@ -330,42 +353,87 @@ async function startMirror(room, rawUrl, userId) {
     if (!viva() || n > 30) return;
     let sonando = false;
     let hayVideo = false;
+    let videoListo = false;
     try { await scrollToPlayer(); } catch {}
     try {
       for (const fr of m.page.frames()) {
-        const r = await fr.evaluate(() => {
+        const r = await fr.evaluate((cine) => {
           let ok = false;
           let cant = 0;
+          let listo = false;
           document.querySelectorAll('video, audio').forEach((v) => {
-            if (v.tagName === 'VIDEO') cant++;
-            if (v.readyState >= 2) { try { if (v.paused) v.play().catch(() => {}); } catch {} }
+            if (v.tagName === 'VIDEO') {
+              cant++;
+              if (v.readyState >= 2 && v.duration > 1) listo = true;
+            }
+            /* v61: en cine NO damos play — queda en pausa esperando el botón */
+            if (!cine && v.readyState >= 2) { try { if (v.paused) v.play().catch(() => {}); } catch {} }
             if (!v.paused && v.currentTime > 0) ok = true;
           });
-          return { ok, cant };
-        }).catch(() => ({ ok: false, cant: 0 }));
+          return { ok, cant, listo };
+        }, esPagCine()).catch(() => ({ ok: false, cant: 0, listo: false }));
         if (r.ok) sonando = true;
         if (r.cant > 0) hayVideo = true;
+        if (r.listo) videoListo = true;
       }
     } catch {}
-    /* v58: película sin video → tocar el reproductor para que cargue
+    /* v58: cine sin video → tocar el reproductor para que cargue
      * (se hace a partir del 2do intento, por si la página aún carga) */
-    if (esPagPelicula() && !hayVideo && n >= 1) {
+    if (esPagCine() && n >= 1) {
       try {
-        const punto = await m.page.evaluate(() => {
-          const vis = (el) => { const b = el.getBoundingClientRect(); return b.width > 200 && b.height > 100; };
-          const c = document.querySelector('.TPlayerTb.Current') || document.querySelector('.TPlayer') || document.querySelector('#Optres');
-          if (!c || !vis(c)) return null;
-          const b = c.getBoundingClientRect();
-          return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
-        }).catch(() => null);
-        if (punto) await m.page.mouse.click(punto.x, punto.y);
+        if (!hayVideo) {
+          /* v58/v61: sin video → tocar el reproductor (película) o el
+           * servidor recomendado (episodio) para que cargue */
+          if (/\/episode\//.test(m.url || '')) {
+            await m.page.evaluate(() => {
+              const a = document.querySelector('a.play[data-domain=goodstream]') || document.querySelector('a.play:not([data-domain=youtube])');
+              if (a) { a.scrollIntoView({ block: 'center' }); a.click(); }
+            }).catch(() => {});
+          } else {
+            const punto = await m.page.evaluate(() => {
+              const vis = (el) => { const b = el.getBoundingClientRect(); return b.width > 200 && b.height > 100; };
+              const c = document.querySelector('.TPlayerTb.Current') || document.querySelector('.TPlayer') || document.querySelector('#Optres');
+              if (!c || !vis(c)) return null;
+              const b = c.getBoundingClientRect();
+              return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+            }).catch(() => null);
+            if (punto) await m.page.mouse.click(punto.x, punto.y);
+          }
+        } else if (!videoListo && n >= 2) {
+          /* v61: hay video pero no carga (rs<2) — los episodios de
+           * cine-calidad necesitan un toque encima del reproductor */
+          const punto = await m.page.evaluate(() => {
+            const f = document.querySelector('#tviframe') || [...document.querySelectorAll('iframe')].find((x) => {
+              const b = x.getBoundingClientRect();
+              return b.width > 250 && b.height > 140;
+            });
+            if (!f) return null;
+            f.scrollIntoView({ block: 'center' });
+            const b = f.getBoundingClientRect();
+            return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+          }).catch(() => null);
+          if (punto) await m.page.mouse.click(punto.x, punto.y);
+        }
       } catch {}
+    }
+    if (esPagCine() && videoListo && !m.ready) {
+      /* v61: la peli queda LISTA EN PAUSA — el botón de play aparece en la sala
+       * y cuando alguien le pica, empieza para todos al mismo tiempo */
+      for (const fr of m.page.frames()) {
+        await fr.evaluate(() => document.querySelectorAll('video').forEach((v) => { try { v.pause(); } catch {} })).catch(() => {});
+      }
+      m.ready = true;
+      m.playing = false;
+      console.log(`[espejo] lista en pausa en sala ${room.code} (${(m.url || '').slice(0, 60)})`);
+      pantallaCompleta().catch(() => {});
+      broadcast(room, 'mirror-state', mirrorState(room));
+      return; /* listo: no seguir reintentando */
     }
     if (sonando && !avisoPlay) {
       avisoPlay = true;
       m.playing = true;
       console.log(`[espejo] reproduciendo en sala ${room.code} (${(m.url || '').slice(0, 60)})`);
-      if (esPagPelicula()) pantallaCompleta().catch(() => {});
+      if (esPagCine()) pantallaCompleta().catch(() => {});
       broadcast(room, 'mirror-state', mirrorState(room));
     }
     if (!sonando) setTimeout(() => intentoPlay(n + 1), 5000);
@@ -675,6 +743,37 @@ async function handleAction(req, res, body) {
       const m = mirrors.get(room.code);
       if (!m) return json(res, 404, { ok: false, error: 'El espejo no está activo' });
 
+      if (op === 'play' || op === 'pause') {
+        /* v61: play/pause central — el botón grande de la sala */
+        const pausar = op === 'pause';
+        for (const fr of m.page.frames()) {
+          await fr.evaluate((p) => {
+            document.querySelectorAll('video').forEach((v) => { try { if (p) v.pause(); else v.play().catch(() => {}); } catch {} });
+          }, pausar).catch(() => {});
+        }
+        m.playing = !pausar;
+        if (m.playing) m.ready = true;
+        broadcast(room, 'mirror-state', mirrorState(room));
+        return json(res, 200, { ok: true });
+      }
+      if (op === 'seekTo') {
+        /* v61: llevar la peli a un punto exacto (la barrita) */
+        const a = Math.max(0, +action.time || 0);
+        let movio = false;
+        for (const fr of m.page.frames()) {
+          try {
+            const r = await fr.evaluate((t) => {
+              const vs = [...document.querySelectorAll('video')].filter((v) => v.duration > 1);
+              if (!vs.length) return false;
+              vs.sort((x, y) => (y.videoWidth * y.videoHeight) - (x.videoWidth * x.videoHeight));
+              try { vs[0].currentTime = Math.max(0, Math.min(vs[0].duration - 0.5, t)); } catch {}
+              return true;
+            }, a).catch(() => false);
+            if (r) movio = true;
+          } catch {}
+        }
+        return json(res, 200, { ok: true, movio });
+      }
       if (op === 'click') {
         await m.page.mouse.click(Math.max(0, +action.x || 0), Math.max(0, +action.y || 0));
         /* v29: ¿el toque dejó el foco en un cuadro de texto? (la página puede
@@ -689,6 +788,23 @@ async function handleAction(req, res, body) {
             });
           } catch {}
           if (typing) break;
+        }
+        /* v61: si el toque puso el video en marcha o lo pausó, avisar
+         * (así el botón de play de la sala siempre dice la verdad) */
+        if (m.ready) {
+          setTimeout(async () => {
+            try {
+              let sonando = false;
+              for (const fr of m.page.frames()) {
+                const r = await fr.evaluate(() => [...document.querySelectorAll('video')].some((v) => !v.paused && v.currentTime > 0)).catch(() => false);
+                if (r) { sonando = true; break; }
+              }
+              if (sonando !== !!m.playing) {
+                m.playing = sonando;
+                broadcast(room, 'mirror-state', mirrorState(room));
+              }
+            } catch {}
+          }, 900);
         }
         return json(res, 200, { ok: true, typing });
       }
@@ -1055,6 +1171,7 @@ async function buscarAnime(q) {
 /* v56: metadatos de lo que se ve en una sala (título + póster) para la
  * tarjeta de invitación — por el slug de la URL y las APIs de cada página */
 const metaCache = new Map();
+const serieCache = new Map(); /* v61: temporadas/episodios por slug */
 async function metaDePelicula(url) {
   const u0 = String(url || '');
   if (!u0) return null;
@@ -1200,6 +1317,47 @@ const server = http.createServer(async (req, res) => {
         seriesRecientes().catch(() => []),
       ]);
       return json(res, 200, { ok: true, results: day, series });
+    }
+    if (url.pathname.startsWith('/api/serie/')) {
+      /* v61: temporadas y episodios de una serie (para elegirla bonito) */
+      const slug = decodeURIComponent(url.pathname.split('/')[3] || '').toLowerCase();
+      if (!/^[a-z0-9-]{2,90}$/.test(slug)) return json(res, 400, { ok: false, error: 'Serie inválida' });
+      const c = serieCache.get(slug);
+      if (c && Date.now() - c.at < 30 * 60 * 1000) return json(res, 200, c.d);
+      try {
+        const r = await fetchSeguro(`https://cine-calidad.mx/serie/${slug}/`, 10000);
+        if (!r.ok) return json(res, 502, { ok: false, error: 'No pude leer la serie' });
+        const html = await r.text();
+        const eps = [];
+        const re = /<li class="mark-(\d+)"[^>]*>.*?<img[^>]*src="([^"]+)".*?<a href="([^"]*\/episode\/[^"]+)"[^>]*>([^<]+)<\/a>/gs;
+        let mm;
+        while ((mm = re.exec(html)) && eps.length < 400) {
+          const nm = /-(\d+)x(\d+)\/?$/.exec(mm[3]);
+          eps.push({
+            temporada: +mm[1],
+            ep: nm ? +nm[2] : 0,
+            url: mm[3],
+            titulo: mm[4].trim().slice(0, 90),
+            img: mm[2].replace('/w300/', '/w342/'),
+          });
+        }
+        const og = (p) => {
+          const a1 = new RegExp(`<meta[^>]+property=["']${p}["'][^>]+content=["']([^"']+)`, 'i').exec(html);
+          const a2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${p}["']`, 'i').exec(html);
+          return (a1 || a2 || [])[1] || '';
+        };
+        const out = {
+          ok: true,
+          slug,
+          titulo: (og('og:title') || slug).replace(/\s*[-–|].*$/, '').trim().slice(0, 80),
+          poster: (og('og:image') || (eps[0] ? eps[0].img : '')).replace('/w780/', '/w342/'),
+          episodios: eps,
+        };
+        serieCache.set(slug, { at: Date.now(), d: out });
+        return json(res, 200, out);
+      } catch {
+        return json(res, 500, { ok: false, error: 'Error leyendo la serie' });
+      }
     }
     if (url.pathname.startsWith('/api/invite/')) {
       /* v56: tarjeta de invitación — quién invita y qué se está viendo */

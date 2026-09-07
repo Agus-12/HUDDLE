@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v60';
+const APP_VERSION = 'v61';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -146,6 +146,7 @@ function connect(code, opts = {}) {
       const ps = S.pendingStart;
       S.pendingStart = null;
 S.mirrorInfo = null; /* v59: título+carátula de lo que se está abriendo */
+S.mirrorTime = null; /* v61: posición de la peli para la barrita */
       if (ps.url && !S.mirror.active) {
         setTimeout(() => {
           if (S.canControl && !S.mirror.active) {
@@ -173,15 +174,23 @@ S.mirrorInfo = null; /* v59: título+carátula de lo que se está abriendo */
   es.addEventListener('users', (e) => renderUsers(JSON.parse(e.data).users));
   es.addEventListener('chat', (e) => addChat(JSON.parse(e.data).msg));
   es.addEventListener('mirror-state', (e) => applyMirrorState(JSON.parse(e.data)));
+  es.addEventListener('mirror-time', (e) => {
+    /* v61: posición de la peli para la barrita */
+    try {
+      const d = JSON.parse(e.data);
+      if (d && d.d > 1) { S.mirrorTime = { t: d.t, d: d.d }; pintarSeekBar(); }
+    } catch {}
+  });
   es.addEventListener('mirror-frame', (e) => {
     const f = JSON.parse(e.data);
     S.mirror.w = f.w; S.mirror.h = f.h;
     S.mirror.gotFrame = true;
     $('#mirrorLoading').classList.add('hidden');
     drawMirrorFrame(f.d);
-    /* v60: en series, la página ya renderizada = listos (la peli espera a que suene) */
+    /* v60: en SERIES la página renderizada ya es útil (eliges episodio);
+     * v61: los EPISODIOS se preparan como pelis — se espera al botón de play */
     const pl = $('#peliLoading');
-    if (pl && !pl.classList.contains('hidden') && /\/serie\/|\/episode\//.test(S.mirror.url || '')) ocultarPeliLoading();
+    if (pl && !pl.classList.contains('hidden') && /\/serie\//.test(S.mirror.url || '') && !/\/episode\//.test(S.mirror.url || '')) ocultarPeliLoading();
   });
   es.addEventListener('mirror-audio', (e) => {
     const d = JSON.parse(e.data);
@@ -310,9 +319,13 @@ function applyMirrorState(ms) {
   if (!ms) return;
   S.mirror.active = !!ms.active;
   S.mirror.url = ms.url || '';
-  /* v59: la peli ya está sonando — fuera la pantalla de espera */
-  if (ms.playing || !ms.active) ocultarPeliLoading();
-  if (!ms.active) S.mirrorInfo = null;
+  /* v59/v61: la peli sonando → fuera la espera y el botón de play.
+   * lista en pausa → mostrar el botón de play grande. */
+  if (ms.playing) { ocultarPeliLoading(); ocultarPlayBtn(); }
+  else if (ms.active && ms.ready) { ocultarPeliLoading(); mostrarPlayBtn(); }
+  /* v61: ojo — si la sala aún va a arrancar el espejo (pendingStart),
+   * NO quitamos la pantalla de espera (era el destello de la sala) */
+  if (!ms.active && !S.pendingStart) { ocultarPeliLoading(); ocultarPlayBtn(); S.mirrorInfo = null; }
   document.body.classList.toggle('mirroring', !!ms.active);
   $('#mirrorLayer').classList.toggle('hidden', !S.mirror.active);
   $('#videoEmpty').classList.toggle('hidden', S.mirror.active);
@@ -753,6 +766,52 @@ $('#btnStopMirrorTop').addEventListener('click', () => {
 });
 
 /* v33: navegar el espejo como un navegador normal — atrás / adelante */
+/* v61: barrita con tiempo — pintar y arrastrar para moverte en la peli */
+function fmtTiempo(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}` : `${m}:${String(x).padStart(2, '0')}`;
+}
+function pintarSeekBar(previewT) {
+  const wrap = $('#seekWrap');
+  if (!wrap) return;
+  const mt = S.mirrorTime;
+  if (!mt || !mt.d) { wrap.classList.add('hidden'); return; }
+  const t = (previewT !== undefined) ? previewT : mt.t;
+  const pct = Math.max(0, Math.min(100, (t / mt.d) * 100));
+  $('#seekFill').style.width = pct + '%';
+  $('#seekDot').style.left = pct + '%';
+  $('#seekCur').textContent = fmtTiempo(t);
+  $('#seekDur').textContent = fmtTiempo(mt.d);
+  wrap.classList.remove('hidden');
+}
+(function() {
+  const bar = document.querySelector('#seekBar');
+  if (!bar) return;
+  let arrastrando = false;
+  const tDe = (ev) => {
+    const r = bar.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+    return pct * (S.mirrorTime ? S.mirrorTime.d : 0);
+  };
+  bar.addEventListener('pointerdown', (ev) => {
+    if (!S.mirrorTime || !S.mirrorTime.d) return;
+    arrastrando = true;
+    try { bar.setPointerCapture(ev.pointerId); } catch {}
+    pintarSeekBar(tDe(ev));
+  });
+  bar.addEventListener('pointermove', (ev) => { if (arrastrando) pintarSeekBar(tDe(ev)); });
+  const soltar = (ev) => {
+    if (!arrastrando) return;
+    arrastrando = false;
+    const t = Math.round(tDe(ev));
+    if (S.mirrorTime) S.mirrorTime.t = t;
+    sendAction({ type: 'mirror', op: 'seekTo', time: t }).catch(() => {});
+  };
+  bar.addEventListener('pointerup', soltar);
+  bar.addEventListener('pointercancel', soltar);
+})();
+
 /* v60: adelantar / atrasar la película (mueve el video del espejo) */
 function moverPelicula(delta) {
   if (!S.mirror.active) { toast('Primero pon una película'); return; }
@@ -804,6 +863,103 @@ function ocultarPeliLoading() {
   }
 }
 $('#peliLoading').addEventListener('click', () => ocultarPeliLoading());
+/* v61: selector de temporadas y episodios para series */
+let spDatos = null; /* lo que devolvió /api/serie */
+function abrirSeriePicker(res, enSala) {
+  const slugM = /\/serie\/([a-z0-9-]+)/i.exec(res.url || '');
+  if (!slugM) { toast('No pude leer esa serie'); return; }
+  const slug = slugM[1];
+  const pk = $('#seriePicker');
+  pk.classList.remove('hidden');
+  $('#spTitle').textContent = res.title || '';
+  $('#spMeta').textContent = 'Cargando temporadas…';
+  const po = $('#spPoster');
+  if (res.img) { po.src = res.img; po.style.display = ''; } else po.style.display = 'none';
+  $('#spTemporadas').innerHTML = '';
+  $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">Buscando episodios…</div>';
+  fetch('/api/serie/' + slug).then((r) => r.json()).then((d) => {
+    if (!d.ok || !d.episodios || !d.episodios.length) {
+      $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">No encontré episodios de esta serie</div>';
+      $('#spMeta').textContent = '';
+      return;
+    }
+    spDatos = { ...d, enSala: !!enSala, posterBase: d.poster || res.img || '' };
+    $('#spTitle').textContent = d.titulo || res.title || '';
+    $('#spMeta').textContent = d.episodios.length + ' episodios';
+    if (d.poster) { po.src = d.poster; po.style.display = ''; }
+    const temps = [...new Set(d.episodios.map((x) => x.temporada))].sort((a, b) => a - b);
+    const tBox = $('#spTemporadas');
+    tBox.innerHTML = '';
+    temps.forEach((T, i) => {
+      const b = document.createElement('button');
+      b.className = 'sp-temp-btn' + (i === 0 ? ' activa' : '');
+      b.textContent = 'Temporada ' + T;
+      b.addEventListener('click', () => {
+        tBox.querySelectorAll('.sp-temp-btn').forEach((x) => x.classList.remove('activa'));
+        b.classList.add('activa');
+        pintarEpisodios(T);
+      });
+      tBox.appendChild(b);
+    });
+    pintarEpisodios(temps[0]);
+  }).catch(() => {
+    $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">Sin conexión — inténtalo de nuevo</div>';
+  });
+}
+function pintarEpisodios(temporada) {
+  const box = $('#spEpisodios');
+  box.innerHTML = '';
+  const eps = (spDatos.episodios || []).filter((x) => x.temporada === temporada);
+  eps.forEach((ep) => {
+    const b = document.createElement('button');
+    b.className = 'sp-ep';
+    b.innerHTML = `<img src="${ep.img || spDatos.posterBase}" alt="" loading="lazy" referrerpolicy="no-referrer">
+      <span><span class="sp-ep-num">${temporada}x${ep.ep || '·'}</span>
+      <span class="sp-ep-tit"></span></span>`;
+    b.querySelector('.sp-ep-tit').textContent = ep.titulo;
+    b.addEventListener('click', () => {
+      /* elegiste episodio → igual que una peli: carátula, sala, pausa y play */
+      cerrarSeriePicker();
+      const nombre = `${spDatos.titulo} ${temporada}x${ep.ep || ''}`.trim();
+      if (spDatos.enSala) {
+        S.mirrorInfo = { title: nombre, img: ep.img || spDatos.posterBase, url: ep.url, sub: 'Abriendo en el espejo…' };
+        $('#mirrorUrl').value = ep.url;
+        startMirrorFromPicker();
+      } else {
+        S.pendingStart = { url: ep.url, name: nombre, img: ep.img || spDatos.posterBase };
+        S.mirrorInfo = { title: nombre, img: ep.img || spDatos.posterBase, url: ep.url, sub: 'Cargando tu sala…' };
+        mostrarPeliLoading();
+        const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+        connect(code);
+      }
+    });
+    box.appendChild(b);
+  });
+}
+function cerrarSeriePicker() { $('#seriePicker').classList.add('hidden'); }
+$('#spClose').addEventListener('click', cerrarSeriePicker);
+$('#seriePicker').addEventListener('click', (e) => { if (e.target === e.currentTarget) cerrarSeriePicker(); });
+
+/* v61: ¿es una serie? → abrir el selector en vez del espejo directo */
+function elegirTitulo(res, enSala) {
+  if (/\/serie\//i.test(res.url || '')) { abrirSeriePicker(res, enSala); return true; }
+  return false;
+}
+
+/* v61: botón grande de play — la peli quedó lista en pausa */
+function mostrarPlayBtn() {
+  const b = $('#playBtn');
+  if (b) b.classList.remove('hidden');
+}
+function ocultarPlayBtn() {
+  const b = $('#playBtn');
+  if (b && !b.classList.contains('hidden')) b.classList.add('hidden');
+}
+$('#playBtn').addEventListener('click', () => {
+  ocultarPlayBtn();
+  sendAction({ type: 'mirror', op: 'play' }).catch(() => {});
+});
+
 /* v60: si la peli tarda demasiado, te dejamos entrar igual (sin quedarte atascado) */
 function arrancarTimerPeli() {
   if (S.peliTimer) clearTimeout(S.peliTimer);
@@ -821,6 +977,9 @@ function startMirrorFromPicker() {
   if (!url) { toast('Escribe la URL de la página a espejar'); return; }
   // feedback inmediato: mostramos la capa del espejo con spinner mientras abre Chrome
   S.mirror.gotFrame = false;
+  S.mirrorTime = null; /* v61: barrita nueva para la peli nueva */
+  ocultarPlayBtn();
+  $('#seekWrap').classList.add('hidden');
   applyMirrorState({ active: true, url, audio: true });
   /* v59: si venimos de elegir una peli/serie, su carátula mientras carga */
   if (S.mirrorInfo) mostrarPeliLoading();
@@ -1829,6 +1988,7 @@ async function buscarInicio() {
       return;
     }
     renderResultados(box, d.results, (res) => {
+      if (elegirTitulo(res)) return; /* v61: series → temporadas y episodios */
       S.pendingStart = { url: res.url, name: res.title || res.site, img: res.img || '' };
       /* v60: pantalla completa de espera desde el toque */
       S.mirrorInfo = { title: res.title || '', img: res.img || '', url: res.url, sub: 'Cargando tu sala…' };
@@ -1886,6 +2046,7 @@ async function cargarPopulares() {
     const d = await r.json();
     if (!d.ok || !d.results || !d.results.length) { delete wrap.dataset.cargado; return; }
     const alTocar = (res) => () => {
+      if (elegirTitulo(res)) return; /* v61: series → temporadas y episodios */
       S.pendingStart = { url: res.url, name: res.title, img: res.img || '' };
       /* v60: carátula a pantalla completa desde YA — la sala carga por detrás */
       S.mirrorInfo = { title: res.title || '', img: res.img || '', url: res.url, sub: 'Cargando tu sala…' };
@@ -1929,6 +2090,7 @@ async function buscarEnSala() {
     renderResultados(box, d.results, (res) => {
       cerrarBuscarSala();
       if (!S.canControl) { toast('Solo el anfitrión puede cambiar de página'); return; }
+      if (elegirTitulo(res, true)) return; /* v61: series → temporadas y episodios */
       /* v59: carátula de lo elegido mientras abre en el espejo */
       S.mirrorInfo = { title: res.title || '', img: res.img || '', url: res.url, sub: 'Abriendo en el espejo…' };
       $('#mirrorUrl').value = res.url;

@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
-<link rel="stylesheet" href="/style.css?v=60">
+<link rel="stylesheet" href="/style.css?v=61">
 </head>
 <body>
 
@@ -163,7 +163,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v60</span>
+        <span class="ver" id="verBadge">v61</span>
       </div>
       <!-- v36: gente, invitar y salir viven JUNTO al logo -->
       <div class="top-quick">
@@ -221,6 +221,22 @@
             <div id="mkBar" class="mk-bar hidden">
               <input id="mirrorKeys" class="input" placeholder="Escribe — se manda a la página espejada…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
               <button id="mkDone" class="btn small">Listo</button>
+            </div>
+            <!-- v61: botón grande de play — la peli espera en pausa a que le piquen -->
+            <div id="playBtn" class="play-btn hidden">
+              <div class="play-circulo">
+                <svg class="icon icon-34" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>
+              </div>
+              <div class="play-txt">Toca para empezar</div>
+            </div>
+            <!-- v61: barrita de la película — tiempo, duración y arrastrar para moverte -->
+            <div id="seekWrap" class="seek-wrap hidden">
+              <span id="seekCur" class="seek-t">0:00</span>
+              <div id="seekBar" class="seek-bar">
+                <div id="seekFill" class="seek-fill"></div>
+                <div id="seekDot" class="seek-dot"></div>
+              </div>
+              <span id="seekDur" class="seek-t">0:00</span>
             </div>
             <!-- v33: navegar como en un navegador normal — atrás / adelante -->
             <div class="mirror-nav" id="mirrorNav">
@@ -321,6 +337,24 @@
     </main>
   </div>
 
+  <!-- v61: selector de temporadas y episodios -->
+  <div id="seriePicker" class="serie-picker hidden">
+    <div class="sp-cuerpo">
+      <div class="sp-head">
+        <img id="spPoster" class="sp-poster" alt="">
+        <div class="sp-info">
+          <div id="spTitle" class="sp-title"></div>
+          <div id="spMeta" class="sp-meta"></div>
+        </div>
+        <button id="spClose" class="btn small ghost" title="Cerrar">
+          <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="spTemporadas" class="sp-temporadas"></div>
+      <div id="spEpisodios" class="sp-episodios"></div>
+    </div>
+  </div>
+
   <!-- v60: pantalla completa de espera — la sala carga por detrás y cuando
        la peli está lista te mete (también al elegir desde el menú) -->
   <div id="peliLoading" class="peli-loading hidden">
@@ -333,6 +367,6 @@
   </div>
 
   <div id="toasts" class="toasts"></div>
-  <script src="/app.js?v=60"></script>
+  <script src="/app.js?v=61"></script>
 </body>
 </html>
