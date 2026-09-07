@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
-<link rel="stylesheet" href="/style.css?v=46">
+<link rel="stylesheet" href="/style.css?v=47">
 </head>
 <body>
 
@@ -92,7 +92,18 @@
             </button>
             <h2 class="setup-title">Prepara tu sala</h2>
           </div>
-          <p class="setup-sub">Elige con qué página arrancar — o entra y decide adentro.</p>
+          <p class="setup-sub">Busca la película o elige una página — todo queda listo para mirar juntos.</p>
+
+          <!-- v47: buscador también al preparar la sala -->
+          <div class="home-search">
+            <input id="setupSearch" class="input" placeholder="Busca la película o serie…" autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off">
+            <button id="btnSetupSearch" class="btn primary big" type="button">
+              <svg class="icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              Buscar
+            </button>
+          </div>
+          <div id="setupResults" class="sr hidden"></div>
+
           <div id="lastCard"></div>
           <div class="setup-label">Páginas</div>
           <div id="setupGrid" class="setup-grid"></div>
@@ -113,7 +124,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v44</span>
+        <span class="ver" id="verBadge">v47</span>
       </div>
       <!-- v36: gente, invitar y salir viven JUNTO al logo -->
       <div class="top-quick">
@@ -260,6 +271,6 @@
   </div>
 
   <div id="toasts" class="toasts"></div>
-  <script src="/app.js?v=46"></script>
+  <script src="/app.js?v=47"></script>
 </body>
 </html>

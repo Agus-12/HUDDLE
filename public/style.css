@@ -1062,3 +1062,10 @@ body { overscroll-behavior-y: contain; }
 /* ---------- v46: resultados con póster (búsqueda en Cuevana/GoPelis) ---------- */
 .sr-poster { width: 34px; height: 48px; border-radius: 6px; flex: none; object-fit: cover; background: rgba(255, 255, 255, 0.06); }
 .sr-dom { color: var(--cyan); }
+
+/* ---------- v47: preparar la sala — buscador arriba + todo ordenado ---------- */
+#setupBox .home-search { margin: 4px 0 0; }
+#setupBox .sr { margin: 12px 0 0; }
+#setupBox .setup-label { text-transform: uppercase; letter-spacing: 0.9px; font-size: 11px; font-weight: 700; color: var(--dim); }
+.sr-row.sel { border-color: rgba(41, 224, 255, 0.65); background: rgba(41, 224, 255, 0.07); }
+.sr-row.sel .sr-go { color: #062028; background: var(--cyan); border-color: var(--cyan); }

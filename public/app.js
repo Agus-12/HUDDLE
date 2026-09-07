@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v46';
+const APP_VERSION = 'v47';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1350,7 +1350,9 @@ function elegirSetup(url, name) {
   else { S.setupUrl = url; S.setupName = name || ''; }
   renderSetupGrid();
   renderLastCard();
-  $('#btnCreateGo').textContent = S.setupUrl ? `Crear y espejar ${S.setupName}` : 'Crear la sala';
+  /* v47: títulos largos (de la búsqueda) se recortan en el botón para que no rompa */
+  const corto = S.setupName.length > 26 ? S.setupName.slice(0, 26).trim() + '…' : S.setupName;
+  $('#btnCreateGo').textContent = S.setupUrl ? `Crear y espejar ${corto}` : 'Crear la sala';
 }
 
 function abrirSetup() {
@@ -1359,6 +1361,9 @@ function abrirSetup() {
   $('#setupBox').classList.remove('hidden');
   $('#homeMain').classList.add('hidden');
   setupMsg('');
+  $('#setupSearch').value = '';
+  $('#setupResults').classList.add('hidden');
+  $('#setupResults').innerHTML = '';
   $('#btnCreateGo').textContent = 'Crear la sala';
   renderSetupGrid();
   renderLastCard();
@@ -1420,6 +1425,7 @@ $('#btnCreateGo').addEventListener('click', () => {
  * resultados listos para crear la sala o navegar el espejo */
 function renderResultados(box, results, alElegir, etiqueta) {
   box.innerHTML = '';
+  const rows = [];
   results.forEach((res) => {
     const row = document.createElement('button');
     row.className = 'sr-row';
@@ -1433,9 +1439,11 @@ function renderResultados(box, results, alElegir, etiqueta) {
       <span class="sr-go">${etiqueta}</span>`;
     row.querySelector('.sr-title').textContent = res.title;
     row.querySelector('.sr-dom').textContent = [res.site, res.extra].filter(Boolean).join(' · ');
-    row.addEventListener('click', () => alElegir(res));
+    row.addEventListener('click', () => alElegir(res, row));
     box.appendChild(row);
+    rows.push(row);
   });
+  return rows;
 }
 
 async function buscarEnServer(q) {
@@ -1466,6 +1474,37 @@ async function buscarInicio() {
 }
 $('#btnHomeSearch').addEventListener('click', buscarInicio);
 $('#homeSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); buscarInicio(); } });
+
+/* v47: buscador también al preparar la sala — el resultado se ELIGE (como las
+ * tarjetas) y el botón grande queda listo con "Crear y espejar …" */
+async function buscarSetup() {
+  const q = $('#setupSearch').value.trim();
+  const box = $('#setupResults');
+  if (!q) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  box.classList.remove('hidden');
+  box.innerHTML = '<div class="sr-info"><div class="spinner"></div> Buscando…</div>';
+  try {
+    const d = await buscarEnServer(q);
+    if (!d.ok || !d.results || !d.results.length) {
+      box.innerHTML = `<div class="sr-info">${(d && d.error) || 'No encontré nada — prueba con otras palabras'}</div>`;
+      return;
+    }
+    const rows = renderResultados(box, d.results, (res, row) => {
+      elegirSetup(res.url, res.title);
+      const elegida = S.setupUrl === res.url;
+      rows.forEach((r) => { r.classList.remove('sel'); const g = r.querySelector('.sr-go'); if (g) g.textContent = 'Elegir'; });
+      if (elegida) {
+        row.classList.add('sel');
+        const g = row.querySelector('.sr-go'); if (g) g.textContent = 'Elegida';
+        $('#btnCreateGo').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 'Elegir');
+  } catch {
+    box.innerHTML = '<div class="sr-info">Sin conexión con el servidor</div>';
+  }
+}
+$('#btnSetupSearch').addEventListener('click', buscarSetup);
+$('#setupSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); buscarSetup(); } });
 
 /* v45: buscar otra página SIN salir de la sala (mientras se espeja) */
 function cerrarBuscarSala() {
