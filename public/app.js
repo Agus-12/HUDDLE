@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v52';
+const APP_VERSION = 'v53';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -945,35 +945,11 @@ function addChat(msg) {
   /* v24: no acumular mensajes viejos en pantalla (el servidor igual guarda 100) */
   while (log.children.length > 80) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
-  /* v51: mensaje de puros emojis → se ve GRANDE con animación y vuela
-   * sobre la película (estilo sticker) */
-  const emo = msg.system ? '' : emojisDelMensaje(msg.text);
-  if (emo) {
-    div.classList.add('solo-emojis');
-    div.textContent = '';
-    div.appendChild(adornarEmojis(emo));
-  }
   /* v50: si están escribiendo con el teclado abierto, la mini-vista de
      arriba de la caja también se actualiza */
   if (document.body.classList.contains('escribiendo-chat')) actualizarChatMini();
   /* v28: en pantalla completa no se ve el chat → tira deslizante abajo (estilo Rave) */
   if (fsActive()) ticker.push(msg);
-}
-
-/* v51: ¿el mensaje es solo emojis (1-3)? → devuelve el emoji para mostrarlo grande */
-function emojisDelMensaje(texto) {
-  const t = String(texto || '').trim();
-  if (!t || t.length > 24) return '';
-  let clusters = [...t];
-  try {
-    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
-      clusters = [...new Intl.Segmenter('es', { granularity: 'grapheme' }).segment(t)].map((s) => s.segment);
-    }
-  } catch {}
-  const partes = clusters.filter((c) => c.trim());
-  const esEmoji = (c) => { try { return /\p{Extended_Pictographic}/u.test(c); } catch { return false; } };
-  if (partes.length && partes.length <= 3 && partes.every(esEmoji)) return partes.join('');
-  return '';
 }
 
 /* v52: cada emoji del mensaje va envuelto en un span con SU animación
@@ -1586,16 +1562,28 @@ function renderResultados(box, results, alElegir, conAnime) {
     const card = document.createElement('button');
     card.className = 'sr-card';
     card.type = 'button';
+    /* v53: las carátulas de AnimeFLV van por un proxy de imágenes porque
+     * en algunos teléfonos/compañías la página bloquea la imagen directa */
+    let srcImg = res.img || '';
+    if (srcImg && /animeflv\./i.test(srcImg)) srcImg = 'https://wsrv.nl/?url=' + srcImg.replace(/^https?:\/\//, '').split('?')[0] + '&w=240';
     card.innerHTML = `
       <span class="sr-badge"><img src="${logoDeSitio(res.site)}" alt=""></span>
-      ${res.img
-        ? `<img class="sr-cover" src="${res.img}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+      ${srcImg
+        ? `<img class="sr-cover" src="${srcImg}" alt="" loading="lazy" referrerpolicy="no-referrer">`
         : `<span class="sr-cover sr-cover-anime"><img src="${logoDeSitio(res.site)}" alt=""></span>`}
       <span class="sr-nombre"></span>
       ${res.extra ? '<span class="sr-extra"></span>' : ''}`;
     card.querySelector('.sr-nombre').textContent = res.title;
     const ex = card.querySelector('.sr-extra');
     if (ex) ex.textContent = res.extra || '';
+    /* si una carátula no carga, se reintenta por el proxy */
+    const im = card.querySelector('img.sr-cover');
+    if (im && res.img) {
+      im.addEventListener('error', () => {
+        const respaldo = 'https://wsrv.nl/?url=' + res.img.replace(/^https?:\/\//, '').split('?')[0] + '&w=240';
+        if (im.src !== respaldo) im.src = respaldo;
+      }, { once: true });
+    }
     card.addEventListener('click', () => alElegir(res, card));
     return card;
   };
