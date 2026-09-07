@@ -1191,4 +1191,4 @@ body { overscroll-behavior-y: contain; }
 .volver .btn { flex: none; padding: 9px 16px; }
 
 /* v56: la fila de la semana respira un poco más */
-#weekBox { margin-top: 14px; }
+#seriesBox { margin-top: 14px; }

@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v56';
+const APP_VERSION = 'v57';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1813,8 +1813,8 @@ $('#setupSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') { 
 async function cargarPopulares() {
   const wrap = document.querySelector('#trendingBox');
   const fila = document.querySelector('#trendingRow');
-  const wrapS = document.querySelector('#weekBox'); /* v56: tendencias de la semana */
-  const filaS = document.querySelector('#weekRow');
+  const wrapS = document.querySelector('#seriesBox'); /* v57: series recién agregadas */
+  const filaS = document.querySelector('#seriesRow');
   if (!wrap || !fila || wrap.dataset.cargado) return;
   wrap.dataset.cargado = '1';
   try {
@@ -1828,9 +1828,9 @@ async function cargarPopulares() {
     };
     d.results.slice(0, 16).forEach((res) => fila.appendChild(crearTarjetaResultado(res, alTocar(res))));
     wrap.classList.remove('hidden');
-    /* v56: segunda fila — lo más visto de la semana */
-    if (wrapS && filaS && d.week && d.week.length) {
-      d.week.slice(0, 16).forEach((res) => filaS.appendChild(crearTarjetaResultado(res, alTocar(res))));
+    /* v57: segunda fila — series recién agregadas */
+    if (wrapS && filaS && d.series && d.series.length) {
+      d.series.slice(0, 16).forEach((res) => filaS.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrapS.classList.remove('hidden');
     }
   } catch {

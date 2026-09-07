@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v56'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v57'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -994,10 +994,14 @@ async function metaDePelicula(url) {
   let u;
   try { u = new URL(u0); } catch { return null; }
   const dom = u.hostname.replace(/^www\./, '');
-  const slugM = /\/pelicula\/\d+\/([a-z0-9-]+)\/?$/i.exec(u.pathname)
-    || /\/serie\/([a-z0-9-]+)\/?$/i.exec(u.pathname)
-    || /\/peliculas\/([a-z0-9-]+)\/?$/i.exec(u.pathname)
-    || /\/anime\/([a-z0-9-]+)\/?$/i.exec(u.pathname);
+  /* v57: Cuevana redirige /serie/X a /wp-serie/X/ y dentro del espejo se
+   * navega a temporadas/episodios — capturamos el slug sin anclar al final */
+  const slugM = /\/pelicula\/\d+\/([a-z0-9-]+)/i.exec(u.pathname)
+    || /\/(?:wp-)?serie\/([a-z0-9-]+)/i.exec(u.pathname)
+    || /\/peliculas\/([a-z0-9-]+)/i.exec(u.pathname)
+    || /\/(?:wp-)?pelicula\/([a-z0-9-]+)/i.exec(u.pathname)
+    || /\/anime\/([a-z0-9-]+)/i.exec(u.pathname)
+    || /\/ver\/([a-z0-9-]+)-episodio-\d+/i.exec(u.pathname);
   let d = null;
   if (slugM) {
     const slug = slugM[1];
@@ -1029,7 +1033,7 @@ async function metaDePelicula(url) {
 
 /* v55: populares del día (Cuevana) — con caché de 30 minutos */
 let tendenciasCache = { at: 0, items: [] };
-let semanaCache = { at: 0, items: [] };
+let seriesCache = { at: 0, items: [] };
 async function tendenciasCuevana(periodo, cache) {
   if (Date.now() - cache.at < 30 * 60 * 1000 && cache.items.length) return cache.items;
   const r = await fetchSeguro(`https://cine-calidad.mx/wp-json/mycustom/v1/trends/${periodo}`, 10000);
@@ -1046,7 +1050,24 @@ async function tendenciasCuevana(periodo, cache) {
   return items;
 }
 async function popularesDeHoy() { return tendenciasCuevana('movies_day', tendenciasCache); }
-async function popularesSemana() { return tendenciasCuevana('movies_week', semanaCache); }
+/* v57: series recién agregadas — reemplaza "tendencias de la semana",
+ * que salía casi igual que los populares del día (21 de 22 repetidas) */
+async function seriesRecientes() {
+  if (Date.now() - seriesCache.at < 30 * 60 * 1000 && seriesCache.items.length) return seriesCache.items;
+  const r = await fetchSeguro('https://cine-calidad.mx/wp-json/mycustom/v1/series', 10000);
+  if (!r.ok) return seriesCache.items; /* si falla, lo de antes es mejor que nada */
+  const d = await r.json().catch(() => ({}));
+  const items = (Array.isArray(d) ? d : d.posts || []).slice(0, 16).map((p) => ({
+    title: String(p.title || ''),
+    slug: String(p.slug || ''),
+    url: `https://cuevana.mov/serie/${p.slug}`,
+    img: String(p.featured_image || '').replace('/w780/', '/w342/'),
+    site: 'Cuevana',
+    extra: p.year ? String(p.year) : '',
+  })).filter((x) => x.title && x.slug);
+  if (items.length) { seriesCache.at = Date.now(); seriesCache.items = items; }
+  return items;
+}
 
 async function buscarEnSitios(q) {
   const grupos = await Promise.all([
@@ -1100,12 +1121,12 @@ const server = http.createServer(async (req, res) => {
     }
     /* v43: directorio de páginas — ver, agregar y quitar */
     if (url.pathname === '/api/trending' && req.method === 'GET') {
-      /* v55: populares del día + v56: tendencias de la semana */
-      const [day, week] = await Promise.all([
+      /* v55: populares del día + v57: series recién agregadas */
+      const [day, series] = await Promise.all([
         popularesDeHoy().catch(() => []),
-        popularesSemana().catch(() => []),
+        seriesRecientes().catch(() => []),
       ]);
-      return json(res, 200, { ok: true, results: day, week });
+      return json(res, 200, { ok: true, results: day, series });
     }
     if (url.pathname.startsWith('/api/invite/')) {
       /* v56: tarjeta de invitación — quién invita y qué se está viendo */
