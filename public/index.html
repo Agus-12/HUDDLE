@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
-<link rel="stylesheet" href="/style.css?v=55">
+<link rel="stylesheet" href="/style.css?v=56">
 </head>
 <body>
 
@@ -20,7 +20,18 @@
     <div class="blob blob-a"></div>
     <div class="blob blob-b"></div>
     <div class="blob blob-c"></div>
+    <!-- v56: póster de la invitación como fondo cinematográfico -->
+    <img id="inviteBg" class="invite-bg hidden" alt="">
     <div class="card landing-card">
+      <!-- v56: "X te invita a ver…" -->
+      <div id="inviteHero" class="invite-hero hidden">
+        <img id="invitePoster" class="invite-poster" alt="">
+        <div class="invite-txts">
+          <span class="invite-txt"><b id="inviteHost"></b><span id="inviteVer"> te invita a ver</span></span>
+          <span class="invite-title" id="inviteTitle"></span>
+          <span class="invite-sub">Pon tu nombre y entra a la sala</span>
+        </div>
+      </div>
       <div class="logo-big">
 <img src="/carita.png" class="carita-big" alt="Carita de Huddle">
       </div>
@@ -52,6 +63,16 @@
 
         <!-- pantalla principal del inicio -->
         <section id="homeMain">
+          <!-- v56: ¿volver a tu sala? -->
+          <div id="volverBox" class="volver hidden">
+            <img id="volverPoster" class="volver-poster" alt="">
+            <div class="volver-txts">
+              <span class="volver-t">Estabas viendo</span>
+              <b id="volverTitle" class="volver-tit"></b>
+              <span id="volverCode" class="volver-c"></span>
+            </div>
+            <button id="btnVolver" class="btn primary">Volver</button>
+          </div>
           <div class="home-hero">
             <h2 class="home-title">¿Qué van a ver hoy?</h2>
             <p class="home-sub">Crea una sala, comparte el link y míralo juntos — todo sincronizado.</p>
@@ -84,6 +105,15 @@
               <span>Populares hoy</span>
             </div>
             <div id="trendingRow" class="sr-fila"></div>
+          </div>
+
+          <!-- v56: tendencias de la semana — segunda fila -->
+          <div id="weekBox" class="sr-sec hidden">
+            <div class="sr-sec-titulo">
+              <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--violet);"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+              <span>Tendencias de la semana</span>
+            </div>
+            <div id="weekRow" class="sr-fila"></div>
           </div>
 
           <!-- v31: salas en vivo ahora, con preview de lo que ven -->
@@ -133,7 +163,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v55</span>
+        <span class="ver" id="verBadge">v56</span>
       </div>
       <!-- v36: gente, invitar y salir viven JUNTO al logo -->
       <div class="top-quick">
@@ -283,6 +313,6 @@
   </div>
 
   <div id="toasts" class="toasts"></div>
-  <script src="/app.js?v=55"></script>
+  <script src="/app.js?v=56"></script>
 </body>
 </html>

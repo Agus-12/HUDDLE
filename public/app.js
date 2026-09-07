@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v55';
+const APP_VERSION = 'v56';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -135,6 +135,8 @@ function connect(code, opts = {}) {
     renderUsers(d.room.users);
     /* v33: el numero de sala ya no se muestra (la invitacion basta) */
     history.replaceState(null, '', '#' + d.room.code);
+    /* v56: recordamos la sala para ofrecer "¿volver a tu sala?" */
+    try { localStorage.setItem('huddle_lastRoom', JSON.stringify({ code: d.room.code, at: Date.now() })); } catch {}
     showScreen('room');
     applyMirrorState(d.room.mirror || { active: false, url: '' });
     applyState(d.room.state);
@@ -1181,8 +1183,11 @@ $('#btnCopy').addEventListener('click', async () => {
 
 $('#btnLeave').addEventListener('click', () => {
   if (S.es) S.es.close();
-  location.href = location.pathname;
-  location.reload();
+  /* v56: saliste a propósito — ya no ofrecemos volver a esta sala.
+   * replace() sin hash: si dejáramos el #codigo, el auto-ingreso
+   * de invitación te metería de vuelta a la sala que acabas de cerrar */
+  try { localStorage.removeItem('huddle_lastRoom'); } catch {}
+  location.replace(location.pathname);
 });
 
 /* ======================= pantalla de inicio (v31) =======================
@@ -1194,6 +1199,80 @@ function loadProfile() {
   try { return JSON.parse(localStorage.getItem('rr-profile') || 'null') || null; } catch { return null; }
 }
 
+/* v56: ¿qué sala había dejado abierta este dispositivo? (máx. 3 h) */
+function leerLastRoom() {
+  try {
+    const d = JSON.parse(localStorage.getItem('huddle_lastRoom') || 'null');
+    if (d && d.code && Date.now() - (d.at || 0) < 3 * 60 * 60 * 1000) return d.code;
+  } catch {}
+  return null;
+}
+
+/* v56: tarjeta de invitación — "X te invita a ver…" con el póster de fondo */
+async function cargarInvitacion(code) {
+  try {
+    const r = await fetch('/api/invite/' + code);
+    if (!r.ok) {
+      toast('Esa sala ya no existe');
+      history.replaceState(null, '', location.pathname);
+      return;
+    }
+    const d = await r.json().catch(() => ({}));
+    if (!d.ok || !d.host) return;
+    $('#inviteHost').textContent = d.host;
+    const tit = $('#inviteTitle');
+    if (d.title) {
+      $('#inviteVer').textContent = ' te invita a ver';
+      tit.textContent = d.title;
+      tit.style.display = '';
+    } else { /* sin película en curso: sala vacía */
+      $('#inviteVer').textContent = ' te invita a su sala';
+      tit.style.display = 'none';
+    }
+    $('#joinCode').value = code; /* por si algo falla, el código queda listo */
+    if (d.poster) {
+      const bg = $('#inviteBg'), po = $('#invitePoster');
+      po.src = d.poster;
+      po.onerror = () => { po.style.display = 'none'; };
+      bg.onload = () => bg.classList.remove('hidden');
+      bg.src = d.poster;
+    } else {
+      $('#invitePoster').style.display = 'none';
+    }
+    $('#inviteHero').classList.remove('hidden');
+    document.title = d.host + ' te invita — Huddle';
+  } catch {}
+}
+
+/* v56: banner "¿Volver a tu sala?" en el inicio */
+async function cargarVolver() {
+  const code = leerLastRoom();
+  if (!code) return;
+  const box = $('#volverBox');
+  box.classList.add('hidden');
+  try {
+    const r = await fetch('/api/invite/' + code);
+    if (!r.ok) { /* la sala ya murió — dejamos de insistir */
+      localStorage.removeItem('huddle_lastRoom');
+      return;
+    }
+    const d = await r.json().catch(() => ({}));
+    if (!d.ok) return;
+    $('#volverTitle').textContent = d.title || 'Tu sala';
+    $('#volverCode').textContent = 'Sala ' + code;
+    const po = $('#volverPoster');
+    po.style.display = '';
+    if (d.poster) {
+      po.src = d.poster;
+      po.onerror = () => { po.style.display = 'none'; };
+    } else {
+      po.removeAttribute('src');
+      po.style.display = 'none';
+    }
+    box.classList.remove('hidden');
+  } catch {}
+}
+
 function initLanding() {
   S.profile = loadProfile();
   const tiene = !!S.profile;
@@ -1203,6 +1282,7 @@ function initLanding() {
   document.querySelector('.landing-card').classList.toggle('hidden', tiene);
   $('#homeFull').classList.toggle('hidden', !tiene);
   $('#landing').classList.toggle('home-mode', tiene);
+  const hM = /^#([A-Za-z0-9]{4,8})$/.exec(location.hash); /* v56: link de invitación */
   if (tiene) {
     $('#profileName').textContent = S.profile.name;
     const av = $('#profileAvatar');
@@ -1210,10 +1290,21 @@ function initLanding() {
     av.style.setProperty('--h', hashHue(S.profile.name));
     pollRooms();
     cargarPopulares(); /* v55: fila de populares del día */
+    if (hM) {
+      /* v56: ya tienes sesión y te invitaron — directo a la sala */
+      const code = hM[1].toUpperCase();
+      fetch('/api/room/' + code).then((r) => {
+        if (r.ok) connect(code);
+        else { toast('Esa sala ya no existe'); history.replaceState(null, '', location.pathname); }
+      }).catch(() => {});
+    } else {
+      cargarVolver(); /* v56: ¿volver a tu sala? */
+    }
   } else {
     const inpU = $('#userNick');
     inpU.value = ''; // v32: sin el nombre viejo pegado tras "cambiar"
     try { inpU.focus(); } catch {}
+    if (hM) cargarInvitacion(hM[1].toUpperCase()); /* v56: "X te invita a ver…" */
   }
 }
 
@@ -1722,24 +1813,34 @@ $('#setupSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') { 
 async function cargarPopulares() {
   const wrap = document.querySelector('#trendingBox');
   const fila = document.querySelector('#trendingRow');
+  const wrapS = document.querySelector('#weekBox'); /* v56: tendencias de la semana */
+  const filaS = document.querySelector('#weekRow');
   if (!wrap || !fila || wrap.dataset.cargado) return;
   wrap.dataset.cargado = '1';
   try {
     const r = await fetch('/api/trending');
     const d = await r.json();
     if (!d.ok || !d.results || !d.results.length) { delete wrap.dataset.cargado; return; }
-    d.results.slice(0, 16).forEach((res) => {
-      fila.appendChild(crearTarjetaResultado(res, () => {
-        S.pendingStart = { url: res.url, name: res.title };
-        const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
-        connect(code);
-      }));
-    });
+    const alTocar = (res) => () => {
+      S.pendingStart = { url: res.url, name: res.title };
+      const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+      connect(code);
+    };
+    d.results.slice(0, 16).forEach((res) => fila.appendChild(crearTarjetaResultado(res, alTocar(res))));
     wrap.classList.remove('hidden');
+    /* v56: segunda fila — lo más visto de la semana */
+    if (wrapS && filaS && d.week && d.week.length) {
+      d.week.slice(0, 16).forEach((res) => filaS.appendChild(crearTarjetaResultado(res, alTocar(res))));
+      wrapS.classList.remove('hidden');
+    }
   } catch {
     delete wrap.dataset.cargado; /* si falló, se reintenta la próxima vez */
   }
 }
+$('#btnVolver').addEventListener('click', () => {
+  const code = leerLastRoom();
+  if (code) connect(code);
+});
 
 /* v45: buscar otra página SIN salir de la sala (mientras se espeja) */
 function cerrarBuscarSala() {

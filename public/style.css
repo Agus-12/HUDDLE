@@ -1158,3 +1158,37 @@ body { overscroll-behavior-y: contain; }
 
 /* ---------- v54: aviso dentro de un apartado sin resultados ---------- */
 .sr-vacio-sec { color: var(--dim); font-size: 12.5px; padding: 12px 4px 2px; flex: none; max-width: 240px; line-height: 1.4; }
+
+/* ---------- v56: tarjeta de invitación con póster ---------- */
+.invite-bg { position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  filter: blur(30px) brightness(.32) saturate(1.15); z-index: 0; opacity: 0;
+  transition: opacity .9s ease; }
+.invite-bg:not(.hidden) { opacity: 1; }
+#landing .landing-card { position: relative; z-index: 1; }
+.invite-hero { display: flex; gap: 13px; align-items: center; text-align: left;
+  margin-bottom: 16px; padding: 12px; border: 1px solid var(--line);
+  border-radius: 14px; background: rgba(255,255,255,.045); }
+.invite-poster { width: 74px; height: 108px; border-radius: 9px; object-fit: cover;
+  flex: none; background: rgba(255,255,255,.07); box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+.invite-txts { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.invite-txt { font-size: 12.5px; color: var(--dim); }
+.invite-txt b { color: var(--txt); }
+.invite-title { font-size: 16.5px; font-weight: 800; line-height: 1.22; color: var(--txt);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.invite-sub { font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+
+/* ---------- v56: banner "¿volver a tu sala?" ---------- */
+.volver { display: flex; align-items: center; gap: 12px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px;
+  margin-bottom: 18px; animation: pop .35s ease; }
+.volver-poster { width: 46px; height: 66px; border-radius: 8px; object-fit: cover;
+  flex: none; background: rgba(255,255,255,.07); }
+.volver-txts { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.volver-t { font-size: 11.5px; color: var(--dim); }
+.volver-tit { font-size: 14.5px; line-height: 1.25; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; }
+.volver-c { font-size: 11px; color: var(--cyan); letter-spacing: 1.5px; }
+.volver .btn { flex: none; padding: 9px 16px; }
+
+/* v56: la fila de la semana respira un poco más */
+#weekBox { margin-top: 14px; }

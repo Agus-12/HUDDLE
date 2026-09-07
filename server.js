@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v55'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v56'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -983,12 +983,57 @@ async function buscarAnime(q) {
   return buscarAnimeJina(q);
 }
 
+/* v56: metadatos de lo que se ve en una sala (título + póster) para la
+ * tarjeta de invitación — por el slug de la URL y las APIs de cada página */
+const metaCache = new Map();
+async function metaDePelicula(url) {
+  const u0 = String(url || '');
+  if (!u0) return null;
+  const c = metaCache.get(u0);
+  if (c && Date.now() - c.at < 10 * 60 * 1000) return c.d;
+  let u;
+  try { u = new URL(u0); } catch { return null; }
+  const dom = u.hostname.replace(/^www\./, '');
+  const slugM = /\/pelicula\/\d+\/([a-z0-9-]+)\/?$/i.exec(u.pathname)
+    || /\/serie\/([a-z0-9-]+)\/?$/i.exec(u.pathname)
+    || /\/peliculas\/([a-z0-9-]+)\/?$/i.exec(u.pathname)
+    || /\/anime\/([a-z0-9-]+)\/?$/i.exec(u.pathname);
+  let d = null;
+  if (slugM) {
+    const slug = slugM[1];
+    const bonito = slug.replace(/-/g, ' ').replace(/\b\w/g, (x) => x.toUpperCase());
+    if (/cuevana\./.test(dom)) {
+      try {
+        const r = await fetchSeguro(`https://cine-calidad.mx/wp-json/mycustom/v1/search/?s=${encodeURIComponent(slug.replace(/-/g, ' '))}&page=1`, 8000);
+        if (r.ok) {
+          const dd = await r.json().catch(() => ({}));
+          const p = (dd.posts || []).find((x) => x.slug === slug) || (dd.posts || [])[0];
+          if (p) d = { title: p.title, poster: String(p.featured_image || '').replace('/w780/', '/w342/') };
+        }
+      } catch {}
+    } else if (/gopelis\./.test(dom)) {
+      try {
+        const r = await fetchSeguro(`https://gopelis.com/api/search?q=${encodeURIComponent(slug.replace(/-/g, ' '))}`, 8000);
+        if (r.ok) {
+          const dd = await r.json().catch(() => ({}));
+          const p = (dd.results || []).find((x) => x.slug === slug) || (dd.results || [])[0];
+          if (p) d = { title: p.title, poster: p.posterPath ? `https://image.tmdb.org/t/p/w342${p.posterPath}` : '' };
+        }
+      } catch {}
+    }
+    if (!d) d = { title: bonito, poster: '' };
+  }
+  if (d) metaCache.set(u0, { at: Date.now(), d });
+  return d;
+}
+
 /* v55: populares del día (Cuevana) — con caché de 30 minutos */
 let tendenciasCache = { at: 0, items: [] };
-async function popularesDeHoy() {
-  if (Date.now() - tendenciasCache.at < 30 * 60 * 1000 && tendenciasCache.items.length) return tendenciasCache.items;
-  const r = await fetchSeguro('https://cine-calidad.mx/wp-json/mycustom/v1/trends/movies_day', 10000);
-  if (!r.ok) return tendenciasCache.items; /* si falla, lo de antes es mejor que nada */
+let semanaCache = { at: 0, items: [] };
+async function tendenciasCuevana(periodo, cache) {
+  if (Date.now() - cache.at < 30 * 60 * 1000 && cache.items.length) return cache.items;
+  const r = await fetchSeguro(`https://cine-calidad.mx/wp-json/mycustom/v1/trends/${periodo}`, 10000);
+  if (!r.ok) return cache.items; /* si falla, lo de antes es mejor que nada */
   const d = await r.json().catch(() => ({}));
   const items = (d.posts || []).slice(0, 16).map((p) => ({
     title: String(p.title || ''),
@@ -997,10 +1042,11 @@ async function popularesDeHoy() {
     site: 'Cuevana',
     extra: [p.year, p.duration ? `${p.duration} min` : ''].filter(Boolean).join(' · '),
   })).filter((x) => x.title && x.url);
-  if (items.length) tendenciasCache = { at: Date.now(), items };
-  console.log(`[populares] ${items.length} del día`);
+  if (items.length) { cache.at = Date.now(); cache.items = items; }
   return items;
 }
+async function popularesDeHoy() { return tendenciasCuevana('movies_day', tendenciasCache); }
+async function popularesSemana() { return tendenciasCuevana('movies_week', semanaCache); }
 
 async function buscarEnSitios(q) {
   const grupos = await Promise.all([
@@ -1054,8 +1100,26 @@ const server = http.createServer(async (req, res) => {
     }
     /* v43: directorio de páginas — ver, agregar y quitar */
     if (url.pathname === '/api/trending' && req.method === 'GET') {
-      const results = await popularesDeHoy().catch(() => []);
-      return json(res, 200, { ok: true, results });
+      /* v55: populares del día + v56: tendencias de la semana */
+      const [day, week] = await Promise.all([
+        popularesDeHoy().catch(() => []),
+        popularesSemana().catch(() => []),
+      ]);
+      return json(res, 200, { ok: true, results: day, week });
+    }
+    if (url.pathname.startsWith('/api/invite/')) {
+      /* v56: tarjeta de invitación — quién invita y qué se está viendo */
+      const code = decodeURIComponent(url.pathname.split('/')[3] || '').toUpperCase();
+      const room = rooms.get(code);
+      if (!room) return json(res, 404, { ok: false, error: 'Sala no encontrada' });
+      const host = [...room.users.values()].find((x) => x.id === room.hostId) || [...room.users.values()][0];
+      const m = mirrors.get(room.code);
+      const out = { ok: true, code: room.code, host: host ? host.name : '', title: '', poster: '' };
+      if (m && m.url) {
+        const meta = await metaDePelicula(m.url).catch(() => null);
+        if (meta) { out.title = meta.title || ''; out.poster = meta.poster || ''; }
+      }
+      return json(res, 200, out);
     }
     if (url.pathname === '/api/search' && req.method === 'GET') {
       const q = (url.searchParams.get('q') || '').trim().slice(0, 120);
