@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v53';
+const APP_VERSION = 'v54';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1602,15 +1602,27 @@ function renderResultados(box, results, alElegir, conAnime) {
     box.appendChild(sec);
     return fila;
   };
-  porSitio.forEach((items, sitio) => {
+  /* v54: los tres sitios conocidos salen SIEMPRE en el mismo orden; si
+   * alguno no tiene resultados para lo que buscaste, lo dice — antes
+   * simplemente no aparecía y parecía que la búsqueda fallaba */
+  const ordenFijo = ['Cuevana', 'GoPelis', 'AnimeFLV'];
+  const extras = [...porSitio.keys()].filter((s) => !ordenFijo.includes(s));
+  for (const sitio of [...ordenFijo, ...extras]) {
+    const items = porSitio.get(sitio) || [];
+    if (!items.length && !ordenFijo.includes(sitio)) continue;
     const fila = crearSeccion(sitio);
     items.forEach((res) => fila.appendChild(crearTarjeta(res)));
-  });
-  /* respaldo de anime: si AnimeFLV no tuvo resultados, la tarjeta abre
-   * AnimeD23 para buscar adentro con el teclado del espejo */
-  if (conAnime && !porSitio.has('AnimeFLV') && !porSitio.has('AnimeD23')) {
-    const fila = crearSeccion('AnimeD23');
-    fila.appendChild(crearTarjeta({ url: 'https://animed23.com/', title: 'Buscar dentro de AnimeD23', site: 'AnimeD23', extra: 'la búsqueda de anime va dentro de su página', img: '' }));
+    if (!items.length) {
+      const v = document.createElement('div');
+      v.className = 'sr-vacio-sec';
+      v.textContent = sitio === 'AnimeFLV' ? 'Sin resultados de anime para esta búsqueda' : 'Sin resultados para esta búsqueda';
+      fila.appendChild(v);
+      /* respaldo de anime: si AnimeFLV no lo tiene, la tarjeta abre AnimeD23
+       * para buscar adentro con el teclado del espejo */
+      if (sitio === 'AnimeFLV' && conAnime) {
+        fila.appendChild(crearTarjeta({ url: 'https://animed23.com/', title: 'Buscar dentro de AnimeD23', site: 'AnimeD23', extra: 'la búsqueda de anime va dentro de su página', img: '' }));
+      }
+    }
   }
 }
 
