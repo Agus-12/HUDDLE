@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v54'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v55'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -910,7 +910,7 @@ async function buscarCuevana(q) {
   return (d.posts || []).slice(0, 12).map((p) => ({
     title: String(p.title || ''),
     url: (p.type === 'movies') ? `https://cuevana.mov/pelicula/${p.tmdb}/${p.slug}` : `https://cuevana.mov/serie/${p.slug}`,
-    img: String(p.featured_image || '').replace('/w780/', '/w185/'),
+    img: String(p.featured_image || '').replace('/w780/', '/w342/'),
     site: 'Cuevana',
     extra: [p.year, p.duration ? `${p.duration} min` : ''].filter(Boolean).join(' · '),
   })).filter((x) => x.title && x.url);
@@ -923,7 +923,7 @@ async function buscarGopelis(q) {
   return (d.results || []).slice(0, 12).map((p) => ({
     title: String(p.title || ''),
     url: p.mediaType === 'tv' ? `https://gopelis.com/series/${p.slug}` : `https://gopelis.com/peliculas/${p.slug}`,
-    img: p.posterPath ? `https://image.tmdb.org/t/p/w185${p.posterPath}` : '',
+    img: p.posterPath ? `https://image.tmdb.org/t/p/w342${p.posterPath}` : '',
     site: 'GoPelis',
     extra: p.releaseDate ? String(p.releaseDate).slice(0, 4) : '',
   })).filter((x) => x.title && x.url);
@@ -983,6 +983,25 @@ async function buscarAnime(q) {
   return buscarAnimeJina(q);
 }
 
+/* v55: populares del día (Cuevana) — con caché de 30 minutos */
+let tendenciasCache = { at: 0, items: [] };
+async function popularesDeHoy() {
+  if (Date.now() - tendenciasCache.at < 30 * 60 * 1000 && tendenciasCache.items.length) return tendenciasCache.items;
+  const r = await fetchSeguro('https://cine-calidad.mx/wp-json/mycustom/v1/trends/movies_day', 10000);
+  if (!r.ok) return tendenciasCache.items; /* si falla, lo de antes es mejor que nada */
+  const d = await r.json().catch(() => ({}));
+  const items = (d.posts || []).slice(0, 16).map((p) => ({
+    title: String(p.title || ''),
+    url: (p.type === 'serie') ? `https://cuevana.mov/serie/${p.slug}` : `https://cuevana.mov/pelicula/${p.tmdb}/${p.slug}`,
+    img: String(p.featured_image || '').replace('/w780/', '/w342/'),
+    site: 'Cuevana',
+    extra: [p.year, p.duration ? `${p.duration} min` : ''].filter(Boolean).join(' · '),
+  })).filter((x) => x.title && x.url);
+  if (items.length) tendenciasCache = { at: Date.now(), items };
+  console.log(`[populares] ${items.length} del día`);
+  return items;
+}
+
 async function buscarEnSitios(q) {
   const grupos = await Promise.all([
     buscarCuevana(q).catch(() => []),
@@ -1034,6 +1053,10 @@ const server = http.createServer(async (req, res) => {
       });
     }
     /* v43: directorio de páginas — ver, agregar y quitar */
+    if (url.pathname === '/api/trending' && req.method === 'GET') {
+      const results = await popularesDeHoy().catch(() => []);
+      return json(res, 200, { ok: true, results });
+    }
     if (url.pathname === '/api/search' && req.method === 'GET') {
       const q = (url.searchParams.get('q') || '').trim().slice(0, 120);
       if (!q) return json(res, 400, { ok: false, error: 'Escribe qué quieren ver' });

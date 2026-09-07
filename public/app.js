@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v54';
+const APP_VERSION = 'v55';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -390,6 +390,15 @@ class MirrorPlayer extends AudioWorkletProcessor {
   process(inputs, outputs) {
     const out = outputs[0][0];
     if (!out) return true;
+    /* v55: gobernador de latencia — si el iPhone pausó el audio por dentro,
+     * los chunks viejos se acumulan (sonido "atrasado"). Si hay más de 1 s
+     * acumulado, tiramos lo viejo y nos quedamos con ~0.3 s fresco */
+    const maxQ = Math.round(1.0 * sampleRate);
+    if (this.qn > maxQ) {
+      let objetivo = Math.round(0.3 * sampleRate);
+      while (this.q.length > 1 && this.qn - this.q[0].length >= objetivo) { this.qn -= this.q[0].length; this.q.shift(); }
+      this.off = 0;
+    }
     if (!this.on && this.qn >= this.pre) this.on = true;
     if (!this.on) { out.fill(0); return true; }
     let i = 0;
@@ -427,6 +436,13 @@ function makeFallbackNode(ctx) {
   node.onaudioprocess = (e) => {
     const out = e.outputBuffer.getChannelData(0);
     stats.llamadas++;
+    /* v55: mismo gobernador de latencia que el worklet (ver arriba) */
+    const maxQ = Math.round(1.0 * ctx.sampleRate);
+    if (qn > maxQ) {
+      let objetivo = Math.round(0.3 * ctx.sampleRate);
+      while (q.length > 1 && qn - q[0].length >= objetivo) { qn -= q[0].length; q.shift(); }
+      off = 0;
+    }
     if (!on && qn >= pre) on = true;
     if (!on) { out.fill(0); return; }
     let i = 0;
@@ -540,6 +556,20 @@ $('#audioChip').addEventListener('click', async () => {
   if (AU.outEl) { try { await AU.outEl.play(); AU.salidaElemento = true; } catch {} }
   $('#audioChip').classList.add('hidden');
 });
+
+/* v55: vigilante del audio — cada 4 s revisa que el sonido siga vivo.
+ * Cuando el iPhone pausa el audio por dentro (cambio de app, bloqueo),
+ * antes se quedaba mudo hasta reiniciar la app; ahora se reactiva solo,
+ * y si el navegador exige un toque, aparece el chip para reactivarlo. */
+setInterval(() => {
+  if (!S.mirror.active || !AU.needAudio || !AU.ctx) return;
+  if (AU.ctx.state === 'suspended') {
+    AU.ctx.resume()
+      .then(() => { if (AU.ctx.state === 'suspended') $('#audioChip').classList.remove('hidden'); })
+      .catch(() => { $('#audioChip').classList.remove('hidden'); });
+  }
+  if (AU.outEl && AU.outEl.paused) { AU.outEl.play().then(() => { AU.salidaElemento = true; }).catch(() => {}); }
+}, 4000);
 
 /* ---------- v21: resync automático al volver a la app ----------
  * cuando la app pasa al fondo (cambias de app, bloqueas el celular), iOS congela
@@ -1179,6 +1209,7 @@ function initLanding() {
     av.textContent = (S.profile.name[0] || '?').toUpperCase();
     av.style.setProperty('--h', hashHue(S.profile.name));
     pollRooms();
+    cargarPopulares(); /* v55: fila de populares del día */
   } else {
     const inpU = $('#userNick');
     inpU.value = ''; // v32: sin el nombre viejo pegado tras "cambiar"
@@ -1551,14 +1582,7 @@ function logoDeSitio(nombre) {
   return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(String(nombre).toLowerCase())}&sz=64`;
 }
 
-function renderResultados(box, results, alElegir, conAnime) {
-  box.innerHTML = '';
-  const porSitio = new Map();
-  results.forEach((r) => {
-    if (!porSitio.has(r.site)) porSitio.set(r.site, []);
-    porSitio.get(r.site).push(r);
-  });
-  const crearTarjeta = (res) => {
+function crearTarjetaResultado(res, alElegir) {
     const card = document.createElement('button');
     card.className = 'sr-card';
     card.type = 'button';
@@ -1584,9 +1608,18 @@ function renderResultados(box, results, alElegir, conAnime) {
         if (im.src !== respaldo) im.src = respaldo;
       }, { once: true });
     }
-    card.addEventListener('click', () => alElegir(res, card));
-    return card;
-  };
+  card.addEventListener('click', () => alElegir(res, card));
+  return card;
+}
+
+function renderResultados(box, results, alElegir, conAnime) {
+  box.innerHTML = '';
+  const porSitio = new Map();
+  results.forEach((r) => {
+    if (!porSitio.has(r.site)) porSitio.set(r.site, []);
+    porSitio.get(r.site).push(r);
+  });
+  const crearTarjeta = (res) => crearTarjetaResultado(res, (r, c) => alElegir(r, c));
   const crearSeccion = (sitio) => {
     const sec = document.createElement('div');
     sec.className = 'sr-sec';
@@ -1684,6 +1717,29 @@ async function buscarSetup() {
 }
 $('#btnSetupSearch').addEventListener('click', buscarSetup);
 $('#setupSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); buscarSetup(); } });
+
+/* v55: populares del día — fila en el inicio, un toque crea la sala */
+async function cargarPopulares() {
+  const wrap = document.querySelector('#trendingBox');
+  const fila = document.querySelector('#trendingRow');
+  if (!wrap || !fila || wrap.dataset.cargado) return;
+  wrap.dataset.cargado = '1';
+  try {
+    const r = await fetch('/api/trending');
+    const d = await r.json();
+    if (!d.ok || !d.results || !d.results.length) { delete wrap.dataset.cargado; return; }
+    d.results.slice(0, 16).forEach((res) => {
+      fila.appendChild(crearTarjetaResultado(res, () => {
+        S.pendingStart = { url: res.url, name: res.title };
+        const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+        connect(code);
+      }));
+    });
+    wrap.classList.remove('hidden');
+  } catch {
+    delete wrap.dataset.cargado; /* si falló, se reintenta la próxima vez */
+  }
+}
 
 /* v45: buscar otra página SIN salir de la sala (mientras se espeja) */
 function cerrarBuscarSala() {
