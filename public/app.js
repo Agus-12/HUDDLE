@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v57';
+const APP_VERSION = 'v58';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {

@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v57'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v58'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -300,24 +300,52 @@ async function startMirror(room, rawUrl, userId) {
   }).catch(() => {});
 
   /* v14: intentar dar play solo (paginas de peliculas lo necesitan);
-     se reintenta un rato y se detiene en cuanto algo suena */
+     se reintenta un rato y se detiene en cuanto algo suena.
+     v58: Cuevana ya no carga el video por sí solo — el iframe del
+     reproductor aparece hasta que alguien le pica. En páginas de
+     PELÍCULA lo tocamos por ti: la película empieza directa.
+     (Series quedan manuales a propósito, mecanismo propio después.) */
+  const esPagPelicula = () => /\/(wp-)?pelicula\/[a-z0-9-]+/i.test(m.url || '');
+  let avisoPlay = false;
   const intentoPlay = async (n) => {
-    if (!viva() || n > 20) return;
+    if (!viva() || n > 30) return;
     let sonando = false;
+    let hayVideo = false;
     try { await scrollToPlayer(); } catch {}
     try {
       for (const fr of m.page.frames()) {
         const r = await fr.evaluate(() => {
           let ok = false;
+          let cant = 0;
           document.querySelectorAll('video, audio').forEach((v) => {
+            if (v.tagName === 'VIDEO') cant++;
             if (v.readyState >= 2) { try { if (v.paused) v.play().catch(() => {}); } catch {} }
             if (!v.paused && v.currentTime > 0) ok = true;
           });
-          return ok;
-        }).catch(() => false);
-        if (r) sonando = true;
+          return { ok, cant };
+        }).catch(() => ({ ok: false, cant: 0 }));
+        if (r.ok) sonando = true;
+        if (r.cant > 0) hayVideo = true;
       }
     } catch {}
+    /* v58: película sin video → tocar el reproductor para que cargue
+     * (se hace a partir del 2do intento, por si la página aún carga) */
+    if (esPagPelicula() && !hayVideo && n >= 1) {
+      try {
+        const punto = await m.page.evaluate(() => {
+          const vis = (el) => { const b = el.getBoundingClientRect(); return b.width > 200 && b.height > 100; };
+          const c = document.querySelector('.TPlayerTb.Current') || document.querySelector('.TPlayer') || document.querySelector('#Optres');
+          if (!c || !vis(c)) return null;
+          const b = c.getBoundingClientRect();
+          return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+        }).catch(() => null);
+        if (punto) await m.page.mouse.click(punto.x, punto.y);
+      } catch {}
+    }
+    if (sonando && !avisoPlay) {
+      avisoPlay = true;
+      console.log(`[espejo] reproduciendo en sala ${room.code} (${(m.url || '').slice(0, 60)})`);
+    }
     if (!sonando) setTimeout(() => intentoPlay(n + 1), 5000);
   };
   setTimeout(() => intentoPlay(0), 3000);
