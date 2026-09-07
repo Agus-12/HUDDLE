@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v58';
+const APP_VERSION = 'v59';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -145,12 +145,14 @@ function connect(code, opts = {}) {
     if (S.pendingStart) {
       const ps = S.pendingStart;
       S.pendingStart = null;
+S.mirrorInfo = null; /* v59: título+carátula de lo que se está abriendo */
       if (ps.url && !S.mirror.active) {
         setTimeout(() => {
           if (S.canControl && !S.mirror.active) {
+            /* v59: carátula + ruedita mientras prepara todo */
+            S.mirrorInfo = { title: ps.name || '', img: ps.img || '', url: ps.url, sub: 'Cargando tu sala…' };
             $('#mirrorUrl').value = ps.url;
             startMirrorFromPicker();
-            toast(`Preparando ${ps.name || 'la página'}…`);
           }
         }, 700);
       }
@@ -305,6 +307,9 @@ function applyMirrorState(ms) {
   if (!ms) return;
   S.mirror.active = !!ms.active;
   S.mirror.url = ms.url || '';
+  /* v59: la peli ya está sonando — fuera la pantalla de espera */
+  if (ms.playing || !ms.active) ocultarPeliLoading();
+  if (!ms.active) S.mirrorInfo = null;
   document.body.classList.toggle('mirroring', !!ms.active);
   $('#mirrorLayer').classList.toggle('hidden', !S.mirror.active);
   $('#videoEmpty').classList.toggle('hidden', S.mirror.active);
@@ -757,6 +762,31 @@ $('#btnMFwd').addEventListener('click', () => {
 });
 
 /* iniciar espejo desde el selector (o cambiar de página sin detener) */
+/* v59: pantalla de espera con carátula mientras el servidor prepara todo */
+function mostrarPeliLoading() {
+  const info = S.mirrorInfo;
+  const box = $('#peliLoading');
+  if (!box) return;
+  if (info) {
+    const po = $('#peliPoster');
+    if (info.img) {
+      po.classList.remove('hidden');
+      po.onerror = () => po.classList.add('hidden');
+      po.src = info.img;
+    } else po.classList.add('hidden');
+    $('#peliNombre').textContent = info.title || '';
+    const esSerie = /\/serie\/|\/episode\//.test(info.url || S.mirror.url || '');
+    $('#peliEstado').textContent = esSerie ? 'Preparando tu serie…' : 'Preparando tu peli…';
+    $('#peliSub').textContent = info.sub || 'Abriendo en el espejo…';
+  }
+  box.classList.remove('hidden');
+}
+function ocultarPeliLoading() {
+  const b = $('#peliLoading');
+  if (b && !b.classList.contains('hidden')) b.classList.add('hidden');
+}
+$('#peliLoading').addEventListener('click', () => ocultarPeliLoading());
+
 function startMirrorFromPicker() {
   if (!S.canControl) { toast('Solo el anfitrión puede espejar'); return; }
   const url = $('#mirrorUrl').value.trim();
@@ -764,6 +794,8 @@ function startMirrorFromPicker() {
   // feedback inmediato: mostramos la capa del espejo con spinner mientras abre Chrome
   S.mirror.gotFrame = false;
   applyMirrorState({ active: true, url, audio: true });
+  /* v59: si venimos de elegir una peli/serie, su carátula mientras carga */
+  if (S.mirrorInfo) mostrarPeliLoading();
   // aprovechamos el clic (gesto del usuario) para desbloquear el audio
   ensureAudioCtx().then((ctx) => { if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {}); });
   sendAction({ type: 'mirror', op: 'start', url }).then((r) => {
@@ -1350,6 +1382,7 @@ $('#btnSwitch').addEventListener('click', () => {
 /* v32: logo del sitio espejado para la tarjeta (o null si no lo tenemos) */
 const SITE_LOGOS = {
   'cuevana.mov': '/sites/cuevana.png',
+  'cine-calidad.mx': '/sites/cuevana.png',
   'gopelis.com': '/sites/gopelis.png',
   'youtube.com': '/sites/youtube.png',
   'animed23.com': '/sites/animed23.png',
@@ -1768,7 +1801,7 @@ async function buscarInicio() {
       return;
     }
     renderResultados(box, d.results, (res) => {
-      S.pendingStart = { url: res.url, name: res.site };
+      S.pendingStart = { url: res.url, name: res.title || res.site, img: res.img || '' };
       const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
       connect(code);
     }, true);
@@ -1822,7 +1855,7 @@ async function cargarPopulares() {
     const d = await r.json();
     if (!d.ok || !d.results || !d.results.length) { delete wrap.dataset.cargado; return; }
     const alTocar = (res) => () => {
-      S.pendingStart = { url: res.url, name: res.title };
+      S.pendingStart = { url: res.url, name: res.title, img: res.img || '' };
       const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
       connect(code);
     };
@@ -1862,7 +1895,8 @@ async function buscarEnSala() {
     renderResultados(box, d.results, (res) => {
       cerrarBuscarSala();
       if (!S.canControl) { toast('Solo el anfitrión puede cambiar de página'); return; }
-      toast(`Abriendo ${res.site}…`);
+      /* v59: carátula de lo elegido mientras abre en el espejo */
+      S.mirrorInfo = { title: res.title || '', img: res.img || '', url: res.url, sub: 'Abriendo en el espejo…' };
       $('#mirrorUrl').value = res.url;
       startMirrorFromPicker();
     }, true);

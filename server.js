@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v58'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v59'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -176,8 +176,8 @@ const MIRROR_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 
 function mirrorState(room) {
   const m = mirrors.get(room.code);
   return m
-    ? { active: true, url: m.url || '', audio: AUDIO_READY }
-    : { active: false, url: '', audio: false };
+    ? { active: true, url: m.url || '', audio: AUDIO_READY, playing: !!m.playing }
+    : { active: false, url: '', audio: false, playing: false };
 }
 
 async function startMirror(room, rawUrl, userId) {
@@ -307,6 +307,25 @@ async function startMirror(room, rawUrl, userId) {
      (Series quedan manuales a propósito, mecanismo propio después.) */
   const esPagPelicula = () => /\/(wp-)?pelicula\/[a-z0-9-]+/i.test(m.url || '');
   let avisoPlay = false;
+  /* v59: pantalla completa — cuando la película arranca, el video llena
+   * todo el espejo (sin el decorado de la página alrededor) */
+  const pantallaCompleta = async () => {
+    try {
+      await m.page.evaluate(() => {
+        const sel = ['.TPlayer iframe', '.TPlayerCn iframe', 'iframe[src*="goodstream"]', 'iframe[src*="embed"]'];
+        let f = null;
+        for (const s of sel) { f = document.querySelector(s); if (f) break; }
+        if (!f) f = [...document.querySelectorAll('iframe')].filter((x) => { const r = x.getBoundingClientRect(); return r.width > 300 && r.height > 150; }).sort((a, b) => (b.width * b.height) - (a.width * a.height))[0];
+        if (f) f.style.cssText = 'position:fixed !important;inset:0 !important;width:100vw !important;height:100vh !important;z-index:2147483647 !important;border:0 !important;background:#000 !important;';
+      }).catch(() => {});
+      for (const fr of m.page.frames()) {
+        await fr.evaluate(() => {
+          const v = document.querySelector('video');
+          if (v) v.style.cssText = 'position:fixed !important;inset:0 !important;width:100vw !important;height:100vh !important;object-fit:contain !important;background:#000 !important;z-index:2147483647 !important;';
+        }).catch(() => {});
+      }
+    } catch {}
+  };
   const intentoPlay = async (n) => {
     if (!viva() || n > 30) return;
     let sonando = false;
@@ -344,7 +363,10 @@ async function startMirror(room, rawUrl, userId) {
     }
     if (sonando && !avisoPlay) {
       avisoPlay = true;
+      m.playing = true;
       console.log(`[espejo] reproduciendo en sala ${room.code} (${(m.url || '').slice(0, 60)})`);
+      if (esPagPelicula()) pantallaCompleta().catch(() => {});
+      broadcast(room, 'mirror-state', mirrorState(room));
     }
     if (!sonando) setTimeout(() => intentoPlay(n + 1), 5000);
   };
@@ -937,7 +959,7 @@ async function buscarCuevana(q) {
   const d = await r.json().catch(() => ({}));
   return (d.posts || []).slice(0, 12).map((p) => ({
     title: String(p.title || ''),
-    url: (p.type === 'movies') ? `https://cuevana.mov/pelicula/${p.tmdb}/${p.slug}` : `https://cuevana.mov/serie/${p.slug}`,
+    url: (p.type === 'movies') ? `https://cuevana.mov/pelicula/${p.tmdb}/${p.slug}` : `https://cine-calidad.mx/serie/${p.slug}`,
     img: String(p.featured_image || '').replace('/w780/', '/w342/'),
     site: 'Cuevana',
     extra: [p.year, p.duration ? `${p.duration} min` : ''].filter(Boolean).join(' · '),
@@ -1023,18 +1045,20 @@ async function metaDePelicula(url) {
   try { u = new URL(u0); } catch { return null; }
   const dom = u.hostname.replace(/^www\./, '');
   /* v57: Cuevana redirige /serie/X a /wp-serie/X/ y dentro del espejo se
-   * navega a temporadas/episodios — capturamos el slug sin anclar al final */
+   * navega a temporadas/episodios — capturamos el slug sin anclar al final.
+   * v59: series y episodios viven en cine-calidad.mx (cuevana las tiene rotas) */
   const slugM = /\/pelicula\/\d+\/([a-z0-9-]+)/i.exec(u.pathname)
     || /\/(?:wp-)?serie\/([a-z0-9-]+)/i.exec(u.pathname)
     || /\/peliculas\/([a-z0-9-]+)/i.exec(u.pathname)
     || /\/(?:wp-)?pelicula\/([a-z0-9-]+)/i.exec(u.pathname)
     || /\/anime\/([a-z0-9-]+)/i.exec(u.pathname)
-    || /\/ver\/([a-z0-9-]+)-episodio-\d+/i.exec(u.pathname);
+    || /\/ver\/([a-z0-9-]+)-episodio-\d+/i.exec(u.pathname)
+    || /\/episode\/([a-z0-9-]+?)-\d+x\d+/i.exec(u.pathname);
   let d = null;
   if (slugM) {
     const slug = slugM[1];
     const bonito = slug.replace(/-/g, ' ').replace(/\b\w/g, (x) => x.toUpperCase());
-    if (/cuevana\./.test(dom)) {
+    if (/cuevana\.|cine-calidad/.test(dom)) {
       try {
         const r = await fetchSeguro(`https://cine-calidad.mx/wp-json/mycustom/v1/search/?s=${encodeURIComponent(slug.replace(/-/g, ' '))}&page=1`, 8000);
         if (r.ok) {
@@ -1069,7 +1093,7 @@ async function tendenciasCuevana(periodo, cache) {
   const d = await r.json().catch(() => ({}));
   const items = (d.posts || []).slice(0, 16).map((p) => ({
     title: String(p.title || ''),
-    url: (p.type === 'serie') ? `https://cuevana.mov/serie/${p.slug}` : `https://cuevana.mov/pelicula/${p.tmdb}/${p.slug}`,
+    url: (p.type === 'serie') ? `https://cine-calidad.mx/serie/${p.slug}` : `https://cuevana.mov/pelicula/${p.tmdb}/${p.slug}`,
     img: String(p.featured_image || '').replace('/w780/', '/w342/'),
     site: 'Cuevana',
     extra: [p.year, p.duration ? `${p.duration} min` : ''].filter(Boolean).join(' · '),
@@ -1088,7 +1112,9 @@ async function seriesRecientes() {
   const items = (Array.isArray(d) ? d : d.posts || []).slice(0, 16).map((p) => ({
     title: String(p.title || ''),
     slug: String(p.slug || ''),
-    url: `https://cuevana.mov/serie/${p.slug}`,
+    /* v59: las páginas de series de cuevana.mov están rotas (app que no
+     * carga) — las series abren en cine-calidad.mx, que sí renderiza */
+    url: `https://cine-calidad.mx/serie/${p.slug}`,
     img: String(p.featured_image || '').replace('/w780/', '/w342/'),
     site: 'Cuevana',
     extra: p.year ? String(p.year) : '',
