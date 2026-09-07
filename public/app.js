@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v49';
+const APP_VERSION = 'v50';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -943,8 +943,21 @@ function addChat(msg) {
   /* v24: no acumular mensajes viejos en pantalla (el servidor igual guarda 100) */
   while (log.children.length > 80) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
+  /* v50: si están escribiendo con el teclado abierto, la mini-vista de
+     arriba de la caja también se actualiza */
+  if (document.body.classList.contains('escribiendo-chat')) actualizarChatMini();
   /* v28: en pantalla completa no se ve el chat → tira deslizante abajo (estilo Rave) */
   if (fsActive()) ticker.push(msg);
+}
+
+/* v50: mini-vista de los últimos mensajes, visible al escribir en el chat */
+function actualizarChatMini() {
+  const mini = $('#chatMini');
+  const log = $('#chatLog');
+  if (!mini || !log) return;
+  mini.innerHTML = '';
+  [...log.children].slice(-4).forEach((m) => mini.appendChild(m.cloneNode(true)));
+  mini.scrollTop = mini.scrollHeight;
 }
 
 /* v28: la tira de mensajes de pantalla completa — cada mensaje entra por la
@@ -1236,30 +1249,27 @@ if (hashMatch) $('#joinCode').value = hashMatch[1].toUpperCase();
   document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
 });
 
-/* v49: teclado estilo WhatsApp, versión robusta.
-   En el iPhone real, Safari no solo achica la vista: a veces DESPLAZA la
-   página para mostrar el campo (y eso mueve la película). Solución:
-   1) si la página se desplazó, la devolvemos a 0 — nada se mueve;
-   2) la caja del chat NO usa una regla fija: se pega al teclado calculando
-      su posición con las coordenadas reales de la vista visible
-      (visualViewport) — así queda justo arriba del teclado SIEMPRE,
-      aunque Safari intente mover cosas. */
+/* v50: el teclado flotante SOLO es para la bandeja de mensajes — las
+ * búsquedas y demás cajas se comportan normal. Al escribir en el chat:
+ * la película no se mueve, la caja sube pegada al teclado y encima de la
+ * caja va una mini-vista con los últimos mensajes (para ver lo que escriben). */
 if (window.visualViewport) {
   const vv = window.visualViewport;
   let raf = 0;
   const acomodarTeclado = () => {
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(() => {
-      /* si Safari movió la página para mostrar el campo, la regresamos */
-      if (window.scrollY) window.scrollTo(0, 0);
       const f = document.querySelector('#chatForm');
       if (!f) return;
       const foco = document.activeElement;
       const enCaja = !!(foco && foco.id === 'chatInput');
-      const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      document.body.classList.toggle('escribiendo-chat', enCaja);
+      if (enCaja) actualizarChatMini();
+      const kb = enCaja ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;
       document.body.style.setProperty('--kb', kb > 40 ? kb + 'px' : '0px');
+      if (enCaja && window.scrollY) window.scrollTo(0, 0);
       if (enCaja && kb > 40) {
-        /* caja pegada arriba del teclado: posición calculada, no regla fija */
+        /* caja pegada arriba del teclado: posición calculada con la vista real */
         const top = Math.round(vv.offsetTop + vv.height - f.offsetHeight - 8);
         f.style.top = top + 'px';
         f.style.bottom = 'auto';
@@ -1463,27 +1473,63 @@ $('#btnCreateGo').addEventListener('click', () => {
 
 /* v45: buscador — busca en la web (DuckDuckGo/Bing vía el server) y muestra
  * resultados listos para crear la sala o navegar el espejo */
-function renderResultados(box, results, alElegir, etiqueta) {
+/* v50: resultados como cartelera — filas horizontales deslizables por página,
+ * carátula grande, nombre abajo y el logo de la página en la esquina */
+function logoDeSitio(nombre) {
+  const s = (typeof SITES !== 'undefined' ? SITES : []).find((x) => x.name === nombre);
+  if (s && s.logo) return s.logo;
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(String(nombre).toLowerCase())}&sz=64`;
+}
+
+function renderResultados(box, results, alElegir, conAnime) {
   box.innerHTML = '';
-  const rows = [];
-  results.forEach((res) => {
-    const row = document.createElement('button');
-    row.className = 'sr-row';
-    row.type = 'button';
-    const img = res.img
-      ? `<img class="sr-poster" src="${res.img}" alt="" loading="lazy" referrerpolicy="no-referrer">`
-      : `<img class="sr-logo" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(res.domain || (res.site || ''))}&sz=64" alt="" loading="lazy">`;
-    row.innerHTML = `
-      ${img}
-      <span class="sr-txt"><span class="sr-title"></span><span class="sr-dom"></span></span>
-      <span class="sr-go">${etiqueta}</span>`;
-    row.querySelector('.sr-title').textContent = res.title;
-    row.querySelector('.sr-dom').textContent = [res.site, res.extra].filter(Boolean).join(' · ');
-    row.addEventListener('click', () => alElegir(res, row));
-    box.appendChild(row);
-    rows.push(row);
+  const porSitio = new Map();
+  results.forEach((r) => {
+    if (!porSitio.has(r.site)) porSitio.set(r.site, []);
+    porSitio.get(r.site).push(r);
   });
-  return rows;
+  const crearTarjeta = (res) => {
+    const card = document.createElement('button');
+    card.className = 'sr-card';
+    card.type = 'button';
+    card.innerHTML = `
+      <span class="sr-badge"><img src="${logoDeSitio(res.site)}" alt=""></span>
+      ${res.img
+        ? `<img class="sr-cover" src="${res.img}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+        : `<span class="sr-cover sr-cover-anime"><img src="${logoDeSitio(res.site)}" alt=""></span>`}
+      <span class="sr-nombre"></span>
+      ${res.extra ? '<span class="sr-extra"></span>' : ''}`;
+    card.querySelector('.sr-nombre').textContent = res.title;
+    const ex = card.querySelector('.sr-extra');
+    if (ex) ex.textContent = res.extra || '';
+    card.addEventListener('click', () => alElegir(res, card));
+    return card;
+  };
+  const crearSeccion = (sitio) => {
+    const sec = document.createElement('div');
+    sec.className = 'sr-sec';
+    const t = document.createElement('div');
+    t.className = 'sr-sec-titulo';
+    t.innerHTML = `<img src="${logoDeSitio(sitio)}" alt="">`;
+    const tt = document.createElement('span');
+    tt.textContent = sitio;
+    t.appendChild(tt);
+    const fila = document.createElement('div');
+    fila.className = 'sr-fila';
+    sec.append(t, fila);
+    box.appendChild(sec);
+    return fila;
+  };
+  porSitio.forEach((items, sitio) => {
+    const fila = crearSeccion(sitio);
+    items.forEach((res) => fila.appendChild(crearTarjeta(res)));
+  });
+  /* apartado de anime: su búsqueda es interna — la tarjeta abre la página
+   * para buscar adentro con el teclado del espejo */
+  if (conAnime && !porSitio.has('AnimeD23')) {
+    const fila = crearSeccion('AnimeD23');
+    fila.appendChild(crearTarjeta({ url: 'https://animed23.com/', title: 'Buscar dentro de AnimeD23', site: 'AnimeD23', extra: 'la búsqueda de anime va dentro de su página', img: '' }));
+  }
 }
 
 async function buscarEnServer(q) {
@@ -1507,7 +1553,7 @@ async function buscarInicio() {
       S.pendingStart = { url: res.url, name: res.site };
       const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
       connect(code);
-    }, 'Crear sala');
+    }, true);
   } catch {
     box.innerHTML = '<div class="sr-info">Sin conexión con el servidor</div>';
   }
@@ -1529,16 +1575,15 @@ async function buscarSetup() {
       box.innerHTML = `<div class="sr-info">${(d && d.error) || 'No encontré nada — prueba con otras palabras'}</div>`;
       return;
     }
-    const rows = renderResultados(box, d.results, (res, row) => {
+    renderResultados(box, d.results, (res, card) => {
       elegirSetup(res.url, res.title);
       const elegida = S.setupUrl === res.url;
-      rows.forEach((r) => { r.classList.remove('sel'); const g = r.querySelector('.sr-go'); if (g) g.textContent = 'Elegir'; });
+      box.querySelectorAll('.sr-card').forEach((c) => c.classList.remove('sel'));
       if (elegida) {
-        row.classList.add('sel');
-        const g = row.querySelector('.sr-go'); if (g) g.textContent = 'Elegida';
+        card.classList.add('sel');
         $('#btnCreateGo').scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-    }, 'Elegir');
+    }, true);
   } catch {
     box.innerHTML = '<div class="sr-info">Sin conexión con el servidor</div>';
   }
@@ -1569,7 +1614,7 @@ async function buscarEnSala() {
       toast(`Abriendo ${res.site}…`);
       $('#mirrorUrl').value = res.url;
       startMirrorFromPicker();
-    }, 'Abrir');
+    }, true);
   } catch {
     box.innerHTML = '<div class="sr-info">Sin conexión con el servidor</div>';
   }
@@ -1605,7 +1650,7 @@ async function buscarEnPicker() {
       toast(`Abriendo ${res.site}…`);
       $('#mirrorUrl').value = res.url;
       startMirrorFromPicker();
-    }, 'Ver');
+    }, true);
   } catch {
     box.innerHTML = '<div class="sr-info">Sin conexión con el servidor</div>';
   }

@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
-<link rel="stylesheet" href="/style.css?v=49">
+<link rel="stylesheet" href="/style.css?v=50">
 </head>
 <body>
 
@@ -124,7 +124,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v49</span>
+        <span class="ver" id="verBadge">v50</span>
       </div>
       <!-- v36: gente, invitar y salir viven JUNTO al logo -->
       <div class="top-quick">
@@ -260,10 +260,13 @@
         <div class="card chat-card">
           <div id="chatLog" class="chat-log"></div>
           <form id="chatForm" class="chat-form">
-            <input id="chatInput" class="input" placeholder="Escribe un mensaje…" maxlength="300" autocomplete="off">
-            <button class="btn primary" type="submit" title="Enviar">
-              <svg class="icon icon-16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 10.6 20.2 3.2a.8.8 0 0 1 1 1L13.8 21a.8.8 0 0 1-1.5-.1l-2-6.8-6.8-2a.8.8 0 0 1-.1-1.5z"/></svg>
-            </button>
+            <div id="chatMini" class="chat-mini"></div>
+            <div class="chat-fila">
+              <input id="chatInput" class="input" placeholder="Escribe un mensaje…" maxlength="300" autocomplete="off">
+              <button class="btn primary" type="submit" title="Enviar">
+                <svg class="icon icon-16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 10.6 20.2 3.2a.8.8 0 0 1 1 1L13.8 21a.8.8 0 0 1-1.5-.1l-2-6.8-6.8-2a.8.8 0 0 1-.1-1.5z"/></svg>
+              </button>
+            </div>
           </form>
         </div>
       </aside>
@@ -271,6 +274,6 @@
   </div>
 
   <div id="toasts" class="toasts"></div>
-  <script src="/app.js?v=49"></script>
+  <script src="/app.js?v=50"></script>
 </body>
 </html>
