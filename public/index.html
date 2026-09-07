@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
-<link rel="stylesheet" href="/style.css?v=43">
+<link rel="stylesheet" href="/style.css?v=44">
 </head>
 <body>
 
@@ -36,28 +36,45 @@
         </button>
         <p class="hint">Nadie más puede usar tu nombre — y te recordamos en este dispositivo</p>
       </div>
+    </div>
 
-      <!-- v31: menú principal (con sesión iniciada) -->
-      <div id="homeBox" class="hidden">
+    <!-- v44: inicio de verdad, a pantalla completa — no más "tarjeta de login" -->
+    <div id="homeFull" class="hidden">
+      <header class="home-top">
+        <img src="/logo.png" class="brand-logo" alt="Huddle">
         <div class="profile-chip">
           <span id="profileAvatar" class="avatar">?</span>
           <span class="profile-hi">Hola, <b id="profileName"></b></span>
           <button id="btnSwitch" class="btn small ghost" title="Usar otro nombre">cambiar</button>
         </div>
-        <div class="join-row">
-          <button id="btnCreate" class="btn primary big">
-            <svg class="icon icon-16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9z"/><path d="M19 15l.9 2.6 2.6.9-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9z" opacity=".7"/></svg>
-            Crear sala
-          </button>
-          <div class="or">o únete con código</div>
-          <div class="join-inline">
-            <input id="joinCode" class="input code" placeholder="ABC12" maxlength="8" autocomplete="off" spellcheck="false" autocapitalize="characters" autocorrect="off">
-            <button id="btnJoin" class="btn big">Unirme</button>
-          </div>
-        </div>
+      </header>
+      <div class="home-body">
 
-        <!-- v43: preparar la sala antes de entrar — última página, directorio, agregar nuevas -->
-        <div id="setupBox" class="hidden">
+        <!-- pantalla principal del inicio -->
+        <section id="homeMain">
+          <div class="home-hero">
+            <h2 class="home-title">¿Qué van a ver hoy?</h2>
+            <p class="home-sub">Crea una sala, comparte el link y míralo juntos — todo sincronizado.</p>
+            <div class="home-actions">
+              <button id="btnCreate" class="btn primary big">
+                <svg class="icon icon-16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9z"/><path d="M19 15l.9 2.6 2.6.9-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9z" opacity=".7"/></svg>
+                Crear sala
+              </button>
+              <div class="join-inline">
+                <input id="joinCode" class="input code" placeholder="CÓDIGO" maxlength="8" autocomplete="off" spellcheck="false" autocapitalize="characters" autocorrect="off">
+                <button id="btnJoin" class="btn big">Unirme</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- v31: salas en vivo ahora, con preview de lo que ven -->
+          <div class="rooms-head"><span class="live-dot"></span> En vivo ahora</div>
+          <div id="liveRooms" class="rooms-grid"></div>
+          <p id="noRooms" class="hint hidden">No hay nadie en salas por ahora — crea la tuya y comparte el link</p>
+        </section>
+
+        <!-- v43/44: preparar la sala — a pantalla completa, como la app -->
+        <section id="setupBox" class="hidden">
           <div class="setup-top">
             <button id="setupBack" class="btn small ghost" type="button">
               <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
@@ -75,12 +92,8 @@
           </div>
           <p id="setupMsg" class="hint hidden"></p>
           <button id="btnCreateGo" class="btn primary big setup-go" type="button">Crear la sala</button>
-        </div>
+        </section>
 
-        <!-- v31: salas en vivo ahora, con preview de lo que ven -->
-        <div class="rooms-head"><span class="live-dot"></span> En vivo ahora</div>
-        <div id="liveRooms" class="rooms-grid"></div>
-        <p id="noRooms" class="hint hidden">No hay nadie en salas por ahora — crea la tuya y comparte el link</p>
       </div>
     </div>
   </div>
@@ -90,7 +103,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v43</span>
+        <span class="ver" id="verBadge">v44</span>
       </div>
       <!-- v36: gente, invitar y salir viven JUNTO al logo -->
       <div class="top-quick">
@@ -225,6 +238,6 @@
   </div>
 
   <div id="toasts" class="toasts"></div>
-  <script src="/app.js?v=43"></script>
+  <script src="/app.js?v=44"></script>
 </body>
 </html>

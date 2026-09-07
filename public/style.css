@@ -980,3 +980,58 @@ body { overscroll-behavior-y: contain; }
   .setup-card { padding: 9px 8px; }
   .landing-card { padding: 26px 18px 22px; }
 }
+
+/* ======================= v44: inicio a pantalla completa, estilo app ======================= */
+
+/* con sesión iniciada, la pantalla de inicio ya no es una tarjetita centrada */
+#landing.home-mode { display: block; padding: 0; }
+#homeFull {
+  position: relative; z-index: 1;
+  width: min(1080px, 100%);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 0 18px 30px;
+  display: flex; flex-direction: column;
+}
+.home-top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 0 8px; gap: 12px;
+}
+.home-top .brand-logo { height: 24px; width: auto; }
+.home-top .profile-chip { margin: 0; }
+.home-body { flex: 1; }
+
+/* hero: pregunta grande + acciones */
+.home-hero { padding: clamp(26px, 7vh, 68px) 0 8px; }
+.home-title {
+  margin: 0 0 10px; font-size: clamp(27px, 5vw, 42px);
+  letter-spacing: -0.8px; line-height: 1.1;
+}
+.home-sub { color: var(--dim); font-size: clamp(14px, 2vw, 16px); margin: 0 0 26px; }
+.home-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: stretch; }
+.home-actions #btnCreate { min-width: 210px; }
+.home-actions .join-inline { flex: 1; max-width: 380px; }
+#homeFull .rooms-head { margin-top: 30px; }
+#homeFull .rooms-grid { max-height: none; }
+
+/* preparar la sala: más aire y tarjetas más grandes a lo ancho */
+#homeFull #setupBox { max-width: 780px; padding-top: 8px; }
+.setup-grid { grid-template-columns: repeat(auto-fill, minmax(225px, 1fr)); gap: 10px; max-height: 340px; }
+.setup-card { padding: 13px 12px; }
+.setup-add { max-width: 560px; }
+.setup-go { width: auto; min-width: 270px; }
+
+@media (max-width: 640px) {
+  #homeFull { padding: 0 14px 24px; }
+  .home-actions { flex-direction: column; align-items: stretch; }
+  .home-actions .join-inline { max-width: none; }
+  .home-title { font-size: 27px; }
+  .setup-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .setup-go { width: 100%; min-width: 0; }
+}
+
+/* v44: en pantallas angostas el saludo se acorta en vez de desbordarse */
+.home-top .profile-chip { min-width: 0; flex: 0 1 auto; }
+.home-top .profile-chip .avatar { flex: none; }
+.home-top .profile-chip .btn { flex: none; }
+.home-top .profile-hi { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

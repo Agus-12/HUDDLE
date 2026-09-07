@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v43';
+const APP_VERSION = 'v44';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -319,6 +319,7 @@ function applyMirrorState(ms) {
     } catch {}
     // si el audio quedó suspendido de una sesión anterior, reactivarlo
     if (AU.needAudio && AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume().catch(() => {});
+    if (AU.needAudio && AU.outEl && AU.outEl.paused) AU.outEl.play().catch(() => {}); // v44
     // pantalla de carga hasta que llegue el primer frame
     if (!S.mirror.gotFrame) $('#mirrorLoading').classList.remove('hidden');
   } else {
@@ -440,9 +441,8 @@ function makeFallbackNode(ctx) {
     stats.muestras += i;
     if (!q.length) on = false; // se vació → re-almacenar colchón
   };
-  node.connect(ctx.destination);
   node._stats = stats;
-  return { node, port, fallback: true };
+  return { node, port, fallback: true }; // v44: la conexión la hace conectarSalidaAudio
 }
 
 async function ensureAudioCtx() {
@@ -456,12 +456,44 @@ async function ensureAudioCtx() {
     const url = URL.createObjectURL(new Blob([WORKLET_CODE], { type: 'text/javascript' }));
     await AU.ctx.audioWorklet.addModule(url);
     AU.node = new AudioWorkletNode(AU.ctx, 'mirror-player', { outputChannelCount: [1] });
-    AU.node.connect(AU.ctx.destination);
   } catch (e) {
     console.warn('[Huddle] AudioWorklet no disponible, usando alternativa', e);
     AU.node = makeFallbackNode(AU.ctx);
   }
+  conectarSalidaAudio(AU.ctx, AU.node);
   return AU.ctx;
+}
+
+/* v44: LA SALIDA DEL AUDIO VA POR UN ELEMENTO <audio>.
+ * Desde iOS 16.3 el audio directo de Web Audio se calla con el switch de
+ * silencio del iPhone, pero los elementos de audio/video NO (el sistema los
+ * trata como reproducción). Sacamos la MISMA señal del worklet por un
+ * MediaStream a un <audio> oculto: mismo sonido, misma latencia, y suena
+ * aunque el teléfono esté silenciado. Si el navegador no lo permite,
+ * caemos a la salida directa de siempre. */
+function conectarSalidaAudio(ctx, node) {
+  try {
+    AU.streamDest = ctx.createMediaStreamDestination();
+    node.connect(AU.streamDest);
+    if (!AU.outEl) {
+      AU.outEl = document.createElement('audio');
+      AU.outEl.setAttribute('playsinline', '');
+      AU.outEl.style.display = 'none';
+      document.body.appendChild(AU.outEl);
+    }
+    AU.outEl.srcObject = AU.streamDest.stream;
+    const pr = AU.outEl.play();
+    if (pr && pr.then) {
+      pr.then(() => { AU.salidaElemento = true; }).catch(() => salidaDirecta(ctx, node));
+    } else {
+      AU.salidaElemento = true; // API vieja: asumimos que sonó
+    }
+  } catch { salidaDirecta(ctx, node); }
+}
+function salidaDirecta(ctx, node) {
+  AU.salidaElemento = false;
+  try { node.disconnect(AU.streamDest); } catch {}
+  try { node.connect(ctx.destination); } catch {}
 }
 
 async function feedMirrorAudio(b64, rate) {
@@ -497,6 +529,7 @@ async function feedMirrorAudio(b64, rate) {
 function stopMirrorAudio() {
   if (AU.node) { try { AU.node.port.postMessage({ clear: true }); } catch {} }
   if (AU.ctx && AU.ctx.state === 'running') { try { AU.ctx.suspend(); } catch {} }
+  if (AU.outEl) { try { AU.outEl.pause(); } catch {} } // v44: soltar la sesión de audio
   $('#audioChip').classList.add('hidden');
 }
 
@@ -504,6 +537,7 @@ function stopMirrorAudio() {
 $('#audioChip').addEventListener('click', async () => {
   const ctx = await ensureAudioCtx();
   if (ctx) { try { await ctx.resume(); } catch {} }
+  if (AU.outEl) { try { await AU.outEl.play(); AU.salidaElemento = true; } catch {} }
   $('#audioChip').classList.add('hidden');
 });
 
@@ -1055,8 +1089,12 @@ function loadProfile() {
 function initLanding() {
   S.profile = loadProfile();
   const tiene = !!S.profile;
+  /* v44: con sesión, el inicio es una pantalla completa estilo app;
+   * sin sesión, la tarjetita de "elige tu nombre" */
   $('#profileBox').classList.toggle('hidden', tiene);
-  $('#homeBox').classList.toggle('hidden', !tiene);
+  document.querySelector('.landing-card').classList.toggle('hidden', tiene);
+  $('#homeFull').classList.toggle('hidden', !tiene);
+  $('#landing').classList.toggle('home-mode', tiene);
   if (tiene) {
     $('#profileName').textContent = S.profile.name;
     const av = $('#profileAvatar');
@@ -1289,7 +1327,8 @@ function renderSetupGrid() {
   const grid = $('#setupGrid');
   if (!grid) return;
   grid.innerHTML = '';
-  SITES.forEach((s) => grid.appendChild(crearCardSitio(s, true)));
+  /* v44: sin botón de borrar — las opciones solo se eligen */
+  SITES.forEach((s) => grid.appendChild(crearCardSitio(s, false)));
 }
 
 function renderLastCard() {
@@ -1318,21 +1357,17 @@ function abrirSetup() {
   S.setupUrl = '';
   S.setupName = '';
   $('#setupBox').classList.remove('hidden');
-  document.querySelector('.join-row').classList.add('hidden');
-  document.querySelector('.rooms-head').classList.add('hidden');
-  $('#liveRooms').classList.add('hidden');
-  $('#noRooms').classList.add('hidden');
+  $('#homeMain').classList.add('hidden');
   setupMsg('');
   $('#btnCreateGo').textContent = 'Crear la sala';
   renderSetupGrid();
   renderLastCard();
+  window.scrollTo(0, 0);
 }
 
 function cerrarSetup() {
   $('#setupBox').classList.add('hidden');
-  document.querySelector('.join-row').classList.remove('hidden');
-  document.querySelector('.rooms-head').classList.remove('hidden');
-  $('#liveRooms').classList.remove('hidden');
+  $('#homeMain').classList.remove('hidden');
   pollRooms();
 }
 
