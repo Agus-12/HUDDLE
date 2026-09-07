@@ -1058,3 +1058,7 @@ body { overscroll-behavior-y: contain; }
 }
 /* v45b: el botón Buscar no hereda el width:100% de .btn.big */
 .home-search .btn { width: auto; flex: none; }
+
+/* ---------- v46: resultados con póster (búsqueda en Cuevana/GoPelis) ---------- */
+.sr-poster { width: 34px; height: 48px; border-radius: 6px; flex: none; object-fit: cover; background: rgba(255, 255, 255, 0.06); }
+.sr-dom { color: var(--cyan); }

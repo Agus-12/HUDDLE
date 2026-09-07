@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v45';
+const APP_VERSION = 'v46';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -749,7 +749,7 @@ $('#mirrorUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') star
 /* v43: el directorio de páginas ya no está clavado — parte de estos 4 y se
  * actualiza con lo que guarda el servidor (data/sites.json) */
 let SITES = [
-  { name: 'Cuevana', full: 'Cuevana — películas y series', url: 'https://cuevana.mov/inicio', logo: '/sites/cuevana.png' },
+  { name: 'Cuevana', full: 'Cuevana — películas y series', url: 'https://cuevana.mov/', logo: '/sites/cuevana.png' },
   { name: 'GoPelis', full: 'GoPelis — películas', url: 'https://gopelis.com/', logo: '/sites/gopelis.png' },
   { name: 'AnimeD23', full: 'AnimeD23 — animes', url: 'https://animed23.com/', logo: '/sites/animed23.png' },
   { name: 'YouTube', full: 'YouTube — videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
@@ -1424,12 +1424,15 @@ function renderResultados(box, results, alElegir, etiqueta) {
     const row = document.createElement('button');
     row.className = 'sr-row';
     row.type = 'button';
+    const img = res.img
+      ? `<img class="sr-poster" src="${res.img}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+      : `<img class="sr-logo" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(res.domain || (res.site || ''))}&sz=64" alt="" loading="lazy">`;
     row.innerHTML = `
-      <img class="sr-logo" src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(res.domain)}&sz=64" alt="" loading="lazy">
+      ${img}
       <span class="sr-txt"><span class="sr-title"></span><span class="sr-dom"></span></span>
       <span class="sr-go">${etiqueta}</span>`;
     row.querySelector('.sr-title').textContent = res.title;
-    row.querySelector('.sr-dom').textContent = res.domain;
+    row.querySelector('.sr-dom').textContent = [res.site, res.extra].filter(Boolean).join(' · ');
     row.addEventListener('click', () => alElegir(res));
     box.appendChild(row);
   });
@@ -1453,7 +1456,7 @@ async function buscarInicio() {
       return;
     }
     renderResultados(box, d.results, (res) => {
-      S.pendingStart = { url: res.url, name: res.domain };
+      S.pendingStart = { url: res.url, name: res.site };
       const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
       connect(code);
     }, 'Crear sala');
@@ -1484,7 +1487,7 @@ async function buscarEnSala() {
     renderResultados(box, d.results, (res) => {
       cerrarBuscarSala();
       if (!S.canControl) { toast('Solo el anfitrión puede cambiar de página'); return; }
-      toast(`Abriendo ${res.domain}…`);
+      toast(`Abriendo ${res.site}…`);
       $('#mirrorUrl').value = res.url;
       startMirrorFromPicker();
     }, 'Abrir');

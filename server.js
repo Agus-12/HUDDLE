@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v45'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v46'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -778,7 +778,18 @@ const SITES_SEED = [
   { name: 'YouTube', desc: 'Videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
 ];
 function loadSitesFile() {
-  try { return JSON.parse(fs.readFileSync(SITES_FILE, 'utf8')); } catch { return null; }
+  try {
+    const l = JSON.parse(fs.readFileSync(SITES_FILE, 'utf8'));
+    if (Array.isArray(l)) {
+      let cambio = false;
+      for (const s of l) {
+        /* v46: Cuevana movió su portada de /inicio a la raíz */
+        if (/^https?:\/\/(www\.)?cuevana\.[a-z.]+\/inicio\/?$/i.test(s.url || '')) { s.url = s.url.replace(/\/inicio\/?$/i, '/'); cambio = true; }
+      }
+      if (cambio) saveSitesFile(l);
+    }
+    return l;
+  } catch { return null; }
 }
 function saveSitesFile(list) {
   fs.mkdirSync(path.dirname(SITES_FILE), { recursive: true });
@@ -882,54 +893,39 @@ async function agregarSitio(urlRaw) {
 
 /* ---------------------- servidor ---------------------- */
 
-/* v45: búsqueda web (DuckDuckGo con respaldo en Bing) para el buscador de la app */
-async function buscarWeb(q) {
-  const resultados = [];
-  const vistos = new Set();
-  const push = (titulo, href) => {
-    try {
-      const u = new URL(href);
-      if (!/^https?:$/.test(u.protocol)) return;
-      if (/\.pdf($|\?)/i.test(u.pathname)) return;
-      const dom = u.hostname.replace(/^www\./, '');
-      if (!dom || dom.length > 60) return;
-      if (vistos.has(dom)) return;
-      vistos.add(dom);
-      let t = String(titulo || '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
-      if (t.length > 90) t = t.slice(0, 90).trim() + '…';
-      if (!t) t = dom;
-      resultados.push({ title: t, url: u.href, domain: dom });
-    } catch {}
-  };
-  /* 1) DuckDuckGo — versión HTML sin JavaScript */
-  try {
-    const r = await fetchSeguro(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`, 8000);
-    if (r.ok) {
-      const html = (await r.text()).slice(0, 700000);
-      const re = /<a[^>]+class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
-      let m;
-      while ((m = re.exec(html)) && resultados.length < 10) {
-        let href = m[1].replace(/&amp;/g, '&');
-        const uddg = /[?&]uddg=([^&]+)/.exec(href); // enlaces de redirección de DDG
-        if (uddg) { try { href = decodeURIComponent(uddg[1]); } catch {} }
-        push(m[2], href);
-      }
-    }
-  } catch {}
-  /* 2) respaldo: Bing */
-  if (resultados.length < 3) {
-    try {
-      const r = await fetchSeguro(`https://www.bing.com/search?q=${encodeURIComponent(q)}&setlang=es`, 8000);
-      if (r.ok) {
-        const html = (await r.text()).slice(0, 700000);
-        const re = /<h2><a[^>]+href="(https?:[^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
-        let m;
-        while ((m = re.exec(html)) && resultados.length < 10) push(m[2], m[1].replace(/&amp;/g, '&'));
-      }
-    } catch {}
-  }
-  console.log(`[buscar] "${q}" → ${resultados.length} resultados`);
-  return resultados.slice(0, 8);
+/* v45: búsqueda en las páginas del directorio — v46: Cuevana y GoPelis por sus
+ * APIs internas (con póster); resultados listos para crear la sala */
+async function buscarCuevana(q) {
+  const r = await fetchSeguro(`https://cine-calidad.mx/wp-json/mycustom/v1/search/?s=${encodeURIComponent(q)}&page=1`, 9000);
+  if (!r.ok) return [];
+  const d = await r.json().catch(() => ({}));
+  return (d.posts || []).slice(0, 6).map((p) => ({
+    title: String(p.title || ''),
+    url: (p.type === 'movies') ? `https://cuevana.mov/pelicula/${p.tmdb}/${p.slug}` : `https://cuevana.mov/serie/${p.slug}`,
+    img: String(p.featured_image || '').replace('/w780/', '/w185/'),
+    site: 'Cuevana',
+    extra: [p.year, p.duration ? `${p.duration} min` : ''].filter(Boolean).join(' · '),
+  })).filter((x) => x.title && x.url);
+}
+
+async function buscarGopelis(q) {
+  const r = await fetchSeguro(`https://gopelis.com/api/search?q=${encodeURIComponent(q)}`, 9000);
+  if (!r.ok) return [];
+  const d = await r.json().catch(() => ({}));
+  return (d.results || []).slice(0, 6).map((p) => ({
+    title: String(p.title || ''),
+    url: p.mediaType === 'tv' ? `https://gopelis.com/series/${p.slug}` : `https://gopelis.com/peliculas/${p.slug}`,
+    img: p.posterPath ? `https://image.tmdb.org/t/p/w185${p.posterPath}` : '',
+    site: 'GoPelis',
+    extra: p.releaseDate ? String(p.releaseDate).slice(0, 4) : '',
+  })).filter((x) => x.title && x.url);
+}
+
+async function buscarEnSitios(q) {
+  const grupos = await Promise.all([buscarCuevana(q).catch(() => []), buscarGopelis(q).catch(() => [])]);
+  const resultados = grupos.flat();
+  console.log(`[buscar] "${q}" en Cuevana+GoPelis → ${resultados.length} resultados`);
+  return resultados.slice(0, 10);
 }
 
 function readBody(req) {
@@ -975,8 +971,8 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/search' && req.method === 'GET') {
       const q = (url.searchParams.get('q') || '').trim().slice(0, 120);
       if (!q) return json(res, 400, { ok: false, error: 'Escribe qué quieren ver' });
-      const results = await buscarWeb(q);
-      if (!results.length) return json(res, 200, { ok: true, results: [], error: 'No encontré resultados — prueba con otras palabras' });
+      const results = await buscarEnSitios(q);
+      if (!results.length) return json(res, 200, { ok: true, results: [], error: 'No encontré nada en Cuevana ni GoPelis — prueba con otras palabras' });
       return json(res, 200, { ok: true, results });
     }
     if (url.pathname === '/api/sites' && req.method === 'GET') {
