@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v50'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v51'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -786,6 +786,14 @@ function loadSitesFile() {
         /* v46: Cuevana movió su portada de /inicio a la raíz */
         if (/^https?:\/\/(www\.)?cuevana\.[a-z.]+\/inicio\/?$/i.test(s.url || '')) { s.url = s.url.replace(/\/inicio\/?$/i, '/'); cambio = true; }
       }
+      /* v51: AnimeFLV — página de anime con búsqueda externa (sub + latino) */
+      if (!l.some((s) => /animeflv\./i.test(s.url || ''))) {
+        const nuevo = { name: 'AnimeFLV', desc: 'Animes sub y latino', url: 'https://vww.animeflv.one/', logo: 'https://www.google.com/s2/favicons?domain=animeflv.one&sz=128' };
+        const i = l.findIndex((s) => /animed23/i.test(s.name || ''));
+        if (i >= 0) l.splice(i + 1, 0, nuevo); else l.push(nuevo);
+        cambio = true;
+        console.log('[sitios] + AnimeFLV (búsqueda integrada)');
+      }
       if (cambio) saveSitesFile(l);
     }
     return l;
@@ -921,11 +929,39 @@ async function buscarGopelis(q) {
   })).filter((x) => x.title && x.url);
 }
 
+async function buscarAnime(q) {
+  /* AnimeFLV — anime sub español y latino; resultados en HTML estático */
+  const r = await fetchSeguro(`https://vww.animeflv.one/animes?buscar=${encodeURIComponent(q)}`, 9000);
+  if (!r.ok) return [];
+  const html = (await r.text()).slice(0, 700000);
+  const re = /<article[^>]*class="li"[^>]*>([\s\S]*?)<\/article>/g;
+  const out = [];
+  const vistos = new Set();
+  let m;
+  while ((m = re.exec(html)) && out.length < 12) {
+    const bloque = m[1];
+    const href = (/href="(\.\/anime\/[^"]+)"/.exec(bloque) || [])[1];
+    const img = (/(?:data-src|src)="(https?:[^"]+\/cdn\/img\/anime\/[^"]+)"/.exec(bloque) || [])[1];
+    const alt = (/alt="([^"]{2,90})"/.exec(bloque) || [])[1];
+    if (!href || !alt) continue;
+    let url;
+    try { url = new URL(href, 'https://vww.animeflv.one/').href; } catch { continue; }
+    if (vistos.has(url)) continue;
+    vistos.add(url);
+    out.push({ title: alt.replace(/\s+/g, ' ').trim(), url, img: img || '', site: 'AnimeFLV', extra: '' });
+  }
+  return out;
+}
+
 async function buscarEnSitios(q) {
-  const grupos = await Promise.all([buscarCuevana(q).catch(() => []), buscarGopelis(q).catch(() => [])]);
+  const grupos = await Promise.all([
+    buscarCuevana(q).catch(() => []),
+    buscarGopelis(q).catch(() => []),
+    buscarAnime(q).catch(() => []),
+  ]);
   const resultados = grupos.flat();
-  console.log(`[buscar] "${q}" en Cuevana+GoPelis → ${resultados.length} resultados`);
-  return resultados.slice(0, 16);
+  console.log(`[buscar] "${q}" en Cuevana+GoPelis+AnimeFLV → ${resultados.length} resultados`);
+  return resultados.slice(0, 20);
 }
 
 function readBody(req) {

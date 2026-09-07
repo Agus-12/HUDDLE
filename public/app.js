@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v50';
+const APP_VERSION = 'v51';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -752,6 +752,7 @@ let SITES = [
   { name: 'Cuevana', full: 'Cuevana — películas y series', url: 'https://cuevana.mov/', logo: '/sites/cuevana.png' },
   { name: 'GoPelis', full: 'GoPelis — películas', url: 'https://gopelis.com/', logo: '/sites/gopelis.png' },
   { name: 'AnimeD23', full: 'AnimeD23 — animes', url: 'https://animed23.com/', logo: '/sites/animed23.png' },
+  { name: 'AnimeFLV', full: 'AnimeFLV — animes sub y latino', url: 'https://vww.animeflv.one/', logo: 'https://www.google.com/s2/favicons?domain=animeflv.one&sz=128' },
   { name: 'YouTube', full: 'YouTube — videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
 ];
 function renderPageDrop() {
@@ -943,11 +944,47 @@ function addChat(msg) {
   /* v24: no acumular mensajes viejos en pantalla (el servidor igual guarda 100) */
   while (log.children.length > 80) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
+  /* v51: mensaje de puros emojis → se ve GRANDE con animación y vuela
+   * sobre la película (estilo sticker) */
+  const emo = msg.system ? '' : emojisDelMensaje(msg.text);
+  if (emo) {
+    div.classList.add('solo-emojis');
+    div.textContent = emo;
+    emojiVolando(emo);
+  }
   /* v50: si están escribiendo con el teclado abierto, la mini-vista de
      arriba de la caja también se actualiza */
   if (document.body.classList.contains('escribiendo-chat')) actualizarChatMini();
   /* v28: en pantalla completa no se ve el chat → tira deslizante abajo (estilo Rave) */
   if (fsActive()) ticker.push(msg);
+}
+
+/* v51: ¿el mensaje es solo emojis (1-3)? → devuelve el emoji para mostrarlo grande */
+function emojisDelMensaje(texto) {
+  const t = String(texto || '').trim();
+  if (!t || t.length > 24) return '';
+  let clusters = [...t];
+  try {
+    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+      clusters = [...new Intl.Segmenter('es', { granularity: 'grapheme' }).segment(t)].map((s) => s.segment);
+    }
+  } catch {}
+  const partes = clusters.filter((c) => c.trim());
+  const esEmoji = (c) => { try { return /\p{Extended_Pictographic}/u.test(c); } catch { return false; } };
+  if (partes.length && partes.length <= 3 && partes.every(esEmoji)) return partes.join('');
+  return '';
+}
+
+/* v51: el emoji vuela sobre la película cuando alguien lo manda */
+function emojiVolando(emoji) {
+  const shell = document.querySelector('#videoShell');
+  if (!shell) return;
+  const el = document.createElement('div');
+  el.className = 'emoji-vuelo';
+  el.textContent = emoji;
+  el.style.left = (15 + Math.random() * 60) + '%';
+  shell.appendChild(el);
+  setTimeout(() => el.remove(), 2600);
 }
 
 /* v50: mini-vista de los últimos mensajes, visible al escribir en el chat */
@@ -956,7 +993,7 @@ function actualizarChatMini() {
   const log = $('#chatLog');
   if (!mini || !log) return;
   mini.innerHTML = '';
-  [...log.children].slice(-4).forEach((m) => mini.appendChild(m.cloneNode(true)));
+  [...log.children].slice(-2).forEach((m) => mini.appendChild(m.cloneNode(true)));
   mini.scrollTop = mini.scrollHeight;
 }
 
@@ -1285,6 +1322,21 @@ if (window.visualViewport) {
   document.addEventListener('focusout', () => setTimeout(acomodarTeclado, 80));
   acomodarTeclado();
 }
+/* v51: la mini-vista debe aparecer SIEMPRE que se toca la caja del chat —
+ * listeners directos además de los de arriba, para que no falle nunca */
+(function() {
+  const ci = document.querySelector('#chatInput');
+  if (!ci) return;
+  ci.addEventListener('focus', () => {
+    document.body.classList.add('escribiendo-chat');
+    actualizarChatMini();
+  });
+  ci.addEventListener('blur', () => setTimeout(() => {
+    if (!(document.activeElement && document.activeElement.id === 'chatInput')) {
+      document.body.classList.remove('escribiendo-chat');
+    }
+  }, 60));
+})();
 
 /* ======================= v42: pantalla activa + aviso de entrada ======================= */
 
@@ -1524,9 +1576,9 @@ function renderResultados(box, results, alElegir, conAnime) {
     const fila = crearSeccion(sitio);
     items.forEach((res) => fila.appendChild(crearTarjeta(res)));
   });
-  /* apartado de anime: su búsqueda es interna — la tarjeta abre la página
-   * para buscar adentro con el teclado del espejo */
-  if (conAnime && !porSitio.has('AnimeD23')) {
+  /* respaldo de anime: si AnimeFLV no tuvo resultados, la tarjeta abre
+   * AnimeD23 para buscar adentro con el teclado del espejo */
+  if (conAnime && !porSitio.has('AnimeFLV') && !porSitio.has('AnimeD23')) {
     const fila = crearSeccion('AnimeD23');
     fila.appendChild(crearTarjeta({ url: 'https://animed23.com/', title: 'Buscar dentro de AnimeD23', site: 'AnimeD23', extra: 'la búsqueda de anime va dentro de su página', img: '' }));
   }
