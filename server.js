@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v62'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v63'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -269,7 +269,7 @@ async function startMirror(room, rawUrl, userId) {
       const ponerCss = () => {
         try {
           const st = document.createElement('style');
-          st.textContent = '.mdl-help,.button-close-help{display:none!important}';
+          st.textContent = '.mdl-help,.button-close-help{display:none!important}::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}html{scrollbar-width:none!important}';
           (document.head || document.documentElement).appendChild(st);
         } catch {}
       };
@@ -393,10 +393,38 @@ async function startMirror(room, rawUrl, userId) {
      * (se hace a partir del 2do intento, por si la página aún carga) */
     if (esPagCine() && n >= 1) {
       try {
+        /* v63: fuera carteles de "ayuda" y avisos que tapan la película */
+        await m.page.evaluate(() => {
+          try {
+            document.querySelectorAll('.mdl-help').forEach((x) => { try { x.remove(); } catch {} });
+            document.querySelectorAll('.button-close-help, [aria-label="Cerrar ayuda"]').forEach((x) => { try { x.click(); } catch {} });
+          } catch {}
+        }).catch(() => {});
+        /* v63: Latanime — su reproductor no arranca solo; montamos nosotros
+         * el iframe del mejor servidor (mp4upload primero) a pantalla completa */
+        if (/latanime\./.test(m.url || '') && !videoListo) {
+          await m.page.evaluate(() => {
+            try {
+              if (document.querySelector('iframe.rr-player')) return;
+              const links = [...document.querySelectorAll('a.play-video')].filter((a) => (a.getAttribute('data-player') || '').length > 8);
+              if (!links.length) return;
+              const dec = (a) => { try { return atob(a.getAttribute('data-player')); } catch { return ''; } };
+              const mejor = links.find((a) => /mp4upload/i.test(dec(a)))
+                || links.find((a) => !/voe\.|mixdrop|netu|streamtape|streamwish/i.test(dec(a)));
+              if (!mejor) return;
+              const f = document.createElement('iframe');
+              f.className = 'rr-player';
+              f.src = dec(mejor);
+              f.allow = 'autoplay; encrypted-media; fullscreen';
+              f.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483000;border:0;background:#000';
+              document.body.appendChild(f);
+            } catch {}
+          }).catch(() => {});
+        }
         /* v62: en AnimeFLV, uqload no descarga solo — si hay otra opción
          * (mp4upload o la que sea) la elegimos nosotros; es idempotente:
          * solo cambia si el seleccionado sigue siendo uqload */
-        if (/\/ver\//.test(m.url || '') && !videoListo) {
+        if (/\/ver\//.test(m.url || '') && !videoListo && /animeflv\./.test(m.url || '')) {
           await m.page.evaluate(() => {
             try {
               const lis = [...document.querySelectorAll('.opt li')];
@@ -409,23 +437,26 @@ async function startMirror(room, rawUrl, userId) {
           }).catch(() => {});
         }
         if (!hayVideo) {
-          /* v58/v61: sin video → tocar el reproductor (película) o el
-           * servidor recomendado (episodio) para que cargue */
-          if (/\/episode\//.test(m.url || '')) {
-            await m.page.evaluate(() => {
-              const a = document.querySelector('a.play[data-domain=goodstream]') || document.querySelector('a.play:not([data-domain=youtube])');
-              if (a) { a.scrollIntoView({ block: 'center' }); a.click(); }
-            }).catch(() => {});
-          } else {
-            const punto = await m.page.evaluate(() => {
-              const vis = (el) => { const b = el.getBoundingClientRect(); return b.width > 200 && b.height > 100; };
-              const c = document.querySelector('.TPlayerTb.Current') || document.querySelector('.TPlayer') || document.querySelector('#Optres');
-              if (!c || !vis(c)) return null;
-              const b = c.getBoundingClientRect();
-              return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
-            }).catch(() => null);
-            if (punto) await m.page.mouse.click(punto.x, punto.y);
-          }
+          /* v63: pelis Y episodios — picar el servidor recomendado para que
+           * cargue (goodstream primero, sin trailers ni VIP) */
+          await m.page.evaluate(() => {
+            const malos = ['youtube', 'google', 'vip', 'trailer'];
+            const a = document.querySelector('a.play[data-domain=goodstream]')
+              || [...document.querySelectorAll('a.play')].find((x) => {
+                const d = (x.getAttribute('data-domain') || '').toLowerCase();
+                return d && !malos.includes(d);
+              });
+            if (a) { a.scrollIntoView({ block: 'center' }); a.click(); }
+          }).catch(() => {});
+          /* v58: Cuevana no usa a.play → tocar su reproductor directamente */
+          const punto = await m.page.evaluate(() => {
+            const vis = (el) => { const b = el.getBoundingClientRect(); return b.width > 200 && b.height > 100; };
+            const c = document.querySelector('.TPlayerTb.Current') || document.querySelector('.TPlayer') || document.querySelector('#Optres');
+            if (!c || !vis(c)) return null;
+            const b = c.getBoundingClientRect();
+            return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+          }).catch(() => null);
+          if (punto) await m.page.mouse.click(punto.x, punto.y);
         } else if (!videoListo && n >= 2) {
           /* v61: hay video pero no carga (rs<2) — los episodios de
            * cine-calidad necesitan un toque encima del reproductor */
@@ -1215,7 +1246,7 @@ async function metaDePelicula(url) {
     || /\/peliculas\/([a-z0-9-]+)/i.exec(u.pathname)
     || /\/(?:wp-)?pelicula\/([a-z0-9-]+)/i.exec(u.pathname)
     || /\/anime\/([a-z0-9-]+)/i.exec(u.pathname)
-    || /\/ver\/([a-z0-9-]+)-episodio-\d+/i.exec(u.pathname)
+    || /\/ver\/([a-z0-9-]+)-episodio-(\d+)/i.exec(u.pathname)
     || /\/ver\/([a-z0-9-]+)-(\d+)\/?$/i.exec(u.pathname)
     || /\/episode\/([a-z0-9-]+?)-\d+x\d+/i.exec(u.pathname);
   let d = null;
@@ -1229,6 +1260,25 @@ async function metaDePelicula(url) {
           const dd = await r.json().catch(() => ({}));
           const p = (dd.posts || []).find((x) => x.slug === slug) || (dd.posts || [])[0];
           if (p) d = { title: p.title, poster: String(p.featured_image || '').replace('/w780/', '/w342/') };
+        }
+      } catch {}
+    } else if (/latanime\./.test(dom)) {
+      /* v63: la página del anime trae og:title y og:image (con proxy) */
+      try {
+        const r = await fetchSeguro(`https://latanime.org/anime/${slug}`, 8000);
+        if (r.ok) {
+          const html = await r.text();
+          const og = (p) => {
+            const a1 = new RegExp(`<meta[^>]+property=["']${p}["'][^>]+content=["']([^"']+)`, 'i').exec(html);
+            const a2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${p}["']`, 'i').exec(html);
+            return (a1 || a2 || [])[1] || '';
+          };
+          const t = (og('og:title') || '').replace(/\s*[—–|]\s*Latanime\s*$/i, '').replace(/\s{2,}/g, ' ').trim();
+          const pst = og('og:image') || '';
+          const poster = /latanime\./i.test(pst)
+            ? 'https://wsrv.nl/?url=' + pst.replace(/^https?:\/\//, '').split('?')[0] + '&w=400'
+            : pst;
+          if (t) d = { title: slugM[2] ? `${t} — Episodio ${slugM[2]}` : t, poster };
         }
       } catch {}
     } else if (/animeflv\./.test(dom)) {
@@ -1312,15 +1362,45 @@ async function seriesRecientes() {
   return items;
 }
 
+/* v63: Latanime — animes con audio LATINO de verdad (mp4upload y amigos) */
+async function buscarLatanime(q) {
+  const r = await fetchSeguro(`https://latanime.org/buscar?q=${encodeURIComponent(q)}`, 9000);
+  if (!r.ok) return [];
+  const html = (await r.text()).slice(0, 700000);
+  const re = /<a href="(https:\/\/latanime\.org\/anime\/[a-z0-9-]+)">([\s\S]*?)<h3[^>]*>([^<]{2,120})<\/h3>/g;
+  const out = [];
+  const vistos = new Set();
+  let m;
+  while ((m = re.exec(html)) && out.length < 12) {
+    if (vistos.has(m[1])) continue;
+    vistos.add(m[1]);
+    const img = (/(?:data-src|src)="(https?:[^"]+\/(?:thumbs|img)\/[^"]+)"/.exec(m[2]) || [])[1] || '';
+    out.push({
+      title: m[3].replace(/&#0?39;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim(),
+      url: m[1],
+      img,
+      site: 'Latanime',
+      extra: '',
+    });
+  }
+  return out;
+}
+
 async function buscarEnSitios(q) {
   const grupos = await Promise.all([
     buscarCuevana(q).catch(() => []),
     buscarGopelis(q).catch(() => []),
     buscarAnime(q).catch(() => []),
+    buscarLatanime(q).catch(() => []),
   ]);
-  const resultados = grupos.flat();
-  console.log(`[buscar] "${q}" en Cuevana+GoPelis+AnimeFLV → ${resultados.length} resultados`);
-  return resultados.slice(0, 20);
+  /* v63: intercalados por sitio para que ningún sitio tape a los demás */
+  const resultados = [];
+  const maximo = Math.max(0, ...grupos.map((g) => g.length));
+  for (let i = 0; i < maximo; i++) {
+    for (const g of grupos) if (g[i]) resultados.push(g[i]);
+  }
+  console.log(`[buscar] "${q}" en Cuevana+GoPelis+AnimeFLV+Latanime → ${resultados.length} resultados`);
+  return resultados.slice(0, 24);
 }
 
 function readBody(req) {
@@ -1387,7 +1467,8 @@ const server = http.createServer(async (req, res) => {
         while ((mm = re.exec(html)) && eps.length < 400) {
           const nm = /-(\d+)x(\d+)\/?$/.exec(mm[3]);
           eps.push({
-            temporada: +mm[1],
+            /* v63: la temporada de verdad está en la URL (-2x5), mark-N siempre es 1 */
+            temporada: nm ? +nm[1] : +mm[1],
             ep: nm ? +nm[2] : 0,
             url: mm[3],
             titulo: mm[4].trim().slice(0, 90),
@@ -1413,9 +1494,46 @@ const server = http.createServer(async (req, res) => {
       }
     }
     if (url.pathname.startsWith('/api/anime/')) {
-      /* v62: episodios de un anime de AnimeFLV (var eps viene en la propia página) */
+      /* v62: episodios de un anime — AnimeFLV (var eps) y v63: Latanime (enlaces /ver/) */
       const slug = decodeURIComponent(url.pathname.split('/')[3] || '').toLowerCase();
       if (!/^[a-z0-9-]{2,90}$/.test(slug)) return json(res, 400, { ok: false, error: 'Anime inválido' });
+      if ((url.searchParams.get('site') || '').toLowerCase() === 'latanime') {
+        const cL = serieCache.get('latanime:' + slug);
+        if (cL && Date.now() - cL.at < 30 * 60 * 1000) return json(res, 200, cL.d);
+        try {
+          const rL = await fetchSeguro(`https://latanime.org/anime/${slug}`, 10000);
+          if (!rL.ok) return json(res, 502, { ok: false, error: 'No pude leer el anime' });
+          const htmlL = await rL.text();
+          const epsL = [];
+          const vistos = new Set();
+          const reL = /href="(https:\/\/latanime\.org\/ver\/[a-z0-9-]+-episodio-(\d+)(?:-[a-z0-9]+)?)"/g;
+          let mL;
+          while ((mL = reL.exec(htmlL)) && epsL.length < 600) {
+            const nL = +mL[2];
+            if (!nL || vistos.has(nL)) continue;
+            vistos.add(nL);
+            epsL.push({ n: nL, url: mL[1], titulo: 'Episodio ' + nL });
+          }
+          epsL.sort((a, b) => a.n - b.n);
+          if (!epsL.length) return json(res, 404, { ok: false, error: 'Sin episodios' });
+          const ogL = (p) => {
+            const a1 = new RegExp(`<meta[^>]+property=["']${p}["'][^>]+content=["']([^"']+)`, 'i').exec(htmlL);
+            const a2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${p}["']`, 'i').exec(htmlL);
+            return (a1 || a2 || [])[1] || '';
+          };
+          const outL = {
+            ok: true,
+            slug,
+            titulo: (ogL('og:title') || slug).replace(/\s*[—–|]\s*Latanime\s*$/i, '').trim().slice(0, 90),
+            poster: ogL('og:image') || '',
+            episodios: epsL,
+          };
+          serieCache.set('latanime:' + slug, { at: Date.now(), d: outL });
+          return json(res, 200, outL);
+        } catch {
+          return json(res, 500, { ok: false, error: 'Error leyendo el anime' });
+        }
+      }
       const c = serieCache.get('anime:' + slug);
       if (c && Date.now() - c.at < 30 * 60 * 1000) return json(res, 200, c.d);
       try {

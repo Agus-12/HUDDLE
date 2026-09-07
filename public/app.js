@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v62';
+const APP_VERSION = 'v63';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -864,7 +864,7 @@ $('#peliLoading').addEventListener('click', () => ocultarPeliLoading());
 let spDatos = null; /* lo que devolvió /api/serie */
 /* v62: imágenes de AnimeFLV pasan por el proxy para poder verse */
 function proxyAnimeImg(src, w) {
-  if (src && /animeflv\./i.test(src)) {
+  if (src && /animeflv\.|latanime\./i.test(src)) {
     return 'https://wsrv.nl/?url=' + src.replace(/^https?:\/\//, '').split('?')[0] + '&w=' + (w || 400);
   }
   return src || '';
@@ -873,6 +873,7 @@ function abrirSeriePicker(res, enSala, esAnime) {
   const slugM = /(?:serie|anime)\/([a-z0-9-]+)/i.exec(res.url || '');
   if (!slugM) { toast('No pude leer esa serie'); return; }
   const slug = slugM[1];
+  const esLat = /latanime\./i.test(res.url || ''); /* v63: anime de Latanime */
   const pk = $('#seriePicker');
   pk.classList.remove('hidden');
   $('#spTitle').textContent = res.title || '';
@@ -882,7 +883,7 @@ function abrirSeriePicker(res, enSala, esAnime) {
   if (poster0) { po.src = poster0; po.style.display = ''; } else po.style.display = 'none';
   $('#spTemporadas').innerHTML = '';
   $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">Buscando episodios…</div>';
-  fetch((esAnime ? '/api/anime/' : '/api/serie/') + slug).then((r) => r.json()).then((d) => {
+  fetch((esAnime ? ('/api/anime/' + slug + (esLat ? '?site=latanime' : '')) : '/api/serie/' + slug)).then((r) => r.json()).then((d) => {
     /* v62: animes → una sola lista de episodios, sin miniaturas */
     const eps = esAnime
       ? (d.episodios || []).map((e) => ({ temporada: 1, ep: e.n, url: e.url, titulo: e.titulo || ('Episodio ' + e.n), img: '' }))
@@ -1037,6 +1038,7 @@ let SITES = [
   { name: 'GoPelis', full: 'GoPelis — películas', url: 'https://gopelis.com/', logo: '/sites/gopelis.png' },
   { name: 'AnimeD23', full: 'AnimeD23 — animes', url: 'https://animed23.com/', logo: '/sites/animed23.png' },
   { name: 'AnimeFLV', full: 'AnimeFLV — animes sub y latino', url: 'https://vww.animeflv.one/', logo: 'https://www.google.com/s2/favicons?domain=animeflv.one&sz=128' },
+  { name: 'Latanime', full: 'Latanime — animes con audio latino', url: 'https://latanime.org/', logo: 'https://www.google.com/s2/favicons?domain=latanime.org&sz=128' },
   { name: 'YouTube', full: 'YouTube — videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
 ];
 function renderPageDrop() {
@@ -1931,7 +1933,7 @@ function crearTarjetaResultado(res, alElegir) {
     /* v53: las carátulas de AnimeFLV van por un proxy de imágenes porque
      * en algunos teléfonos/compañías la página bloquea la imagen directa */
     let srcImg = res.img || '';
-    if (srcImg && /animeflv\./i.test(srcImg)) srcImg = 'https://wsrv.nl/?url=' + srcImg.replace(/^https?:\/\//, '').split('?')[0] + '&w=240';
+    if (srcImg && /animeflv\.|latanime\./i.test(srcImg)) srcImg = 'https://wsrv.nl/?url=' + srcImg.replace(/^https?:\/\//, '').split('?')[0] + '&w=240';
     card.innerHTML = `
       <span class="sr-badge"><img src="${logoDeSitio(res.site)}" alt=""></span>
       ${srcImg
