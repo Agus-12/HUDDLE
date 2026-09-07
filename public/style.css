@@ -743,7 +743,7 @@ select.input {
   #room { display: flex; flex-direction: column; min-height: 100dvh; }
   @supports (height: 100svh) {
     #room { height: 100svh; min-height: 0; }
-    body.teclado #room { height: auto; min-height: 100svh; }
+    /* v48: ya NO crece con el teclado — la película nunca se mueve */
   }
   .topbar { flex: none; }
   .layout {
@@ -1069,3 +1069,26 @@ body { overscroll-behavior-y: contain; }
 #setupBox .setup-label { text-transform: uppercase; letter-spacing: 0.9px; font-size: 11px; font-weight: 700; color: var(--dim); }
 .sr-row.sel { border-color: rgba(41, 224, 255, 0.65); background: rgba(41, 224, 255, 0.07); }
 .sr-row.sel .sr-go { color: #062028; background: var(--cyan); border-color: var(--cyan); }
+
+/* ---------- v48: chat estilo WhatsApp — el teclado solo sube la caja ---------- */
+@media (max-width: 980px) {
+  .side { padding-bottom: var(--kb, 0px); }
+  .chat-form {
+    position: fixed; left: 8px; right: 8px;
+    bottom: calc(8px + var(--kb, 0px) + env(safe-area-inset-bottom, 0px));
+    z-index: 45; margin-top: 0;
+    background: rgba(18, 12, 32, 0.94); backdrop-filter: blur(10px);
+    border: 1px solid var(--line); border-radius: 14px;
+    padding: 6px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+  }
+  .chat-log { padding-bottom: 78px; }
+}
+/* las barras flotantes del espejo también suben con el teclado */
+.mk-bar, #msBar { transform: translateY(calc(-1 * var(--kb, 0px))); }
+#msResults { bottom: calc(64px + var(--kb, 0px) + env(safe-area-inset-bottom, 0px)); }
+
+/* ---------- v48: buscador al principio del desplegable de páginas ---------- */
+.pd-search { display: flex; gap: 6px; padding: 10px 10px 8px; border-bottom: 1px solid var(--line); }
+.pd-search .input { flex: 1; min-width: 0; font-size: 16px; } /* 16px: iOS sin zoom */
+.pd-results { max-height: 42vh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+.pd-results:empty { display: none; }

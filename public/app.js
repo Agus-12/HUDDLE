@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v47';
+const APP_VERSION = 'v48';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -758,6 +758,17 @@ function renderPageDrop() {
   const drop = $('#pageDrop');
   if (!drop) return;
   drop.innerHTML = '';
+  /* v48: al principio de la lista — buscar series o películas */
+  const buscar = document.createElement('div');
+  buscar.className = 'pd-search';
+  buscar.innerHTML = `
+    <input id="pdSearch" class="input" placeholder="Buscar series o películas…" autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off">
+    <button id="pdGo" class="btn primary small" type="button">Buscar</button>`;
+  drop.appendChild(buscar);
+  const pdRes = document.createElement('div');
+  pdRes.id = 'pdResults';
+  pdRes.className = 'pd-results';
+  drop.appendChild(pdRes);
   SITES.forEach((s) => {
     const b = document.createElement('button');
     b.className = 'page-opt';
@@ -797,7 +808,12 @@ function renderPageDrop() {
     e.stopPropagation();
     drop.classList.toggle('hidden');
   });
+  /* v48: Enter en la caja de búsqueda del desplegable */
+  drop.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target && e.target.id === 'pdSearch') { e.preventDefault(); buscarEnPicker(); }
+  });
   drop.addEventListener('click', (e) => {
+    if (e.target.closest('#pdGo')) { buscarEnPicker(); return; }
     const opt = e.target.closest('.page-opt');
     if (!opt) return;
     drop.classList.add('hidden');
@@ -1220,21 +1236,23 @@ if (hashMatch) $('#joinCode').value = hashMatch[1].toUpperCase();
   document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
 });
 
-/* v37: dashboard de tamaño fijo — al deslizar no se re-estira; cuando el
-   teclado del celular se abre, dejamos crecer la página y centramos el campo */
+/* v48: estilo WhatsApp — el teclado SOLO sube la caja del chat.
+   Medimos la altura del teclado con visualViewport y la ponemos en --kb;
+   la sala ya no crece ni se desplaza: la película nunca se mueve. */
 if (window.visualViewport) {
+  const vv = window.visualViewport;
   const ajustarTeclado = () => {
-    document.body.classList.toggle('teclado', window.innerHeight - window.visualViewport.height > 120);
+    const foco = document.activeElement;
+    const escribiendo = !!(foco && /INPUT|TEXTAREA/.test(foco.tagName || ''));
+    const kb = escribiendo ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;
+    document.body.style.setProperty('--kb', kb + 'px');
+    /* si el navegador intentó desplazar la página, la devolvemos: nada se mueve */
+    if (kb > 0 && window.scrollY) window.scrollTo(0, 0);
   };
-  window.visualViewport.addEventListener('resize', ajustarTeclado);
+  vv.addEventListener('resize', ajustarTeclado);
+  vv.addEventListener('scroll', ajustarTeclado);
   ajustarTeclado();
 }
-['#chatInput', '#mirrorUrl'].forEach((sel) => {
-  const el = document.querySelector(sel);
-  if (el) el.addEventListener('focus', () => {
-    setTimeout(() => { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch {} }, 250);
-  });
-});
 
 /* ======================= v42: pantalla activa + aviso de entrada ======================= */
 
@@ -1544,3 +1562,29 @@ $('#btnMSearch').addEventListener('click', () => {
 $('#msGo').addEventListener('click', buscarEnSala);
 $('#msClose').addEventListener('click', cerrarBuscarSala);
 $('#msInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); buscarEnSala(); } });
+
+/* v48: buscar desde el desplegable de páginas (en la sala) */
+async function buscarEnPicker() {
+  const inp = $('#pdSearch');
+  const box = $('#pdResults');
+  if (!inp || !box) return;
+  const q = inp.value.trim();
+  if (!q) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="sr-info"><div class="spinner"></div> Buscando…</div>';
+  try {
+    const d = await buscarEnServer(q);
+    if (!d.ok || !d.results || !d.results.length) {
+      box.innerHTML = `<div class="sr-info">${(d && d.error) || 'No encontré nada — prueba con otras palabras'}</div>`;
+      return;
+    }
+    renderResultados(box, d.results, (res) => {
+      $('#pageDrop').classList.add('hidden');
+      if (!S.canControl) { toast('Solo el anfitrión puede cambiar de página'); return; }
+      toast(`Abriendo ${res.site}…`);
+      $('#mirrorUrl').value = res.url;
+      startMirrorFromPicker();
+    }, 'Ver');
+  } catch {
+    box.innerHTML = '<div class="sr-info">Sin conexión con el servidor</div>';
+  }
+}
