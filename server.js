@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v42'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v43'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -765,6 +765,121 @@ function serveStatic(req, res, urlPath) {
   });
 }
 
+/* ---------------------- v43: directorio de páginas ----------------------
+ * Las páginas del desplegable ya no están clavadas en el código: viven en
+ * data/sites.json y crecen cuando alguien pega una URL nueva. Al agregar,
+ * el servidor visita la página y saca su nombre, descripción y logo. */
+const SITES_FILE = path.join(__dirname, 'data', 'sites.json');
+const LOGO_DIR = path.join(__dirname, 'public', 'sites-logos');
+const SITES_SEED = [
+  { name: 'Cuevana', desc: 'Películas y series', url: 'https://cuevana.mov/inicio', logo: '/sites/cuevana.png' },
+  { name: 'GoPelis', desc: 'Películas', url: 'https://gopelis.com/', logo: '/sites/gopelis.png' },
+  { name: 'AnimeD23', desc: 'Animes', url: 'https://animed23.com/', logo: '/sites/animed23.png' },
+  { name: 'YouTube', desc: 'Videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
+];
+function loadSitesFile() {
+  try { return JSON.parse(fs.readFileSync(SITES_FILE, 'utf8')); } catch { return null; }
+}
+function saveSitesFile(list) {
+  fs.mkdirSync(path.dirname(SITES_FILE), { recursive: true });
+  fs.writeFileSync(SITES_FILE, JSON.stringify(list, null, 2));
+}
+function sitesList() {
+  const l = loadSitesFile();
+  if (Array.isArray(l) && l.length) return l;
+  saveSitesFile(SITES_SEED);
+  return SITES_SEED;
+}
+function normalizarUrl(raw) {
+  let s = String(raw || '').trim();
+  if (!s) throw new Error('vacía');
+  if (!/^https?:\/\//i.test(s)) s = 'https://' + s;
+  const u = new URL(s);
+  if (!/^https?:$/.test(u.protocol) || !u.hostname.includes('.')) throw new Error('inválida');
+  return u.href;
+}
+function mismaPagina(a, b) {
+  const quitar = (x) => String(x || '').toLowerCase().replace(/\/+$/, '').replace(/^https?:\/\/(www\.)?/, '');
+  return quitar(a) === quitar(b);
+}
+async function fetchSeguro(url, ms) {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
+  try {
+    return await fetch(url, {
+      signal: c.signal, redirect: 'follow',
+      headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept-Language': 'es-MX,es;q=0.9,en;q=0.8' },
+    });
+  } finally { clearTimeout(t); }
+}
+async function infoDePagina(url) {
+  const u = new URL(url);
+  let title = '', desc = '', iconHref = '';
+  try {
+    const r = await fetchSeguro(u.href, 6000);
+    if (r.ok && /text\/html/i.test(r.headers.get('content-type') || '')) {
+      const html = (await r.text()).slice(0, 500000);
+      title = (/<title[^>]*>([^<]{1,160})<\/title>/i.exec(html) || [])[1] || '';
+      desc = (/<meta[^>]+(?:name|property)=["'](?:description|og:description)["'][^>]*content=["']([^"']{1,240})/i.exec(html) || [])[1] || '';
+      if (!desc) desc = (/<meta[^>]+content=["']([^"']{1,240})["'][^>]+(?:name|property)=["'](?:description|og:description)["']/i.exec(html) || [])[1] || '';
+      iconHref = (/<link[^>]+rel=["'][^"']*(?:shortcut |apple-touch )?icon[^"']*["'][^>]*href=["']([^"']{2,300})/i.exec(html) || [])[1] || '';
+    }
+  } catch { /* página inalcanzable: seguimos con los fallbacks */ }
+  let name = '';
+  try { name = decodeURIComponent(title || ''); } catch { name = title || ''; }
+  name = name.replace(/\s+/g, ' ').trim();
+  if (name.length > 40) name = name.slice(0, 40).trim() + '…';
+  if (!name) name = u.hostname.replace(/^www\./, '');
+  if (desc) desc = desc.replace(/\s+/g, ' ').trim().slice(0, 140);
+  return { name, desc, iconHref, url: u.href };
+}
+async function descargarLogo(u, iconHref) {
+  fs.mkdirSync(LOGO_DIR, { recursive: true });
+  const candidatos = [];
+  if (iconHref) { try { candidatos.push(new URL(iconHref, u).href); } catch {} }
+  candidatos.push(`https://www.google.com/s2/favicons?domain=${u.hostname}&sz=128`);
+  candidatos.push(new URL('/favicon.ico', u).href);
+  for (const cUrl of candidatos) {
+    try {
+      const r = await fetchSeguro(cUrl, 6000);
+      if (!r.ok) continue;
+      const ct = (r.headers.get('content-type') || '').toLowerCase();
+      if (!/image\//.test(ct)) continue;
+      const buf = Buffer.from(await r.arrayBuffer());
+      if (buf.length < 100 || buf.length > 400000) continue;
+      const ext = ct.includes('svg') ? 'svg' : (ct.includes('jpeg') || ct.includes('jpg')) ? 'jpg' : (ct.includes('icon')) ? 'ico' : 'png';
+      const slug = u.hostname.replace(/^www\./, '').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 40).toLowerCase() || 'sitio';
+      const file = `${slug}-${Date.now().toString(36)}.${ext}`;
+      fs.writeFileSync(path.join(LOGO_DIR, file), buf);
+      return `/sites-logos/${file}`;
+    } catch {}
+  }
+  return null;
+}
+function logoDeLetra(name) {
+  fs.mkdirSync(LOGO_DIR, { recursive: true });
+  const letra = (name[0] || '?').toUpperCase().replace(/[<>&"']/g, '');
+  const file = `letra-${Date.now().toString(36)}.svg`;
+  fs.writeFileSync(path.join(LOGO_DIR, file),
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#241a3d"/><rect width="64" height="64" rx="14" fill="none" stroke="#5b4a86" stroke-width="2"/><text x="32" y="43" font-family="Arial,Helvetica,sans-serif" font-size="32" fill="#e9e2ff" text-anchor="middle" font-weight="bold">${letra}</text></svg>`);
+  return `/sites-logos/${file}`;
+}
+async function agregarSitio(urlRaw) {
+  const url = normalizarUrl(urlRaw);
+  const list = sitesList();
+  const existente = list.find((s) => mismaPagina(s.url, url));
+  if (existente) return { site: existente, exists: true };
+  const info = await infoDePagina(url);
+  const u = new URL(info.url);
+  let logo = await descargarLogo(u, info.iconHref);
+  if (!logo) logo = logoDeLetra(info.name);
+  const site = { name: info.name, desc: info.desc, url: info.url, logo };
+  list.unshift(site);
+  saveSitesFile(list);
+  console.log(`[sitios] + ${site.name} → ${site.url}`);
+  return { site, exists: false };
+}
+
 /* ---------------------- servidor ---------------------- */
 
 function readBody(req) {
@@ -806,6 +921,32 @@ const server = http.createServer(async (req, res) => {
         room: { code: room.code, users: usersOf(room), state: stateOf(room), mirror: mirrorState(room) },
       });
     }
+    /* v43: directorio de páginas — ver, agregar y quitar */
+    if (url.pathname === '/api/sites' && req.method === 'GET') {
+      return json(res, 200, { ok: true, sites: sitesList() });
+    }
+    if (url.pathname === '/api/sites' && req.method === 'POST') {
+      const body = await readBody(req);
+      try {
+        const r = await agregarSitio(body.url);
+        return json(res, 200, { ok: true, site: r.site, exists: r.exists });
+      } catch (e) {
+        return json(res, 400, { ok: false, error: 'No pude leer esa página — revisa que la dirección esté completa' });
+      }
+    }
+    if (url.pathname === '/api/sites' && req.method === 'DELETE') {
+      const target = url.searchParams.get('url') || '';
+      const list = sitesList();
+      const i = list.findIndex((s) => mismaPagina(s.url, target));
+      if (i >= 0) {
+        const [borrado] = list.splice(i, 1);
+        saveSitesFile(list);
+        try { if ((borrado.logo || '').startsWith('/sites-logos/')) fs.unlinkSync(path.join(PUBLIC_DIR, borrado.logo)); } catch {}
+        console.log(`[sitios] - ${borrado.name}`);
+      }
+      return json(res, 200, { ok: true, sites: sitesList() });
+    }
+
     if (url.pathname === '/api/login' && req.method === 'POST') {
       const body = await readBody(req);
       const name = String(body.name || '').trim().replace(/\s+/g, ' ');

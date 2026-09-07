@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v42';
+const APP_VERSION = 'v43';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -138,6 +138,21 @@ function connect(code, opts = {}) {
     showScreen('room');
     applyMirrorState(d.room.mirror || { active: false, url: '' });
     applyState(d.room.state);
+
+    /* v43: si vienen del menú con página elegida, el espejo arranca solo */
+    if (S.pendingStart) {
+      const ps = S.pendingStart;
+      S.pendingStart = null;
+      if (ps.url && !S.mirror.active) {
+        setTimeout(() => {
+          if (S.canControl && !S.mirror.active) {
+            $('#mirrorUrl').value = ps.url;
+            startMirrorFromPicker();
+            toast(`Preparando ${ps.name || 'la página'}…`);
+          }
+        }, 700);
+      }
+    }
 
     // ¿el servidor tiene una interfaz más nueva que la mía? → actualizar
     if (d.srvVersion && d.srvVersion !== APP_VERSION) maybeReload(d.srvVersion);
@@ -295,6 +310,13 @@ function applyMirrorState(ms) {
     AU.needAudio = !!ms.audio; // el servidor indica si hay audio disponible
     if (window.__setPagePick) window.__setPagePick(S.mirror.url);
     pedirPantallaActiva(); // v42: mientras se mira, la pantalla no se apaga
+    /* v43: recordar la última página espejada para el menú de crear sala */
+    try {
+      const ms2 = SITES.find((x) => S.mirror.url && S.mirror.url.startsWith(x.url.replace(/\/$/, '')));
+      let nm = ms2 ? ms2.name : '';
+      if (!nm) { try { nm = new URL(S.mirror.url).hostname.replace(/^www\./, ''); } catch {} }
+      localStorage.setItem('rr-lastMirror', JSON.stringify({ url: S.mirror.url, name: nm, logo: ms2 ? ms2.logo : '' }));
+    } catch {}
     // si el audio quedó suspendido de una sesión anterior, reactivarlo
     if (AU.needAudio && AU.ctx && AU.ctx.state === 'suspended') AU.ctx.resume().catch(() => {});
     // pantalla de carga hasta que llegue el primer frame
@@ -690,12 +712,40 @@ $('#mirrorUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') star
 
 /* v34: páginas recomendadas en desplegable propio CON LOGOS — un toque y a ver;
    la fila de URL solo aparece al elegir "Otra página" */
-const SITES = [
+/* v43: el directorio de páginas ya no está clavado — parte de estos 4 y se
+ * actualiza con lo que guarda el servidor (data/sites.json) */
+let SITES = [
   { name: 'Cuevana', full: 'Cuevana — películas y series', url: 'https://cuevana.mov/inicio', logo: '/sites/cuevana.png' },
   { name: 'GoPelis', full: 'GoPelis — películas', url: 'https://gopelis.com/', logo: '/sites/gopelis.png' },
   { name: 'AnimeD23', full: 'AnimeD23 — animes', url: 'https://animed23.com/', logo: '/sites/animed23.png' },
   { name: 'YouTube', full: 'YouTube — videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
 ];
+function renderPageDrop() {
+  const drop = $('#pageDrop');
+  if (!drop) return;
+  drop.innerHTML = '';
+  SITES.forEach((s) => {
+    const b = document.createElement('button');
+    b.className = 'page-opt';
+    b.type = 'button';
+    b.dataset.url = s.url;
+    b.dataset.logo = s.logo;
+    b.dataset.name = s.name;
+    const im = document.createElement('img');
+    im.src = s.logo; im.className = 'site-logo'; im.alt = '';
+    const sp = document.createElement('span');
+    sp.textContent = s.full || s.name;
+    b.append(im, sp);
+    drop.appendChild(b);
+  });
+  const otra = document.createElement('button');
+  otra.className = 'page-opt';
+  otra.type = 'button';
+  otra.dataset.url = '';
+  otra.dataset.name = 'otra';
+  otra.innerHTML = '<svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>Otra página (escribe la URL)…</span>';
+  drop.appendChild(otra);
+}
 (function montarPaginas() {
   const btn = $('#pagePickBtn');
   const drop = $('#pageDrop');
@@ -707,16 +757,7 @@ const SITES = [
     $('#pagePickName').textContent = texto;
   };
 
-  const opciones = SITES.map((s) =>
-    `<button class="page-opt" type="button" data-url="${s.url}" data-logo="${s.logo}" data-name="${s.name}">
-      <img src="${s.logo}" class="site-logo" alt=""><span>${s.full}</span>
-    </button>`
-  ).join('') +
-  `<button class="page-opt" type="button" data-url="" data-name="otra">
-     <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-     <span>Otra página (escribe la URL)…</span>
-   </button>`;
-  drop.innerHTML = opciones;
+  renderPageDrop();
 
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -757,6 +798,21 @@ const SITES = [
     else setBtn('', 'Elige una página…');
   };
 })();
+
+/* v43: cargar el directorio real del servidor (crece al pegar URLs) */
+async function cargarSitios() {
+  try {
+    const r = await fetch('/api/sites');
+    const d = await r.json();
+    if (d.ok && Array.isArray(d.sites) && d.sites.length) {
+      SITES = d.sites.map((s) => ({ ...s, full: s.desc ? `${s.name} — ${s.desc}` : s.name }));
+      renderPageDrop();
+      renderSetupGrid();
+      renderLastCard();
+    }
+  } catch { /* sin directorio: seguimos con los 4 de siempre */ }
+}
+cargarSitios();
 
 function updateControlUi() {
   const isHost = S.room && S.room.hostId === S.userId;
@@ -847,7 +903,7 @@ const ticker = {
   q: [], busy: false,
   push(msg) {
     const nombre = msg.system ? '' : (msg.name || '');
-    const texto = String(msg.system ? '⚡ ' + (msg.text || '') : (msg.text || '')).slice(0, 220);
+    const texto = String(msg.system ? (msg.text || '') : (msg.text || '')).slice(0, 220);
     this.q.push({ nombre, texto });
     if (this.q.length > 5) this.q = this.q.slice(-5); // sin acumular atrasos
     this.run();
@@ -966,7 +1022,7 @@ $('#btnCopy').addEventListener('click', async () => {
   const link = location.origin + '/#' + S.code;
   /* v22: mensaje listo para pegar — el link SOLO en su línea hace que
    * WhatsApp lo reconozca como link (dominio + https, ver GUIA-HTTPS.md) */
-  const msg = `¡Únete a mi sala en Huddle! 🎬\n${link}`;
+  const msg = `¡Únete a mi sala en Huddle!\n${link}`;
   let ok = false;
   try {
     const ta = document.createElement('textarea');
@@ -1040,7 +1096,7 @@ async function loginNombre() {
       localStorage.setItem('rr-profiles', JSON.stringify(all));
     } catch {}
     initLanding();
-    toast(d.resumed ? `¡De vuelta, ${d.name}!` : (d.reclaimed ? `¡Bienvenido de vuelta, ${d.name}!` : `¡Listo, ${d.name}! Ese nombre es tuyo 🎉`), 4200);
+    toast(d.resumed ? `¡De vuelta, ${d.name}!` : (d.reclaimed ? `¡Bienvenido de vuelta, ${d.name}!` : `¡Listo, ${d.name}! Ese nombre es tuyo`), 4200);
   } catch { toast('Sin conexión con el servidor'); }
   finally { $('#btnLogin').disabled = false; }
 }
@@ -1084,7 +1140,11 @@ async function pollRooms() {
       const logo = rm.isMirror ? siteLogoFor(rm.host) : null;
       const prev = logo
         ? '<img src="' + logo + '" class="site-logo-big" alt="">'
-        : '<span class="room-emoji">' + (rm.isMirror ? '🪞' : (rm.watching ? '🎬' : '💬')) + '</span>';
+        : '<span class="room-emoji">' + (rm.isMirror
+            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>'
+            : (rm.watching
+                ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z" fill="currentColor" stroke="none"/></svg>'
+                : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>')) + '</span>';
       card.innerHTML =
         '<div class="room-prev">' + prev + '<span class="room-live"><span class="live-dot"></span>' + rm.count + '</span></div>' +
         '<div class="room-info">' +
@@ -1100,8 +1160,7 @@ roomsTimer = setInterval(pollRooms, 5000);
 
 $('#btnCreate').addEventListener('click', () => {
   if (!S.profile) { toast('Primero elige tu nombre de usuario'); initLanding(); return; }
-  const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
-  connect(code);
+  abrirSetup(); // v43: antes de entrar, eliges con qué página arrancar
 });
 
 function joinFromInput() {
@@ -1183,3 +1242,141 @@ function sonidoEntrada() {
   } catch {}
 }
 let prevUsers = null;
+
+/* ======================= v43: preparar la sala antes de entrar ======================= */
+S.setupUrl = '';
+S.setupName = '';
+S.pendingStart = null;
+
+function setupMsg(t, ok) {
+  const el = $('#setupMsg');
+  el.textContent = t || '';
+  el.classList.toggle('hidden', !t);
+  el.classList.toggle('okmsg', !!ok);
+}
+
+function crearCardSitio(s, removable) {
+  const card = document.createElement('div');
+  card.className = 'setup-card' + (S.setupUrl === s.url ? ' sel' : '');
+  card.tabIndex = 0;
+  card.setAttribute('role', 'button');
+  card.innerHTML = `
+    <span class="sc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+    <img class="sc-logo" src="${s.logo || ''}" alt="">
+    <span class="sc-name"></span>
+    <span class="sc-desc"></span>`;
+  card.querySelector('.sc-name').textContent = s.name;
+  card.querySelector('.sc-desc').textContent = s.desc || '';
+  if (!s.logo) {
+    card.querySelector('.sc-logo').outerHTML = '<svg class="sc-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>';
+  }
+  if (removable) {
+    const x = document.createElement('button');
+    x.className = 'sc-x';
+    x.type = 'button';
+    x.title = 'Quitar del directorio';
+    x.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+    card.appendChild(x);
+  }
+  card.addEventListener('click', (e) => {
+    if (e.target.closest('.sc-x')) { quitarSitio(s); return; }
+    elegirSetup(s.url, s.name);
+  });
+  return card;
+}
+
+function renderSetupGrid() {
+  const grid = $('#setupGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  SITES.forEach((s) => grid.appendChild(crearCardSitio(s, true)));
+}
+
+function renderLastCard() {
+  const box = $('#lastCard');
+  if (!box) return;
+  box.innerHTML = '';
+  let last = null;
+  try { last = JSON.parse(localStorage.getItem('rr-lastMirror') || 'null'); } catch {}
+  if (!last || !last.url) return;
+  const lbl = document.createElement('div');
+  lbl.className = 'setup-label';
+  lbl.textContent = 'Continuar donde se quedaron';
+  const card = crearCardSitio({ name: last.name || 'Última página', desc: last.url, url: last.url, logo: last.logo || '' }, false);
+  box.append(lbl, card);
+}
+
+function elegirSetup(url, name) {
+  if (S.setupUrl === url) { S.setupUrl = ''; S.setupName = ''; }
+  else { S.setupUrl = url; S.setupName = name || ''; }
+  renderSetupGrid();
+  renderLastCard();
+  $('#btnCreateGo').textContent = S.setupUrl ? `Crear y espejar ${S.setupName}` : 'Crear la sala';
+}
+
+function abrirSetup() {
+  S.setupUrl = '';
+  S.setupName = '';
+  $('#setupBox').classList.remove('hidden');
+  document.querySelector('.join-row').classList.add('hidden');
+  document.querySelector('.rooms-head').classList.add('hidden');
+  $('#liveRooms').classList.add('hidden');
+  $('#noRooms').classList.add('hidden');
+  setupMsg('');
+  $('#btnCreateGo').textContent = 'Crear la sala';
+  renderSetupGrid();
+  renderLastCard();
+}
+
+function cerrarSetup() {
+  $('#setupBox').classList.add('hidden');
+  document.querySelector('.join-row').classList.remove('hidden');
+  document.querySelector('.rooms-head').classList.remove('hidden');
+  $('#liveRooms').classList.remove('hidden');
+  pollRooms();
+}
+
+async function quitarSitio(s) {
+  try {
+    const r = await fetch('/api/sites?url=' + encodeURIComponent(s.url), { method: 'DELETE' });
+    const d = await r.json();
+    if (d.ok && Array.isArray(d.sites)) {
+      SITES = d.sites.map((x) => ({ ...x, full: x.desc ? `${x.name} — ${x.desc}` : x.name }));
+      renderPageDrop();
+      renderSetupGrid();
+      if (S.setupUrl === s.url) { S.setupUrl = ''; S.setupName = ''; $('#btnCreateGo').textContent = 'Crear la sala'; }
+    }
+  } catch { toast('No pude quitar la página'); }
+}
+
+async function agregarSitioSetup() {
+  const inp = $('#newSiteUrl');
+  const raw = inp.value.trim();
+  if (!raw) { toast('Pega la dirección de la página'); return; }
+  const btn = $('#btnAddSite');
+  btn.disabled = true;
+  btn.textContent = 'Buscando…';
+  setupMsg('');
+  try {
+    const r = await fetch('/api/sites', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: raw }) });
+    const d = await r.json();
+    if (!d.ok) { setupMsg(d.error || 'No pude leer esa página'); return; }
+    const s = d.site;
+    if (!SITES.some((x) => x.url === s.url)) SITES = [{ ...s, full: s.desc ? `${s.name} — ${s.desc}` : s.name }, ...SITES];
+    renderPageDrop();
+    renderSetupGrid();
+    elegirSetup(s.url, s.name);
+    inp.value = '';
+    setupMsg(d.exists ? `Ya estaba en el directorio: ${s.name}` : `Agregada: ${s.name}`, true);
+  } catch { setupMsg('Sin conexión con el servidor'); }
+  finally { btn.disabled = false; btn.textContent = 'Agregar'; }
+}
+
+$('#setupBack').addEventListener('click', cerrarSetup);
+$('#btnAddSite').addEventListener('click', agregarSitioSetup);
+$('#newSiteUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') agregarSitioSetup(); });
+$('#btnCreateGo').addEventListener('click', () => {
+  S.pendingStart = S.setupUrl ? { url: S.setupUrl, name: S.setupName } : null;
+  const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+  connect(code);
+});

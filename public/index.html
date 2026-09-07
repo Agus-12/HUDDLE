@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
-<link rel="stylesheet" href="/style.css?v=42">
+<link rel="stylesheet" href="/style.css?v=43">
 </head>
 <body>
 
@@ -56,10 +56,31 @@
           </div>
         </div>
 
+        <!-- v43: preparar la sala antes de entrar — última página, directorio, agregar nuevas -->
+        <div id="setupBox" class="hidden">
+          <div class="setup-top">
+            <button id="setupBack" class="btn small ghost" type="button">
+              <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+              Volver
+            </button>
+            <h2 class="setup-title">Prepara tu sala</h2>
+          </div>
+          <p class="setup-sub">Elige con qué página arrancar — o entra y decide adentro.</p>
+          <div id="lastCard"></div>
+          <div class="setup-label">Páginas</div>
+          <div id="setupGrid" class="setup-grid"></div>
+          <div class="setup-add">
+            <input id="newSiteUrl" class="input" placeholder="Pega la dirección de otra página" autocomplete="off" spellcheck="false">
+            <button id="btnAddSite" class="btn" type="button">Agregar</button>
+          </div>
+          <p id="setupMsg" class="hint hidden"></p>
+          <button id="btnCreateGo" class="btn primary big setup-go" type="button">Crear la sala</button>
+        </div>
+
         <!-- v31: salas en vivo ahora, con preview de lo que ven -->
         <div class="rooms-head"><span class="live-dot"></span> En vivo ahora</div>
         <div id="liveRooms" class="rooms-grid"></div>
-        <p id="noRooms" class="hint hidden">No hay nadie en salas por ahora — crea la tuya y comparte el link 👀</p>
+        <p id="noRooms" class="hint hidden">No hay nadie en salas por ahora — crea la tuya y comparte el link</p>
       </div>
     </div>
   </div>
@@ -69,7 +90,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v42</span>
+        <span class="ver" id="verBadge">v43</span>
       </div>
       <!-- v36: gente, invitar y salir viven JUNTO al logo -->
       <div class="top-quick">
@@ -204,6 +225,6 @@
   </div>
 
   <div id="toasts" class="toasts"></div>
-  <script src="/app.js?v=42"></script>
+  <script src="/app.js?v=43"></script>
 </body>
 </html>

@@ -27,9 +27,16 @@ echo "==> Carpeta destino:   $APP_DIR"
 # El código debe vivir en ~/raveroom (así lo esperan los servicios)
 if [ "$REPO_DIR" != "$APP_DIR" ]; then
   echo "==> Copiando el proyecto a $APP_DIR ..."
+  # v43: conservar el directorio de páginas y logos agregados por los usuarios
+  BKUP="$(mktemp -d)"
+  [ -d "$APP_DIR/data" ] && cp -a "$APP_DIR/data" "$BKUP/data"
+  [ -d "$APP_DIR/public/sites-logos" ] && cp -a "$APP_DIR/public/sites-logos" "$BKUP/sites-logos"
   rm -rf "$APP_DIR"
   mkdir -p "$(dirname "$APP_DIR")"
   cp -a "$REPO_DIR" "$APP_DIR"
+  if [ -d "$BKUP/data" ]; then rm -rf "$APP_DIR/data"; cp -a "$BKUP/data" "$APP_DIR/"; fi
+  if [ -d "$BKUP/sites-logos" ]; then rm -rf "$APP_DIR/public/sites-logos"; cp -a "$BKUP/sites-logos" "$APP_DIR/public/"; fi
+  rm -rf "$BKUP"
 fi
 chown -R "$APP_USER":"$APP_USER" "$APP_DIR"
 
