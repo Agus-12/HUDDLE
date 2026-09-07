@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v63'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v64'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -448,6 +448,31 @@ async function startMirror(room, rawUrl, userId) {
               });
             if (a) { a.scrollIntoView({ block: 'center' }); a.click(); }
           }).catch(() => {});
+          /* v64: algunas PELIS de cine-calidad pasan por un "protector de
+           * enlaces" (acortalink) que bloquea el video — decodificamos nosotros
+           * el servidor goodstream (base64 → números → letras corridas 2
+           * lugares) y montamos el iframe directo a pantalla completa */
+          if (/cine-calidad\./.test(m.url || '') && n >= 2) {
+            await m.page.evaluate(() => {
+              try {
+                if (document.querySelector('iframe.rr-player')) return;
+                const a = document.querySelector('a.play[data-domain=goodstream]');
+                const enc = a && a.getAttribute('data-src');
+                if (!enc) return;
+                const nums = atob(enc).trim().split(/\s+/).map((x) => parseInt(x, 10));
+                if (!nums.length || nums.some((x) => !Number.isFinite(x))) return;
+                const crudo = String.fromCharCode(...nums.slice(0, 400));
+                const url = [...crudo].map((ch) => String.fromCharCode(ch.charCodeAt(0) - 2)).join('');
+                if (!/^https?:\/\/[a-z0-9.-]+\//i.test(url)) return;
+                const f = document.createElement('iframe');
+                f.className = 'rr-player';
+                f.src = url;
+                f.allow = 'autoplay; encrypted-media; fullscreen';
+                f.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483000;border:0;background:#000';
+                document.body.appendChild(f);
+              } catch {}
+            }).catch(() => {});
+          }
           /* v58: Cuevana no usa a.play → tocar su reproductor directamente */
           const punto = await m.page.evaluate(() => {
             const vis = (el) => { const b = el.getBoundingClientRect(); return b.width > 200 && b.height > 100; };
