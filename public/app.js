@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v59';
+const APP_VERSION = 'v60';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -179,6 +179,9 @@ S.mirrorInfo = null; /* v59: título+carátula de lo que se está abriendo */
     S.mirror.gotFrame = true;
     $('#mirrorLoading').classList.add('hidden');
     drawMirrorFrame(f.d);
+    /* v60: en series, la página ya renderizada = listos (la peli espera a que suene) */
+    const pl = $('#peliLoading');
+    if (pl && !pl.classList.contains('hidden') && /\/serie\/|\/episode\//.test(S.mirror.url || '')) ocultarPeliLoading();
   });
   es.addEventListener('mirror-audio', (e) => {
     const d = JSON.parse(e.data);
@@ -750,6 +753,17 @@ $('#btnStopMirrorTop').addEventListener('click', () => {
 });
 
 /* v33: navegar el espejo como un navegador normal — atrás / adelante */
+/* v60: adelantar / atrasar la película (mueve el video del espejo) */
+function moverPelicula(delta) {
+  if (!S.mirror.active) { toast('Primero pon una película'); return; }
+  sendAction({ type: 'mirror', op: 'seek', delta }).then((r) => {
+    if (r && r.ok === false) toast(r.error || 'No se pudo mover');
+    else if (r && r.movio === false) toast('Todavía no hay video que mover');
+  }).catch(() => {});
+}
+$('#btnSeekBack').addEventListener('click', () => moverPelicula(-10));
+$('#btnSeekFwd').addEventListener('click', () => moverPelicula(30));
+
 $('#btnMBack').addEventListener('click', () => {
   if (!S.mirror.active) return;
   if (!S.canControl) { toast('Solo el anfitrión controla el espejo'); return; }
@@ -780,12 +794,26 @@ function mostrarPeliLoading() {
     $('#peliSub').textContent = info.sub || 'Abriendo en el espejo…';
   }
   box.classList.remove('hidden');
+  arrancarTimerPeli();
 }
 function ocultarPeliLoading() {
   const b = $('#peliLoading');
-  if (b && !b.classList.contains('hidden')) b.classList.add('hidden');
+  if (b && !b.classList.contains('hidden')) {
+    b.classList.add('hidden');
+    if (S.peliTimer) { clearTimeout(S.peliTimer); S.peliTimer = null; }
+  }
 }
 $('#peliLoading').addEventListener('click', () => ocultarPeliLoading());
+/* v60: si la peli tarda demasiado, te dejamos entrar igual (sin quedarte atascado) */
+function arrancarTimerPeli() {
+  if (S.peliTimer) clearTimeout(S.peliTimer);
+  S.peliTimer = setTimeout(() => {
+    if (!$('#peliLoading').classList.contains('hidden')) {
+      ocultarPeliLoading();
+      toast('Ya estás en la sala — la película sigue preparándose');
+    }
+  }, 100000);
+}
 
 function startMirrorFromPicker() {
   if (!S.canControl) { toast('Solo el anfitrión puede espejar'); return; }
@@ -1802,6 +1830,9 @@ async function buscarInicio() {
     }
     renderResultados(box, d.results, (res) => {
       S.pendingStart = { url: res.url, name: res.title || res.site, img: res.img || '' };
+      /* v60: pantalla completa de espera desde el toque */
+      S.mirrorInfo = { title: res.title || '', img: res.img || '', url: res.url, sub: 'Cargando tu sala…' };
+      mostrarPeliLoading();
       const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
       connect(code);
     }, true);
@@ -1856,6 +1887,9 @@ async function cargarPopulares() {
     if (!d.ok || !d.results || !d.results.length) { delete wrap.dataset.cargado; return; }
     const alTocar = (res) => () => {
       S.pendingStart = { url: res.url, name: res.title, img: res.img || '' };
+      /* v60: carátula a pantalla completa desde YA — la sala carga por detrás */
+      S.mirrorInfo = { title: res.title || '', img: res.img || '', url: res.url, sub: 'Cargando tu sala…' };
+      mostrarPeliLoading();
       const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
       connect(code);
     };

@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v59'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v60'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -697,6 +697,25 @@ async function handleAction(req, res, body) {
       else if (op === 'back') await m.page.goBack({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
       else if (op === 'fwd') await m.page.goForward({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
       else if (op === 'scroll') await m.page.mouse.wheel({ deltaY: +action.deltaY || 0 });
+      else if (op === 'seek') {
+        /* v60: adelantar / atrasar — se mueve el video más grande de la página */
+        const delta = Math.max(-300, Math.min(300, +action.delta || 0));
+        let movio = false;
+        for (const fr of m.page.frames()) {
+          try {
+            const r = await fr.evaluate((d) => {
+              const vs = [...document.querySelectorAll('video')].filter((v) => v.readyState >= 1 && v.duration > 1);
+              if (!vs.length) return false;
+              vs.sort((a, b) => (b.videoWidth * b.videoHeight) - (a.videoWidth * a.videoHeight));
+              const v = vs[0];
+              try { v.currentTime = Math.max(0, Math.min(v.duration - 0.5, v.currentTime + d)); } catch {}
+              return true;
+            }, delta).catch(() => false);
+            if (r) movio = true;
+          } catch {}
+        }
+        return json(res, 200, { ok: true, movio });
+      }
       else return json(res, 400, { ok: false, error: 'Operación de espejo desconocida' });
 
       return json(res, 200, { ok: true });
