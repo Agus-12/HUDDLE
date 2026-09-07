@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v51';
+const APP_VERSION = 'v52';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -937,7 +937,8 @@ function addChat(msg) {
     b.style.setProperty('--h', hashHue(msg.name || ''));
     b.textContent = msg.name || '?';
     const sp = document.createElement('span');
-    sp.textContent = ' ' + msg.text;
+    sp.appendChild(document.createTextNode(' '));
+    sp.appendChild(adornarEmojis(msg.text)); /* v52: emojis animados dentro del mensaje */
     div.appendChild(b); div.appendChild(sp);
   }
   log.appendChild(div);
@@ -949,8 +950,8 @@ function addChat(msg) {
   const emo = msg.system ? '' : emojisDelMensaje(msg.text);
   if (emo) {
     div.classList.add('solo-emojis');
-    div.textContent = emo;
-    emojiVolando(emo);
+    div.textContent = '';
+    div.appendChild(adornarEmojis(emo));
   }
   /* v50: si están escribiendo con el teclado abierto, la mini-vista de
      arriba de la caja también se actualiza */
@@ -975,16 +976,43 @@ function emojisDelMensaje(texto) {
   return '';
 }
 
-/* v51: el emoji vuela sobre la película cuando alguien lo manda */
-function emojiVolando(emoji) {
-  const shell = document.querySelector('#videoShell');
-  if (!shell) return;
-  const el = document.createElement('div');
-  el.className = 'emoji-vuelo';
-  el.textContent = emoji;
-  el.style.left = (15 + Math.random() * 60) + '%';
-  shell.appendChild(el);
-  setTimeout(() => el.remove(), 2600);
+/* v52: cada emoji del mensaje va envuelto en un span con SU animación
+ * (llorar llora, corazón late, fuego parpadea…) como los chats modernos */
+function claseDeEmoji(c) {
+  if (c.includes('😂') || c.includes('🤣')) return 'e-risa';
+  if (c.includes('😭') || c.includes('😢')) return 'e-llanto';
+  if (/[❤💗💖💕💘💝]/u.test(c)) return 'e-corazon';
+  if (c.includes('🔥')) return 'e-fuego';
+  if (c.includes('😍') || c.includes('🥰')) return 'e-enamorado';
+  if (c.includes('😡') || c.includes('😠')) return 'e-enojo';
+  if (c.includes('👍') || c.includes('👎')) return 'e-pulgar';
+  if (c.includes('😱') || c.includes('😲')) return 'e-sorpresa';
+  if (/[😀😃😄🙂😊😎🤗]/u.test(c)) return 'e-risa';
+  return 'e-generico';
+}
+
+function adornarEmojis(texto) {
+  const frag = document.createDocumentFragment();
+  const t = String(texto || '');
+  let clusters = [...t];
+  try {
+    if (typeof Intl !== 'undefined' && Intl.Segmenter) {
+      clusters = [...new Intl.Segmenter('es', { granularity: 'grapheme' }).segment(t)].map((s) => s.segment);
+    }
+  } catch {}
+  clusters.forEach((c) => {
+    let esEmoji = false;
+    try { esEmoji = /\p{Extended_Pictographic}/u.test(c); } catch {}
+    if (esEmoji) {
+      const sp = document.createElement('span');
+      sp.className = 'emoji-anim ' + claseDeEmoji(c);
+      sp.textContent = c;
+      frag.appendChild(sp);
+    } else {
+      frag.appendChild(document.createTextNode(c));
+    }
+  });
+  return frag;
 }
 
 /* v50: mini-vista de los últimos mensajes, visible al escribir en el chat */
@@ -993,7 +1021,15 @@ function actualizarChatMini() {
   const log = $('#chatLog');
   if (!mini || !log) return;
   mini.innerHTML = '';
-  [...log.children].slice(-2).forEach((m) => mini.appendChild(m.cloneNode(true)));
+  const ultimos = [...log.children].slice(-2);
+  if (!ultimos.length) {
+    const v = document.createElement('div');
+    v.className = 'cm-vacio';
+    v.textContent = 'Aún no hay mensajes';
+    mini.appendChild(v);
+    return;
+  }
+  ultimos.forEach((m) => mini.appendChild(m.cloneNode(true)));
   mini.scrollTop = mini.scrollHeight;
 }
 
@@ -1321,6 +1357,12 @@ if (window.visualViewport) {
   document.addEventListener('focusin', acomodarTeclado);
   document.addEventListener('focusout', () => setTimeout(acomodarTeclado, 80));
   acomodarTeclado();
+  /* v52: auto-reparación — iOS a veces se traga los avisos; re-chequeamos
+   * seguido mientras estás en la sala para que la burbuja NUNCA falle */
+  setInterval(() => {
+    const room = document.querySelector('#room');
+    if (room && !room.classList.contains('hidden')) acomodarTeclado();
+  }, 400);
 }
 /* v51: la mini-vista debe aparecer SIEMPRE que se toca la caja del chat —
  * listeners directos además de los de arriba, para que no falle nunca */

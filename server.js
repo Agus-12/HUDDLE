@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v51'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v52'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -929,9 +929,8 @@ async function buscarGopelis(q) {
   })).filter((x) => x.title && x.url);
 }
 
-async function buscarAnime(q) {
-  /* AnimeFLV — anime sub español y latino; resultados en HTML estático */
-  const r = await fetchSeguro(`https://vww.animeflv.one/animes?buscar=${encodeURIComponent(q)}`, 9000);
+async function buscarAnimeDirecto(q, base) {
+  const r = await fetchSeguro(`${base}/animes?buscar=${encodeURIComponent(q)}`, 9000);
   if (!r.ok) return [];
   const html = (await r.text()).slice(0, 700000);
   const re = /<article[^>]*class="li"[^>]*>([\s\S]*?)<\/article>/g;
@@ -945,12 +944,43 @@ async function buscarAnime(q) {
     const alt = (/alt="([^"]{2,90})"/.exec(bloque) || [])[1];
     if (!href || !alt) continue;
     let url;
-    try { url = new URL(href, 'https://vww.animeflv.one/').href; } catch { continue; }
+    try { url = new URL(href, base + '/').href; } catch { continue; }
     if (vistos.has(url)) continue;
     vistos.add(url);
     out.push({ title: alt.replace(/\s+/g, ' ').trim(), url, img: img || '', site: 'AnimeFLV', extra: '' });
   }
   return out;
+}
+
+/* respaldo: si el server está bloqueado por la página, un lector externo
+ * (r.jina.ai) la abre por nosotros y nos da los resultados en texto */
+async function buscarAnimeJina(q) {
+  try {
+    const r = await fetchSeguro(`https://r.jina.ai/https://vww.animeflv.one/animes?buscar=${encodeURIComponent(q)}`, 20000);
+    if (!r.ok) return [];
+    const md = (await r.text()).slice(0, 500000);
+    const re = /\[!\[Image \d+: ([^\]]{2,90})\]\((https?:[^)]+\/cdn\/img\/anime\/[^)]+)\)[^\]]*\]\((https?:\/\/[^)\s]+\/anime\/[a-z0-9-]+)/g;
+    const out = [];
+    const vistos = new Set();
+    let m;
+    while ((m = re.exec(md)) && out.length < 12) {
+      if (vistos.has(m[3])) continue;
+      vistos.add(m[3]);
+      out.push({ title: m[1].replace(/\s+/g, ' ').trim(), url: m[3], img: m[2], site: 'AnimeFLV', extra: '' });
+    }
+    return out;
+  } catch { return []; }
+}
+
+async function buscarAnime(q) {
+  /* AnimeFLV — anime sub español y latino; directo y con respaldo */
+  let out = await buscarAnimeDirecto(q, 'https://vww.animeflv.one').catch(() => []);
+  if (out.length) return out;
+  for (const host of ['https://www3.animeflv.one', 'https://animeflv.one']) {
+    out = await buscarAnimeDirecto(q, host).catch(() => []);
+    if (out.length) return out;
+  }
+  return buscarAnimeJina(q);
 }
 
 async function buscarEnSitios(q) {
