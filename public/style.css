@@ -1296,3 +1296,31 @@ body { overscroll-behavior-y: contain; }
   50% { transform: translateY(-9px); }
 }
 .peli-spin { will-change: transform; }
+
+
+/* ======================= v65: vista normal — play abajo, controles arriba ======================= */
+/* Sin pantalla completa: el botón grande de play ya no estorba al centro,
+ * se pega al margen de abajo; la barrita (10/30/lupa) queda arribita.
+ * En pantalla completa (real o simulada) todo se queda como estaba (v62). */
+.video-shell:not(:fullscreen):not(:-webkit-full-screen):not(.pseudo-fs) .play-btn {
+  justify-content: flex-end;
+  padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+}
+.video-shell:not(:fullscreen):not(:-webkit-full-screen):not(.pseudo-fs) .ctrl-layer {
+  top: 0; bottom: auto;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 10px 6px;
+  background: linear-gradient(rgba(5,7,15,.82), rgba(5,7,15,0));
+}
+/* la lupa quedó arriba → su barra de búsqueda y resultados también */
+.video-shell:not(:fullscreen):not(:-webkit-full-screen):not(.pseudo-fs) #msBar {
+  top: calc(10px + env(safe-area-inset-top, 0px)); bottom: auto;
+}
+.video-shell:not(:fullscreen):not(:-webkit-full-screen):not(.pseudo-fs) .ms-results {
+  top: calc(64px + env(safe-area-inset-top, 0px)); bottom: auto;
+}
+
+/* v65: en pantalla completa, cuando la barrita está visible la tira de
+ * mensajes del chat se sube encima de ella (antes se tapaban) */
+body.ctrls-vis .msg-ticker {
+  bottom: calc(122px + env(safe-area-inset-bottom, 0px));
+}

@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v64'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v65'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1040,9 +1040,12 @@ function serveStatic(req, res, urlPath) {
 const SITES_FILE = path.join(__dirname, 'data', 'sites.json');
 const LOGO_DIR = path.join(__dirname, 'public', 'sites-logos');
 const SITES_SEED = [
-  { name: 'Cuevana', desc: 'Películas y series', url: 'https://cuevana.mov/inicio', logo: '/sites/cuevana.png' },
+  /* v65: Latanime primero (predeterminado) */
+  { name: 'Latanime', desc: 'Animes con audio latino', url: 'https://latanime.org/', logo: '/sites/latanime.png' },
+  { name: 'Cuevana', desc: 'Películas y series', url: 'https://cuevana.mov/', logo: '/sites/cuevana.png' },
   { name: 'GoPelis', desc: 'Películas', url: 'https://gopelis.com/', logo: '/sites/gopelis.png' },
   { name: 'AnimeD23', desc: 'Animes', url: 'https://animed23.com/', logo: '/sites/animed23.png' },
+  { name: 'AnimeFLV', desc: 'Animes sub y latino', url: 'https://vww.animeflv.one/', logo: '/sites/animeflv.png' },
   { name: 'YouTube', desc: 'Videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
 ];
 function loadSitesFile() {
@@ -1056,11 +1059,27 @@ function loadSitesFile() {
       }
       /* v51: AnimeFLV — página de anime con búsqueda externa (sub + latino) */
       if (!l.some((s) => /animeflv\./i.test(s.url || ''))) {
-        const nuevo = { name: 'AnimeFLV', desc: 'Animes sub y latino', url: 'https://vww.animeflv.one/', logo: 'https://www.google.com/s2/favicons?domain=animeflv.one&sz=128' };
+        const nuevo = { name: 'AnimeFLV', desc: 'Animes sub y latino', url: 'https://vww.animeflv.one/', logo: '/sites/animeflv.png' };
         const i = l.findIndex((s) => /animed23/i.test(s.name || ''));
         if (i >= 0) l.splice(i + 1, 0, nuevo); else l.push(nuevo);
         cambio = true;
         console.log('[sitios] + AnimeFLV (búsqueda integrada)');
+      }
+      /* v65: logos propios para Latanime y AnimeFLV (los favicons de Google
+       * a veces no cargan → salía el recuadro azul con ?) y Latanime
+       * predeterminado: primero en la lista */
+      const esLat = (s) => /latanime\./i.test(s.url || '');
+      for (const s of l) {
+        if (esLat(s) && s.logo !== '/sites/latanime.png') { s.logo = '/sites/latanime.png'; cambio = true; }
+        if (/animeflv\./i.test(s.url || '') && s.logo !== '/sites/animeflv.png') { s.logo = '/sites/animeflv.png'; cambio = true; }
+      }
+      if (!l.some(esLat)) {
+        l.unshift({ name: 'Latanime', desc: 'Animes con audio latino', url: 'https://latanime.org/', logo: '/sites/latanime.png' });
+        cambio = true;
+        console.log('[sitios] + Latanime (predeterminado)');
+      } else {
+        const iLat = l.findIndex(esLat);
+        if (iLat > 0) { const [lat] = l.splice(iLat, 1); l.unshift(lat); cambio = true; }
       }
       if (cambio) saveSitesFile(l);
     }

@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v64';
+const APP_VERSION = 'v65';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -966,12 +966,14 @@ function elegirTitulo(res, enSala) {
 let ctrlTimer = null;
 function mostrarCtrls5s() {
   $('#ctrlLayer').classList.add('visible');
+  document.body.classList.add('ctrls-vis'); /* v65: sube la tira de mensajes para no taparla */
   if (ctrlTimer) clearTimeout(ctrlTimer);
-  ctrlTimer = setTimeout(() => { $('#ctrlLayer').classList.remove('visible'); ctrlTimer = null; }, 5000);
+  ctrlTimer = setTimeout(() => { $('#ctrlLayer').classList.remove('visible'); document.body.classList.remove('ctrls-vis'); ctrlTimer = null; }, 5000);
 }
 function ocultarCtrls() {
   if (ctrlTimer) { clearTimeout(ctrlTimer); ctrlTimer = null; }
   $('#ctrlLayer').classList.remove('visible');
+  document.body.classList.remove('ctrls-vis');
 }
 function tocarPantallaCine() {
   if ($('#ctrlLayer').classList.contains('visible')) {
@@ -1034,11 +1036,13 @@ $('#mirrorUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') star
 /* v43: el directorio de páginas ya no está clavado — parte de estos 4 y se
  * actualiza con lo que guarda el servidor (data/sites.json) */
 let SITES = [
+  /* v65: Latanime primero (predeterminado) + logos propios en /sites/
+   * (los favicons de Google a veces no cargan → recuadro con ?) */
+  { name: 'Latanime', full: 'Latanime — animes con audio latino', url: 'https://latanime.org/', logo: '/sites/latanime.png' },
   { name: 'Cuevana', full: 'Cuevana — películas y series', url: 'https://cuevana.mov/', logo: '/sites/cuevana.png' },
   { name: 'GoPelis', full: 'GoPelis — películas', url: 'https://gopelis.com/', logo: '/sites/gopelis.png' },
   { name: 'AnimeD23', full: 'AnimeD23 — animes', url: 'https://animed23.com/', logo: '/sites/animed23.png' },
-  { name: 'AnimeFLV', full: 'AnimeFLV — animes sub y latino', url: 'https://vww.animeflv.one/', logo: 'https://www.google.com/s2/favicons?domain=animeflv.one&sz=128' },
-  { name: 'Latanime', full: 'Latanime — animes con audio latino', url: 'https://latanime.org/', logo: 'https://www.google.com/s2/favicons?domain=latanime.org&sz=128' },
+  { name: 'AnimeFLV', full: 'AnimeFLV — animes sub y latino', url: 'https://vww.animeflv.one/', logo: '/sites/animeflv.png' },
   { name: 'YouTube', full: 'YouTube — videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
 ];
 function renderPageDrop() {
