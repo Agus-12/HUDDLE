@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v48';
+const APP_VERSION = 'v49';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1236,22 +1236,44 @@ if (hashMatch) $('#joinCode').value = hashMatch[1].toUpperCase();
   document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
 });
 
-/* v48: estilo WhatsApp — el teclado SOLO sube la caja del chat.
-   Medimos la altura del teclado con visualViewport y la ponemos en --kb;
-   la sala ya no crece ni se desplaza: la película nunca se mueve. */
+/* v49: teclado estilo WhatsApp, versión robusta.
+   En el iPhone real, Safari no solo achica la vista: a veces DESPLAZA la
+   página para mostrar el campo (y eso mueve la película). Solución:
+   1) si la página se desplazó, la devolvemos a 0 — nada se mueve;
+   2) la caja del chat NO usa una regla fija: se pega al teclado calculando
+      su posición con las coordenadas reales de la vista visible
+      (visualViewport) — así queda justo arriba del teclado SIEMPRE,
+      aunque Safari intente mover cosas. */
 if (window.visualViewport) {
   const vv = window.visualViewport;
-  const ajustarTeclado = () => {
-    const foco = document.activeElement;
-    const escribiendo = !!(foco && /INPUT|TEXTAREA/.test(foco.tagName || ''));
-    const kb = escribiendo ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0;
-    document.body.style.setProperty('--kb', kb + 'px');
-    /* si el navegador intentó desplazar la página, la devolvemos: nada se mueve */
-    if (kb > 0 && window.scrollY) window.scrollTo(0, 0);
+  let raf = 0;
+  const acomodarTeclado = () => {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => {
+      /* si Safari movió la página para mostrar el campo, la regresamos */
+      if (window.scrollY) window.scrollTo(0, 0);
+      const f = document.querySelector('#chatForm');
+      if (!f) return;
+      const foco = document.activeElement;
+      const enCaja = !!(foco && foco.id === 'chatInput');
+      const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      document.body.style.setProperty('--kb', kb > 40 ? kb + 'px' : '0px');
+      if (enCaja && kb > 40) {
+        /* caja pegada arriba del teclado: posición calculada, no regla fija */
+        const top = Math.round(vv.offsetTop + vv.height - f.offsetHeight - 8);
+        f.style.top = top + 'px';
+        f.style.bottom = 'auto';
+      } else {
+        f.style.top = '';
+        f.style.bottom = '';
+      }
+    });
   };
-  vv.addEventListener('resize', ajustarTeclado);
-  vv.addEventListener('scroll', ajustarTeclado);
-  ajustarTeclado();
+  vv.addEventListener('resize', acomodarTeclado);
+  vv.addEventListener('scroll', acomodarTeclado);
+  document.addEventListener('focusin', acomodarTeclado);
+  document.addEventListener('focusout', () => setTimeout(acomodarTeclado, 80));
+  acomodarTeclado();
 }
 
 /* ======================= v42: pantalla activa + aviso de entrada ======================= */

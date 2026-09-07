@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v48'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v49'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -899,7 +899,7 @@ async function buscarCuevana(q) {
   const r = await fetchSeguro(`https://cine-calidad.mx/wp-json/mycustom/v1/search/?s=${encodeURIComponent(q)}&page=1`, 9000);
   if (!r.ok) return [];
   const d = await r.json().catch(() => ({}));
-  return (d.posts || []).slice(0, 6).map((p) => ({
+  return (d.posts || []).slice(0, 12).map((p) => ({
     title: String(p.title || ''),
     url: (p.type === 'movies') ? `https://cuevana.mov/pelicula/${p.tmdb}/${p.slug}` : `https://cuevana.mov/serie/${p.slug}`,
     img: String(p.featured_image || '').replace('/w780/', '/w185/'),
@@ -912,7 +912,7 @@ async function buscarGopelis(q) {
   const r = await fetchSeguro(`https://gopelis.com/api/search?q=${encodeURIComponent(q)}`, 9000);
   if (!r.ok) return [];
   const d = await r.json().catch(() => ({}));
-  return (d.results || []).slice(0, 6).map((p) => ({
+  return (d.results || []).slice(0, 12).map((p) => ({
     title: String(p.title || ''),
     url: p.mediaType === 'tv' ? `https://gopelis.com/series/${p.slug}` : `https://gopelis.com/peliculas/${p.slug}`,
     img: p.posterPath ? `https://image.tmdb.org/t/p/w185${p.posterPath}` : '',
@@ -925,7 +925,7 @@ async function buscarEnSitios(q) {
   const grupos = await Promise.all([buscarCuevana(q).catch(() => []), buscarGopelis(q).catch(() => [])]);
   const resultados = grupos.flat();
   console.log(`[buscar] "${q}" en Cuevana+GoPelis → ${resultados.length} resultados`);
-  return resultados.slice(0, 10);
+  return resultados.slice(0, 16);
 }
 
 function readBody(req) {
