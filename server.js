@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v61'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v62'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -264,6 +264,18 @@ async function startMirror(room, rawUrl, userId) {
   /* v14: sin ventanas emergentes de anuncios dentro del espejo */
   await page.evaluateOnNewDocument(() => {
     try { window.open = function () { return null; }; } catch {}
+    /* v62: fuera el cartel de "ayuda" que tapa las películas de Cuevana */
+    try {
+      const ponerCss = () => {
+        try {
+          const st = document.createElement('style');
+          st.textContent = '.mdl-help,.button-close-help{display:none!important}';
+          (document.head || document.documentElement).appendChild(st);
+        } catch {}
+      };
+      ponerCss();
+      document.addEventListener('DOMContentLoaded', ponerCss);
+    } catch {}
     /* parecer un navegador normal: algunos reproductores bloquean automatizacion */
     try { Object.defineProperty(navigator, 'webdriver', { get: () => false }); } catch {}
     try { Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] }); } catch {}
@@ -328,7 +340,7 @@ async function startMirror(room, rawUrl, userId) {
      PELÍCULA lo tocamos por ti: la película empieza directa.
      (Series quedan manuales a propósito, mecanismo propio después.) */
   /* v61: páginas de "cine" = películas Y episodios de serie (cine-calidad) */
-  const esPagCine = () => /\/(wp-)?pelicula\/[a-z0-9-]+|\/episode\//i.test(m.url || '');
+  const esPagCine = () => /\/(wp-)?pelicula\/[a-z0-9-]+|\/episode\/|\/ver\//i.test(m.url || '');
   let avisoPlay = false;
   /* v59: pantalla completa — cuando la película arranca, el video llena
    * todo el espejo (sin el decorado de la página alrededor) */
@@ -381,6 +393,21 @@ async function startMirror(room, rawUrl, userId) {
      * (se hace a partir del 2do intento, por si la página aún carga) */
     if (esPagCine() && n >= 1) {
       try {
+        /* v62: en AnimeFLV, uqload no descarga solo — si hay otra opción
+         * (mp4upload o la que sea) la elegimos nosotros; es idempotente:
+         * solo cambia si el seleccionado sigue siendo uqload */
+        if (/\/ver\//.test(m.url || '') && !videoListo) {
+          await m.page.evaluate(() => {
+            try {
+              const lis = [...document.querySelectorAll('.opt li')];
+              const act = lis.find((x) => x.classList.contains('se'));
+              if (!act || !/uqload/i.test(act.textContent || '')) return;
+              const mejor = lis.find((x) => /mp4upload/i.test(x.textContent || ''))
+                || lis.find((x) => x !== act && !/uqload/i.test(x.textContent || ''));
+              if (mejor) mejor.click();
+            } catch {}
+          }).catch(() => {});
+        }
         if (!hayVideo) {
           /* v58/v61: sin video → tocar el reproductor (película) o el
            * servidor recomendado (episodio) para que cargue */
@@ -1189,6 +1216,7 @@ async function metaDePelicula(url) {
     || /\/(?:wp-)?pelicula\/([a-z0-9-]+)/i.exec(u.pathname)
     || /\/anime\/([a-z0-9-]+)/i.exec(u.pathname)
     || /\/ver\/([a-z0-9-]+)-episodio-\d+/i.exec(u.pathname)
+    || /\/ver\/([a-z0-9-]+)-(\d+)\/?$/i.exec(u.pathname)
     || /\/episode\/([a-z0-9-]+?)-\d+x\d+/i.exec(u.pathname);
   let d = null;
   if (slugM) {
@@ -1201,6 +1229,31 @@ async function metaDePelicula(url) {
           const dd = await r.json().catch(() => ({}));
           const p = (dd.posts || []).find((x) => x.slug === slug) || (dd.posts || [])[0];
           if (p) d = { title: p.title, poster: String(p.featured_image || '').replace('/w780/', '/w342/') };
+        }
+      } catch {}
+    } else if (/animeflv\./.test(dom)) {
+      /* v62: la página del anime trae og:title y og:image listos */
+      try {
+        const r = await fetchSeguro(`https://vww.animeflv.one/anime/${slug}`, 8000);
+        if (r.ok) {
+          const html = await r.text();
+          const og = (p) => {
+            const a1 = new RegExp(`<meta[^>]+property=["']${p}["'][^>]+content=["']([^"']+)`, 'i').exec(html);
+            const a2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${p}["']`, 'i').exec(html);
+            return (a1 || a2 || [])[1] || '';
+          };
+          const t = (og('og:title') || '')
+            .replace(/^ver\s+/i, '')
+            .replace(/\s*(online|sub español|español latino|latino)\b.*$/i, '')
+            .replace(/\s*[|─✔★].*$/, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+          const pst = og('og:image') || '';
+          /* v62: AnimeFLV bloquea imágenes directas → proxy wsrv */
+          const poster = /animeflv\./i.test(pst)
+            ? 'https://wsrv.nl/?url=' + pst.replace(/^https?:\/\//, '').split('?')[0] + '&w=400'
+            : pst;
+          if (t) d = { title: slugM[2] ? `${t} — Episodio ${slugM[2]}` : t, poster };
         }
       } catch {}
     } else if (/gopelis\./.test(dom)) {
@@ -1357,6 +1410,58 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, out);
       } catch {
         return json(res, 500, { ok: false, error: 'Error leyendo la serie' });
+      }
+    }
+    if (url.pathname.startsWith('/api/anime/')) {
+      /* v62: episodios de un anime de AnimeFLV (var eps viene en la propia página) */
+      const slug = decodeURIComponent(url.pathname.split('/')[3] || '').toLowerCase();
+      if (!/^[a-z0-9-]{2,90}$/.test(slug)) return json(res, 400, { ok: false, error: 'Anime inválido' });
+      const c = serieCache.get('anime:' + slug);
+      if (c && Date.now() - c.at < 30 * 60 * 1000) return json(res, 200, c.d);
+      try {
+        const r = await fetchSeguro(`https://vww.animeflv.one/anime/${slug}`, 10000);
+        if (!r.ok) return json(res, 502, { ok: false, error: 'No pude leer el anime' });
+        const html = await r.text();
+        /* lista completa viene como: var eps = [["220","0",""],["219","0",""],...] */
+        const nums = new Set();
+        const bloque = /var\s+eps\s*=\s*(\[[\s\S]*?\]);/.exec(html);
+        if (bloque) {
+          try {
+            for (const it of JSON.parse(bloque[1])) if (it && it[0]) nums.add(+it[0]);
+          } catch {}
+        }
+        if (!nums.size) {
+          const re = /\["(\d+)","\d+","[^"]*"\]/g;
+          let mm;
+          while ((mm = re.exec(html)) && nums.size < 500) nums.add(+mm[1]);
+        }
+        const eps = [...nums].sort((a, b) => a - b).map((n) => ({
+          n,
+          url: `https://vww.animeflv.one/ver/${slug}-${n}`,
+          titulo: 'Episodio ' + n,
+        }));
+        const og = (p) => {
+          const a1 = new RegExp(`<meta[^>]+property=["']${p}["'][^>]+content=["']([^"']+)`, 'i').exec(html);
+          const a2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${p}["']`, 'i').exec(html);
+          return (a1 || a2 || [])[1] || '';
+        };
+        const out = {
+          ok: true,
+          slug,
+          titulo: (og('og:title') || slug)
+            .replace(/^ver\s+/i, '')
+            .replace(/\s*(online|sub español|español latino|latino)\b.*$/i, '')
+            .replace(/\s*[|─✔★].*$/, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim().slice(0, 80) || slug,
+          poster: og('og:image') || '',
+          episodios: eps,
+        };
+        if (!eps.length) return json(res, 404, { ok: false, error: 'Sin episodios' });
+        serieCache.set('anime:' + slug, { at: Date.now(), d: out });
+        return json(res, 200, out);
+      } catch {
+        return json(res, 500, { ok: false, error: 'Error leyendo el anime' });
       }
     }
     if (url.pathname.startsWith('/api/invite/')) {

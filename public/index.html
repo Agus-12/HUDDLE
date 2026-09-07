@@ -163,7 +163,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v61</span>
+        <span class="ver" id="verBadge">v62</span>
       </div>
       <!-- v36: gente, invitar y salir viven JUNTO al logo -->
       <div class="top-quick">
@@ -229,35 +229,31 @@
               </div>
               <div class="play-txt">Toca para empezar</div>
             </div>
-            <!-- v61: barrita de la película — tiempo, duración y arrastrar para moverte -->
-            <div id="seekWrap" class="seek-wrap hidden">
-              <span id="seekCur" class="seek-t">0:00</span>
-              <div id="seekBar" class="seek-bar">
-                <div id="seekFill" class="seek-fill"></div>
-                <div id="seekDot" class="seek-dot"></div>
+            <!-- v62: capa de controles ABAJO — se esconde, un toque la saca 5s -->
+            <div id="ctrlLayer" class="ctrl-layer">
+              <!-- v61: barrita de la película — tiempo, duración y arrastrar -->
+              <div id="seekWrap" class="seek-wrap hidden">
+                <span id="seekCur" class="seek-t">0:00</span>
+                <div id="seekBar" class="seek-bar">
+                  <div id="seekFill" class="seek-fill"></div>
+                  <div id="seekDot" class="seek-dot"></div>
+                </div>
+                <span id="seekDur" class="seek-t">0:00</span>
               </div>
-              <span id="seekDur" class="seek-t">0:00</span>
-            </div>
-            <!-- v33: navegar como en un navegador normal — atrás / adelante -->
-            <div class="mirror-nav" id="mirrorNav">
-              <!-- v60: atrasar / adelantar la película -->
-              <button id="btnSeekBack" class="btn small nav-btn seek-btn" title="Atrasar 10 segundos">
-                <svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor"><path d="M11 12 19 6v12zM2 12l8-6v12z"/></svg>
-                <span>10</span>
-              </button>
-              <button id="btnSeekFwd" class="btn small nav-btn seek-btn" title="Adelantar 30 segundos">
-                <span>30</span>
-                <svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor"><path d="M13 12 5 18V6zM22 12l-8 6V6z"/></svg>
-              </button>
-              <button id="btnMBack" class="btn small nav-btn" title="Volver a la página anterior">
-                <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-              </button>
-              <button id="btnMFwd" class="btn small nav-btn" title="Avanzar">
-                <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-              </button>
-              <button id="btnMSearch" class="btn small nav-btn" title="Buscar otra cosa sin salir de la sala">
-                <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-              </button>
+              <div class="mirror-nav" id="mirrorNav">
+                <!-- v60: atrasar / adelantar la película -->
+                <button id="btnSeekBack" class="btn small nav-btn seek-btn" title="Atrasar 10 segundos">
+                  <svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor"><path d="M11 12 19 6v12zM2 12l8-6v12z"/></svg>
+                  <span>10</span>
+                </button>
+                <button id="btnSeekFwd" class="btn small nav-btn seek-btn" title="Adelantar 30 segundos">
+                  <span>30</span>
+                  <svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor"><path d="M13 12 5 18V6zM22 12l-8 6V6z"/></svg>
+                </button>
+                <button id="btnMSearch" class="btn small nav-btn" title="Buscar otra cosa sin salir de la sala">
+                  <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                </button>
+              </div>
             </div>
             <!-- v45: buscar dentro de la sala — resultados sobre la barra -->
             <div id="msResults" class="ms-results hidden"></div>

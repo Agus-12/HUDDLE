@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v61';
+const APP_VERSION = 'v62';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -45,7 +45,7 @@ const S = {
   dragging: false,
   lastTarget: 0,
   offset: 0,      // reloj del servidor - reloj local
-  mirror: { active: false, url: '', w: 0, h: 0, gotFrame: false },
+  mirror: { active: false, url: '', w: 0, h: 0, gotFrame: false, ready: false, playing: false },
   lastActionAt: 0,
   useGet: false,     // se activa si el entorno bloquea POST
   helloSent: false,
@@ -319,6 +319,11 @@ function applyMirrorState(ms) {
   if (!ms) return;
   S.mirror.active = !!ms.active;
   S.mirror.url = ms.url || '';
+  S.mirror.ready = !!(ms.active && ms.ready);
+  S.mirror.playing = !!ms.playing;
+  /* v62: en modo cine los controles viven escondidos abajo */
+  document.body.classList.toggle('cine-listo', S.mirror.ready);
+  if (ms.playing || !ms.active) ocultarCtrls();
   /* v59/v61: la peli sonando → fuera la espera y el botón de play.
    * lista en pausa → mostrar el botón de play grande. */
   if (ms.playing) { ocultarPeliLoading(); ocultarPlayBtn(); }
@@ -680,6 +685,9 @@ window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload();
     if (!S.mirror.active) return;
     if (t > 600) return; // presión larga sin mover: ignorar
     if (!S.canControl) { toast('Solo el anfitrión controla el espejo'); return; }
+    /* v62: con la película lista el toque ya no viaja a la página:
+     * 1er toque saca los controles 5 segundos; si ya se veían, pausa o sigue */
+    if (S.mirror.ready) { tocarPantallaCine(); return; }
     const p = toPage(e.clientX, e.clientY);
     if (!p) return;
     /* v29: el servidor contesta si el toque dejó el foco en un cuadro de
@@ -823,17 +831,6 @@ function moverPelicula(delta) {
 $('#btnSeekBack').addEventListener('click', () => moverPelicula(-10));
 $('#btnSeekFwd').addEventListener('click', () => moverPelicula(30));
 
-$('#btnMBack').addEventListener('click', () => {
-  if (!S.mirror.active) return;
-  if (!S.canControl) { toast('Solo el anfitrión controla el espejo'); return; }
-  sendAction({ type: 'mirror', op: 'back' });
-});
-$('#btnMFwd').addEventListener('click', () => {
-  if (!S.mirror.active) return;
-  if (!S.canControl) { toast('Solo el anfitrión controla el espejo'); return; }
-  sendAction({ type: 'mirror', op: 'fwd' });
-});
-
 /* iniciar espejo desde el selector (o cambiar de página sin detener) */
 /* v59: pantalla de espera con carátula mientras el servidor prepara todo */
 function mostrarPeliLoading() {
@@ -865,42 +862,56 @@ function ocultarPeliLoading() {
 $('#peliLoading').addEventListener('click', () => ocultarPeliLoading());
 /* v61: selector de temporadas y episodios para series */
 let spDatos = null; /* lo que devolvió /api/serie */
-function abrirSeriePicker(res, enSala) {
-  const slugM = /\/serie\/([a-z0-9-]+)/i.exec(res.url || '');
+/* v62: imágenes de AnimeFLV pasan por el proxy para poder verse */
+function proxyAnimeImg(src, w) {
+  if (src && /animeflv\./i.test(src)) {
+    return 'https://wsrv.nl/?url=' + src.replace(/^https?:\/\//, '').split('?')[0] + '&w=' + (w || 400);
+  }
+  return src || '';
+}
+function abrirSeriePicker(res, enSala, esAnime) {
+  const slugM = /(?:serie|anime)\/([a-z0-9-]+)/i.exec(res.url || '');
   if (!slugM) { toast('No pude leer esa serie'); return; }
   const slug = slugM[1];
   const pk = $('#seriePicker');
   pk.classList.remove('hidden');
   $('#spTitle').textContent = res.title || '';
-  $('#spMeta').textContent = 'Cargando temporadas…';
+  $('#spMeta').textContent = esAnime ? 'Cargando episodios…' : 'Cargando temporadas…';
   const po = $('#spPoster');
-  if (res.img) { po.src = res.img; po.style.display = ''; } else po.style.display = 'none';
+  const poster0 = proxyAnimeImg(res.img, 400);
+  if (poster0) { po.src = poster0; po.style.display = ''; } else po.style.display = 'none';
   $('#spTemporadas').innerHTML = '';
   $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">Buscando episodios…</div>';
-  fetch('/api/serie/' + slug).then((r) => r.json()).then((d) => {
-    if (!d.ok || !d.episodios || !d.episodios.length) {
-      $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">No encontré episodios de esta serie</div>';
+  fetch((esAnime ? '/api/anime/' : '/api/serie/') + slug).then((r) => r.json()).then((d) => {
+    /* v62: animes → una sola lista de episodios, sin miniaturas */
+    const eps = esAnime
+      ? (d.episodios || []).map((e) => ({ temporada: 1, ep: e.n, url: e.url, titulo: e.titulo || ('Episodio ' + e.n), img: '' }))
+      : (d.episodios || []);
+    if (!d.ok || !eps.length) {
+      $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">No encontré episodios de esta ' + (esAnime ? 'serie' : 'serie') + '</div>';
       $('#spMeta').textContent = '';
       return;
     }
-    spDatos = { ...d, enSala: !!enSala, posterBase: d.poster || res.img || '' };
+    spDatos = { ...d, esAnime: !!esAnime, episodios: eps, enSala: !!enSala, posterBase: proxyAnimeImg(d.poster || res.img, 400) };
     $('#spTitle').textContent = d.titulo || res.title || '';
-    $('#spMeta').textContent = d.episodios.length + ' episodios';
-    if (d.poster) { po.src = d.poster; po.style.display = ''; }
-    const temps = [...new Set(d.episodios.map((x) => x.temporada))].sort((a, b) => a - b);
+    $('#spMeta').textContent = eps.length + ' episodios';
+    if (spDatos.posterBase) { po.src = spDatos.posterBase; po.style.display = ''; }
+    const temps = [...new Set(eps.map((x) => x.temporada))].sort((a, b) => a - b);
     const tBox = $('#spTemporadas');
     tBox.innerHTML = '';
-    temps.forEach((T, i) => {
-      const b = document.createElement('button');
-      b.className = 'sp-temp-btn' + (i === 0 ? ' activa' : '');
-      b.textContent = 'Temporada ' + T;
-      b.addEventListener('click', () => {
-        tBox.querySelectorAll('.sp-temp-btn').forEach((x) => x.classList.remove('activa'));
-        b.classList.add('activa');
-        pintarEpisodios(T);
+    if (temps.length > 1) {
+      temps.forEach((T, i) => {
+        const b = document.createElement('button');
+        b.className = 'sp-temp-btn' + (i === 0 ? ' activa' : '');
+        b.textContent = 'Temporada ' + T;
+        b.addEventListener('click', () => {
+          tBox.querySelectorAll('.sp-temp-btn').forEach((x) => x.classList.remove('activa'));
+          b.classList.add('activa');
+          pintarEpisodios(T);
+        });
+        tBox.appendChild(b);
       });
-      tBox.appendChild(b);
-    });
+    }
     pintarEpisodios(temps[0]);
   }).catch(() => {
     $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">Sin conexión — inténtalo de nuevo</div>';
@@ -912,22 +923,24 @@ function pintarEpisodios(temporada) {
   const eps = (spDatos.episodios || []).filter((x) => x.temporada === temporada);
   eps.forEach((ep) => {
     const b = document.createElement('button');
-    b.className = 'sp-ep';
-    b.innerHTML = `<img src="${ep.img || spDatos.posterBase}" alt="" loading="lazy" referrerpolicy="no-referrer">
-      <span><span class="sp-ep-num">${temporada}x${ep.ep || '·'}</span>
+    const esAn = !!spDatos.esAnime;
+    b.className = 'sp-ep' + (esAn ? ' sin-img' : '');
+    b.innerHTML = (esAn ? '' : `<img src="${ep.img || spDatos.posterBase}" alt="" loading="lazy" referrerpolicy="no-referrer">`)
+      + `<span><span class="sp-ep-num">${esAn ? 'Episodio ' + (ep.ep || '·') : temporada + 'x' + (ep.ep || '·')}</span>
       <span class="sp-ep-tit"></span></span>`;
-    b.querySelector('.sp-ep-tit').textContent = ep.titulo;
+    b.querySelector('.sp-ep-tit').textContent = esAn ? (spDatos.titulo || ep.titulo) : ep.titulo;
     b.addEventListener('click', () => {
       /* elegiste episodio → igual que una peli: carátula, sala, pausa y play */
       cerrarSeriePicker();
-      const nombre = `${spDatos.titulo} ${temporada}x${ep.ep || ''}`.trim();
+      const nombre = esAn ? `${spDatos.titulo} — Episodio ${ep.ep || ''}`.trim() : `${spDatos.titulo} ${temporada}x${ep.ep || ''}`.trim();
+      const imgEp = ep.img || spDatos.posterBase;
       if (spDatos.enSala) {
-        S.mirrorInfo = { title: nombre, img: ep.img || spDatos.posterBase, url: ep.url, sub: 'Abriendo en el espejo…' };
+        S.mirrorInfo = { title: nombre, img: imgEp, url: ep.url, sub: 'Abriendo en el espejo…' };
         $('#mirrorUrl').value = ep.url;
         startMirrorFromPicker();
       } else {
-        S.pendingStart = { url: ep.url, name: nombre, img: ep.img || spDatos.posterBase };
-        S.mirrorInfo = { title: nombre, img: ep.img || spDatos.posterBase, url: ep.url, sub: 'Cargando tu sala…' };
+        S.pendingStart = { url: ep.url, name: nombre, img: imgEp };
+        S.mirrorInfo = { title: nombre, img: imgEp, url: ep.url, sub: 'Cargando tu sala…' };
         mostrarPeliLoading();
         const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
         connect(code);
@@ -942,8 +955,28 @@ $('#seriePicker').addEventListener('click', (e) => { if (e.target === e.currentT
 
 /* v61: ¿es una serie? → abrir el selector en vez del espejo directo */
 function elegirTitulo(res, enSala) {
-  if (/\/serie\//i.test(res.url || '')) { abrirSeriePicker(res, enSala); return true; }
+  if (/\/serie\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, false); return true; }
+  if (/\/anime\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, true); return true; }
   return false;
+}
+
+/* v62: capa de controles de abajo — escondida en modo cine,
+ * un toque la muestra 5 segundos y otro toque pausa o reanuda */
+let ctrlTimer = null;
+function mostrarCtrls5s() {
+  $('#ctrlLayer').classList.add('visible');
+  if (ctrlTimer) clearTimeout(ctrlTimer);
+  ctrlTimer = setTimeout(() => { $('#ctrlLayer').classList.remove('visible'); ctrlTimer = null; }, 5000);
+}
+function ocultarCtrls() {
+  if (ctrlTimer) { clearTimeout(ctrlTimer); ctrlTimer = null; }
+  $('#ctrlLayer').classList.remove('visible');
+}
+function tocarPantallaCine() {
+  if ($('#ctrlLayer').classList.contains('visible')) {
+    ocultarCtrls();
+    sendAction({ type: 'mirror', op: S.mirror.playing ? 'pause' : 'play' }).catch(() => {});
+  } else mostrarCtrls5s();
 }
 
 /* v61: botón grande de play — la peli quedó lista en pausa */
@@ -1122,8 +1155,6 @@ function updateControlUi() {
   $('#btnMirror').disabled = !S.canControl;
   $('#mirrorUrl').disabled = !S.canControl;
   $('#btnStopMirrorTop').disabled = !S.canControl;
-  $('#btnMBack').disabled = !S.canControl;
-  $('#btnMFwd').disabled = !S.canControl;
   $('#chkControl').checked = !!(S.room && S.room.anyoneCanControl);
   $('#chkControl').disabled = !isHost;
   $('#lockHint').textContent = S.canControl ? '' : 'Solo el anfitrión controla el espejo';
