@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v68';
+const APP_VERSION = 'v69';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -2083,7 +2083,10 @@ async function cargarPopulares() {
   try {
     const r = await fetch('/api/trending');
     const d = await r.json();
-    if (!d.ok || !d.results || !d.results.length) { delete wrap.dataset.cargado; return; }
+    /* v69: cada sección se muestra con lo que llegue — los animes (arriba)
+     * no dependen de que las películas hayan cargado */
+    const hayAlgo = (d.results && d.results.length) || (d.series && d.series.length) || (d.animes && d.animes.length);
+    if (!d.ok || !hayAlgo) { delete wrap.dataset.cargado; return; }
     const alTocar = (res) => () => {
       if (elegirTitulo(res)) return; /* v61: series → temporadas y episodios */
       S.pendingStart = { url: res.url, name: res.title, img: res.img || '' };
@@ -2093,8 +2096,10 @@ async function cargarPopulares() {
       const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
       connect(code);
     };
-    d.results.slice(0, 16).forEach((res) => fila.appendChild(crearTarjetaResultado(res, alTocar(res))));
-    wrap.classList.remove('hidden');
+    if (d.results && d.results.length) {
+      d.results.slice(0, 16).forEach((res) => fila.appendChild(crearTarjetaResultado(res, alTocar(res))));
+      wrap.classList.remove('hidden');
+    }
     /* v57: segunda fila — series recién agregadas */
     if (wrapS && filaS && d.series && d.series.length) {
       d.series.slice(0, 16).forEach((res) => filaS.appendChild(crearTarjetaResultado(res, alTocar(res))));

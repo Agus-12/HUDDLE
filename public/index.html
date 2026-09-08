@@ -98,6 +98,15 @@
           <!-- v45: resultados de búsqueda del inicio -->
           <div id="searchResults" class="sr hidden"></div>
 
+          <!-- v69: animes del momento (Latanime) — PRIMERA sección, hasta arriba -->
+          <div id="animesBox" class="sr-sec hidden">
+            <div class="sr-sec-titulo">
+              <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--pink);"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/></svg>
+              <span>Animes del momento</span>
+            </div>
+            <div id="animesRow" class="sr-fila"></div>
+          </div>
+
           <!-- v55: populares del día — un toque y a ver -->
           <div id="trendingBox" class="sr-sec hidden">
             <div class="sr-sec-titulo">
@@ -114,15 +123,6 @@
               <span>Series agregadas recientemente</span>
             </div>
             <div id="seriesRow" class="sr-fila"></div>
-          </div>
-
-          <!-- v67: animes del momento (Latanime) — tercera fila -->
-          <div id="animesBox" class="sr-sec hidden">
-            <div class="sr-sec-titulo">
-              <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--pink);"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/></svg>
-              <span>Animes del momento</span>
-            </div>
-            <div id="animesRow" class="sr-fila"></div>
           </div>
 
           <!-- v31: salas en vivo ahora, con preview de lo que ven -->
@@ -172,7 +172,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v68</span>
+        <span class="ver" id="verBadge">v69</span>
       </div>
       <!-- v36: gente, invitar y salir viven JUNTO al logo -->
       <div class="top-quick">
