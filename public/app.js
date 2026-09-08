@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v74';
+const APP_VERSION = 'v75';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1151,9 +1151,9 @@ function renderPageDrop() {
   };
 })();
 
-/* v74: botoncitos de episodio anterior/siguiente en la esquina del
- * reproductor (junto a la opción de ampliar) — solo cuando la sala
- * está viendo una serie y solo para quien puede controlar. En el
+/* v74/v75: botones de episodio anterior/siguiente en la barra de
+ * abajo, DEBAJO de "Ampliar" (fuera de la película) — solo cuando
+ * la sala ve una serie y solo para quien puede controlar. En el
  * último episodio, el botón de "siguiente" se vuelve "Buscar películas" */
 function updateEpNav() {
   const nav = $('#epNav');
