@@ -1330,13 +1330,27 @@ body.ctrls-vis .msg-ticker {
 .live-site .site-logo { width: 18px; height: 18px; border-radius: 5px; flex: none; }
 .live-site span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* v71: en CELULAR (sin pantalla completa) la pantalla queda como
- * siempre era — reproductor compacto a lo ancho — y el botón de
- * "Toca para empezar" va CENTRADO en medio del reproductor, igual
- * que en la computadora (círculo al centro con su texto debajo). */
+/* v71: en CELULAR (sin pantalla completa) el botón de "Toca para
+ * empezar" va CENTRADO en medio del reproductor, igual que en la
+ * computadora (círculo al centro con su texto debajo). */
 @media (max-width: 980px) {
   .video-shell:not(:fullscreen):not(:-webkit-full-screen):not(.pseudo-fs) .play-btn {
     gap: 10px; /* un poquito más junto que en escritorio, la pantalla es chica */
+  }
+  /* v72: la barrita de adelantar (y sus botones) van FIJAS abajo,
+   * CASI AL BORDE DE LA PANTALLA, justo encima de la caja del chat —
+   * ya no incrustadas en la película. En computadora y en pantalla
+   * completa siguen donde siempre. */
+  .video-shell:not(:fullscreen):not(:-webkit-full-screen):not(.pseudo-fs) .ctrl-layer {
+    position: fixed;
+    left: 8px; right: 8px;
+    bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+    z-index: 44; /* debajo de la caja del chat (45) y del teclado */
+    padding: 10px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: rgba(10, 7, 19, 0.9);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--line);
+    border-radius: 14px;
   }
 }
 
