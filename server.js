@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v73'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v74'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -195,22 +195,138 @@ const MIRROR_SEND_MS = 45;          // máx. ~20 fps hacia los clientes
 const MIRROR_IDLE_MS = 20 * 1000; // la sala queda vacía → el espejo se apaga en 20 s
 const MIRROR_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
+/* v74: datos de una serie de Cuevana (temporadas y episodios) — los usa
+ * el selector (/api/serie) y los botones de siguiente/anterior episodio */
+async function datosSerieCuevana(slug) {
+  const c = serieCache.get(slug);
+  if (c && Date.now() - c.at < 30 * 60 * 1000) return c.d;
+  try {
+    const r = await fetchSeguro(`https://cine-calidad.mx/serie/${slug}/`, 10000);
+    if (!r.ok) return null;
+    const html = await r.text();
+    const eps = [];
+    const re = /<li class="mark-(\d+)"[^>]*>.*?<img[^>]*src="([^"]+)".*?<a href="([^"]*\/episode\/[^"]+)"[^>]*>([^<]+)<\/a>/gs;
+    let mm;
+    while ((mm = re.exec(html)) && eps.length < 400) {
+      const nm = /-(\d+)x(\d+)\/?$/.exec(mm[3]);
+      eps.push({
+        temporada: nm ? +nm[1] : +mm[1],
+        ep: nm ? +nm[2] : 0,
+        url: mm[3],
+        titulo: mm[4].trim().slice(0, 90),
+        img: mm[2].replace('/w300/', '/w342/'),
+      });
+    }
+    const og = (p) => {
+      const a1 = new RegExp(`<meta[^>]+property=["']${p}["'][^>]+content=["']([^"']+)`, 'i').exec(html);
+      const a2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${p}["']`, 'i').exec(html);
+      return (a1 || a2 || [])[1] || '';
+    };
+    const out = {
+      ok: true, slug,
+      titulo: (og('og:title') || slug).replace(/\s*[-–|].*$/, '').trim().slice(0, 80),
+      poster: (og('og:image') || (eps[0] ? eps[0].img : '')).replace('/w780/', '/w342/'),
+      episodios: eps,
+    };
+    serieCache.set(slug, { at: Date.now(), d: out });
+    return out;
+  } catch { return null; }
+}
+
+/* v74: episodios de un anime de Latanime — selector + botones de episodio */
+async function datosAnimeLatanime(slug) {
+  const cL = serieCache.get('latanime:' + slug);
+  if (cL && Date.now() - cL.at < 30 * 60 * 1000) return cL.d;
+  try {
+    const rL = await fetchSeguro(`https://latanime.org/anime/${slug}`, 10000);
+    if (!rL.ok) return null;
+    const htmlL = await rL.text();
+    const epsL = [];
+    const vistos = new Set();
+    const reL = /href="(https:\/\/latanime\.org\/ver\/[a-z0-9-]+-episodio-(\d+)(?:-[a-z0-9]+)?)"/g;
+    let mL;
+    while ((mL = reL.exec(htmlL)) && epsL.length < 600) {
+      const nL = +mL[2];
+      if (!nL || vistos.has(nL)) continue;
+      vistos.add(nL);
+      epsL.push({ n: nL, url: mL[1], titulo: 'Episodio ' + nL });
+    }
+    epsL.sort((a, b) => a.n - b.n);
+    if (!epsL.length) return null;
+    const ogL = (p) => {
+      const a1 = new RegExp(`<meta[^>]+property=["']${p}["'][^>]+content=["']([^"']+)`, 'i').exec(htmlL);
+      const a2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${p}["']`, 'i').exec(htmlL);
+      return (a1 || a2 || [])[1] || '';
+    };
+    const outL = {
+      ok: true, slug,
+      titulo: (ogL('og:title') || slug).replace(/\s*[—–|]\s*Latanime\s*$/i, '').trim().slice(0, 90),
+      poster: ogL('og:image') || '',
+      episodios: epsL,
+    };
+    serieCache.set('latanime:' + slug, { at: Date.now(), d: outL });
+    return outL;
+  } catch { return null; }
+}
+
+/* v74: si la URL es un episodio de serie, saca la lista completa de
+ * episodios para saber cuál sigue y cuál va antes */
+async function serieCtxFromUrl(u) {
+  try {
+    const url = new URL(u);
+    const host = url.hostname.toLowerCase();
+    let m = /\/ver\/([a-z0-9-]+)-episodio-(\d+)/i.exec(url.pathname);
+    if (m && host.endsWith('latanime.org')) {
+      const d = await datosAnimeLatanime(m[1]);
+      if (!d || !d.episodios || !d.episodios.length) return null;
+      const idx = d.episodios.findIndex((e) => e.n === +m[2]);
+      if (idx < 0) return null;
+      return { tipo: 'latanime', titulo: d.titulo, poster: d.poster, idx, eps: d.episodios.map((e) => ({ url: e.url, num: 'Episodio ' + e.n })) };
+    }
+    m = /\/episode\/([a-z0-9-]+)-(\d+)x(\d+)/i.exec(url.pathname);
+    if (m && /(cine-calidad\.mx|cuevana\.)$/.test(host)) {
+      const d = await datosSerieCuevana(m[1]);
+      if (!d || !d.episodios || !d.episodios.length) return null;
+      const idx = d.episodios.findIndex((e) => e.temporada === +m[2] && e.ep === +m[3]);
+      if (idx < 0) return null;
+      return { tipo: 'cuevana', titulo: d.titulo, poster: d.poster, idx, eps: d.episodios.map((e) => ({ url: e.url, num: e.temporada + 'x' + e.ep })) };
+    }
+    return null;
+  } catch { return null; }
+}
+
 function mirrorState(room) {
   const m = mirrors.get(room.code);
-  return m
+  const out = m
     ? { active: true, url: m.url || '', audio: AUDIO_READY, playing: !!m.playing, ready: !!m.ready }
     : { active: false, url: '', audio: false, playing: false, ready: false };
+  /* v74: si están viendo un episodio de serie, la sala sabe cuál es y si
+   * hay siguiente/anterior — para los botoncitos de la esquina */
+  if (m && m.serie) {
+    const sc = m.serie;
+    out.serie = {
+      titulo: sc.titulo, poster: sc.poster, total: sc.eps.length,
+      num: sc.eps[sc.idx] ? sc.eps[sc.idx].num : '',
+      hayPrev: sc.idx > 0, hayNext: sc.idx >= 0 && sc.idx < sc.eps.length - 1,
+    };
+  }
+  return out;
 }
 
 async function startMirror(room, rawUrl, userId) {
   const url = normalizeWebUrl(rawUrl);
   if (mirrors.has(room.code)) {
     const m = mirrors.get(room.code);
-    m.url = url;
-    m.ownerId = userId;
-    await m.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {});
-    broadcast(room, 'mirror-state', mirrorState(room));
-    return;
+    if ((m.url || '') === url) {
+      m.url = url;
+      m.ownerId = userId;
+      await m.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {});
+      broadcast(room, 'mirror-state', mirrorState(room));
+      return;
+    }
+    /* v74: cambiar de página (o de episodio) → arranque limpio: la
+     * detección de "lista en pausa" vuelve a correr para lo nuevo */
+    await stopMirror(room);
   }
 
   /* reciclaje de slots: nunca fallamos por "demasiados espejos" si podemos liberar
@@ -289,8 +405,17 @@ async function startMirror(room, rawUrl, userId) {
   }).catch(() => {});
   const cdp = await page.createCDPSession();
 
-  const m = { browser, page, cdp, url, frame: null, dirty: false, timer: null, emptySince: null, ownerId: userId, startedAt: Date.now() };
+  const m = { browser, page, cdp, url, frame: null, dirty: false, timer: null, emptySince: null, ownerId: userId, startedAt: Date.now(), serie: null };
   mirrors.set(room.code, m);
+
+  /* v74: si la URL es un episodio de serie, cargamos su lista de
+   * episodios para los botones de siguiente/anterior */
+  serieCtxFromUrl(url).then((sc) => {
+    if (mirrors.get(room.code) === m && sc) {
+      m.serie = sc;
+      broadcast(room, 'mirror-state', mirrorState(room));
+    }
+  }).catch(() => {});
 
   cdp.on('Page.screencastFrame', async (ev) => {
     m.frame = {
@@ -822,6 +947,18 @@ async function handleAction(req, res, body) {
         return json(res, 200, { ok: true });
       }
       if (op === 'stop') { await stopMirror(room); return json(res, 200, { ok: true }); }
+      if (op === 'epPrev' || op === 'epNext') {
+        /* v74: episodio anterior/siguiente — cambia para toda la sala */
+        const m = mirrors.get(room.code);
+        if (!m || !m.serie) return json(res, 404, { ok: false, error: 'No hay serie en el espejo' });
+        let idx = m.serie.eps.findIndex((e) => e.url === (m.url || ''));
+        if (idx < 0) idx = m.serie.idx;
+        const target = m.serie.eps[idx + (op === 'epNext' ? 1 : -1)];
+        if (!target) return json(res, 400, { ok: false, error: op === 'epNext' ? 'Ya estás en el último episodio' : 'Ya estás en el primer episodio' });
+        await stopMirror(room);
+        await startMirror(room, target.url, userId);
+        return json(res, 200, { ok: true });
+      }
 
       const m = mirrors.get(room.code);
       if (!m) return json(res, 404, { ok: false, error: 'El espejo no está activo' });
@@ -1479,84 +1616,18 @@ const server = http.createServer(async (req, res) => {
       /* v61: temporadas y episodios de una serie (para elegirla bonito) */
       const slug = decodeURIComponent(url.pathname.split('/')[3] || '').toLowerCase();
       if (!/^[a-z0-9-]{2,90}$/.test(slug)) return json(res, 400, { ok: false, error: 'Serie inválida' });
-      const c = serieCache.get(slug);
-      if (c && Date.now() - c.at < 30 * 60 * 1000) return json(res, 200, c.d);
-      try {
-        const r = await fetchSeguro(`https://cine-calidad.mx/serie/${slug}/`, 10000);
-        if (!r.ok) return json(res, 502, { ok: false, error: 'No pude leer la serie' });
-        const html = await r.text();
-        const eps = [];
-        const re = /<li class="mark-(\d+)"[^>]*>.*?<img[^>]*src="([^"]+)".*?<a href="([^"]*\/episode\/[^"]+)"[^>]*>([^<]+)<\/a>/gs;
-        let mm;
-        while ((mm = re.exec(html)) && eps.length < 400) {
-          const nm = /-(\d+)x(\d+)\/?$/.exec(mm[3]);
-          eps.push({
-            /* v63: la temporada de verdad está en la URL (-2x5), mark-N siempre es 1 */
-            temporada: nm ? +nm[1] : +mm[1],
-            ep: nm ? +nm[2] : 0,
-            url: mm[3],
-            titulo: mm[4].trim().slice(0, 90),
-            img: mm[2].replace('/w300/', '/w342/'),
-          });
-        }
-        const og = (p) => {
-          const a1 = new RegExp(`<meta[^>]+property=["']${p}["'][^>]+content=["']([^"']+)`, 'i').exec(html);
-          const a2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${p}["']`, 'i').exec(html);
-          return (a1 || a2 || [])[1] || '';
-        };
-        const out = {
-          ok: true,
-          slug,
-          titulo: (og('og:title') || slug).replace(/\s*[-–|].*$/, '').trim().slice(0, 80),
-          poster: (og('og:image') || (eps[0] ? eps[0].img : '')).replace('/w780/', '/w342/'),
-          episodios: eps,
-        };
-        serieCache.set(slug, { at: Date.now(), d: out });
-        return json(res, 200, out);
-      } catch {
-        return json(res, 500, { ok: false, error: 'Error leyendo la serie' });
-      }
+      const dS = await datosSerieCuevana(slug); /* v74: compartida con los botones de episodio */
+      if (!dS) return json(res, 502, { ok: false, error: 'No pude leer la serie' });
+      return json(res, 200, dS);
     }
     if (url.pathname.startsWith('/api/anime/')) {
       /* v62: episodios de un anime — AnimeFLV (var eps) y v63: Latanime (enlaces /ver/) */
       const slug = decodeURIComponent(url.pathname.split('/')[3] || '').toLowerCase();
       if (!/^[a-z0-9-]{2,90}$/.test(slug)) return json(res, 400, { ok: false, error: 'Anime inválido' });
       if ((url.searchParams.get('site') || '').toLowerCase() === 'latanime') {
-        const cL = serieCache.get('latanime:' + slug);
-        if (cL && Date.now() - cL.at < 30 * 60 * 1000) return json(res, 200, cL.d);
-        try {
-          const rL = await fetchSeguro(`https://latanime.org/anime/${slug}`, 10000);
-          if (!rL.ok) return json(res, 502, { ok: false, error: 'No pude leer el anime' });
-          const htmlL = await rL.text();
-          const epsL = [];
-          const vistos = new Set();
-          const reL = /href="(https:\/\/latanime\.org\/ver\/[a-z0-9-]+-episodio-(\d+)(?:-[a-z0-9]+)?)"/g;
-          let mL;
-          while ((mL = reL.exec(htmlL)) && epsL.length < 600) {
-            const nL = +mL[2];
-            if (!nL || vistos.has(nL)) continue;
-            vistos.add(nL);
-            epsL.push({ n: nL, url: mL[1], titulo: 'Episodio ' + nL });
-          }
-          epsL.sort((a, b) => a.n - b.n);
-          if (!epsL.length) return json(res, 404, { ok: false, error: 'Sin episodios' });
-          const ogL = (p) => {
-            const a1 = new RegExp(`<meta[^>]+property=["']${p}["'][^>]+content=["']([^"']+)`, 'i').exec(htmlL);
-            const a2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${p}["']`, 'i').exec(htmlL);
-            return (a1 || a2 || [])[1] || '';
-          };
-          const outL = {
-            ok: true,
-            slug,
-            titulo: (ogL('og:title') || slug).replace(/\s*[—–|]\s*Latanime\s*$/i, '').trim().slice(0, 90),
-            poster: ogL('og:image') || '',
-            episodios: epsL,
-          };
-          serieCache.set('latanime:' + slug, { at: Date.now(), d: outL });
-          return json(res, 200, outL);
-        } catch {
-          return json(res, 500, { ok: false, error: 'Error leyendo el anime' });
-        }
+        const dL = await datosAnimeLatanime(slug); /* v74: compartida con los botones de episodio */
+        if (!dL) return json(res, 502, { ok: false, error: 'No pude leer el anime' });
+        return json(res, 200, dL);
       }
       const c = serieCache.get('anime:' + slug);
       if (c && Date.now() - c.at < 30 * 60 * 1000) return json(res, 200, c.d);

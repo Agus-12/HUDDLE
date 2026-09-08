@@ -172,7 +172,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v73</span>
+        <span class="ver" id="verBadge">v74</span>
       </div>
       <!-- v36: gente, invitar y salir viven JUNTO al logo -->
       <div class="top-quick">
@@ -283,6 +283,21 @@
             <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
             <span id="fitToggleTxt">Llenar</span>
           </button>
+          <!-- v74: episodio anterior/siguiente (solo series, junto a la opción de ampliar) -->
+          <div id="epNav" class="ep-nav hidden">
+            <button id="epPrevBtn" class="btn small ep-btn" title="Episodio anterior">
+              <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m11 18-6-6 6-6"/><path d="m18 18-6-6 6-6"/></svg>
+              <span>Anterior</span>
+            </button>
+            <button id="epNextBtn" class="btn small ep-btn" title="Episodio siguiente">
+              <span>Siguiente</span>
+              <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m13 6 6 6-6 6"/><path d="m6 6 6 6-6 6"/></svg>
+            </button>
+            <button id="epSearchBtn" class="btn small ep-btn hidden" title="Buscar películas">
+              <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <span>Buscar películas</span>
+            </button>
+          </div>
           <!-- salir de pantalla completa (visible en pantalla completa real o simulada) -->
           <button id="fsExit" class="btn small fit-btn" title="Salir de pantalla completa">
             <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -367,11 +382,16 @@
   <!-- v60: pantalla completa de espera — la sala carga por detrás y cuando
        la peli está lista te mete (también al elegir desde el menú) -->
   <div id="peliLoading" class="peli-loading hidden">
-    <img id="peliPoster" class="peli-poster hidden" alt="">
-    <div class="peli-nombre" id="peliNombre"></div>
+    <!-- v74: tarjeta centrada — carátula a la izquierda, nombre y episodio a la derecha -->
+    <div class="peli-card">
+      <img id="peliPoster" class="peli-poster hidden" alt="">
+      <div class="peli-datos">
+        <div class="peli-nombre" id="peliNombre"></div>
+        <div class="peli-estado" id="peliEstado">Preparando tu peli…</div>
+        <div class="peli-sub" id="peliSub">Cargando tu sala…</div>
+      </div>
+    </div>
     <div class="spinner peli-spin"></div>
-    <div class="peli-estado" id="peliEstado">Preparando tu peli…</div>
-    <div class="peli-sub" id="peliSub">Cargando tu sala…</div>
     <div class="peli-hint">Toca la pantalla para entrar mientras carga</div>
   </div>
 

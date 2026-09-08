@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v73';
+const APP_VERSION = 'v74';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -321,6 +321,7 @@ function applyMirrorState(ms) {
   S.mirror.url = ms.url || '';
   S.mirror.ready = !!(ms.active && ms.ready);
   S.mirror.playing = !!ms.playing;
+  S.mirror.serie = ms.serie || null; /* v74: episodio de serie actual */
   /* v62: en modo cine los controles viven escondidos abajo */
   document.body.classList.toggle('cine-listo', S.mirror.ready);
   if (ms.playing || !ms.active) ocultarCtrls();
@@ -328,6 +329,13 @@ function applyMirrorState(ms) {
    * lista en pausa → mostrar el botón de play grande. */
   if (ms.playing) { ocultarPeliLoading(); ocultarPlayBtn(); }
   else if (ms.active && ms.ready) { ocultarPeliLoading(); mostrarPlayBtn(); }
+  /* v74: mientras se abre un episodio, TODA la sala ve la pantalla de
+   * espera con la carátula de la serie y el episodio que se prepara */
+  else if (ms.active && !ms.ready && ms.serie && !S.pendingStart) {
+    S.mirrorInfo = { title: ms.serie.titulo, img: (ms.serie.poster ? proxyAnimeImg(ms.serie.poster, 400) : ''), url: ms.url, sub: 'Abriendo en el espejo…', epNum: ms.serie.num };
+    mostrarPeliLoading();
+  }
+  updateEpNav();
   /* v61: ojo — si la sala aún va a arrancar el espejo (pendingStart),
    * NO quitamos la pantalla de espera (era el destello de la sala) */
   if (!ms.active && !S.pendingStart) { ocultarPeliLoading(); ocultarPlayBtn(); S.mirrorInfo = null; }
@@ -845,8 +853,12 @@ function mostrarPeliLoading() {
       po.src = info.img;
     } else po.classList.add('hidden');
     $('#peliNombre').textContent = info.title || '';
-    const esSerie = /\/serie\/|\/episode\//.test(info.url || S.mirror.url || '');
-    $('#peliEstado').textContent = esSerie ? 'Preparando tu serie…' : 'Preparando tu peli…';
+    /* v74: para episodios: "Preparando Episodio 3…" junto al nombre de la serie */
+    if (info.epNum) $('#peliEstado').textContent = `Preparando ${info.epNum}…`;
+    else {
+      const esSerie = /\/serie\/|\/episode\//.test(info.url || S.mirror.url || '');
+      $('#peliEstado').textContent = esSerie ? 'Preparando tu serie…' : 'Preparando tu peli…';
+    }
     $('#peliSub').textContent = info.sub || 'Abriendo en el espejo…';
   }
   box.classList.remove('hidden');
@@ -1139,6 +1151,29 @@ function renderPageDrop() {
   };
 })();
 
+/* v74: botoncitos de episodio anterior/siguiente en la esquina del
+ * reproductor (junto a la opción de ampliar) — solo cuando la sala
+ * está viendo una serie y solo para quien puede controlar. En el
+ * último episodio, el botón de "siguiente" se vuelve "Buscar películas" */
+function updateEpNav() {
+  const nav = $('#epNav');
+  if (!nav) return;
+  const sc = S.mirror && S.mirror.serie;
+  const puede = !!(sc && S.mirror.active && S.canControl);
+  nav.classList.toggle('hidden', !puede);
+  if (!puede) return;
+  $('#epPrevBtn').classList.toggle('hidden', !sc.hayPrev);
+  $('#epNextBtn').classList.toggle('hidden', !sc.hayNext);
+  $('#epSearchBtn').classList.toggle('hidden', !!sc.hayNext);
+}
+(function montarEpNav() {
+  const prev = $('#epPrevBtn'), next = $('#epNextBtn'), buscar = $('#epSearchBtn');
+  if (!prev || !next || !buscar) return;
+  prev.addEventListener('click', () => { toast('Abriendo el episodio anterior…'); sendAction({ type: 'mirror', op: 'epPrev' }); });
+  next.addEventListener('click', () => { toast('Abriendo el episodio siguiente…'); sendAction({ type: 'mirror', op: 'epNext' }); });
+  buscar.addEventListener('click', () => { try { $('#pagePickBtn').click(); } catch {} });
+})();
+
 /* v43: cargar el directorio real del servidor (crece al pegar URLs) */
 async function cargarSitios() {
   try {
@@ -1155,6 +1190,7 @@ async function cargarSitios() {
 cargarSitios();
 
 function updateControlUi() {
+  updateEpNav(); /* v74: botones de episodio según permisos */
   const isHost = S.room && S.room.hostId === S.userId;
   $('#pagePickBtn').disabled = !S.canControl;
   $('#btnMirror').disabled = !S.canControl;
