@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v80';
+const APP_VERSION = 'v81';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -999,6 +999,15 @@ function pintarEpisodios(temporada) {
       cerrarSeriePicker();
       const nombre = esAn ? `${spDatos.titulo} — Episodio ${ep.ep || ''}`.trim() : `${spDatos.titulo} ${temporada}x${ep.ep || ''}`.trim();
       const imgEp = ep.img || spDatos.posterBase;
+      if (S.modoSolo) {
+        /* v81: episodio en modo individual — los animes (filemoon) no
+         * tienen extracción directa y se quedan en la sala */
+        if (esAn) toast('Los animes se ven en modo 👥 Juntos');
+        else {
+          abrirSolo(ep.url, { title: spDatos.titulo || '', ep: `${temporada}x${ep.ep || ''}`, serie: spDatos.titulo || '', img: imgEp });
+          return;
+        }
+      }
       if (spDatos.enSala) {
         S.mirrorInfo = { title: nombre, img: imgEp, url: ep.url, sub: 'Abriendo en el espejo…' };
         $('#mirrorUrl').value = ep.url;
@@ -1964,6 +1973,7 @@ S.setupUrl = '';
 S.setupName = '';
 S.pendingStart = null;
 S.resumeAt = null; /* v78: {url,t} para retomar donde se quedaron */
+S.modoSolo = false; /* v81: modo individual — se pinta en el arranque */
 
 function setupMsg(t, ok) {
   const el = $('#setupMsg');
@@ -2276,7 +2286,8 @@ function crearTarjetaContinuar(e) {
     <span class="sr-nombre"></span>
     ${e.ep ? '<span class="cont-ep"></span>' : ''}
     <span class="cont-barra"><i style="width:${pct}%"></i></span>
-    <span class="cont-tiempo"></span>`;
+    <span class="cont-tiempo"></span>
+    ${e.modo === 'solo' ? '<span class="cont-modo">solo</span>' : ''}`;
   card.querySelector('.sr-nombre').textContent = e.title || e.serie || 'Película';
   if (e.ep) card.querySelector('.cont-ep').textContent = e.ep;
   card.querySelector('.cont-tiempo').textContent = `Quedaste en ${fmtTiempo(e.t)} de ${fmtTiempo(e.d)}`;
@@ -2311,13 +2322,275 @@ function crearTarjetaContinuar(e) {
 function retomar(e) {
   /* como tocar una tarjeta del inicio, pero recordando la posición */
   const t = Math.floor(+e.t || 0);
-  S.resumeAt = (e.d && t > 10 && t < e.d - 20) ? { url: e.url, t } : null; /* si casi terminó, desde el inicio */
+  const reanudar = !!(e.d && t > 10 && t < e.d - 20); /* si casi terminó, desde el inicio */
+  if (e.modo === 'solo') {
+    /* v81: se estaba viendo en modo individual → vuelve al reproductor */
+    abrirSolo(e.url, { title: e.title || '', ep: e.ep || '', serie: e.serie || '', img: e.img || '' }, { startAt: reanudar ? t : 0 });
+    return;
+  }
+  S.resumeAt = reanudar ? { url: e.url, t } : null;
   S.pendingStart = { url: e.url, name: e.title || '', img: e.img || '' };
   S.mirrorInfo = { title: e.title || '', img: e.img || '', url: e.url, sub: 'Cargando tu sala…' };
   mostrarPeliLoading();
   const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
   connect(code);
 }
+
+/* ======================= v81: modo individual ======================= */
+/* Ver pelis y series directo en tu dispositivo, SIN sala y SIN el
+ * navegador-espejo del servidor: /api/solo resuelve el m3u8 (goodstream)
+ * con puros fetch y hls.js lo reproduce aquí. Si al navegador no le
+ * sirve directo (el token puede venir amarrado a la IP del servidor),
+ * re-servimos el stream por /api/hls. Los animes (filemoon) se quedan
+ * en modo sala — no tienen extracción directa. */
+try { S.modoSolo = localStorage.getItem('huddle_modo_solo') === '1'; } catch {}
+function pintarModoPills() {
+  $('#pillJuntos').classList.toggle('activa', !S.modoSolo);
+  $('#pillSolo').classList.toggle('activa', S.modoSolo);
+  const sub = document.querySelector('.home-sub');
+  if (sub) sub.textContent = S.modoSolo
+    ? 'Modo individual: se reproduce directo en tu dispositivo, sin sala ni espejo.'
+    : 'Crea una sala, comparte el link y míralo juntos — todo sincronizado.';
+}
+function setModoSolo(v) {
+  if (S.modoSolo === !!v) { pintarModoPills(); return; }
+  S.modoSolo = !!v;
+  try { localStorage.setItem('huddle_modo_solo', S.modoSolo ? '1' : '0'); } catch {}
+  pintarModoPills();
+  if (S.modoSolo) toast('Modo individual — lo que abras se reproduce aquí mismo');
+}
+$('#pillJuntos').addEventListener('click', () => setModoSolo(false));
+$('#pillSolo').addEventListener('click', () => setModoSolo(true));
+pintarModoPills();
+
+let SOLO = null; /* { url, info, res, hls, viaProxy, startAt, seekHecho, timer, subsOn, cerrado } */
+function cargarHlsJs(cb) {
+  if (window.Hls) return cb(true);
+  const s = document.createElement('script');
+  s.src = '/hls.min.js';
+  s.onload = () => cb(!!window.Hls);
+  s.onerror = () => cb(false);
+  document.head.appendChild(s);
+}
+async function abrirSolo(pageUrl, info, opts) {
+  info = info || {}; opts = opts || {};
+  if (!S.profile) { toast('Entra con tu perfil primero'); return; }
+  if (SOLO) cerrarSolo();
+  $('#soloTitle').textContent = info.title || info.serie || 'Reproduciendo';
+  $('#soloEp').textContent = info.ep ? 'Episodio ' + info.ep : '';
+  $('#soloCargando').classList.remove('hidden');
+  $('#soloCtrls').classList.add('oculto');
+  $('#soloBar').value = 0;
+  $('#soloTime').textContent = '0:00 / 0:00';
+  $('#soloCC').classList.remove('activa');
+  const video = $('#soloVideo');
+  video.removeAttribute('src');
+  video.querySelectorAll('track').forEach((t) => t.remove());
+  try { video.load(); } catch {}
+  $('#soloPlayer').classList.remove('hidden');
+  SOLO = {
+    url: pageUrl, info,
+    startAt: Math.max(0, Math.floor(+opts.startAt || 0)),
+    seekHecho: false, subsOn: false, viaProxy: false, cerrado: false,
+    res: null, hls: null, timer: null,
+  };
+  try {
+    const r = await fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(pageUrl));
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'No pude resolver el video');
+    if (!SOLO || SOLO.url !== pageUrl || SOLO.cerrado) return; /* cerraron mientras buscaba */
+    SOLO.res = d;
+    montarSolo(d, false);
+  } catch (e) {
+    if (SOLO && SOLO.url === pageUrl && !SOLO.cerrado) {
+      toast(String(e.message || e).slice(0, 120) + ' — ábrelo en modo 👥 Juntos');
+      cerrarSolo();
+    }
+  }
+}
+function montarSolo(d, viaProxy) {
+  const video = $('#soloVideo');
+  const src = viaProxy ? '/api/hls?u=' + encodeURIComponent(d.m3u8) : d.m3u8;
+  if (SOLO.hls) { try { SOLO.hls.destroy(); } catch {} SOLO.hls = null; }
+  SOLO.viaProxy = viaProxy;
+  cargarHlsJs((okHls) => {
+    if (!SOLO || SOLO.cerrado) return;
+    ponerSubsSolo(d.subs || []);
+    const hlsOk = okHls && window.Hls && window.Hls.isSupported();
+    if (hlsOk) {
+      const hls = new window.Hls({ maxBufferLength: 30 });
+      SOLO.hls = hls;
+      hls.on(window.Hls.Events.ERROR, (ev, data) => {
+        if (!SOLO || !data || !data.fatal) return;
+        if (!SOLO.viaProxy && data.type === window.Hls.ErrorTypes.NETWORK_ERROR && SOLO.res) {
+          /* el token puede venir amarrado a la IP del servidor → proxy */
+          toast('Conectando por el servidor…');
+          montarSolo(SOLO.res, true);
+        } else {
+          try { hls.destroy(); } catch {}
+          if (!SOLO.cerrado) { toast('Se cortó el video — vuelve a abrirlo'); cerrarSolo(); }
+        }
+      });
+      hls.loadSource(src);
+      hls.attachMedia(video);
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      /* Safari / iPhone: HLS nativo, sin hls.js */
+      video.src = src;
+    } else {
+      toast('Tu navegador no reproduce este video — ábrelo en modo 👥 Juntos');
+      cerrarSolo();
+      return;
+    }
+    video.play().catch(() => {});
+  });
+}
+function ponerSubsSolo(subs) {
+  const video = $('#soloVideo');
+  const esp = subs.find((s) => s.lang === 'es') || subs.find((s) => s.lang === 'es-419') || subs[0];
+  if (!esp) { $('#soloCC').classList.add('hidden'); return; }
+  $('#soloCC').classList.remove('hidden');
+  const tr = document.createElement('track');
+  tr.kind = 'subtitles';
+  tr.src = '/api/hls?u=' + encodeURIComponent(esp.url); /* por el proxy: algunos nodos piden Referer de goodstream */
+  tr.srclang = esp.lang === 'en' ? 'en' : 'es';
+  tr.label = esp.lang === 'es-419' ? 'Latino' : esp.lang === 'en' ? 'English' : 'Español';
+  video.appendChild(tr);
+  const activar = () => {
+    const tt = video.textTracks && video.textTracks[0];
+    if (tt) tt.mode = SOLO.subsOn ? 'showing' : 'hidden';
+  };
+  setTimeout(activar, 500);
+  video.addEventListener('loadedmetadata', activar, { once: true });
+}
+function soloReportar() {
+  if (!SOLO || !S.profile || !SOLO.url) return;
+  const video = $('#soloVideo');
+  const t = video ? Math.floor(video.currentTime || 0) : 0;
+  const d = (video && isFinite(video.duration)) ? Math.floor(video.duration) : 0;
+  if (!d) return;
+  fetch('/api/progress', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: S.profile.name, token: S.profile.token, url: SOLO.url, t, d,
+      title: SOLO.info.title || '', img: SOLO.info.img || '',
+      ep: String(SOLO.info.ep || ''), serie: SOLO.info.serie || '', modo: 'solo',
+    }),
+  }).catch(() => {});
+}
+function soloSetPlayIco(playing) {
+  $('#soloPlayIco').innerHTML = playing
+    ? '<path d="M7 5h3.4v14H7zM13.6 5H17v14h-3.6z"/>'
+    : '<path d="M8 5.5v13l11-6.5z"/>';
+}
+let soloCtrlTimer = null;
+function mostrarSoloCtrls5s() {
+  const c = $('#soloCtrls');
+  if (!c) return;
+  c.classList.remove('oculto');
+  if (soloCtrlTimer) clearTimeout(soloCtrlTimer);
+  soloCtrlTimer = setTimeout(() => { c.classList.add('oculto'); soloCtrlTimer = null; }, 5000);
+}
+function cerrarSolo() {
+  if (soloCtrlTimer) { clearTimeout(soloCtrlTimer); soloCtrlTimer = null; }
+  if (SOLO) {
+    SOLO.cerrado = true;
+    try { soloReportar(); } catch {}
+    if (SOLO.timer) { clearInterval(SOLO.timer); SOLO.timer = null; }
+    if (SOLO.hls) { try { SOLO.hls.destroy(); } catch {} }
+  }
+  const video = $('#soloVideo');
+  try { video.pause(); } catch {}
+  video.removeAttribute('src');
+  video.querySelectorAll('track').forEach((t) => t.remove());
+  try { video.load(); } catch {}
+  if (document.fullscreenElement) { try { document.exitFullscreen(); } catch {} }
+  $('#soloPlayer').classList.add('hidden');
+  SOLO = null;
+  cargarContinuar(); /* refresca la fila de "Continuar viendo" */
+}
+$('#soloBack').addEventListener('click', cerrarSolo);
+$('#soloVideo').addEventListener('click', () => {
+  if (!$('#soloCargando').classList.contains('hidden')) return; /* aún cargando */
+  if ($('#soloCtrls').classList.contains('oculto')) { mostrarSoloCtrls5s(); return; }
+  const video = $('#soloVideo');
+  if (video.paused) video.play().catch(() => {}); else video.pause();
+});
+$('#soloPlay').addEventListener('click', () => {
+  const video = $('#soloVideo');
+  if (video.paused) video.play().catch(() => {}); else video.pause();
+});
+$('#soloBar').addEventListener('input', () => {
+  const video = $('#soloVideo');
+  if (isFinite(video.duration) && video.duration > 0) {
+    $('#soloTime').textContent = fmtTiempo((+$('#soloBar').value / 1000) * video.duration) + ' / ' + fmtTiempo(video.duration);
+  }
+});
+$('#soloBar').addEventListener('change', () => {
+  const video = $('#soloVideo');
+  if (isFinite(video.duration) && video.duration > 0) {
+    video.currentTime = (+$('#soloBar').value / 1000) * video.duration;
+  }
+});
+$('#soloCC').addEventListener('click', () => {
+  const video = $('#soloVideo');
+  const tt = video.textTracks && video.textTracks[0];
+  if (!tt) { toast('Este video no trae subtítulos'); return; }
+  SOLO.subsOn = !SOLO.subsOn;
+  tt.mode = SOLO.subsOn ? 'showing' : 'hidden';
+  $('#soloCC').classList.toggle('activa', SOLO.subsOn);
+});
+$('#soloFs').addEventListener('click', () => {
+  const el = $('#soloPlayer');
+  try {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (el.requestFullscreen) el.requestFullscreen();
+    else if ($('#soloVideo').webkitEnterFullscreen) $('#soloVideo').webkitEnterFullscreen(); /* iOS */
+  } catch {}
+});
+(() => {
+  const video = $('#soloVideo');
+  video.addEventListener('timeupdate', () => {
+    if (!SOLO) return;
+    if (!SOLO.seekHecho && isFinite(video.duration) && video.duration > 0) {
+      /* retomar donde se quedó (o desde el inicio si ya casi la termina) */
+      if (SOLO.startAt > 0 && SOLO.startAt < video.duration - 5) {
+        try { video.currentTime = SOLO.startAt; } catch {}
+      }
+      SOLO.seekHecho = true;
+      SOLO.d = video.duration;
+      if (!SOLO.timer) {
+        SOLO.timer = setInterval(() => {
+          const v = $('#soloVideo');
+          if (SOLO && v && !v.paused && !v.ended) soloReportar();
+        }, 10000);
+      }
+    }
+    if (isFinite(video.duration) && video.duration > 0) {
+      $('#soloBar').value = String(Math.round((video.currentTime / video.duration) * 1000));
+      $('#soloTime').textContent = fmtTiempo(video.currentTime) + ' / ' + fmtTiempo(video.duration);
+    }
+  });
+  video.addEventListener('playing', () => {
+    $('#soloCargando').classList.add('hidden');
+    soloSetPlayIco(true);
+    mostrarSoloCtrls5s();
+  });
+  video.addEventListener('pause', () => { soloSetPlayIco(false); mostrarSoloCtrls5s(); });
+  video.addEventListener('ended', () => { soloReportar(); mostrarSoloCtrls5s(); });
+  video.addEventListener('error', () => {
+    if (SOLO && !SOLO.cerrado && !SOLO.hls && !SOLO.viaProxy && SOLO.res) {
+      /* HLS nativo que no arrancó directo → por el proxy */
+      toast('Conectando por el servidor…');
+      montarSolo(SOLO.res, true);
+    }
+  });
+  $('#soloPlayer').addEventListener('pointermove', () => {
+    if (!$('#soloCargando').classList.contains('hidden')) return;
+    mostrarSoloCtrls5s();
+  });
+})();
+/* =================== fin v81: modo individual =================== */
 
 /* v55: populares del día — fila en el inicio, un toque crea la sala */
 async function cargarPopulares() {
@@ -2338,6 +2611,10 @@ async function cargarPopulares() {
     if (!d.ok || !hayAlgo) { delete wrap.dataset.cargado; return; }
     const alTocar = (res) => () => {
       if (elegirTitulo(res)) return; /* v61: series → temporadas y episodios */
+      if (S.modoSolo) { /* v81: sin sala — directo en tu dispositivo */
+        abrirSolo(res.url, { title: res.title || '', img: res.img || '' });
+        return;
+      }
       S.pendingStart = { url: res.url, name: res.title, img: res.img || '' };
       /* v60: carátula a pantalla completa desde YA — la sala carga por detrás */
       S.mirrorInfo = { title: res.title || '', img: res.img || '', url: res.url, sub: 'Cargando tu sala…' };

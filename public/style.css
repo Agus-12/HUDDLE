@@ -1429,3 +1429,63 @@ body.ctrls-vis .msg-ticker {
   }
 }
 
+
+/* ======================= v81: modo individual ======================= */
+.modo-pills {
+  display: flex; gap: 4px; width: max-content; margin: 2px 0 16px;
+  background: rgba(255, 255, 255, 0.07); border-radius: 999px; padding: 4px;
+}
+.modo-pill {
+  border: 0; background: transparent; color: var(--dim);
+  font: inherit; font-size: 13px; font-weight: 600;
+  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.modo-pill:active { transform: scale(0.96); }
+.modo-pill.activa {
+  background: linear-gradient(135deg, var(--violet), #5a8bff);
+  color: #fff;
+}
+.solo-player {
+  position: fixed; inset: 0; z-index: 90;
+  background: #000; display: flex; align-items: center; justify-content: center;
+}
+.solo-player video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+.solo-cargando {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px;
+  color: #cfd8e3; font-size: 14px; background: rgba(0, 0, 0, 0.55);
+}
+.solo-top {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  background: linear-gradient(rgba(0, 0, 0, 0.75), transparent);
+  z-index: 2;
+}
+.solo-tit { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.solo-tit b { color: #fff; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.solo-tit span { color: #aeb8c6; font-size: 12px; }
+.solo-badge {
+  font-size: 10px; letter-spacing: 0.4px; color: #7ee0ff; white-space: nowrap;
+  background: rgba(126, 224, 255, 0.12); border: 1px solid rgba(126, 224, 255, 0.3);
+  padding: 3px 8px; border-radius: 999px;
+}
+.solo-ctrls {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.82));
+  transition: opacity 0.25s, transform 0.25s;
+}
+.solo-ctrls.oculto { opacity: 0; transform: translateY(8px); pointer-events: none; }
+.solo-btn-osc { color: #e8edf4; border-color: rgba(255, 255, 255, 0.25); background: rgba(0, 0, 0, 0.35); }
+.solo-bar { flex: 1; min-width: 40px; accent-color: var(--violet); cursor: pointer; }
+.solo-time { color: #cfd8e3; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#soloCC { font-size: 12px; font-weight: 700; }
+#soloCC.activa { background: rgba(124, 92, 255, 0.35); border-color: var(--violet); color: #fff; }
+.cont-modo {
+  position: absolute; top: 8px; left: 8px; z-index: 2;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.4px; text-transform: uppercase;
+  color: #7ee0ff; background: rgba(5, 7, 15, 0.78);
+  border: 1px solid rgba(126, 224, 255, 0.4); border-radius: 999px; padding: 2px 7px;
+}
+/* =================== fin v81 =================== */

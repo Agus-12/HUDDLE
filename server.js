@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v80'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v81'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -131,7 +131,7 @@ function registrarProgreso(room, m, r) {
       title = m.title || hostOf(m.url || '');
       img = m.img || '';
     }
-    const entry = { url: m.url || '', t: Math.round(r.t), d: Math.round(r.d), title, img, ep, serie, ts: Date.now() };
+    const entry = { url: m.url || '', t: Math.round(r.t), d: Math.round(r.d), title, img, ep, serie, ts: Date.now(), modo: '' };
     if (!entry.url) return;
     for (const u of room.users.values()) {
       const key = u.nameKey || String(u.name || '').toLowerCase();
@@ -1599,6 +1599,141 @@ function readBody(req) {
   });
 }
 
+/* ===================== v81: modo individual =====================
+ * Ver una peli o un episodio SIN sala y SIN el navegador-espejo del
+ * servidor: resolvemos la URL directa del video (goodstream HLS) con
+ * puros fetch — como las sondas — y el navegador del usuario lo
+ * reproduce con hls.js. Sin competir por MIRROR_MAX ni reciclaje. */
+function decodificarDataSrc(enc) {
+  /* cuevana: <a class="play" data-src="BASE64"> — base64 → binario →
+   * números separados por espacios → charCodes desplazados -2 */
+  try {
+    const nums = Buffer.from(enc, 'base64').toString('binary').trim().split(/\s+/).map((x) => parseInt(x, 10));
+    if (nums.length < 8 || nums.some((x) => !Number.isFinite(x))) return null;
+    const crudo = nums.map((n) => String.fromCharCode(n)).join('');
+    const url = [...crudo].map((ch) => String.fromCharCode(ch.charCodeAt(0) - 2)).join('');
+    return /^https?:\/\/[a-z0-9.-]+\//i.test(url) ? url : null;
+  } catch { return null; }
+}
+async function fetchTexto(url, referer) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 25000);
+  try {
+    const r = await fetch(url, {
+      headers: { 'User-Agent': MIRROR_UA, Referer: referer || '', 'Accept-Language': 'es-MX,es;q=0.9,en;q=0.6' },
+      signal: ctl.signal, redirect: 'follow',
+    });
+    if (!r.ok) throw new Error('El sitio respondió ' + r.status);
+    return await r.text();
+  } finally { clearTimeout(t); }
+}
+async function resolverSolo(pageUrl) {
+  const html = await fetchTexto(pageUrl, '');
+  /* 1) el botón play goodstream (data-src cifrado) */
+  let embed = null;
+  const tags = html.match(/<a\b[^>]*class="[^"]*\bplay\b[^"]*"[^>]*>/gi) || [];
+  for (const t of tags) {
+    if ((t.match(/data-domain="([^"]*)"/i) || [])[1] !== 'goodstream') continue;
+    const enc = (t.match(/data-src="([^"]*)"/i) || [])[1];
+    if (enc) { const u = decodificarDataSrc(enc); if (u) { embed = u; break; } }
+  }
+  /* 2) plan B: algún embed goodstream a la vista */
+  if (!embed) {
+    const m = html.match(/https?:\/\/[^"'\s<>]*goodstream\.one\/embed[^"'\s<>]*/i);
+    if (m) embed = m[0];
+  }
+  if (!embed) throw new Error('Este título no tiene servidor goodstream — se ve en modo sala (👥 Juntos)');
+  /* 3) el embed contiene el master.m3u8 y los subtítulos VTT */
+  const em = await fetchTexto(embed, pageUrl);
+  const files = [...em.matchAll(/file\s*:\s*["'](https?:\/\/[^"']+)["']/gi)].map((m) => m[1]);
+  const m3u8 = files.find((f) => /\.m3u8/i.test(f));
+  if (!m3u8) throw new Error('El servidor no entregó el video — ábrelo en modo sala (👥 Juntos)');
+  const subs = files
+    .filter((f) => /\.vtt/i.test(f))
+    .map((f) => ({
+      url: f,
+      lang: /_spa\.|_esp\.|_es\./i.test(f) ? 'es' : /_eng\.|_en\./i.test(f) ? 'en' : /_sli\./i.test(f) ? 'es-419' : 'vtt',
+    }));
+  /* algunos nodos (hls1) solo sirven si el Referer es una página de
+   * goodstream: recordamos el embed que funcionó para este host */
+  try {
+    hlsReferers.set(new URL(m3u8).host, embed);
+    for (const s of subs) { try { hlsReferers.set(new URL(s.url).host, embed); } catch {} }
+  } catch {}
+  return { m3u8, subs };
+}
+
+/* v81: proxy HLS con allowlist — el token de goodstream puede venir
+ * amarrado a la IP del servidor, así que si al navegador no le sirve
+ * directo, re-servimos el stream por aquí (reescribiendo los m3u8). */
+const { Readable } = require('stream');
+const hlsReferers = new Map(); /* v81: host goodstream → embed que sirvió de Referer */
+function esGoodstream(u) {
+  try { const h = new URL(u).host; return /(^|\.)goodstream\.one$/i.test(h); }
+  catch { return false; }
+}
+async function proxearHls(req, res, target) {
+  if (!esGoodstream(target)) return json(res, 403, { ok: false, error: 'No permitido' });
+  /* el origen de goodstream a veces suelta 403 transitorios (cache-miss):
+   * reintentamos un par de veces antes de rendirnos */
+  let ref = 'https://goodstream.one/';
+  try { ref = hlsReferers.get(new URL(target).host) || ref; } catch {}
+  let upstream = null;
+  for (let intento = 0; intento < 3; intento++) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 30000);
+    try {
+      upstream = await fetch(target, {
+        headers: {
+          'User-Agent': MIRROR_UA,
+          Referer: ref,
+          'Accept-Language': 'es-MX,es;q=0.9,en;q=0.6', /* igual que fetchTexto: hls1 amarra el token al fingerprint */
+        },
+        signal: ctl.signal, redirect: 'follow',
+      });
+      clearTimeout(t);
+      if (upstream.ok) break;
+      if (upstream.status === 403 || upstream.status >= 500) {
+        try { upstream.body && upstream.body.cancel(); } catch {}
+        upstream = null;
+        await new Promise((r2) => setTimeout(r2, 1500 * (intento + 1)));
+        continue;
+      }
+      break; /* otros códigos (404…) se pasan tal cual */
+    } catch (e) {
+      clearTimeout(t);
+      upstream = null;
+      if (intento === 2) return json(res, 502, { ok: false, error: 'El servidor de video no respondió' });
+      await new Promise((r2) => setTimeout(r2, 1500 * (intento + 1)));
+    }
+  }
+  if (!upstream) return json(res, 502, { ok: false, error: 'El servidor de video no respondió' });
+  if (!upstream.ok && upstream.status !== 404) {
+    return json(res, 502, { ok: false, error: 'El servidor de video respondió ' + upstream.status });
+  }
+  const ct = upstream.headers.get('content-type') || '';
+  const esLista = /mpegurl|m3u8/i.test(ct) || /\.m3u8(\?|$)/i.test(target);
+  if (!esLista) {
+    /* segmento: tubería directa, sin tocar los bytes */
+    res.writeHead(upstream.status, { 'Content-Type': ct || 'video/MP2T', 'Cache-Control': 'no-store' });
+    Readable.fromWeb(upstream.body).on('error', () => {}).pipe(res);
+    return;
+  }
+  let txt = await upstream.text();
+  const prox = (u) => {
+    let abs; try { abs = new URL(u, target).href; } catch { return u; }
+    return esGoodstream(abs) ? '/api/hls?u=' + encodeURIComponent(abs) : abs;
+  };
+  txt = txt.replace(/URI="([^"]+)"/g, (m, u) => 'URI="' + prox(u) + '"');
+  txt = txt
+    .split('\n')
+    .map((l) => { const s = l.trim(); return !s || s.startsWith('#') ? l : prox(s); })
+    .join('\n');
+  res.writeHead(upstream.status, { 'Content-Type': 'application/vnd.apple.mpegurl', 'Cache-Control': 'no-store' });
+  res.end(txt);
+}
+/* =================== fin v81: modo individual =================== */
+
 const imgProxyCache = new Map(); /* v67: imágenes de animes proxyadas, url → {buf, ct, at} */
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
@@ -1824,9 +1959,60 @@ const server = http.createServer(async (req, res) => {
       const urec = users.get(name.toLowerCase());
       if (!name || !urec || urec.token !== tok) return json(res, 403, { ok: false, error: 'Perfil no válido' });
       const items = (continuar.get(name.toLowerCase()) || []).map((e) => ({
-        url: e.url, t: e.t, d: e.d, title: e.title, img: e.img, ep: e.ep, serie: e.serie, ts: e.ts,
+        url: e.url, t: e.t, d: e.d, title: e.title, img: e.img, ep: e.ep, serie: e.serie, ts: e.ts, modo: e.modo || '',
       }));
       return json(res, 200, { ok: true, items });
+    }
+    if (url.pathname === '/api/solo' && req.method === 'GET') {
+      /* v81: resolver el video directo de una página para modo individual */
+      const name = (url.searchParams.get('name') || '').trim();
+      const tok = url.searchParams.get('tok') || '';
+      const urec = users.get(name.toLowerCase());
+      if (!name || !urec || urec.token !== tok) return json(res, 403, { ok: false, error: 'Perfil no válido' });
+      const target = url.searchParams.get('url') || '';
+      if (!/^https?:\/\/[a-z0-9.-]+/i.test(target)) return json(res, 400, { ok: false, error: 'URL no válida' });
+      try {
+        const r = await resolverSolo(target);
+        return json(res, 200, { ok: true, m3u8: r.m3u8, subs: r.subs });
+      } catch (e) {
+        return json(res, 404, { ok: false, error: String(e.message || e).slice(0, 200) });
+      }
+    }
+    if (url.pathname === '/api/hls') {
+      /* v81: proxy del stream (solo goodstream) cuando directo falla */
+      return proxearHls(req, res, url.searchParams.get('u') || '');
+    }
+    if (url.pathname === '/api/progress' && req.method === 'POST') {
+      /* v81: guardar el minuto por el que va el usuario en modo individual */
+      const body = await readBody(req);
+      const name = String(body.name || '').trim();
+      const tok = String(body.token || '');
+      const urec = users.get(name.toLowerCase());
+      if (!name || !urec || urec.token !== tok) return json(res, 403, { ok: false, error: 'Perfil no válido' });
+      const entry = {
+        url: String(body.url || '').slice(0, 300),
+        t: Math.max(0, Math.round(+body.t || 0)),
+        d: Math.max(0, Math.round(+body.d || 0)),
+        title: String(body.title || '').slice(0, 80),
+        img: String(body.img || '').slice(0, 400),
+        ep: String(body.ep || '').slice(0, 30),
+        serie: String(body.serie || '').slice(0, 80),
+        modo: body.modo === 'solo' ? 'solo' : '',
+        ts: Date.now(),
+      };
+      if (!entry.url) return json(res, 400, { ok: false, error: 'Falta la URL' });
+      /* mismo criterio que registrarProgreso: solo si hay algo que retomar */
+      if (entry.d >= 60 && entry.t >= 5) {
+        const key = name.toLowerCase();
+        const lista = continuar.get(key) || [];
+        const i = lista.findIndex((e) => e.url === entry.url);
+        if (i >= 0) lista.splice(i, 1);
+        lista.unshift(entry);
+        if (lista.length > CONT_MAX) lista.length = CONT_MAX;
+        continuar.set(key, lista);
+        saveContinuar();
+      }
+      return json(res, 200, { ok: true });
     }
     if (url.pathname === '/api/rooms') {
       /* v31: salas en vivo con gente, qué ven y preview del espejo (estilo Rave) */
