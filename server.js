@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v78'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v79'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -116,6 +116,10 @@ function saveContinuar() {
 }
 function registrarProgreso(room, m, r) {
   try {
+    /* v79: solo lo que de verdad se estaba reproduciendo — el autoplay
+     * inicial de la página (antes del "lista en pausa") no cuenta como
+     * visto, para no llenar la fila con cosas apenas abiertas */
+    if (!m.playing) return;
     if (!r || !r.d || r.d < 60 || r.t < 5) return; // aún no hay nada que retomar
     let title = '', img = '', ep = '', serie = '';
     if (m.serie) {
@@ -1798,6 +1802,19 @@ const server = http.createServer(async (req, res) => {
       users.set(key, rec); saveUsers();
       console.log(`[usuarios] + ${name}`);
       return json(res, 200, { ok: true, name, token: rec.token });
+    }
+    if (url.pathname === '/api/continue' && req.method === 'DELETE') {
+      /* v79: quitar una entrada de "Continuar viendo" */
+      const name = (url.searchParams.get('name') || '').trim();
+      const tok = url.searchParams.get('tok') || '';
+      const delUrl = url.searchParams.get('url') || '';
+      const urec = users.get(name.toLowerCase());
+      if (!name || !urec || urec.token !== tok) return json(res, 403, { ok: false, error: 'Perfil no válido' });
+      const key = name.toLowerCase();
+      const lista = continuar.get(key) || [];
+      const i = lista.findIndex((en) => en.url === delUrl);
+      if (i >= 0) { lista.splice(i, 1); continuar.set(key, lista); saveContinuar(); }
+      return json(res, 200, { ok: true, quedan: lista.length });
     }
     if (url.pathname === '/api/continue') {
       /* v78: lo que este usuario dejó a medias (pelis y series, con su

@@ -575,6 +575,27 @@ body.sala-girada #room {
   overflow: hidden;
 }
 
+/* v79: TODO lo demás también se ve vertical en el celular — la tarjetita
+ * de login/invitación, la pantalla de "Preparando tu peli…" y el selector
+ * de episodios se giran igual cuando el celular está horizontal (la
+ * pantalla completa del video es lo único que se ve horizontal) */
+body.movil-horizontal .landing-card {
+  position: fixed; top: 50%; left: 50%;
+  width: min(460px, 92dvh);
+  max-height: 94dvw;
+  transform: translate(-50%, -50%) rotate(90deg);
+  overflow: auto;
+}
+body.movil-horizontal .peli-loading,
+body.movil-horizontal .serie-picker {
+  inset: auto;
+  top: 50%; left: 50%;
+  width: 100dvh; height: 100dvw;
+  transform: translate(-50%, -50%) rotate(90deg);
+  animation: none; /* pop anima transform y volaría la rotación */
+}
+body.movil-horizontal .sp-cuerpo { max-height: 88dvw; }
+
 /* v19: en móvil la barra del espejo (URL/Ir/Detener) no roba espacio al reproductor;
  * detener el espejo se hace desde las opciones (#mirrorStopRow) */
 #mirrorStopRow { display: none; }
@@ -1162,6 +1183,18 @@ body { overscroll-behavior-y: contain; }
 }
 .cont-card .cont-tiempo { display: block; font-size: 10.5px; color: var(--dim); margin-top: 4px; }
 .cont-card .sr-cover-anime { font-size: 40px; } /* 🎬 grande cuando no hay carátula */
+
+/* v79: botón de quitar la entrada (X en la esquina de la carátula) */
+.cont-x {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  width: 26px; height: 26px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(5, 7, 15, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--txt); cursor: pointer;
+}
+.cont-x:active { transform: scale(0.88); }
+.cont-x svg { width: 12px; height: 12px; }
 
 
 

@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v78';
+const APP_VERSION = 'v79';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1490,7 +1490,13 @@ function sincronizarSalaGirada() {
     document.body.classList.toggle('sala-girada', girar);
   } catch {}
 }
-function sincronizarGiros() { sincronizarFsGirado(); sincronizarSalaGirada(); }
+function sincronizarGiros() {
+  sincronizarFsGirado();
+  sincronizarSalaGirada();
+  /* v79: con el celular horizontal (y sin ampliar), TODO se ve vertical —
+   * login/invitación, pantalla de espera y selector de episodios */
+  try { document.body.classList.toggle('movil-horizontal', mqOrient.matches && esCelular() && !fsActive()); } catch {}
+}
 /* v78: ¿la vista está girada 90°? (pantalla completa en vertical, o la
  * sala con el celular horizontal) — los toques y la barrita se transponen */
 function vistaGirada() {
@@ -1517,6 +1523,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
   setTimeout(() => { autoFsPorOrientacion(mqOrient.matches); sincronizarGiros(); }, 250);
 });
+sincronizarGiros(); /* v79: al abrir la página ya acomoda las vistas (invitación incluida) */
 
 /* botón «Llenar / Ver todo»: solo visible en pantalla completa */
 $('#fitToggle').addEventListener('click', () => {
@@ -2236,6 +2243,22 @@ function crearTarjetaContinuar(e) {
   card.querySelector('.sr-nombre').textContent = e.title || e.serie || 'Película';
   if (e.ep) card.querySelector('.cont-ep').textContent = e.ep;
   card.querySelector('.cont-tiempo').textContent = `Quedaste en ${fmtTiempo(e.t)} de ${fmtTiempo(e.d)}`;
+  /* v79: X para quitar la entrada de la lista */
+  const x = document.createElement('span');
+  x.className = 'cont-x';
+  x.title = 'Quitar de la lista';
+  x.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+  x.addEventListener('click', (ev) => {
+    ev.stopPropagation(); /* que no abra la peli */
+    card.remove();
+    const f = document.querySelector('#continueRow');
+    const b = document.querySelector('#continueBox');
+    if (f && !f.children.length && b) b.classList.add('hidden');
+    if (S.profile) {
+      fetch('/api/continue?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(e.url), { method: 'DELETE' }).catch(() => {});
+    }
+  });
+  card.appendChild(x);
   const im = card.querySelector('img.sr-cover');
   if (im && e.img) {
     im.addEventListener('error', () => {
