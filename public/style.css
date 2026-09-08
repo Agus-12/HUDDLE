@@ -565,13 +565,18 @@ body.fs-lock .topbar { display: none; }
  * (la X) con el celular horizontal, la sala se muestra girada: voltea el
  * teléfono para usarla derecha (como Netflix: el video horizontal, la
  * app vertical). Al volver a vertical se endereza sola. */
+/* v80: el sentido del giro de la sala (y demás pantallas) depende de
+ * hacia qué lado esté acostado el teléfono: su parte de ARRIBA debe
+ * quedar hacia la parte de arriba del teléfono, pa' que se lea derecho */
+body { --giro-sala: 90deg; }
+body.giro-ccw { --giro-sala: -90deg; }
 body.sala-girada #room {
   position: fixed;
   top: 50%; left: 50%;
   width: 100vh; height: 100vw;
   width: 100dvh; height: 100dvw;
   min-height: 0; max-height: none;
-  transform: translate(-50%, -50%) rotate(90deg);
+  transform: translate(-50%, -50%) rotate(var(--giro-sala));
   overflow: hidden;
 }
 
@@ -583,7 +588,7 @@ body.movil-horizontal .landing-card {
   position: fixed; top: 50%; left: 50%;
   width: min(460px, 92dvh);
   max-height: 94dvw;
-  transform: translate(-50%, -50%) rotate(90deg);
+  transform: translate(-50%, -50%) rotate(var(--giro-sala));
   overflow: auto;
 }
 body.movil-horizontal .peli-loading,
@@ -591,7 +596,7 @@ body.movil-horizontal .serie-picker {
   inset: auto;
   top: 50%; left: 50%;
   width: 100dvh; height: 100dvw;
-  transform: translate(-50%, -50%) rotate(90deg);
+  transform: translate(-50%, -50%) rotate(var(--giro-sala));
   animation: none; /* pop anima transform y volaría la rotación */
 }
 body.movil-horizontal .sp-cuerpo { max-height: 88dvw; }

@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v79';
+const APP_VERSION = 'v80';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -665,8 +665,13 @@ window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload();
       const rc = videoShellEl.getBoundingClientRect();
       const cX = rc.left + rc.width / 2, cY = rc.top + rc.height / 2;
       const W = rc.height, H = rc.width; /* tamaño sin girar */
-      rect = { left: cX - W / 2, top: cY - H / 2, width: W, height: H };
-      const nx = W / 2 + (cy - cY), ny = H / 2 - (cx - cX);
+      /* v80: el lienzo SIN girar, en coordenadas de CONTENIDO (origen 0,0) —
+       * los toques transpuestos caen ahí, no en la posición visual */
+      rect = { left: 0, top: 0, width: W, height: H };
+      /* v80: el sentido depende de hacia qué lado esté acostado el teléfono */
+      let nx, ny;
+      if (dirGiro() < 0) { nx = W / 2 - (cy - cY); ny = H / 2 + (cx - cX); }
+      else { nx = W / 2 + (cy - cY); ny = H / 2 - (cx - cX); }
       cx = nx; cy = ny;
     }
     const scale = Math.min(rect.width / S.mirror.w, rect.height / S.mirror.h);
@@ -676,6 +681,7 @@ window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload();
     if (px < 0 || py < 0 || px > drawW || py > drawH) return null; // borde negro
     return { x: Math.round(px / scale), y: Math.round(py / scale), scale };
   };
+  try { window.__toPage = toPage; } catch {} /* v80: para pruebas */
 
   img.addEventListener('pointerdown', (e) => {
     if (!S.mirror.active) return;
@@ -695,14 +701,16 @@ window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload();
     const rect = img.getBoundingClientRect();
     /* v78: con la vista girada el rect visual está volteado — se compara
      * cruzado para que la velocidad del scroll sea la correcta */
-    const gir = vistaGirada();
+    const g = dirGiro();
     const scale = (S.mirror.w && S.mirror.h)
-      ? (gir ? Math.min(rect.height / S.mirror.w, rect.width / S.mirror.h)
-             : Math.min(rect.width / S.mirror.w, rect.height / S.mirror.h))
+      ? (g ? Math.min(rect.height / S.mirror.w, rect.width / S.mirror.h)
+           : Math.min(rect.width / S.mirror.w, rect.height / S.mirror.h))
       : 1;
-    /* v77: con la vista girada, arrastrar a los lados (en pantalla) es
-     * arrastrar arriba/abajo en la página — el eje se intercambia */
-    accDy += -((gir ? e.clientX : e.clientY) - (gir ? last.x : last.y)) / scale; // dedo arriba/izquierda → página baja
+    /* v77/v80: con la vista girada, arrastrar a los lados (en pantalla) es
+     * arrastrar arriba/abajo en la página — el eje se intercambia y el
+     * SENTIDO depende de hacia qué lado esté acostado el teléfono */
+    if (g) accDy += (g < 0 ? 1 : -1) * (e.clientX - last.x) / scale;
+    else accDy += -(e.clientY - last.y) / scale;
     last = { x: e.clientX, y: e.clientY };
     const now = Date.now();
     if (now - lastSent > 90 && Math.abs(accDy) >= 10) {
@@ -840,12 +848,14 @@ function pintarSeekBar(previewT) {
   const tDe = (ev) => {
     const r = bar.getBoundingClientRect();
     let pct;
-    if (vistaGirada()) {
-      /* v78: con la vista girada la barra se ve VERTICAL — el inicio
-       * queda ARRIBA: se recorre con el dedo hacia abajo */
+    if (dirGiro()) {
+      /* v78/v80: con la vista girada la barra se ve VERTICAL — se recorre
+       * con el dedo arriba/abajo; el INICIO queda arriba o abajo según
+       * hacia qué lado esté acostado el teléfono */
       const largo = r.height; /* largo real de la barra sin girar */
       const cY = r.top + r.height / 2;
-      pct = Math.max(0, Math.min(1, (largo / 2 + (ev.clientY - cY)) / largo));
+      const u = (dirGiro() < 0) ? (largo / 2 - (ev.clientY - cY)) : (largo / 2 + (ev.clientY - cY));
+      pct = Math.max(0, Math.min(1, u / largo));
     } else {
       pct = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
     }
@@ -1496,11 +1506,38 @@ function sincronizarGiros() {
   /* v79: con el celular horizontal (y sin ampliar), TODO se ve vertical —
    * login/invitación, pantalla de espera y selector de episodios */
   try { document.body.classList.toggle('movil-horizontal', mqOrient.matches && esCelular() && !fsActive()); } catch {}
+  /* v80: ¿hacia qué lado está acostado el teléfono? La vista girada debe
+   * quedar con su parte de ARRIBA hacia la parte de arriba del teléfono,
+   * pa' que se lea derecho — no al revés */
+  try { document.body.classList.toggle('giro-ccw', telefonoTopIzquierda()); } catch {}
 }
 /* v78: ¿la vista está girada 90°? (pantalla completa en vertical, o la
  * sala con el celular horizontal) — los toques y la barrita se transponen */
 function vistaGirada() {
   return videoShellEl.classList.contains('fs-girado') || document.body.classList.contains('sala-girada');
+}
+/* v80: ¿hacia qué lado está acostado el teléfono? true = su parte de
+ * arriba quedó a la IZQUIERDA (el agarre más común). Se detecta con la
+ * orientación de pantalla que reporta el navegador. */
+function telefonoTopIzquierda() {
+  try {
+    const so = screen.orientation;
+    if (so) {
+      if (typeof so.angle === 'number' && (so.angle === 90 || so.angle === 270)) return so.angle === 90;
+      if (so.type && /landscape/.test(so.type)) return /primary/.test(so.type);
+    }
+  } catch {}
+  try { if (typeof window.orientation === 'number' && window.orientation !== 0) return window.orientation > 0; } catch {}
+  return true; /* sin API: el agarre más común (arriba del teléfono a la izquierda) */
+}
+/* v80: sentido del giro de la vista: 1 = horario (como v77/v78),
+ * -1 = antihorario (teléfono acostado al otro lado), 0 = sin giro.
+ * La ampliada en vertical SIEMPRE gira igual (v77); la sala y las demás
+ * pantallas siguen el lado al que está acostado el teléfono. */
+function dirGiro() {
+  if (videoShellEl.classList.contains('fs-girado')) return 1;
+  if (document.body.classList.contains('sala-girada')) return document.body.classList.contains('giro-ccw') ? -1 : 1;
+  return 0;
 }
 function autoFsPorOrientacion(landscape) {
   try {
