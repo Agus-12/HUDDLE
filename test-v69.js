@@ -1,5 +1,6 @@
-/* E2E v69: "Animes del momento" HASTA ARRIBA del inicio + carga
- * independiente de secciones — más lo esencial de v68/v67/v65 */
+/* E2E v69 FULL: "Animes del momento" hasta arriba + todo v68 (sin
+ * AnimeFLV/GoPelis, chip junto a "En vivo", "Buscar películas", play
+ * abajo en celular) + v67 (animes del momento, proxy img) + v66/v65/v64 */
 const fs = require('fs');
 const movioCanvas = (page) => page.evaluate(() => {
   const c = document.querySelector('#mirrorImg');
@@ -114,7 +115,7 @@ async function tocarCanvas(page) {
 
   /* ---------- USUARIO A (anfitrión) ---------- */
   console.log('— Usuario A (anfitrión) —');
-  const bA = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required'] });
+  const bA = await puppeteer.launch({ headless: 'new', protocolTimeout: 180000, args: ['--no-sandbox', '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required'] });
   const pA = await bA.newPage();
   /* ojo: el sandbox tiene poca RAM — el viewport ancho solo se usa cuando
      toca medir posiciones de escritorio (más abajo), no durante el video */
@@ -182,6 +183,12 @@ async function tocarCanvas(page) {
     };
   });
   ok(filaAnm.n >= 8, `fila de animes con ${filaAnm.n} carátulas`);
+  const orden69 = await pA.evaluate(() => {
+    const a = document.querySelector('#animesBox').getBoundingClientRect();
+    const t = document.querySelector('#trendingBox').getBoundingClientRect();
+    return { aTop: a.top, tTop: t.top };
+  });
+  ok(orden69.aTop <= orden69.tTop, `v69: Animes del momento ARRIBA en el inicio (${Math.round(orden69.aTop)} ≤ ${Math.round(orden69.tTop)})`);
   ok(filaAnm.cargada && filaAnm.viaProxy, `primera carátula carga: "${filaAnm.nombre}" (${filaAnm.extra})`);
   /* un toque abre el selector de episodios como cualquier anime */
   await pA.click('#animesRow .sr-card');
@@ -199,16 +206,366 @@ async function tocarCanvas(page) {
   await pA.evaluate(() => cerrarSeriePicker());
   await sleep(400);
 
-  /* v69: el orden en pantalla — animes PRIMERO */
-  const orden = await pA.evaluate(() => {
-    const a = document.querySelector('#animesBox').getBoundingClientRect();
-    const t = document.querySelector('#trendingBox').getBoundingClientRect();
-    return { aTop: a.top, tTop: t.top, aVis: !document.querySelector('#animesBox').classList.contains('hidden'), tVis: !document.querySelector('#trendingBox').classList.contains('hidden') };
-  });
-  ok(orden.aVis && orden.tVis && orden.aTop <= orden.tTop, `secciones en orden: Animes del momento ARRIBA (${Math.round(orden.aTop)} ≤ ${Math.round(orden.tTop)})`);
+  /* ---------- picker de anime LATINO: Latanime (v63) ---------- */
+  console.log('— Selector de anime LATINO (Latanime) —');
+  await pA.evaluate(() => { abrirSeriePicker({ url: 'https://latanime.org/anime/dragon-ball-daima-latino', title: 'Dragon Ball Daima Latino', img: '' }, false, true); });
+  await pA.waitForSelector('#seriePicker:not(.hidden)', { timeout: 15000 });
+  await pA.waitForFunction(() => document.querySelectorAll('#spEpisodios .sp-ep').length > 0, { timeout: 30000 });
+  const latPk = await pA.evaluate(() => ({
+    titulo: document.querySelector('#spTitle').textContent,
+    meta: document.querySelector('#spMeta').textContent,
+    eps: document.querySelectorAll('#spEpisodios .sp-ep').length,
+    primero: (document.querySelector('#spEpisodios .sp-ep .sp-ep-num') || {}).textContent || '',
+    poster: document.querySelector('#spPoster').getAttribute('src') || '',
+  }));
+  ok(/Daima/i.test(latPk.titulo), `anime latino: "${latPk.titulo}"`);
+  ok(latPk.eps >= 15, `${latPk.eps} episodios (${latPk.meta})`);
+  ok(/Episodio\s*1/.test(latPk.primero), `primera fila: "${latPk.primero}"`);
+  ok(/\/api\/img\?u=/.test(latPk.poster), `póster vía proxy propio (${latPk.poster.slice(0, 46)}…)`);
 
-  ok(errsA.length === 0, `A sin errores JS${errsA.length ? ' → ' + errsA[0] : ''}`);
-  await bA.close();
+  /* ---------- episodio de anime LATINO → mismo flujo que una peli ---------- */
+  console.log('— Episodio de anime LATINO (Latanime) —');
+  await pA.click('#spEpisodios .sp-ep');
+  await pA.waitForSelector('#peliLoading:not(.hidden)', { timeout: 15000 });
+  await pA.waitForFunction(() => location.hash.match(/^#[A-Z0-9]{4,8}$/), { timeout: 20000 });
+  const codeAni = await pA.evaluate(() => location.hash.slice(1));
+  ok(!!codeAni, `sala de anime latino: ${codeAni}`);
+  /* v68: el sitio que se ve, junto a "En vivo" + botón "Buscar películas" */
+  await pA.waitForFunction(() => !document.querySelector('#liveSite').hidden, { timeout: 15000 }).catch(() => {});
+  const chipV68 = await pA.evaluate(() => ({
+    visible: !document.querySelector('#liveSite').hidden,
+    nombre: document.querySelector('#liveSiteName').textContent,
+    logo: document.querySelector('#liveSiteImg').getAttribute('src') || '',
+    buscar: document.querySelector('#pagePickBtn').textContent.trim(),
+  }));
+  ok(chipV68.visible && chipV68.nombre === 'Latanime' && chipV68.logo === '/sites/latanime.png', `chip junto a "En vivo": ${chipV68.nombre} con logo`);
+  ok(/Buscar películas/.test(chipV68.buscar), `botón de la sala: "${chipV68.buscar}"`);
+  const nomAni = await pA.evaluate(() => document.querySelector('#peliNombre').textContent);
+  ok(/Daima/i.test(nomAni) && /Episodio/.test(nomAni), `espera con nombre: "${nomAni}"`);
+  /* el reproductor de Latanime tarda un poquito en madurar */
+  let listoAni = true;
+  await pA.waitForSelector('#playBtn:not(.hidden)', { timeout: 150000 }).catch(() => { listoAni = false; });
+  ok(listoAni, 'episodio latino listo en pausa — botón de play visible');
+  if (listoAni) {
+    await sleep(900); /* la capa se funde a opacity 0 en .22s */
+    const cineAni = await pA.evaluate(() => ({
+      cine: document.body.classList.contains('cine-listo'),
+      capa: !document.querySelector('#ctrlLayer').classList.contains('visible'),
+      opa: getComputedStyle(document.querySelector('#ctrlLayer')).opacity,
+    }));
+    ok(cineAni.cine && cineAni.capa && cineAni.opa === '0', 'modo cine: controles escondidos (opacidad 0)');
+    await pA.click('#playBtn');
+    await pA.waitForFunction(() => document.querySelector('#playBtn').classList.contains('hidden'), { timeout: 15000 });
+    await sleep(6000);
+    const a1 = await movioCanvas(pA).catch(() => -1);
+    await sleep(4000);
+    const a2 = await movioCanvas(pA).catch(() => -2);
+    ok(a1 !== a2, `anime latino corriendo tras el play (${a1}→${a2})`);
+    /* invitación con metadatos del anime (rama Latanime) */
+    const invA = await pA.evaluate(async (c) => (await fetch('/api/invite/' + c)).json(), codeAni);
+    ok(/Daima/i.test(invA.title || '') && /Episodio/.test(invA.title || ''), `invite anime latino: "${invA.title}"`);
+    ok(/\/api\/img\?u=/.test(invA.poster || '') || /latanime/.test(invA.poster || ''), `invite póster (proxy propio): ${(invA.poster || '').slice(0, 50)}`);
+    /* paramos el espejo del anime (igual que el botón Detener) */
+    await pA.evaluate(() => { try { sendAction({ type: 'mirror', op: 'stop' }); } catch {} });
+    await sleep(2500);
+  }
+
+  /* ---------- PELI de cine-calidad con protector de enlaces (v64) ---------- */
+  console.log('— Película: bypass del protector —');
+  await pA.goto(BASE + '/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await pA.waitForSelector('#trendingBox:not(.hidden)', { timeout: 30000 });
+  await pA.evaluate(() => {
+    S.pendingStart = { url: 'https://cine-calidad.mx/pelicula/mayday/', name: 'Mayday', img: '' };
+    S.mirrorInfo = { title: 'Mayday', img: '', url: 'https://cine-calidad.mx/pelicula/mayday/', sub: 'Abriendo…' };
+    const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+    connect(code);
+  });
+  await pA.waitForFunction(() => location.hash.match(/^#[A-Z0-9]{4,8}$/), { timeout: 20000 });
+  const codePeli = await pA.evaluate(() => location.hash.slice(1));
+  ok(!!codePeli, `sala de película: ${codePeli}`);
+  let listoPeli = true;
+  await pA.waitForSelector('#playBtn:not(.hidden)', { timeout: 150000 }).catch(() => { listoPeli = false; });
+  ok(listoPeli, 'película lista en pausa (bypass del protector) — botón de play visible');
+  if (listoPeli) {
+    await pA.click('#playBtn');
+    await sleep(7000);
+    /* el tiempo de la peli avanza (más confiable que el brillo del canvas) */
+    const tiempos = [];
+    for (let i = 0; i < 4; i++) {
+      tiempos.push(await pA.evaluate(() => document.querySelector('#seekCur').textContent));
+      await sleep(2500);
+    }
+    ok(tiempos[0] !== tiempos[3], `película corriendo (${tiempos.join(' → ')})`);
+    const barra = await pA.evaluate(() => ({ dur: document.querySelector('#seekDur').textContent }));
+    ok(barra.dur !== '0:00', `duración en la barrita (${barra.dur})`);
+    await pA.evaluate(() => { try { sendAction({ type: 'mirror', op: 'stop' }); } catch {} });
+    await sleep(2000);
+  }
+
+  /* ---------- episodio de SERIE + posiciones v65 ---------- */
+  console.log('— Episodio de serie: botones sobre la barrita, play al centro (v66) —');
+  await pA.goto(BASE + '/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await pA.waitForSelector('#trendingBox:not(.hidden)', { timeout: 30000 });
+  /* v63: TWD debe mostrar sus 11 temporadas en pestañas */
+  await pA.evaluate(() => { abrirSeriePicker({ url: 'https://cine-calidad.mx/serie/the-walking-dead/', title: 'The Walking Dead', img: '' }, false, false); });
+  await pA.waitForSelector('#seriePicker:not(.hidden)', { timeout: 15000 });
+  await pA.waitForFunction(() => document.querySelectorAll('#spEpisodios .sp-ep').length > 0, { timeout: 30000 });
+  const twdTabs = await pA.evaluate(() => document.querySelectorAll('#spTemporadas .sp-temp-btn').length);
+  ok(twdTabs === 11, `TWD: ${twdTabs} pestañas de temporada (antes salía 1)`);
+  /* cambiar a la temporada 5 debe listar sus episodios */
+  await pA.evaluate(() => { const b = document.querySelectorAll('#spTemporadas .sp-temp-btn')[4]; if (b) b.click(); });
+  await sleep(700);
+  const twdT5 = await pA.evaluate(() => [...document.querySelectorAll('#spEpisodios .sp-ep .sp-ep-num')].slice(0, 3).map((x) => x.textContent));
+  ok(twdT5.length > 0 && twdT5.every((x) => /^5x/.test(x)), `temporada 5 lista: ${twdT5.join(', ')}`);
+  await pA.evaluate(() => cerrarSeriePicker());
+  await sleep(400);
+  /* serie fija (Arrow — su episodio 1x1 tiene servidor goodstream) */
+  await pA.evaluate(() => { abrirSeriePicker({ url: 'https://cine-calidad.mx/serie/peaky-blinders/', title: 'Peaky Blinders', img: '' }, false, false); });
+  await pA.waitForSelector('#seriePicker:not(.hidden)', { timeout: 15000 });
+  await pA.waitForFunction(() => document.querySelectorAll('#spEpisodios .sp-ep').length > 0, { timeout: 30000 });
+  const pkSer = await pA.evaluate(() => ({
+    eps: document.querySelectorAll('#spEpisodios .sp-ep').length,
+    temps: document.querySelectorAll('#spTemporadas .sp-temp-btn').length,
+  }));
+  ok(pkSer.eps >= 3, `selector de serie: ${pkSer.eps} episodio(s), ${pkSer.temps} pestaña(s)`);
+  await pA.click('#spEpisodios .sp-ep');
+  await pA.waitForSelector('#peliLoading:not(.hidden)', { timeout: 15000 });
+  await pA.waitForFunction(() => location.hash.match(/^#[A-Z0-9]{4,8}$/), { timeout: 20000 });
+  const codeSer = await pA.evaluate(() => location.hash.slice(1));
+  ok(!!codeSer, `sala de serie: ${codeSer}`);
+  await pA.waitForSelector('#playBtn:not(.hidden)', { timeout: 120000 });
+  ok(true, 'episodio listo en pausa — botón de play visible');
+  /* la barrita aparece cuando llega el primer mirror-time con duración */
+  await pA.waitForFunction(() => !document.querySelector('#seekWrap').classList.contains('hidden') && document.querySelector('#seekDur').textContent !== '0:00', { timeout: 30000 });
+  await sleep(900); /* fundido de la capa (.22s) */
+  /* viewport de escritorio para las medidas (más de 980px de ancho) */
+  await pA.setViewport({ width: 1280, height: 800 });
+  await sleep(600);
+
+  /* v66 (vista normal): capa pegada ABAJO, botones ARRIBA de la barrita,
+   * y el botón de "Toca para empezar" al CENTRO del video */
+  const pos = await pA.evaluate(() => {
+    const L = document.querySelector('#ctrlLayer').getBoundingClientRect();
+    const M = document.querySelector('#mirrorLayer').getBoundingClientRect();
+    const W = document.querySelector('#seekWrap').getBoundingClientRect();
+    const N = document.querySelector('#mirrorNav').getBoundingClientRect();
+    const C = document.querySelector('.play-circulo') ? document.querySelector('.play-circulo').getBoundingClientRect() : null;
+    return {
+      lb: L.bottom, mb: M.bottom, mt: M.top,
+      wtop: W.top, ntop: N.top,
+      ctop: C ? C.top : 0, cbot: C ? C.bottom : 0,
+    };
+  });
+  ok(Math.abs(pos.lb - pos.mb) < 6, `capa de controles pegada al FONDO del video (${Math.round(pos.lb)}/${Math.round(pos.mb)}px)`);
+  ok(pos.ntop < pos.wtop, `botones 10/30/lupa ARRIBA de la barrita (nav ${Math.round(pos.ntop)} < barra ${Math.round(pos.wtop)})`);
+  const centroCirc = (pos.ctop + pos.cbot) / 2, centroVideo = (pos.mt + pos.mb) / 2;
+  ok(Math.abs(centroCirc - centroVideo) < 60, `"Toca para empezar" al CENTRO del video (círculo ${Math.round(centroCirc)} vs centro ${Math.round(centroVideo)})`);
+  /* v66: la barra de búsqueda sale ABAJO (como la lupa, que está abajo) */
+  const msPos = await pA.evaluate(() => {
+    const bar = document.querySelector('#msBar');
+    bar.classList.remove('hidden');
+    const B = bar.getBoundingClientRect();
+    const M = document.querySelector('#mirrorLayer').getBoundingClientRect();
+    bar.classList.add('hidden');
+    return { top: B.top - M.top, bot: M.bottom - B.bottom };
+  });
+  ok(msPos.bot < 30 && msPos.bot >= -2, `barra de búsqueda ABAJO en vista normal (a ${Math.round(msPos.bot)}px del fondo)`);
+
+  /* v65: en pantalla completa (simulada) todo se queda como en v62 */
+  await pA.evaluate(() => enterPseudoFs());
+  await sleep(400);
+  const posFs = await pA.evaluate(() => {
+    const L = document.querySelector('#ctrlLayer').getBoundingClientRect();
+    const M = document.querySelector('#mirrorLayer').getBoundingClientRect();
+    const W = document.querySelector('#seekWrap').getBoundingClientRect();
+    const N = document.querySelector('#mirrorNav').getBoundingClientRect();
+    const just = getComputedStyle(document.querySelector('#playBtn')).justifyContent;
+    const bar = document.querySelector('#msBar');
+    bar.classList.remove('hidden');
+    const B = bar.getBoundingClientRect();
+    bar.classList.add('hidden');
+    return { lb: L.bottom, mb: M.bottom, just, bBot: M.bottom - B.bottom, wbot: W.bottom, ntop: N.top };
+  });
+  ok(Math.abs(posFs.lb - posFs.mb) < 6, 'en pantalla completa la capa se queda ABAJO (sin cambios)');
+  ok(posFs.just === 'center', 'en pantalla completa el botón de play queda al CENTRO (sin cambios)');
+  ok(posFs.ntop >= posFs.wbot - 6, `en pantalla completa los botones van DEBAJO de la barrita (como en v62)`);
+  ok(posFs.bBot < 40 && posFs.bBot >= -2, `en pantalla completa la búsqueda sale ABAJO (${Math.round(posFs.bBot)}px del fondo)`);
+  await pA.evaluate(() => exitFullscreen());
+  await sleep(300);
+  await pA.setViewport({ width: 800, height: 600 }); /* de vuelta al liviano */
+  await sleep(600);
+
+  /* escondidos por defecto en modo cine */
+  const oculto0 = await pA.evaluate(() => ({
+    cine: document.body.classList.contains('cine-listo'),
+    vis: document.querySelector('#ctrlLayer').classList.contains('visible'),
+    opa: getComputedStyle(document.querySelector('#ctrlLayer')).opacity,
+    ptr: getComputedStyle(document.querySelector('#ctrlLayer')).pointerEvents,
+  }));
+  ok(oculto0.cine && !oculto0.vis && oculto0.opa === '0' && oculto0.ptr === 'none', 'controles escondidos en modo cine (opacity 0, sin toques)');
+
+  /* 1er toque → aparecen */
+  await tocarCanvas(pA);
+  const vis1 = await pA.evaluate(() => ({
+    vis: document.querySelector('#ctrlLayer').classList.contains('visible'),
+    opa: getComputedStyle(document.querySelector('#ctrlLayer')).opacity,
+  }));
+  ok(vis1.vis && vis1.opa === '1', 'un toque en la pantalla saca los controles');
+
+  /* 5s → se esconden solos */
+  await sleep(5300);
+  const vis2 = await pA.evaluate(() => ({ vis: document.querySelector('#ctrlLayer').classList.contains('visible'), opa: getComputedStyle(document.querySelector('#ctrlLayer')).opacity }));
+  ok(!vis2.vis && vis2.opa === '0', 'a los 5 segundos se esconden solos');
+
+  /* tocar y jugar: play → controles fuera */
+  await pA.click('#playBtn');
+  await pA.waitForFunction(() => document.querySelector('#playBtn').classList.contains('hidden'), { timeout: 15000 });
+  await sleep(1500);
+  const trasPlay = await pA.evaluate(() => document.querySelector('#ctrlLayer').classList.contains('visible'));
+  ok(!trasPlay, 'al reproducir los controles se esconden');
+  await sleep(5000);
+
+  /* toque → aparecen; otro toque → PAUSA */
+  await tocarCanvas(pA);
+  const vis3 = await pA.evaluate(() => document.querySelector('#ctrlLayer').classList.contains('visible'));
+  ok(vis3, 'toque durante la peli saca los controles');
+  /* que corra unos segundos comprobables antes de pausar */
+  const curA = await pA.evaluate(() => document.querySelector('#seekCur').textContent);
+  await sleep(2000); /* rápido: el segundo toque debe caer dentro de los 5s de controles visibles */
+  const curB = await pA.evaluate(() => document.querySelector('#seekCur').textContent);
+  ok(curA !== curB, `la peli avanza (${curA} → ${curB})`);
+  await tocarCanvas(pA);
+  await sleep(2500);
+  const pausa = await pA.evaluate(() => ({
+    btn: !document.querySelector('#playBtn').classList.contains('hidden'),
+    capa: document.querySelector('#ctrlLayer').classList.contains('visible'),
+  }));
+  ok(pausa.btn, 'segundo toque PAUSÓ la peli (botón de play grande de vuelta)');
+  ok(!pausa.capa, 'y los controles se volvieron a esconder');
+  const cur2 = await pA.evaluate(() => document.querySelector('#seekCur').textContent);
+  await sleep(3000);
+  const cur3 = await pA.evaluate(() => document.querySelector('#seekCur').textContent);
+  ok(cur2 === cur3, `la peli quedó en pausa de verdad (congelada en ${cur2} = ${cur3})`);
+
+  /* pausada: un toque saca controles (no reanuda) */
+  await tocarCanvas(pA);
+  const visP = await pA.evaluate(() => document.querySelector('#ctrlLayer').classList.contains('visible'));
+  ok(visP, 'en pausa, un toque también saca los controles');
+
+  /* reanudar con el botón grande */
+  await pA.click('#playBtn');
+  await pA.waitForFunction(() => document.querySelector('#playBtn').classList.contains('hidden'), { timeout: 15000 });
+  await sleep(6000);
+  const s1 = await movioCanvas(pA).catch(() => -1);
+  const rA1 = await pA.evaluate(() => document.querySelector('#seekCur').textContent);
+  await sleep(4000);
+  const s2 = await movioCanvas(pA).catch(() => -2);
+  const rA2 = await pA.evaluate(() => document.querySelector('#seekCur').textContent);
+  ok(s1 !== s2 || rA1 !== rA2, `serie corriendo tras reanudar (${rA1}→${rA2})`); /* v67: canvas negro ≠ parada */
+
+  /* USUARIO B: entra y ve la sala sin errores */
+  console.log('— Usuario B (invitado) —');
+  const bB = await puppeteer.launch({ headless: 'new', protocolTimeout: 180000, args: ['--no-sandbox', '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required'] });
+  const pB = await bB.newPage();
+  const errsB = [];
+  pB.on('pageerror', (e) => errsB.push(String(e)));
+  await pB.goto(BASE + '/#' + codeSer, { waitUntil: 'networkidle2', timeout: 60000 });
+  await pB.waitForSelector('#inviteHero:not(.hidden)', { timeout: 15000 });
+  await pB.type('#userNick', NOMBRE_B);
+  await pB.click('#btnLogin');
+  await pB.waitForFunction(() => !document.querySelector('#room').classList.contains('hidden'), { timeout: 30000 });
+  const ctrlB = await pB.evaluate(() => ({
+    flechas: !!document.querySelector('#btnMBack') || !!document.querySelector('#btnMFwd'),
+    capa: !!document.querySelector('#ctrlLayer'),
+    cine: document.body.classList.contains('cine-listo'),
+  }));
+  ok(!ctrlB.flechas && ctrlB.capa && ctrlB.cine, 'B dentro: sin flechas, capa nueva, modo cine');
+  /* B (invitado) también puede sacar los controles con un toque */
+  await tocarCanvas(pB);
+  const visB = await pB.evaluate(() => document.querySelector('#ctrlLayer').classList.contains('visible'));
+  ok(visB, 'B ve los controles al tocar la pantalla');
+
+  /* ---------- v65: mensajes del chat con el nuevo acomodo ---------- */
+  console.log('— Mensajes del chat (v65) —');
+  /* A en pantalla completa + controles visibles → la tira se sube sobre ellos */
+  await pA.evaluate(() => enterPseudoFs());
+  await sleep(400);
+  await tocarCanvas(pA);
+  const lift = await pA.evaluate(() => ({
+    vis: document.querySelector('#ctrlLayer').classList.contains('visible'),
+    cls: document.body.classList.contains('ctrls-vis'),
+    bot: getComputedStyle(document.querySelector('#msgTicker')).bottom,
+  }));
+  ok(lift.vis && lift.cls && botPx(lift.bot) > 100, `con controles visibles, la tira de mensajes se sube (bottom ${lift.bot})`);
+  /* B manda un mensaje → A lo ve deslizarse en la tira */
+  await pB.type('#chatInput', 'hola desde B ' + RUN);
+  await pB.keyboard.press('Enter');
+  await pA.waitForFunction(() => document.querySelector('#msgTicker').classList.contains('run'), { timeout: 8000 });
+  const tickTxt = await pA.evaluate(() => document.querySelector('#msgTickerInner').textContent);
+  ok(/hola desde B/.test(tickTxt), `mensaje de B en la tira deslizante: "${tickTxt.trim().slice(0, 40)}…"`);
+  /* a los 5s los controles se esconden → la tira baja al margen */
+  await sleep(5300);
+  const unlift = await pA.evaluate(() => ({
+    cls: document.body.classList.contains('ctrls-vis'),
+    bot: getComputedStyle(document.querySelector('#msgTicker')).bottom,
+  }));
+  ok(!unlift.cls && botPx(unlift.bot) < 100, `controles fuera → la tira baja de vuelta (bottom ${unlift.bot})`);
+  /* otro mensaje con controles escondidos → tira al margen, sin tapar nada */
+  await pB.type('#chatInput', 'segundo mensaje');
+  await pB.keyboard.press('Enter');
+  await sleep(900);
+  const tick2 = await pA.evaluate(() => getComputedStyle(document.querySelector('#msgTicker')).bottom);
+  ok(botPx(tick2) < 100, `segundo mensaje con la tira al margen (bottom ${tick2})`);
+  await pA.evaluate(() => exitFullscreen());
+  await sleep(300);
+  /* en vista normal el mensaje llega al chat de siempre (columna del chat) */
+  const chatA = await pA.evaluate(() => [...document.querySelectorAll('#chatLog .msg')].map((m) => m.textContent).join(' | '));
+  ok(/hola desde B/.test(chatA) && /segundo mensaje/.test(chatA), 'vista normal: los mensajes llegan al chat de siempre');
+
+  /* B ya no se necesita: cerramos su navegador antes del celular
+     (el entorno de pruebas tiene poca memoria) */
+  ok(errsB.length === 0, `B sin errores JS${errsB.length ? ' → ' + errsB[0] : ''}`);
+  await bB.close();
+  await sleep(500);
+
+  /* ---------- v68: en CELULAR el botón de play va ABAJO del video ---------- */
+  console.log('— Celular (v68) —');
+  const bM = await puppeteer.launch({ headless: 'new', protocolTimeout: 180000, args: ['--no-sandbox', '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required'] });
+  const pM = await bM.newPage();
+  const errsM = [];
+  pM.on('pageerror', (e) => errsM.push(String(e)));
+  await pM.setViewport({ width: 390, height: 844, isMobile: true, hasTouch: true });
+  await pM.goto(BASE + '/#' + codeSer, { waitUntil: 'networkidle2', timeout: 60000 });
+  await pM.waitForSelector('#inviteHero:not(.hidden)', { timeout: 15000 });
+  await pM.type('#userNick', 'Mvl' + RUN);
+  await pM.click('#btnLogin');
+  await pM.waitForFunction(() => !document.querySelector('#room').classList.contains('hidden'), { timeout: 20000 });
+  /* A pausa la peli → el botón grande aparece también para el celular */
+  await pA.evaluate(() => { try { sendAction({ type: 'mirror', op: 'pause' }); } catch {} });
+  await pM.waitForSelector('#playBtn:not(.hidden)', { timeout: 20000 });
+  await pM.waitForFunction(() => !document.querySelector('#seekWrap').classList.contains('hidden') && document.querySelector('#seekDur').textContent !== '0:00', { timeout: 30000 });
+  await sleep(800);
+  const posM = await pM.evaluate(() => {
+    const M = document.querySelector('#mirrorLayer').getBoundingClientRect();
+    const C = document.querySelector('.play-circulo').getBoundingClientRect();
+    const T = document.querySelector('.play-txt').getBoundingClientRect();
+    const N = document.querySelector('#mirrorNav').getBoundingClientRect();
+    const W = document.querySelector('#seekWrap').getBoundingClientRect();
+    return {
+      centroCirc: (C.top + C.bottom) / 2, centroVideo: (M.top + M.bottom) / 2,
+      fila: Math.abs(((C.top + C.bottom) / 2) - ((T.top + T.bottom) / 2)) < 30,
+      navTop: N.top, barTop: W.top, videoAlto: M.height,
+    };
+  });
+  ok(posM.centroCirc > posM.centroVideo + 20, `celular: botón de play ABAJO del centro (círculo ${Math.round(posM.centroCirc)} vs centro ${Math.round(posM.centroVideo)} de ${Math.round(posM.videoAlto)}px)`);
+  ok(posM.fila, 'celular: "Toca para empezar" al lado del círculo (en fila)');
+  ok(posM.navTop < posM.barTop, 'celular: botones 10/30/lupa arriba de la barrita');
+  ok(errsM.length === 0, `celular sin errores JS${errsM.length ? ' → ' + errsM[0] : ''}`);
+  await bM.close();
+  /* paramos el espejo para no dejar la sala consumiendo memoria del servidor */
+  await pA.evaluate(() => { try { sendAction({ type: 'mirror', op: 'stop' }); } catch {} });
+  await sleep(1500);
+
   ok(errsA.length === 0, `A sin errores JS${errsA.length ? ' → ' + errsA[0] : ''}`);
 
   await bA.close();
