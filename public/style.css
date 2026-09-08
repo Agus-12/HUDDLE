@@ -1330,25 +1330,13 @@ body.ctrls-vis .msg-ticker {
 .live-site .site-logo { width: 18px; height: 18px; border-radius: 5px; flex: none; }
 .live-site span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* v70: en CELULAR el reproductor es más ALTO (la película queda al centro
- * con aire arriba y abajo) para que la barrita de adelantar y los botones
- * vivan ABAJO, cerca del chat — y no incrustados en la película chiquita.
- * En computadora y en pantalla completa no cambia nada. */
+/* v71: en CELULAR (sin pantalla completa) la pantalla queda como
+ * siempre era — reproductor compacto a lo ancho — y el botón de
+ * "Toca para empezar" va CENTRADO en medio del reproductor, igual
+ * que en la computadora (círculo al centro con su texto debajo). */
 @media (max-width: 980px) {
-  .video-shell:not(:fullscreen):not(:-webkit-full-screen):not(.pseudo-fs) {
-    aspect-ratio: auto;
-    height: calc(100dvh - 390px);
-    min-height: 260px;
-    max-height: none; /* v20 la limitaba al 16:9 del ancho; ya no aplica */
-  }
-  /* v70: el botón de "Toca para empezar" va ABAJO y CENTRADO — el círculo
-   * justo al medio de la pantalla (v68 lo ponía a un lado, en fila con el
-   * texto; ahora el texto va DEBAJO del círculo) */
   .video-shell:not(:fullscreen):not(:-webkit-full-screen):not(.pseudo-fs) .play-btn {
-    flex-direction: column;
-    justify-content: flex-end; /* pegado al margen de abajo */
-    align-items: center;       /* círculo al centro */
-    gap: 10px;
-    padding: 0 12px calc(16px + env(safe-area-inset-bottom, 0px));
+    gap: 10px; /* un poquito más junto que en escritorio, la pantalla es chica */
   }
 }
+
