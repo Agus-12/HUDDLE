@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v75';
+const APP_VERSION = 'v76';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1418,6 +1418,24 @@ function toggleFullscreen() {
 }
 $('#btnFs').addEventListener('click', toggleFullscreen);
 $('#fsExit').addEventListener('click', exitFullscreen);
+
+/* v76: al VOLTEAR el celular (horizontal) se amplía solo, y al
+ * levantarlo (vertical) se regresa al modo sala — como YouTube.
+ * Solo dentro de la sala, con algo reproduciéndose en el espejo,
+ * y solo en pantallas de celular (con toque). */
+const mqOrient = window.matchMedia('(orientation: landscape)');
+function autoFsPorOrientacion(landscape) {
+  try {
+    if (!S.room || !document.querySelector('#room') || document.querySelector('#room').classList.contains('hidden')) return;
+    if (!document.body.classList.contains('mirroring')) return;
+    if (window.innerWidth > 980) return; /* pantallas grandes */
+    if (!('ontouchstart' in window) && !(navigator.maxTouchPoints > 0)) return; /* sin celular */
+    if (landscape && !fsActive()) toggleFullscreen(); /* él solo ajusta el modo de llenado */
+    else if (!landscape && fsActive()) exitFullscreen();
+  } catch {}
+}
+if (mqOrient.addEventListener) mqOrient.addEventListener('change', (e) => autoFsPorOrientacion(e.matches));
+else if (mqOrient.addListener) mqOrient.addListener((e) => autoFsPorOrientacion(e.matches)); /* iOS viejo */
 
 /* botón «Llenar / Ver todo»: solo visible en pantalla completa */
 $('#fitToggle').addEventListener('click', () => {
