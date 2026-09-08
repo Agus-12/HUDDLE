@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v66';
+const APP_VERSION = 'v67';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -862,10 +862,11 @@ function ocultarPeliLoading() {
 $('#peliLoading').addEventListener('click', () => ocultarPeliLoading());
 /* v61: selector de temporadas y episodios para series */
 let spDatos = null; /* lo que devolvió /api/serie */
-/* v62: imágenes de AnimeFLV pasan por el proxy para poder verse */
+/* v62→v67: imágenes de AnimeFLV y Latanime pasan por NUESTRO proxy —
+ * wsrv.nl ya no puede con ellas (las bloquean con 403) */
 function proxyAnimeImg(src, w) {
   if (src && /animeflv\.|latanime\./i.test(src)) {
-    return 'https://wsrv.nl/?url=' + src.replace(/^https?:\/\//, '').split('?')[0] + '&w=' + (w || 400);
+    return '/api/img?u=' + encodeURIComponent(src);
   }
   return src || '';
 }
@@ -1937,7 +1938,7 @@ function crearTarjetaResultado(res, alElegir) {
     /* v53: las carátulas de AnimeFLV van por un proxy de imágenes porque
      * en algunos teléfonos/compañías la página bloquea la imagen directa */
     let srcImg = res.img || '';
-    if (srcImg && /animeflv\.|latanime\./i.test(srcImg)) srcImg = 'https://wsrv.nl/?url=' + srcImg.replace(/^https?:\/\//, '').split('?')[0] + '&w=240';
+    if (srcImg && /animeflv\.|latanime\./i.test(srcImg)) srcImg = '/api/img?u=' + encodeURIComponent(srcImg);
     card.innerHTML = `
       <span class="sr-badge"><img src="${logoDeSitio(res.site)}" alt=""></span>
       ${srcImg
@@ -1952,7 +1953,9 @@ function crearTarjetaResultado(res, alElegir) {
     const im = card.querySelector('img.sr-cover');
     if (im && res.img) {
       im.addEventListener('error', () => {
-        const respaldo = 'https://wsrv.nl/?url=' + res.img.replace(/^https?:\/\//, '').split('?')[0] + '&w=240';
+        const respaldo = /animeflv\.|latanime\./i.test(res.img)
+          ? '/api/img?u=' + encodeURIComponent(res.img) /* v67: proxy propio */
+          : 'https://wsrv.nl/?url=' + res.img.replace(/^https?:\/\//, '').split('?')[0] + '&w=240';
         if (im.src !== respaldo) im.src = respaldo;
       }, { once: true });
     }
@@ -2076,6 +2079,8 @@ async function cargarPopulares() {
   const fila = document.querySelector('#trendingRow');
   const wrapS = document.querySelector('#seriesBox'); /* v57: series recién agregadas */
   const filaS = document.querySelector('#seriesRow');
+  const wrapA = document.querySelector('#animesBox'); /* v67: animes del momento */
+  const filaA = document.querySelector('#animesRow');
   if (!wrap || !fila || wrap.dataset.cargado) return;
   wrap.dataset.cargado = '1';
   try {
@@ -2097,6 +2102,12 @@ async function cargarPopulares() {
     if (wrapS && filaS && d.series && d.series.length) {
       d.series.slice(0, 16).forEach((res) => filaS.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrapS.classList.remove('hidden');
+    }
+    /* v67: tercera fila — animes del momento (Latanime); un toque abre
+     * el selector de episodios, igual que cualquier anime */
+    if (wrapA && filaA && d.animes && d.animes.length) {
+      d.animes.slice(0, 16).forEach((res) => filaA.appendChild(crearTarjetaResultado(res, alTocar(res))));
+      wrapA.classList.remove('hidden');
     }
   } catch {
     delete wrap.dataset.cargado; /* si falló, se reintenta la próxima vez */

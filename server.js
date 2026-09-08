@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v66'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v67'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1319,9 +1319,7 @@ async function metaDePelicula(url) {
           };
           const t = (og('og:title') || '').replace(/\s*[—–|]\s*Latanime\s*$/i, '').replace(/\s{2,}/g, ' ').trim();
           const pst = og('og:image') || '';
-          const poster = /latanime\./i.test(pst)
-            ? 'https://wsrv.nl/?url=' + pst.replace(/^https?:\/\//, '').split('?')[0] + '&w=400'
-            : pst;
+          const poster = /latanime\./i.test(pst) ? '/api/img?u=' + encodeURIComponent(pst) : pst;
           if (t) d = { title: slugM[2] ? `${t} — Episodio ${slugM[2]}` : t, poster };
         }
       } catch {}
@@ -1343,10 +1341,8 @@ async function metaDePelicula(url) {
             .replace(/\s{2,}/g, ' ')
             .trim();
           const pst = og('og:image') || '';
-          /* v62: AnimeFLV bloquea imágenes directas → proxy wsrv */
-          const poster = /animeflv\./i.test(pst)
-            ? 'https://wsrv.nl/?url=' + pst.replace(/^https?:\/\//, '').split('?')[0] + '&w=400'
-            : pst;
+          /* v62→v67: AnimeFLV bloquea imágenes directas → proxy propio */
+          const poster = /animeflv\./i.test(pst) ? '/api/img?u=' + encodeURIComponent(pst) : pst;
           if (t) d = { title: slugM[2] ? `${t} — Episodio ${slugM[2]}` : t, poster };
         }
       } catch {}
@@ -1406,6 +1402,32 @@ async function seriesRecientes() {
   return items;
 }
 
+/* v67: animes del momento — los "animes de estreno" de Latanime (en emisión),
+ * con sus carátulas, para la fila de animes en el inicio */
+const animesCache = { at: 0, items: [] };
+async function animesDelMomento() {
+  if (Date.now() - animesCache.at < 30 * 60 * 1000 && animesCache.items.length) return animesCache.items;
+  const r = await fetchSeguro('https://latanime.org/emision', 10000);
+  if (!r.ok) return animesCache.items; /* si falla, lo de antes es mejor que nada */
+  const html = await r.text();
+  const items = [];
+  const re = /<a href="(https:\/\/latanime\.org\/anime\/[a-z0-9-]+)">\s*<div class="series">\s*<div class="serieimg[^"]*">\s*<img src="([^"]+)"[^>]*>[\s\S]*?<h3[^>]*>([^<]+)<\/h3>\s*<div[^>]*>\s*<span class="opacity-75">([^<]*)<\/span>/g;
+  let m;
+  while ((m = re.exec(html)) && items.length < 18) {
+    const title = m[3].replace(/\s+/g, ' ').trim().replace(/\s+(latino|castellano|espa\u00f1ol|sub(?:titulado)?)\s*$/i, '').slice(0, 80);
+    if (!title) continue;
+    items.push({
+      title,
+      url: m[1],
+      img: m[2],
+      site: 'Latanime',
+      extra: (m[4] || '').trim() || 'Latino', /* idioma: Latino, Castellano, Sin Censura… */
+    });
+  }
+  if (items.length) { animesCache.at = Date.now(); animesCache.items = items; }
+  return items;
+}
+
 /* v63: Latanime — animes con audio LATINO de verdad (mp4upload y amigos) */
 async function buscarLatanime(q) {
   const r = await fetchSeguro(`https://latanime.org/buscar?q=${encodeURIComponent(q)}`, 9000);
@@ -1460,6 +1482,7 @@ function readBody(req) {
   });
 }
 
+const imgProxyCache = new Map(); /* v67: imágenes de animes proxyadas, url → {buf, ct, at} */
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   try {
@@ -1487,13 +1510,46 @@ const server = http.createServer(async (req, res) => {
       });
     }
     /* v43: directorio de páginas — ver, agregar y quitar */
+    /* v67: proxy propio de imágenes de animes — wsrv.nl ya no puede con
+     * Latanime ni AnimeFLV (responden 403), así que las servimos nosotros */
+    if (url.pathname === '/api/img' && req.method === 'GET') {
+      const iu = url.searchParams.get('u') || '';
+      let host = '';
+      try { host = new URL(iu).hostname; } catch {}
+      if (!/^(www\.|vww\.)?(latanime\.org|animeflv\.one)$/i.test(host)) {
+        return json(res, 403, { ok: false, error: 'Host no permitido' });
+      }
+      const key = iu.split('?')[0];
+      const c = imgProxyCache.get(key);
+      if (c && Date.now() - c.at < 60 * 60 * 1000) {
+        res.writeHead(200, { 'Content-Type': c.ct, 'Cache-Control': 'public, max-age=86400' });
+        return res.end(c.buf);
+      }
+      try {
+        const r = await fetchSeguro(iu, 8000);
+        const ct = (r.headers.get('content-type') || '').toLowerCase();
+        if (!r.ok || !/image\//.test(ct)) return json(res, 502, { ok: false, error: 'No pude cargar la imagen' });
+        const buf = Buffer.from(await r.arrayBuffer());
+        if (buf.length > 3000000) return json(res, 502, { ok: false, error: 'Imagen demasiado grande' });
+        if (imgProxyCache.size > 300) { /* tirar las 100 más viejas */
+          let n = 0;
+          for (const k2 of imgProxyCache.keys()) { if (n++ >= 100) break; imgProxyCache.delete(k2); }
+        }
+        imgProxyCache.set(key, { buf, ct, at: Date.now() });
+        res.writeHead(200, { 'Content-Type': ct, 'Cache-Control': 'public, max-age=86400' });
+        return res.end(buf);
+      } catch {
+        return json(res, 502, { ok: false, error: 'No pude cargar la imagen' });
+      }
+    }
     if (url.pathname === '/api/trending' && req.method === 'GET') {
       /* v55: populares del día + v57: series recién agregadas */
-      const [day, series] = await Promise.all([
+      const [day, series, animes] = await Promise.all([
         popularesDeHoy().catch(() => []),
         seriesRecientes().catch(() => []),
+        animesDelMomento().catch(() => []), /* v67: animes del momento (Latanime) */
       ]);
-      return json(res, 200, { ok: true, results: day, series });
+      return json(res, 200, { ok: true, results: day, series, animes });
     }
     if (url.pathname.startsWith('/api/serie/')) {
       /* v61: temporadas y episodios de una serie (para elegirla bonito) */
