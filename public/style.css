@@ -561,6 +561,20 @@ body.fs-lock .topbar { display: none; }
 }
 #fitToggle, #fsExit { z-index: 60; }
 
+/* v78: la sala SIEMPRE se ve VERTICAL — si cierras la pantalla completa
+ * (la X) con el celular horizontal, la sala se muestra girada: voltea el
+ * teléfono para usarla derecha (como Netflix: el video horizontal, la
+ * app vertical). Al volver a vertical se endereza sola. */
+body.sala-girada #room {
+  position: fixed;
+  top: 50%; left: 50%;
+  width: 100vh; height: 100vw;
+  width: 100dvh; height: 100dvw;
+  min-height: 0; max-height: none;
+  transform: translate(-50%, -50%) rotate(90deg);
+  overflow: hidden;
+}
+
 /* v19: en móvil la barra del espejo (URL/Ir/Detener) no roba espacio al reproductor;
  * detener el espejo se hace desde las opciones (#mirrorStopRow) */
 #mirrorStopRow { display: none; }
@@ -1132,6 +1146,22 @@ body { overscroll-behavior-y: contain; }
 .sr-cover-anime { display: flex; align-items: center; justify-content: center; }
 .sr-cover-anime img { width: 62px; height: 62px; object-fit: contain; }
 @media (max-width: 640px) { .sr-card, .sr-cover { width: 108px; } .sr-cover { height: 154px; } }
+
+/* ======================= v78: Continuar viendo ======================= */
+/* tarjeta con la carátula, el avance (barrita) y en dónde se quedaron */
+.cont-card .cont-ep {
+  display: block; font-size: 11px; font-weight: 600; color: var(--cyan);
+  margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cont-card .cont-barra {
+  display: block; height: 4px; border-radius: 4px;
+  background: rgba(255, 255, 255, 0.14); margin-top: 6px; overflow: hidden;
+}
+.cont-card .cont-barra i {
+  display: block; height: 100%; background: var(--cyan); border-radius: 4px;
+}
+.cont-card .cont-tiempo { display: block; font-size: 10.5px; color: var(--dim); margin-top: 4px; }
+.cont-card .sr-cover-anime { font-size: 40px; } /* 🎬 grande cuando no hay carátula */
 
 
 

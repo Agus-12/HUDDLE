@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v77'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v78'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -97,6 +97,51 @@ function saveUsers() {
 const NAME_RE = /^[\p{L}\p{N}_ ]{3,20}$/u;
 const NAME_RECLAIM_MS = 30 * 24 * 3600 * 1000;
 function hostOf(u) { try { return new URL(u).host.replace(/^www\./, ''); } catch { return String(u).slice(0, 30); } }
+
+/* v78: "Continuar viendo" — por dónde se quedó cada usuario. La entrada se
+ * le anota a TODOS los que estaban en la sala (anfitrión e invitados):
+ * si la estaban viendo juntos, cualquiera de los dos la puede retomar. */
+const CONT_FILE = path.join(DATA_DIR, 'continue.json');
+const continuar = new Map(); // nameKey -> [{ url, t, d, title, img, ep, serie, ts }]
+try {
+  const rawC = JSON.parse(fs.readFileSync(CONT_FILE, 'utf8'));
+  for (const [k, v] of Object.entries(rawC || {})) if (Array.isArray(v)) continuar.set(k, v);
+} catch {}
+const CONT_MAX = 10; // entradas guardadas por usuario
+function saveContinuar() {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(CONT_FILE, JSON.stringify(Object.fromEntries(continuar)));
+  } catch (e) { console.warn('⚠️ no pude guardar continuar-viendo:', e.message); }
+}
+function registrarProgreso(room, m, r) {
+  try {
+    if (!r || !r.d || r.d < 60 || r.t < 5) return; // aún no hay nada que retomar
+    let title = '', img = '', ep = '', serie = '';
+    if (m.serie) {
+      title = m.serie.titulo || '';
+      img = m.serie.poster || '';
+      ep = (m.serie.eps && m.serie.eps[m.serie.idx] && m.serie.eps[m.serie.idx].num) || '';
+      serie = title;
+    } else {
+      title = m.title || hostOf(m.url || '');
+      img = m.img || '';
+    }
+    const entry = { url: m.url || '', t: Math.round(r.t), d: Math.round(r.d), title, img, ep, serie, ts: Date.now() };
+    if (!entry.url) return;
+    for (const u of room.users.values()) {
+      const key = u.nameKey || String(u.name || '').toLowerCase();
+      if (!key) continue;
+      const lista = continuar.get(key) || [];
+      const i = lista.findIndex((e) => e.url === entry.url);
+      if (i >= 0) lista.splice(i, 1);
+      lista.unshift(entry);
+      if (lista.length > CONT_MAX) lista.length = CONT_MAX;
+      continuar.set(key, lista);
+    }
+    saveContinuar();
+  } catch {}
+}
 
 function getOrCreateRoom(code) {
   if (rooms.has(code)) return rooms.get(code);
@@ -180,6 +225,7 @@ setInterval(async () => {
         }).catch(() => null);
         if (r && r.d > 1) {
           broadcast(room, 'mirror-time', { t: Math.round(r.t * 10) / 10, d: Math.round(r.d) });
+          registrarProgreso(room, m, r); /* v78: seguir viendo */
           break;
         }
       }
@@ -797,8 +843,8 @@ function handleEvents(req, res, url) {
   }
 
   const userId = isNew ? uid() : uidParam;
-  if (isNew) room.users.set(userId, { id: userId, name, joinedAt: Date.now() });
-  else room.users.get(userId).name = name;
+  if (isNew) room.users.set(userId, { id: userId, name, joinedAt: Date.now(), token: tok, nameKey: name.toLowerCase() });
+  else { const ru = room.users.get(userId); ru.name = name; ru.token = tok; ru.nameKey = name.toLowerCase(); }
 
   if (!room.hostId || !room.users.has(room.hostId)) room.hostId = userId;
 
@@ -937,6 +983,12 @@ async function handleAction(req, res, body) {
     try {
       if (op === 'start' || op === 'nav') {
         await startMirror(room, action.url, userId);
+        /* v78: título y carátula de lo que abrieron (para "Continuar viendo") */
+        const nm = mirrors.get(room.code);
+        if (nm) {
+          nm.title = String(action.title || '').slice(0, 80);
+          nm.img = String(action.img || '').slice(0, 400);
+        }
         // si se estaba reproduciendo un video, se pausa: la sala pasa a modo espejo
         if (room.isPlaying) {
           room.position = currentPosition(room);
@@ -1746,6 +1798,18 @@ const server = http.createServer(async (req, res) => {
       users.set(key, rec); saveUsers();
       console.log(`[usuarios] + ${name}`);
       return json(res, 200, { ok: true, name, token: rec.token });
+    }
+    if (url.pathname === '/api/continue') {
+      /* v78: lo que este usuario dejó a medias (pelis y series, con su
+       * posición) — también lo que veía junto con invitados */
+      const name = (url.searchParams.get('name') || '').trim();
+      const tok = url.searchParams.get('tok') || '';
+      const urec = users.get(name.toLowerCase());
+      if (!name || !urec || urec.token !== tok) return json(res, 403, { ok: false, error: 'Perfil no válido' });
+      const items = (continuar.get(name.toLowerCase()) || []).map((e) => ({
+        url: e.url, t: e.t, d: e.d, title: e.title, img: e.img, ep: e.ep, serie: e.serie, ts: e.ts,
+      }));
+      return json(res, 200, { ok: true, items });
     }
     if (url.pathname === '/api/rooms') {
       /* v31: salas en vivo con gente, qué ven y preview del espejo (estilo Rave) */

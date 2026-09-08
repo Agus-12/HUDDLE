@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v77';
+const APP_VERSION = 'v78';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -86,6 +86,7 @@ function hashHue(s) {
 function showScreen(id) {
   $('#landing').classList.toggle('hidden', id !== 'landing');
   $('#room').classList.toggle('hidden', id !== 'room');
+  sincronizarSalaGirada(); /* v78: la sala siempre vertical en el celular */
 }
 
 /* Si el servidor sirve otra versión de la interfaz, la página se actualiza
@@ -178,7 +179,19 @@ S.mirrorTime = null; /* v61: posición de la peli para la barrita */
     /* v61: posición de la peli para la barrita */
     try {
       const d = JSON.parse(e.data);
-      if (d && d.d > 1) { S.mirrorTime = { t: d.t, d: d.d }; pintarSeekBar(); }
+      if (d && d.d > 1) {
+        S.mirrorTime = { t: d.t, d: d.d }; pintarSeekBar();
+        /* v78: al retomar algo de "Continuar viendo", saltamos a donde
+         * se quedaron (una sola vez, y solo si es esa misma peli) */
+        if (S.resumeAt && S.resumeAt.t > 0 && S.resumeAt.url === S.mirror.url) {
+          const t = S.resumeAt.t;
+          S.resumeAt = null;
+          sendAction({ type: 'mirror', op: 'seekTo', time: t }).then(() => {
+            if (S.mirrorTime) { S.mirrorTime.t = t; pintarSeekBar(); }
+            toast('Seguimos donde se quedaron: ' + fmtTiempo(t), 4000);
+          }).catch(() => {});
+        }
+      }
     } catch {}
   });
   es.addEventListener('mirror-frame', (e) => {
@@ -645,10 +658,10 @@ window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload();
   const toPage = (cx, cy) => {
     if (!S.mirror.w || !S.mirror.h) return null;
     let rect = img.getBoundingClientRect();
-    /* v77: con la vista GIRADA (ampliada en vertical), el rectángulo
-     * visual está volteado — lo transponemos a las coordenadas de la
-     * página para que los toques caigan donde se ven */
-    if (videoShellEl.classList.contains('fs-girado')) {
+    /* v77/v78: con la vista GIRADA (pantalla completa en vertical, o la
+     * sala girada en horizontal), el rectángulo visual está volteado —
+     * lo transponemos para que los toques caigan donde se ven */
+    if (vistaGirada()) {
       const rc = videoShellEl.getBoundingClientRect();
       const cX = rc.left + rc.width / 2, cY = rc.top + rc.height / 2;
       const W = rc.height, H = rc.width; /* tamaño sin girar */
@@ -680,10 +693,15 @@ window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload();
     }
     if (!dragging) return;
     const rect = img.getBoundingClientRect();
-    const scale = (S.mirror.w && S.mirror.h) ? Math.min(rect.width / S.mirror.w, rect.height / S.mirror.h) : 1;
+    /* v78: con la vista girada el rect visual está volteado — se compara
+     * cruzado para que la velocidad del scroll sea la correcta */
+    const gir = vistaGirada();
+    const scale = (S.mirror.w && S.mirror.h)
+      ? (gir ? Math.min(rect.height / S.mirror.w, rect.width / S.mirror.h)
+             : Math.min(rect.width / S.mirror.w, rect.height / S.mirror.h))
+      : 1;
     /* v77: con la vista girada, arrastrar a los lados (en pantalla) es
      * arrastrar arriba/abajo en la página — el eje se intercambia */
-    const gir = videoShellEl.classList.contains('fs-girado');
     accDy += -((gir ? e.clientX : e.clientY) - (gir ? last.x : last.y)) / scale; // dedo arriba/izquierda → página baja
     last = { x: e.clientX, y: e.clientY };
     const now = Date.now();
@@ -821,7 +839,16 @@ function pintarSeekBar(previewT) {
   let arrastrando = false;
   const tDe = (ev) => {
     const r = bar.getBoundingClientRect();
-    const pct = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+    let pct;
+    if (vistaGirada()) {
+      /* v78: con la vista girada la barra se ve VERTICAL — el inicio
+       * queda ARRIBA: se recorre con el dedo hacia abajo */
+      const largo = r.height; /* largo real de la barra sin girar */
+      const cY = r.top + r.height / 2;
+      pct = Math.max(0, Math.min(1, (largo / 2 + (ev.clientY - cY)) / largo));
+    } else {
+      pct = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+    }
     return pct * (S.mirrorTime ? S.mirrorTime.d : 0);
   };
   bar.addEventListener('pointerdown', (ev) => {
@@ -1048,7 +1075,7 @@ function startMirrorFromPicker() {
   if (S.mirrorInfo) mostrarPeliLoading();
   // aprovechamos el clic (gesto del usuario) para desbloquear el audio
   ensureAudioCtx().then((ctx) => { if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {}); });
-  sendAction({ type: 'mirror', op: 'start', url }).then((r) => {
+  sendAction({ type: 'mirror', op: 'start', url, title: (S.mirrorInfo && S.mirrorInfo.title) || '', img: (S.mirrorInfo && S.mirrorInfo.img) || '' }).then((r) => {
     // si falló (RAM, URL mala, etc.) volvemos a la pantalla normal al instante
     if (r && r.ok === false) applyMirrorState({ active: false, url: '' });
   });
@@ -1405,21 +1432,22 @@ function exitFullscreen() {
   videoShellEl.classList.remove('fit-cover');
   videoShellEl.classList.remove('fs-girado'); /* v77 */
   $('#fitToggleTxt').textContent = 'Llenar';
+  sincronizarSalaGirada(); /* v78: al salir, la sala vuelve a verse vertical */
 }
 function enterPseudoFs() {
   videoShellEl.classList.add('pseudo-fs');
   document.body.classList.add('fs-lock');
-  sincronizarFsGirado(); /* v77 */
+  sincronizarGiros(); /* v77/v78: vista girada + sala vertical */
 }
-document.addEventListener('fullscreenchange', () => sincronizarFsGirado()); /* v77 */
-document.addEventListener('webkitfullscreenchange', () => sincronizarFsGirado()); /* v77 */
+document.addEventListener('fullscreenchange', () => sincronizarGiros()); /* v77/v78 */
+document.addEventListener('webkitfullscreenchange', () => sincronizarGiros()); /* v77/v78 */
 /* v20: al entrar a pantalla completa, el ajuste ideal depende de la orientación:
  * horizontal → llenar la pantalla (sin barras laterales); vertical → ver todo */
 function applyDefaultFsFit() {
   const landscape = window.matchMedia('(orientation: landscape)').matches;
   videoShellEl.classList.toggle('fit-cover', landscape);
   $('#fitToggleTxt').textContent = landscape ? 'Ver todo' : 'Llenar';
-  sincronizarFsGirado(); /* v77 */
+  sincronizarGiros(); /* v77/v78: vista girada + sala vertical */
 }
 window.addEventListener('orientationchange', () => {
   if (fsActive()) setTimeout(applyDefaultFsFit, 200); // al girar, reajustar
@@ -1452,15 +1480,34 @@ function esCelular() {
 function sincronizarFsGirado() {
   try { videoShellEl.classList.toggle('fs-girado', fsActive() && !mqOrient.matches && esCelular()); } catch {}
 }
+/* v78: la sala SIEMPRE se ve VERTICAL — con el celular horizontal (por
+ * ejemplo al cerrar la pantalla completa con la X) la sala se gira
+ * completa para que se siga viendo derecha al poner el teléfono vertical */
+function sincronizarSalaGirada() {
+  try {
+    const room = document.querySelector('#room');
+    const girar = !!room && !room.classList.contains('hidden') && !fsActive() && mqOrient.matches && esCelular();
+    document.body.classList.toggle('sala-girada', girar);
+  } catch {}
+}
+function sincronizarGiros() { sincronizarFsGirado(); sincronizarSalaGirada(); }
+/* v78: ¿la vista está girada 90°? (pantalla completa en vertical, o la
+ * sala con el celular horizontal) — los toques y la barrita se transponen */
+function vistaGirada() {
+  return videoShellEl.classList.contains('fs-girado') || document.body.classList.contains('sala-girada');
+}
 function autoFsPorOrientacion(landscape) {
   try {
-    if (!S.room || !document.querySelector('#room') || document.querySelector('#room').classList.contains('hidden')) return;
-    if (!document.body.classList.contains('mirroring')) return;
-    if (!esCelular()) return;
-    if (landscape && !fsActive()) toggleFullscreen();
-    else if (!landscape && fsActive()) exitFullscreen();
+    /* v78: el volteo solo amplía con la sala abierta y algo en el espejo;
+     * los giros de la vista se sincronizan SIEMPRE (la sala es vertical
+     * aunque no haya nada reproduciéndose) */
+    if (S.room && !document.querySelector('#room').classList.contains('hidden') &&
+        document.body.classList.contains('mirroring') && esCelular()) {
+      if (landscape && !fsActive()) toggleFullscreen();
+      else if (!landscape && fsActive()) exitFullscreen();
+    }
   } catch {}
-  sincronizarFsGirado();
+  sincronizarGiros();
 }
 if (mqOrient.addEventListener) mqOrient.addEventListener('change', (e) => autoFsPorOrientacion(e.matches));
 else if (mqOrient.addListener) mqOrient.addListener((e) => autoFsPorOrientacion(e.matches)); /* iOS viejo */
@@ -1468,7 +1515,7 @@ else if (mqOrient.addListener) mqOrient.addListener((e) => autoFsPorOrientacion(
  * acomoda a como traigas el celular: vertical → modo sala */
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
-  setTimeout(() => { autoFsPorOrientacion(mqOrient.matches); sincronizarFsGirado(); }, 250);
+  setTimeout(() => { autoFsPorOrientacion(mqOrient.matches); sincronizarGiros(); }, 250);
 });
 
 /* botón «Llenar / Ver todo»: solo visible en pantalla completa */
@@ -1633,6 +1680,7 @@ function initLanding() {
     av.style.setProperty('--h', hashHue(S.profile.name));
     pollRooms();
     cargarPopulares(); /* v55: fila de populares del día */
+    cargarContinuar(); /* v78: seguir viendo donde te quedaste */
     if (hM) {
       /* v56: ya tienes sesión y te invitaron — directo a la sala */
       const code = hM[1].toUpperCase();
@@ -1871,6 +1919,7 @@ let prevUsers = null;
 S.setupUrl = '';
 S.setupName = '';
 S.pendingStart = null;
+S.resumeAt = null; /* v78: {url,t} para retomar donde se quedaron */
 
 function setupMsg(t, ok) {
   const el = $('#setupMsg');
@@ -2152,6 +2201,63 @@ async function buscarSetup() {
 }
 $('#btnSetupSearch').addEventListener('click', buscarSetup);
 $('#setupSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); buscarSetup(); } });
+
+/* ======================= v78: Continuar viendo ======================= */
+/* fila en el inicio con lo que dejaste a medias — la entrada también le
+ * aparece a tu invitado (la estaban viendo juntos): cualquiera retoma */
+async function cargarContinuar() {
+  const box = document.querySelector('#continueBox');
+  const fila = document.querySelector('#continueRow');
+  if (!box || !fila || !S.profile) return;
+  try {
+    const r = await fetch('/api/continue?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token));
+    const d = await r.json();
+    fila.innerHTML = '';
+    if (!d.ok || !d.items || !d.items.length) { box.classList.add('hidden'); return; }
+    d.items.slice(0, 10).forEach((e) => fila.appendChild(crearTarjetaContinuar(e)));
+    box.classList.remove('hidden');
+  } catch {}
+}
+function crearTarjetaContinuar(e) {
+  const card = document.createElement('button');
+  card.type = 'button';
+  card.className = 'sr-card cont-card';
+  let srcImg = e.img || '';
+  if (srcImg && /animeflv\.|latanime\./i.test(srcImg)) srcImg = '/api/img?u=' + encodeURIComponent(srcImg);
+  const pct = (e.d > 0) ? Math.max(4, Math.min(100, Math.round((e.t / e.d) * 100))) : 0;
+  card.innerHTML = `
+    ${srcImg
+      ? `<img class="sr-cover" src="${srcImg}" alt="" loading="lazy" referrerpolicy="no-referrer">`
+      : `<span class="sr-cover sr-cover-anime">🎬</span>`}
+    <span class="sr-nombre"></span>
+    ${e.ep ? '<span class="cont-ep"></span>' : ''}
+    <span class="cont-barra"><i style="width:${pct}%"></i></span>
+    <span class="cont-tiempo"></span>`;
+  card.querySelector('.sr-nombre').textContent = e.title || e.serie || 'Película';
+  if (e.ep) card.querySelector('.cont-ep').textContent = e.ep;
+  card.querySelector('.cont-tiempo').textContent = `Quedaste en ${fmtTiempo(e.t)} de ${fmtTiempo(e.d)}`;
+  const im = card.querySelector('img.sr-cover');
+  if (im && e.img) {
+    im.addEventListener('error', () => {
+      const respaldo = /animeflv\.|latanime\./i.test(e.img)
+        ? '/api/img?u=' + encodeURIComponent(e.img)
+        : 'https://wsrv.nl/?url=' + e.img.replace(/^https?:\/\//, '').split('?')[0] + '&w=240';
+      if (im.src !== respaldo) im.src = respaldo;
+    }, { once: true });
+  }
+  card.addEventListener('click', () => retomar(e));
+  return card;
+}
+function retomar(e) {
+  /* como tocar una tarjeta del inicio, pero recordando la posición */
+  const t = Math.floor(+e.t || 0);
+  S.resumeAt = (e.d && t > 10 && t < e.d - 20) ? { url: e.url, t } : null; /* si casi terminó, desde el inicio */
+  S.pendingStart = { url: e.url, name: e.title || '', img: e.img || '' };
+  S.mirrorInfo = { title: e.title || '', img: e.img || '', url: e.url, sub: 'Cargando tu sala…' };
+  mostrarPeliLoading();
+  const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+  connect(code);
+}
 
 /* v55: populares del día — fila en el inicio, un toque crea la sala */
 async function cargarPopulares() {

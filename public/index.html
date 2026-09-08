@@ -98,6 +98,16 @@
           <!-- v45: resultados de búsqueda del inicio -->
           <div id="searchResults" class="sr hidden"></div>
 
+          <!-- v78: continuar viendo — retoma donde te quedaste (también
+               para el invitado con el que lo estaban viendo) -->
+          <div id="continueBox" class="sr-sec hidden">
+            <div class="sr-sec-titulo">
+              <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--cyan);"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              <span>Continuar viendo</span>
+            </div>
+            <div id="continueRow" class="sr-fila"></div>
+          </div>
+
           <!-- v69: animes del momento (Latanime) — PRIMERA sección, hasta arriba -->
           <div id="animesBox" class="sr-sec hidden">
             <div class="sr-sec-titulo">
@@ -172,7 +182,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v77</span>
+        <span class="ver" id="verBadge">v78</span>
       </div>
       <!-- v36: gente, invitar y salir viven JUNTO al logo -->
       <div class="top-quick">
