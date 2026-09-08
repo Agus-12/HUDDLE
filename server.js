@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v69'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v70'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1040,10 +1040,10 @@ function serveStatic(req, res, urlPath) {
 const SITES_FILE = path.join(__dirname, 'data', 'sites.json');
 const LOGO_DIR = path.join(__dirname, 'public', 'sites-logos');
 const SITES_SEED = [
-  /* v65: Latanime primero (predeterminado) — v68: fuera GoPelis y AnimeFLV */
+  /* v65: Latanime primero (predeterminado) — v68: fuera GoPelis y AnimeFLV
+   * v70: fuera AnimeD23 también (queda Latanime, Cuevana y YouTube) */
   { name: 'Latanime', desc: 'Animes con audio latino', url: 'https://latanime.org/', logo: '/sites/latanime.png' },
   { name: 'Cuevana', desc: 'Películas y series', url: 'https://cuevana.mov/', logo: '/sites/cuevana.png' },
-  { name: 'AnimeD23', desc: 'Animes', url: 'https://animed23.com/', logo: '/sites/animed23.png' },
   { name: 'YouTube', desc: 'Videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
 ];
 function loadSitesFile() {
@@ -1055,10 +1055,10 @@ function loadSitesFile() {
         /* v46: Cuevana movió su portada de /inicio a la raíz */
         if (/^https?:\/\/(www\.)?cuevana\.[a-z.]+\/inicio\/?$/i.test(s.url || '')) { s.url = s.url.replace(/\/inicio\/?$/i, '/'); cambio = true; }
       }
-      /* v68: fuera AnimeFLV y GoPelis del directorio */
+      /* v68: fuera AnimeFLV y GoPelis — v70: fuera AnimeD23 también */
       const antes = l.length;
-      l = l.filter((s) => !/animeflv\.|gopelis\./i.test(s.url || ''));
-      if (l.length !== antes) { cambio = true; console.log('[sitios] - AnimeFLV y GoPelis (v68)'); }
+      l = l.filter((s) => !/animeflv\.|gopelis\.|animed23\./i.test(s.url || ''));
+      if (l.length !== antes) { cambio = true; console.log('[sitios] - AnimeFLV, GoPelis y AnimeD23'); }
       /* v65: logos propios para Latanime y AnimeFLV (los favicons de Google
        * a veces no cargan → salía el recuadro azul con ?) y Latanime
        * predeterminado: primero en la lista */
@@ -1196,77 +1196,9 @@ async function buscarCuevana(q) {
   })).filter((x) => x.title && x.url);
 }
 
-async function buscarGopelis(q) {
-  const r = await fetchSeguro(`https://gopelis.com/api/search?q=${encodeURIComponent(q)}`, 9000);
-  if (!r.ok) return [];
-  const d = await r.json().catch(() => ({}));
-  return (d.results || []).slice(0, 12).map((p) => ({
-    title: String(p.title || ''),
-    url: p.mediaType === 'tv' ? `https://gopelis.com/series/${p.slug}` : `https://gopelis.com/peliculas/${p.slug}`,
-    img: p.posterPath ? `https://image.tmdb.org/t/p/w342${p.posterPath}` : '',
-    site: 'GoPelis',
-    extra: p.releaseDate ? String(p.releaseDate).slice(0, 4) : '',
-  })).filter((x) => x.title && x.url);
-}
-
-async function buscarAnimeDirecto(q, base) {
-  const r = await fetchSeguro(`${base}/animes?buscar=${encodeURIComponent(q)}`, 9000);
-  if (!r.ok) return [];
-  const html = (await r.text()).slice(0, 700000);
-  const re = /<article[^>]*class="li"[^>]*>([\s\S]*?)<\/article>/g;
-  const out = [];
-  const vistos = new Set();
-  let m;
-  while ((m = re.exec(html)) && out.length < 12) {
-    const bloque = m[1];
-    const href = (/href="(\.\/anime\/[^"]+)"/.exec(bloque) || [])[1];
-    const img = (/(?:data-src|src)="(https?:[^"]+\/cdn\/img\/anime\/[^"]+)"/.exec(bloque) || [])[1];
-    const alt = (/alt="([^"]{2,90})"/.exec(bloque) || [])[1];
-    if (!href || !alt) continue;
-    let url;
-    try { url = new URL(href, base + '/').href; } catch { continue; }
-    if (vistos.has(url)) continue;
-    vistos.add(url);
-    out.push({ title: alt.replace(/\s+/g, ' ').trim(), url, img: img || '', site: 'AnimeFLV', extra: '' });
-  }
-  return out;
-}
-
-/* respaldo: si el server está bloqueado por la página, un lector externo
- * (r.jina.ai) la abre por nosotros y nos da los resultados en texto */
-async function buscarAnimeJina(q) {
-  try {
-    const r = await fetchSeguro(`https://r.jina.ai/https://vww.animeflv.one/animes?buscar=${encodeURIComponent(q)}`, 20000);
-    if (!r.ok) return [];
-    const md = (await r.text()).slice(0, 500000);
-    const re = /\[!\[Image \d+: ([^\]]{2,90})\]\((https?:[^)]+\/cdn\/img\/anime\/[^)]+)\)[^\]]*\]\((https?:\/\/[^)\s]+\/anime\/[a-z0-9-]+)/g;
-    const out = [];
-    const vistos = new Set();
-    let m;
-    while ((m = re.exec(md)) && out.length < 12) {
-      if (vistos.has(m[3])) continue;
-      vistos.add(m[3]);
-      out.push({ title: m[1].replace(/\s+/g, ' ').trim(), url: m[3], img: m[2], site: 'AnimeFLV', extra: '' });
-    }
-    return out;
-  } catch { return []; }
-}
-
-async function buscarAnime(q) {
-  /* AnimeFLV — anime sub español y latino; directo y con respaldo */
-  let out = await buscarAnimeDirecto(q, 'https://vww.animeflv.one').catch(() => []);
-  if (out.length) return out;
-  for (const host of ['https://www3.animeflv.one', 'https://animeflv.one']) {
-    out = await buscarAnimeDirecto(q, host).catch(() => []);
-    if (out.length) return out;
-  }
-  return buscarAnimeJina(q);
-}
-
-/* v56: metadatos de lo que se ve en una sala (título + póster) para la
- * tarjeta de invitación — por el slug de la URL y las APIs de cada página */
+/* v70: fuera las búsquedas de GoPelis y AnimeFLV (código retirado) */
 const metaCache = new Map();
-const serieCache = new Map(); /* v61: temporadas/episodios por slug */
+const serieCache = new Map();
 async function metaDePelicula(url) {
   const u0 = String(url || '');
   if (!u0) return null;

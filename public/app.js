@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v69';
+const APP_VERSION = 'v70';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1038,11 +1038,9 @@ $('#mirrorUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') star
  * actualiza con lo que guarda el servidor (data/sites.json) */
 let SITES = [
   /* v65: Latanime primero (predeterminado) + logos propios en /sites/
-   * (los favicons de Google a veces no cargan → recuadro con ?)
-   * v68: fuera GoPelis (poco catálogo) y AnimeFLV */
+   * v68: fuera GoPelis y AnimeFLV — v70: fuera AnimeD23 también */
   { name: 'Latanime', full: 'Latanime — animes con audio latino', url: 'https://latanime.org/', logo: '/sites/latanime.png' },
   { name: 'Cuevana', full: 'Cuevana — películas y series', url: 'https://cuevana.mov/', logo: '/sites/cuevana.png' },
-  { name: 'AnimeD23', full: 'AnimeD23 — animes', url: 'https://animed23.com/', logo: '/sites/animed23.png' },
   { name: 'YouTube', full: 'YouTube — videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
 ];
 function renderPageDrop() {
@@ -1092,6 +1090,9 @@ function renderPageDrop() {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     drop.classList.toggle('hidden');
+    /* v70: al abrirse, la caja de buscar queda lista para escribir
+     * (como en el inicio) — solo la ve quien la abrió, en su pantalla */
+    if (!drop.classList.contains('hidden')) setTimeout(() => { try { $('#pdSearch').focus(); } catch {} }, 60);
   });
   /* v48: Enter en la caja de búsqueda del desplegable */
   drop.addEventListener('keydown', (e) => {
@@ -1983,10 +1984,9 @@ function renderResultados(box, results, alElegir, conAnime) {
     box.appendChild(sec);
     return fila;
   };
-  /* v54: los tres sitios conocidos salen SIEMPRE en el mismo orden; si
-   * alguno no tiene resultados para lo que buscaste, lo dice — antes
-   * simplemente no aparecía y parecía que la búsqueda fallaba */
-  const ordenFijo = ['Cuevana', 'GoPelis', 'AnimeFLV'];
+  /* v70: solo Cuevana y Latanime, siempre en ese orden y con su sección
+   * (si alguno no tiene resultados para lo que buscaste, lo dice) */
+  const ordenFijo = ['Cuevana', 'Latanime'];
   const extras = [...porSitio.keys()].filter((s) => !ordenFijo.includes(s));
   for (const sitio of [...ordenFijo, ...extras]) {
     const items = porSitio.get(sitio) || [];
@@ -1996,13 +1996,8 @@ function renderResultados(box, results, alElegir, conAnime) {
     if (!items.length) {
       const v = document.createElement('div');
       v.className = 'sr-vacio-sec';
-      v.textContent = sitio === 'AnimeFLV' ? 'Sin resultados de anime para esta búsqueda' : 'Sin resultados para esta búsqueda';
+      v.textContent = sitio === 'Latanime' ? 'Sin resultados de anime para esta búsqueda' : 'Sin resultados para esta búsqueda';
       fila.appendChild(v);
-      /* respaldo de anime: si AnimeFLV no lo tiene, la tarjeta abre AnimeD23
-       * para buscar adentro con el teclado del espejo */
-      if (sitio === 'AnimeFLV' && conAnime) {
-        fila.appendChild(crearTarjeta({ url: 'https://animed23.com/', title: 'Buscar dentro de AnimeD23', site: 'AnimeD23', extra: 'la búsqueda de anime va dentro de su página', img: '' }));
-      }
     }
   }
 }
