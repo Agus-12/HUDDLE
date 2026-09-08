@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v76'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v77'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1032,7 +1032,7 @@ async function handleAction(req, res, body) {
       else if (op === 'press') await m.page.keyboard.press(String(action.key || 'Enter').slice(0, 20));
       else if (op === 'back') await m.page.goBack({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
       else if (op === 'fwd') await m.page.goForward({ waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
-      else if (op === 'scroll') await m.page.mouse.wheel({ deltaY: +action.deltaY || 0 });
+      else if (op === 'scroll') await m.page.mouse.wheel({ deltaY: +action.deltaY || 0, deltaX: +action.deltaX || 0 });
       else if (op === 'seek') {
         /* v60: adelantar / atrasar — se mueve el video más grande de la página */
         const delta = Math.max(-300, Math.min(300, +action.delta || 0));

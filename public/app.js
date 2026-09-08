@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v76';
+const APP_VERSION = 'v77';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -644,7 +644,18 @@ window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload();
   };
   const toPage = (cx, cy) => {
     if (!S.mirror.w || !S.mirror.h) return null;
-    const rect = img.getBoundingClientRect();
+    let rect = img.getBoundingClientRect();
+    /* v77: con la vista GIRADA (ampliada en vertical), el rectángulo
+     * visual está volteado — lo transponemos a las coordenadas de la
+     * página para que los toques caigan donde se ven */
+    if (videoShellEl.classList.contains('fs-girado')) {
+      const rc = videoShellEl.getBoundingClientRect();
+      const cX = rc.left + rc.width / 2, cY = rc.top + rc.height / 2;
+      const W = rc.height, H = rc.width; /* tamaño sin girar */
+      rect = { left: cX - W / 2, top: cY - H / 2, width: W, height: H };
+      const nx = W / 2 + (cy - cY), ny = H / 2 - (cx - cX);
+      cx = nx; cy = ny;
+    }
     const scale = Math.min(rect.width / S.mirror.w, rect.height / S.mirror.h);
     const drawW = S.mirror.w * scale, drawH = S.mirror.h * scale;
     const offX = (rect.width - drawW) / 2, offY = (rect.height - drawH) / 2;
@@ -670,7 +681,10 @@ window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload();
     if (!dragging) return;
     const rect = img.getBoundingClientRect();
     const scale = (S.mirror.w && S.mirror.h) ? Math.min(rect.width / S.mirror.w, rect.height / S.mirror.h) : 1;
-    accDy += -(e.clientY - last.y) / scale; // dedo arriba → página baja (scroll natural)
+    /* v77: con la vista girada, arrastrar a los lados (en pantalla) es
+     * arrastrar arriba/abajo en la página — el eje se intercambia */
+    const gir = videoShellEl.classList.contains('fs-girado');
+    accDy += -((gir ? e.clientX : e.clientY) - (gir ? last.x : last.y)) / scale; // dedo arriba/izquierda → página baja
     last = { x: e.clientX, y: e.clientY };
     const now = Date.now();
     if (now - lastSent > 90 && Math.abs(accDy) >= 10) {
@@ -1389,18 +1403,23 @@ function exitFullscreen() {
   videoShellEl.classList.remove('pseudo-fs');
   document.body.classList.remove('fs-lock');
   videoShellEl.classList.remove('fit-cover');
+  videoShellEl.classList.remove('fs-girado'); /* v77 */
   $('#fitToggleTxt').textContent = 'Llenar';
 }
 function enterPseudoFs() {
   videoShellEl.classList.add('pseudo-fs');
   document.body.classList.add('fs-lock');
+  sincronizarFsGirado(); /* v77 */
 }
+document.addEventListener('fullscreenchange', () => sincronizarFsGirado()); /* v77 */
+document.addEventListener('webkitfullscreenchange', () => sincronizarFsGirado()); /* v77 */
 /* v20: al entrar a pantalla completa, el ajuste ideal depende de la orientación:
  * horizontal → llenar la pantalla (sin barras laterales); vertical → ver todo */
 function applyDefaultFsFit() {
   const landscape = window.matchMedia('(orientation: landscape)').matches;
   videoShellEl.classList.toggle('fit-cover', landscape);
   $('#fitToggleTxt').textContent = landscape ? 'Ver todo' : 'Llenar';
+  sincronizarFsGirado(); /* v77 */
 }
 window.addEventListener('orientationchange', () => {
   if (fsActive()) setTimeout(applyDefaultFsFit, 200); // al girar, reajustar
@@ -1424,18 +1443,33 @@ $('#fsExit').addEventListener('click', exitFullscreen);
  * Solo dentro de la sala, con algo reproduciéndose en el espejo,
  * y solo en pantallas de celular (con toque). */
 const mqOrient = window.matchMedia('(orientation: landscape)');
+function esCelular() {
+  return window.innerWidth <= 980 && (('ontouchstart' in window) || navigator.maxTouchPoints > 0);
+}
+/* v77: la pantalla completa siempre se ve HORIZONTAL — si amplías con
+ * el celular vertical, la vista se gira (voltea el teléfono para
+ * verla derecha); al voltearlo se endereza sola */
+function sincronizarFsGirado() {
+  try { videoShellEl.classList.toggle('fs-girado', fsActive() && !mqOrient.matches && esCelular()); } catch {}
+}
 function autoFsPorOrientacion(landscape) {
   try {
     if (!S.room || !document.querySelector('#room') || document.querySelector('#room').classList.contains('hidden')) return;
     if (!document.body.classList.contains('mirroring')) return;
-    if (window.innerWidth > 980) return; /* pantallas grandes */
-    if (!('ontouchstart' in window) && !(navigator.maxTouchPoints > 0)) return; /* sin celular */
-    if (landscape && !fsActive()) toggleFullscreen(); /* él solo ajusta el modo de llenado */
+    if (!esCelular()) return;
+    if (landscape && !fsActive()) toggleFullscreen();
     else if (!landscape && fsActive()) exitFullscreen();
   } catch {}
+  sincronizarFsGirado();
 }
 if (mqOrient.addEventListener) mqOrient.addEventListener('change', (e) => autoFsPorOrientacion(e.matches));
 else if (mqOrient.addListener) mqOrient.addListener((e) => autoFsPorOrientacion(e.matches)); /* iOS viejo */
+/* v77: al volver de la pantalla apagada (o de otra app), la sala se
+ * acomoda a como traigas el celular: vertical → modo sala */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  setTimeout(() => { autoFsPorOrientacion(mqOrient.matches); sincronizarFsGirado(); }, 250);
+});
 
 /* botón «Llenar / Ver todo»: solo visible en pantalla completa */
 $('#fitToggle').addEventListener('click', () => {
