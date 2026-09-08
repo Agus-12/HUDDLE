@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v67';
+const APP_VERSION = 'v68';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1038,12 +1038,11 @@ $('#mirrorUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') star
  * actualiza con lo que guarda el servidor (data/sites.json) */
 let SITES = [
   /* v65: Latanime primero (predeterminado) + logos propios en /sites/
-   * (los favicons de Google a veces no cargan → recuadro con ?) */
+   * (los favicons de Google a veces no cargan → recuadro con ?)
+   * v68: fuera GoPelis (poco catálogo) y AnimeFLV */
   { name: 'Latanime', full: 'Latanime — animes con audio latino', url: 'https://latanime.org/', logo: '/sites/latanime.png' },
   { name: 'Cuevana', full: 'Cuevana — películas y series', url: 'https://cuevana.mov/', logo: '/sites/cuevana.png' },
-  { name: 'GoPelis', full: 'GoPelis — películas', url: 'https://gopelis.com/', logo: '/sites/gopelis.png' },
   { name: 'AnimeD23', full: 'AnimeD23 — animes', url: 'https://animed23.com/', logo: '/sites/animed23.png' },
-  { name: 'AnimeFLV', full: 'AnimeFLV — animes sub y latino', url: 'https://vww.animeflv.one/', logo: '/sites/animeflv.png' },
   { name: 'YouTube', full: 'YouTube — videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
 ];
 function renderPageDrop() {
@@ -1088,12 +1087,6 @@ function renderPageDrop() {
   const drop = $('#pageDrop');
   if (!btn || !drop) return;
 
-  const setBtn = (logo, texto) => {
-    const im = $('#pagePickLogo');
-    if (logo) { im.src = logo; im.hidden = false; } else { im.hidden = true; im.removeAttribute('src'); }
-    $('#pagePickName').textContent = texto;
-  };
-
   renderPageDrop();
 
   btn.addEventListener('click', (e) => {
@@ -1114,12 +1107,10 @@ function renderPageDrop() {
       $('#customRow').classList.remove('hidden');
       $('#mirrorUrl').value = '';
       $('#mirrorUrl').focus();
-      setBtn('', 'Otra página…');
       return;
     }
     $('#customRow').classList.add('hidden');
     if (!S.canControl) { toast('Solo el anfitrión puede espejar'); return; }
-    setBtn(opt.dataset.logo, opt.dataset.name);
     $('#mirrorUrl').value = opt.dataset.url;
     startMirrorFromPicker();
   });
@@ -1127,17 +1118,23 @@ function renderPageDrop() {
     if (!drop.classList.contains('hidden') && !e.target.closest('#pagePick')) drop.classList.add('hidden');
   });
 
-  /* mientras se espeja, el botón muestra el sitio en pantalla;
-     si es una URL propia, muestra su nombre de dominio */
+  /* v68: mientras se espeja, el logo y nombre de la página que se está
+   * viendo vive junto al indicador "En vivo" de la barra de arriba */
   window.__setPagePick = (url) => {
+    const chip = $('#liveSite'), im = $('#liveSiteImg'), nm = $('#liveSiteName');
+    if (!chip) return;
     const s = SITES.find((x) => url && url.startsWith(x.url.replace(/\/$/, '')));
-    if (s) setBtn(s.logo, s.name);
-    else if (url) {
+    if (s) {
+      im.src = s.logo; im.hidden = false;
+      nm.textContent = s.name;
+      chip.hidden = false;
+    } else if (url) {
       let host = 'Página actual';
       try { host = new URL(url).hostname.replace(/^www\./, ''); } catch {}
-      setBtn('', host);
-    }
-    else setBtn('', 'Elige una página…');
+      im.hidden = true; im.removeAttribute('src');
+      nm.textContent = host;
+      chip.hidden = false;
+    } else chip.hidden = true;
   };
 })();
 

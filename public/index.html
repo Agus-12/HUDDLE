@@ -172,7 +172,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v67</span>
+        <span class="ver" id="verBadge">v68</span>
       </div>
       <!-- v36: gente, invitar y salir viven JUNTO al logo -->
       <div class="top-quick">
@@ -194,6 +194,8 @@
       <!-- v36: fila de abajo — en vivo y detener (con texto, solo mientras se espeja) -->
       <div class="top-live">
         <span id="connBadge" class="conn ok"><span class="live-dot"></span><span id="connText">En vivo</span></span>
+        <!-- v68: logo y nombre de la página que se está viendo, junto a "En vivo" -->
+        <span id="liveSite" class="live-site" hidden><img id="liveSiteImg" class="site-logo" alt=""><span id="liveSiteName"></span></span>
         <button id="btnStopMirrorTop" class="btn small danger stop-btn" title="Detener el espejo">
           <svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
           Detener
@@ -296,9 +298,11 @@
         <div class="picker card">
           <div class="picker-row">
             <div class="page-pick" id="pagePick">
-              <button id="pagePickBtn" class="input page-pick-btn" type="button" title="Elegir página para espejar">
-                <img id="pagePickLogo" class="site-logo" alt="" hidden>
-                <span id="pagePickName">Elige una página…</span>
+              <!-- v68: antes mostraba la página actual (ahora vive junto a "En vivo");
+                   el botón es para buscar películas y series -->
+              <button id="pagePickBtn" class="input page-pick-btn" type="button" title="Buscar películas y series">
+                <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <span>Buscar películas</span>
                 <svg class="chev" viewBox="0 0 12 8" width="12" height="8"><path d="M1 1l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </button>
               <div id="pageDrop" class="page-drop hidden"></div>

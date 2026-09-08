@@ -1316,3 +1316,29 @@ body { overscroll-behavior-y: contain; }
 body.ctrls-vis .msg-ticker {
   bottom: calc(122px + env(safe-area-inset-bottom, 0px));
 }
+
+
+/* ======================= v68: chip del sitio junto a "En vivo" + play abajo en celular ======================= */
+/* logo y nombre de la página que se está viendo, en la barra de arriba */
+.live-site {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 11px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line);
+  font-size: 12px; font-weight: 600; color: var(--txt);
+  max-width: 42vw; min-width: 0;
+}
+.live-site .site-logo { width: 18px; height: 18px; border-radius: 5px; flex: none; }
+.live-site span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* v68: en CELULAR el botón de "Toca para empezar" va ABAJO del video,
+ * en fila con su texto al lado — ya no tapa el centro de la película.
+ * En computadora y en pantalla completa se queda como siempre (al centro). */
+@media (max-width: 980px) {
+  .video-shell:not(:fullscreen):not(:-webkit-full-screen):not(.pseudo-fs) .play-btn {
+    flex-direction: row;
+    justify-content: center; /* centrado horizontal */
+    align-items: flex-end;   /* pegado al margen de abajo */
+    gap: 12px;
+    padding: 0 12px calc(18px + env(safe-area-inset-bottom, 0px));
+  }
+}

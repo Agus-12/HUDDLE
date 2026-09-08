@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v67'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v68'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1040,38 +1040,31 @@ function serveStatic(req, res, urlPath) {
 const SITES_FILE = path.join(__dirname, 'data', 'sites.json');
 const LOGO_DIR = path.join(__dirname, 'public', 'sites-logos');
 const SITES_SEED = [
-  /* v65: Latanime primero (predeterminado) */
+  /* v65: Latanime primero (predeterminado) — v68: fuera GoPelis y AnimeFLV */
   { name: 'Latanime', desc: 'Animes con audio latino', url: 'https://latanime.org/', logo: '/sites/latanime.png' },
   { name: 'Cuevana', desc: 'Películas y series', url: 'https://cuevana.mov/', logo: '/sites/cuevana.png' },
-  { name: 'GoPelis', desc: 'Películas', url: 'https://gopelis.com/', logo: '/sites/gopelis.png' },
   { name: 'AnimeD23', desc: 'Animes', url: 'https://animed23.com/', logo: '/sites/animed23.png' },
-  { name: 'AnimeFLV', desc: 'Animes sub y latino', url: 'https://vww.animeflv.one/', logo: '/sites/animeflv.png' },
   { name: 'YouTube', desc: 'Videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
 ];
 function loadSitesFile() {
   try {
-    const l = JSON.parse(fs.readFileSync(SITES_FILE, 'utf8'));
+    let l = JSON.parse(fs.readFileSync(SITES_FILE, 'utf8'));
     if (Array.isArray(l)) {
       let cambio = false;
       for (const s of l) {
         /* v46: Cuevana movió su portada de /inicio a la raíz */
         if (/^https?:\/\/(www\.)?cuevana\.[a-z.]+\/inicio\/?$/i.test(s.url || '')) { s.url = s.url.replace(/\/inicio\/?$/i, '/'); cambio = true; }
       }
-      /* v51: AnimeFLV — página de anime con búsqueda externa (sub + latino) */
-      if (!l.some((s) => /animeflv\./i.test(s.url || ''))) {
-        const nuevo = { name: 'AnimeFLV', desc: 'Animes sub y latino', url: 'https://vww.animeflv.one/', logo: '/sites/animeflv.png' };
-        const i = l.findIndex((s) => /animed23/i.test(s.name || ''));
-        if (i >= 0) l.splice(i + 1, 0, nuevo); else l.push(nuevo);
-        cambio = true;
-        console.log('[sitios] + AnimeFLV (búsqueda integrada)');
-      }
+      /* v68: fuera AnimeFLV y GoPelis del directorio */
+      const antes = l.length;
+      l = l.filter((s) => !/animeflv\.|gopelis\./i.test(s.url || ''));
+      if (l.length !== antes) { cambio = true; console.log('[sitios] - AnimeFLV y GoPelis (v68)'); }
       /* v65: logos propios para Latanime y AnimeFLV (los favicons de Google
        * a veces no cargan → salía el recuadro azul con ?) y Latanime
        * predeterminado: primero en la lista */
       const esLat = (s) => /latanime\./i.test(s.url || '');
       for (const s of l) {
         if (esLat(s) && s.logo !== '/sites/latanime.png') { s.logo = '/sites/latanime.png'; cambio = true; }
-        if (/animeflv\./i.test(s.url || '') && s.logo !== '/sites/animeflv.png') { s.logo = '/sites/animeflv.png'; cambio = true; }
       }
       if (!l.some(esLat)) {
         l.unshift({ name: 'Latanime', desc: 'Animes con audio latino', url: 'https://latanime.org/', logo: '/sites/latanime.png' });
@@ -1453,10 +1446,9 @@ async function buscarLatanime(q) {
 }
 
 async function buscarEnSitios(q) {
+  /* v68: fuera GoPelis (poco catálogo) y AnimeFLV — queda Cuevana + Latanime */
   const grupos = await Promise.all([
     buscarCuevana(q).catch(() => []),
-    buscarGopelis(q).catch(() => []),
-    buscarAnime(q).catch(() => []),
     buscarLatanime(q).catch(() => []),
   ]);
   /* v63: intercalados por sitio para que ningún sitio tape a los demás */
@@ -1465,7 +1457,7 @@ async function buscarEnSitios(q) {
   for (let i = 0; i < maximo; i++) {
     for (const g of grupos) if (g[i]) resultados.push(g[i]);
   }
-  console.log(`[buscar] "${q}" en Cuevana+GoPelis+AnimeFLV+Latanime → ${resultados.length} resultados`);
+  console.log(`[buscar] "${q}" en Cuevana+Latanime → ${resultados.length} resultados`);
   return resultados.slice(0, 24);
 }
 
