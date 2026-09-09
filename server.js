@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v92'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v93'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1757,14 +1757,17 @@ async function resolverSolo(pageUrl) {
 async function resolverGoodstream(embed, pageUrl) {
   /* el embed contiene el master.m3u8 y los subtítulos VTT.
    * El embed a veces se raciona por IP (403 por ráfagas): un reintento. */
-  let em = null;
-  for (let intento = 0; intento < 2; intento++) {
+  /* v93: además de reintentar cuando FALLA el fetch, reintenta cuando
+   * responde 200 con el cuerpo racionado (sin m3u8) — el glitch que
+   * hacía fallar pelis como Conclave */
+  let em = null, files = [], m3u8 = null;
+  for (let intento = 0; intento < 3 && !m3u8; intento++) {
     if (intento > 0) await new Promise((r2) => setTimeout(r2, 2500));
-    try { em = await fetchTexto(embed, pageUrl); break; }
-    catch (e) { if (intento === 1) throw e; }
+    try { em = await fetchTexto(embed, pageUrl); }
+    catch (e) { if (intento === 2) throw e; continue; }
+    files = [...em.matchAll(/file\s*:\s*["'](https?:\/\/[^"']+)["']/gi)].map((m) => m[1]);
+    m3u8 = files.find((f) => /\.m3u8/i.test(f));
   }
-  const files = [...em.matchAll(/file\s*:\s*["'](https?:\/\/[^"']+)["']/gi)].map((m) => m[1]);
-  const m3u8 = files.find((f) => /\.m3u8/i.test(f));
   if (!m3u8) throw new Error('El servidor no entregó el video — ábrelo en modo sala (👥 Juntos)');
   const subs = files
     .filter((f) => /\.vtt/i.test(f))
@@ -1791,25 +1794,165 @@ async function resolverVimeos(embed, pageUrl) {
   return { m3u8, proxy: true, subs: [] }; /* directo no sirve → siempre proxy */
 }
 /* v90: episodios de Latanime en modo individual — el embed de mp4upload
- * trae el mp4 DIRECTO en su HTML (player.src), sin navegador remoto */
+ * trae el mp4 DIRECTO en su HTML (player.src), sin navegador remoto.
+ * v93: a veces mp4upload responde 200 con el cuerpo VACÍO por ráfagas
+ * (Evangelion "no funcionaba" por eso — no estaba borrado) → reintentos
+ * con calma, TODOS los candidatos mp4upload, y verificamos que sirva. */
 async function resolverAnime(epUrl) {
   const html = await fetchTexto(epUrl, 'https://latanime.org/');
   const links = [...html.matchAll(/<a\b[^>]*class="[^"]*play-video[^"]*"[^>]*data-player="([^"]+)"[^>]*>/gi)];
   const embeds = links.map((m) => { try { return Buffer.from(m[1], 'base64').toString('utf8'); } catch { return ''; } }).filter((u) => /^https?:\/\//i.test(u));
-  const mejor = embeds.find((u) => /mp4upload\./i.test(u));
-  if (!mejor) throw new Error('Este episodio no tiene servidor mp4upload — se ve en modo sala (👥 Juntos)');
-  let em = '';
-  for (let intento = 0; intento < 2; intento++) {
-    if (intento > 0) await new Promise((r2) => setTimeout(r2, 2500));
-    try { em = await fetchTexto(mejor, epUrl); break; }
-    catch (e) { if (intento === 1) throw e; }
+  const candidatos = [...new Set(embeds.filter((u) => /mp4upload\./i.test(u)))];
+  if (!candidatos.length) throw new Error('Este episodio no tiene servidor mp4upload — se ve en modo sala (👥 Juntos)');
+  let ultimoError = null;
+  for (const mejor of candidatos) {
+    let m = null;
+    for (let intento = 0; intento < 4 && !m; intento++) {
+      if (intento > 0) await new Promise((r2) => setTimeout(r2, 1500 * intento));
+      try {
+        const em = await fetchTexto(mejor, epUrl);
+        m = em.match(/player\.src\(\{\s*type:\s*["']video\/mp4["']\s*,\s*src:\s*["'](https?:\/\/[^"']+)["']/i)
+          || em.match(/["'](https?:\/\/[^"'\s<>]*mp4upload[^"'\s<>]*\.mp4[^"'\s<>]*)["']/i);
+        if (!m) {
+          if (/file was deleted/i.test(em)) break; /* borrado: reintentar no ayuda */
+          if (em.length < 500 && intento < 3) continue; /* cuerpo racionado (glitch) → reintento */
+          break;
+        }
+      } catch (e) { ultimoError = e; }
+    }
+    if (!m) continue; /* a probar el siguiente mp4upload */
+    /* v93: ¿el mp4 SIRVE? un rangito con su Referer antes de prometer */
+    if (await sirveElVideo(m[1], mejor)) {
+      /* el mp4 exige el Referer del embed: lo recordamos para el proxy */
+      try { hlsReferers.set(new URL(m[1]).hostname, mejor); } catch {}
+      return { m3u8: m[1], mp4: true, proxy: true, subs: [] };
+    }
+    ultimoError = new Error('El servidor de anime no entregó el video');
   }
-  const m = em.match(/player\.src\(\{\s*type:\s*["']video\/mp4["']\s*,\s*src:\s*["'](https?:\/\/[^"']+)["']/i)
-    || em.match(/["'](https?:\/\/[^"'\s<>]*mp4upload[^"'\s<>]*\.mp4[^"'\s<>]*)["']/i);
-  if (!m) throw new Error('El servidor de anime no entregó el video — ábrelo en modo sala (👥 Juntos)');
-  /* el mp4 exige el Referer del embed: lo recordamos para el proxy */
-  try { hlsReferers.set(new URL(m[1]).hostname, mejor); } catch {}
-  return { m3u8: m[1], mp4: true, proxy: true, subs: [] };
+  /* v93: mp4upload agotado (borrado, como le pasó a Evangelion) → que
+   * el navegador del servidor lo resuelva UNA vez y todos lo ven nativo */
+  const nat = await resolverAnimePorNavegador(epUrl).catch(() => null);
+  if (nat) return nat;
+  throw ultimoError || new Error('Los servidores de este episodio están caídos en Latanime (probé todos, hasta con navegador). Prueba otra versión del anime o más tarde');
+}
+/* v93: el navegador del servidor abre el episodio, deja que su
+ * reproductor cargue el video, lee la URL que pidió y cierra. El
+ * usuario después lo reproduce NATIVO (hls.js/video), como cualquier
+ * peli — el navegador solo sirvió para DESCUBRIR la URL. */
+async function resolverAnimePorNavegador(epUrl) {
+  if (!PUPPETEER) { try { PUPPETEER = require('puppeteer'); } catch { return null; } }
+  const browser = await PUPPETEER.launch({
+    headless: 'new',
+    ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
+    args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required', '--disable-blink-features=AutomationControlled'],
+  }).catch(() => null);
+  if (!browser) return null;
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 });
+    await page.setUserAgent(MIRROR_UA).catch(() => {});
+    await page.evaluateOnNewDocument(() => {
+      try { window.open = function () { return null; }; } catch {}
+      try { Object.defineProperty(navigator, 'webdriver', { get: () => false }); } catch {}
+    });
+    const vistos = [];
+    page.on('request', (r) => {
+      try {
+        const u = r.url();
+        if (!/^https?:/i.test(u)) return;
+        const tipo = /\.m3u8(\?|$)/i.test(u) ? 'm3u8' : /\.mp4(\?|$)/i.test(u) ? 'mp4' : /\.ts(\?|$)/i.test(u) ? 'ts' : /\.vtt(\?|$)/i.test(u) ? 'vtt' : null;
+        if (tipo) vistos.push({ url: u, ref: (r.headers() && r.headers().referer) || '', tipo });
+      } catch {}
+    });
+    await page.goto(epUrl, { waitUntil: 'domcontentloaded', timeout: 25000 });
+    const montarIframe = (u) => page.evaluate((u2) => {
+      try {
+        document.querySelectorAll('iframe.rr-player').forEach((x) => x.remove());
+        const f = document.createElement('iframe');
+        f.className = 'rr-player';
+        f.src = u2;
+        f.allow = 'autoplay; encrypted-media; fullscreen';
+        f.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483000;border:0;background:#000';
+        document.body.appendChild(f);
+      } catch {}
+    }, u).catch(() => {});
+    /* leer el src del <video> de cualquier frame (CDP entra aunque sea
+     * cross-origin): video.js/jw lo dejan listo ANTES de darle play */
+    const leerVideoSrc = async () => {
+      for (const fr of page.frames()) {
+        const s = await fr.evaluate(() => {
+          try {
+            const v = document.querySelector('video');
+            if (v && (v.currentSrc || v.src) && /^https?:/i.test(v.currentSrc || v.src)) return (v.currentSrc || v.src);
+          } catch {}
+          return null;
+        }).catch(() => null);
+        if (s) return { url: s, ref: (() => { try { return new URL(fr.url()).href; } catch { return epUrl; } })() };
+      }
+      return null;
+    };
+    const links = await page.evaluate(() => {
+      try {
+        return [...document.querySelectorAll('a.play-video')]
+          .filter((a) => (a.getAttribute('data-player') || '').length > 8)
+          .map((a) => { try { return atob(a.getAttribute('data-player')); } catch { return ''; } })
+          .filter((u) => /^https?:\/\//i.test(u));
+      } catch { return []; }
+    }).catch(() => []);
+    /* 1) mp4upload EN EL NAVEGADOR (pasa muros que nuestro fetch no) */
+    const mp4 = links.find((u) => /mp4upload/i.test(u));
+    if (mp4) {
+      await montarIframe(mp4);
+      await new Promise((r2) => setTimeout(r2, 3500));
+      let hallado = await leerVideoSrc();
+      if (!hallado) hallado = vistos.find((v) => v.tipo === 'mp4') ? { url: vistos.find((v) => v.tipo === 'mp4').url, ref: mp4 } : null;
+      if (hallado && await sirveElVideo(hallado.url, hallado.ref || mp4)) {
+        try { hlsReferers.set(new URL(hallado.url).hostname, hallado.ref || mp4); } catch {}
+        console.log('[anime] POR NAVEGADOR (mp4upload) → ' + hallado.url.slice(0, 60));
+        return { m3u8: hallado.url, mp4: true, proxy: true, subs: [] };
+      }
+    }
+    /* 2) el mejor de los demás (sin mega ni mp4upload) — leer src y,
+     * si no, esperar autoplay un rato con un par de clics */
+    const otros = links.filter((u) => !/mp4upload|mega\.nz|youtube/i.test(u));
+    const orden = [
+      otros.find((u) => !/voe\.|mixdrop|netu|streamtape|streamwish|filemoon|vide0/i.test(u)), /* el "mejor" del espejo */
+      otros.find((u) => /filemoon|do7go|luluvdoo/i.test(u)),
+    ].filter(Boolean);
+    for (const srv of [...new Set(orden)]) {
+      await montarIframe(srv);
+      await new Promise((r2) => setTimeout(r2, 4000));
+      /* estos reproductores no se dejan automatizar (anti-bot): solo
+       * leer el src si el <video> ya existe — sin esperas largas */
+      let hallado = await leerVideoSrc();
+      if (!hallado && vistos.length) {
+        const media = vistos.find((v) => v.tipo === 'm3u8') || vistos.find((v) => v.tipo === 'mp4');
+        if (media) hallado = { url: media.url, ref: media.ref || srv };
+      }
+      if (hallado && await sirveElVideo(hallado.url, hallado.ref || srv)) {
+        /* los hosts que pidió el navegador → el proxy los sabe servir */
+        for (const v of vistos) { try { hlsReferers.set(new URL(v.url).hostname, v.ref || epUrl); } catch {} }
+        try { hlsReferers.set(new URL(hallado.url).hostname, hallado.ref || srv); } catch {}
+        console.log('[anime] POR NAVEGADOR (' + (() => { try { return new URL(srv).hostname; } catch { return '?'; } })() + ') → ' + hallado.url.slice(0, 60));
+        return { m3u8: hallado.url, mp4: /\.mp4(\?|$)/i.test(hallado.url), proxy: true, subs: [] };
+      }
+    }
+    return null;
+  } catch { return null; }
+  finally { try { await browser.close(); } catch {} }
+}
+/* v93: probamos que un video directo responda (rangito con su Referer) */
+async function sirveElVideo(url, referer) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 8000);
+  try {
+    const r = await fetch(url, {
+      headers: { 'User-Agent': MIRROR_UA, Referer: referer, Range: 'bytes=0-1024' },
+      signal: ctl.signal, redirect: 'follow',
+    });
+    clearTimeout(t);
+    return r.ok || r.status === 206;
+  } catch { clearTimeout(t); return false; }
 }
 
 /* v81: proxy HLS con allowlist — el token de goodstream puede venir
@@ -1826,7 +1969,8 @@ function esGoodstream(u) {
 function esProxeable(u) {
   try {
     const h = new URL(u).hostname;
-    return /(^|\.)goodstream\.one$/i.test(h) || /(^|\.)mp4upload\.com$/i.test(h) || /(^|\.)vimeos\.(net|zip)$/i.test(h);
+    return /(^|\.)goodstream\.one$/i.test(h) || /(^|\.)mp4upload\.com$/i.test(h) || /(^|\.)vimeos\.(net|zip)$/i.test(h)
+      || hlsReferers.has(h); /* v93: hosts que ya resolvimos (con su Referer) */
   } catch { return false; }
 }
 /* v83: reescribe un m3u8 para que todo pase por el proxy */
