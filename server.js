@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v96'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v97'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1341,10 +1341,11 @@ function loadSitesFile() {
         /* v46: Cuevana movió su portada de /inicio a la raíz */
         if (/^https?:\/\/(www\.)?cuevana\.[a-z.]+\/inicio\/?$/i.test(s.url || '')) { s.url = s.url.replace(/\/inicio\/?$/i, '/'); cambio = true; }
       }
-      /* v68: fuera AnimeFLV y GoPelis — v70: fuera AnimeD23 también */
+      /* v68/v70: fuera GoPelis y AnimeD23 — v97: AnimeFLV REGRESA
+       * (trae mp4upload entre sus servidores y sirve de respaldo) */
       const antes = l.length;
-      l = l.filter((s) => !/animeflv\.|gopelis\.|animed23\./i.test(s.url || ''));
-      if (l.length !== antes) { cambio = true; console.log('[sitios] - AnimeFLV, GoPelis y AnimeD23'); }
+      l = l.filter((s) => !/gopelis\.|animed23\./i.test(s.url || ''));
+      if (l.length !== antes) { cambio = true; console.log('[sitios] - GoPelis y AnimeD23'); }
       /* v65: logos propios para Latanime y AnimeFLV (los favicons de Google
        * a veces no cargan → salía el recuadro azul con ?) y Latanime
        * predeterminado: primero en la lista */
@@ -1359,6 +1360,16 @@ function loadSitesFile() {
       } else {
         const iLat = l.findIndex(esLat);
         if (iLat > 0) { const [lat] = l.splice(iLat, 1); l.unshift(lat); cambio = true; }
+      }
+      /* v97: AnimeFLV de vuelta en el directorio, con su logo */
+      const esAF = (s) => /animeflv\./i.test(s.url || '');
+      for (const s of l) {
+        if (esAF(s) && s.logo !== '/sites/animeflv.png') { s.logo = '/sites/animeflv.png'; cambio = true; }
+      }
+      if (!l.some(esAF)) {
+        l.push({ name: 'AnimeFLV', desc: 'Animes (respaldo de Latanime)', url: 'https://vww.animeflv.one/', logo: '/sites/animeflv.png' });
+        cambio = true;
+        console.log('[sitios] + AnimeFLV (v97)');
       }
       if (cambio) saveSitesFile(l);
     }
@@ -1663,11 +1674,39 @@ async function buscarLatanime(q) {
   return out;
 }
 
+/* v97: AnimeFLV de vuelta — catálogo gigante y trae mp4upload entre sus
+ * servidores (extraíble); respaldo cuando la versión de Latanime está muerta */
+async function buscarAnimeflv(q) {
+  const r = await fetchSeguro('https://vww.animeflv.one/animes?buscar=' + encodeURIComponent(q), 9000);
+  if (!r.ok) return [];
+  const html = (await r.text()).slice(0, 700000);
+  const out = [];
+  const vistos = new Set();
+  for (const bloque of html.match(/<article class="li">[\s\S]*?<\/article>/g) || []) {
+    if (out.length >= 8) break;
+    const href = (/(?:\.\/|https:\/\/vww\.animeflv\.one\/)(anime\/[a-z0-9-]+)/.exec(bloque) || [])[1];
+    const h3 = (/<h3 class="h"><a[^>]*>([^<]{2,120})<\/a>/i.exec(bloque) || [])[1];
+    if (!href || !h3) continue; /* los "últimos episodios" no traen h3 */
+    const url = 'https://vww.animeflv.one/' + href;
+    if (vistos.has(url)) continue;
+    vistos.add(url);
+    out.push({
+      title: h3.replace(/&#0?39;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim(),
+      url,
+      img: (/data-src="([^"]+)"/.exec(bloque) || [])[1] || '',
+      site: 'AnimeFLV',
+      extra: (/<u class="c-p">([^<]*)<\/u>/.exec(bloque) || [])[1] || '', /* Pelicula, Ova… */
+    });
+  }
+  return out;
+}
+
 async function buscarEnSitios(q) {
   /* v68: fuera GoPelis (poco catálogo) y AnimeFLV — queda Cuevana + Latanime */
   const grupos = await Promise.all([
     buscarCuevana(q).catch(() => []),
     buscarLatanime(q).catch(() => []),
+    buscarAnimeflv(q).catch(() => []), /* v97 */
   ]);
   /* v63: intercalados por sitio para que ningún sitio tape a los demás */
   const resultados = [];
@@ -1675,7 +1714,7 @@ async function buscarEnSitios(q) {
   for (let i = 0; i < maximo; i++) {
     for (const g of grupos) if (g[i]) resultados.push(g[i]);
   }
-  console.log(`[buscar] "${q}" en Cuevana+Latanime → ${resultados.length} resultados`);
+  console.log(`[buscar] "${q}" en Cuevana+Latanime+AnimeFLV → ${resultados.length} resultados`);
   return resultados.slice(0, 24);
 }
 
@@ -1813,19 +1852,13 @@ async function resolverVimeos(embed, pageUrl) {
  * v93: a veces mp4upload responde 200 con el cuerpo VACÍO por ráfagas
  * (Evangelion "no funcionaba" por eso — no estaba borrado) → reintentos
  * con calma, TODOS los candidatos mp4upload, y verificamos que sirva. */
-async function resolverAnime(epUrl) {
-  const html = await fetchTexto(epUrl, 'https://latanime.org/');
-  const links = [...html.matchAll(/<a\b[^>]*class="[^"]*play-video[^"]*"[^>]*data-player="([^"]+)"[^>]*>/gi)];
-  const embeds = links.map((m) => { try { return Buffer.from(m[1], 'base64').toString('utf8'); } catch { return ''; } }).filter((u) => /^https?:\/\//i.test(u));
-  const candidatos = [...new Set(embeds.filter((u) => /mp4upload\./i.test(u)))];
-  if (!candidatos.length) throw new Error('Este episodio no tiene servidor mp4upload — se ve en modo sala (👥 Juntos)');
-  let ultimoError = null;
+async function extraerMp4(candidatos, pageUrl) {
   for (const mejor of candidatos) {
     let m = null;
     for (let intento = 0; intento < 4 && !m; intento++) {
       if (intento > 0) await new Promise((r2) => setTimeout(r2, 1500 * intento));
       try {
-        const em = await fetchTexto(mejor, epUrl);
+        const em = await fetchTexto(mejor, pageUrl);
         m = em.match(/player\.src\(\{\s*type:\s*["']video\/mp4["']\s*,\s*src:\s*["'](https?:\/\/[^"']+)["']/i)
           || em.match(/["'](https?:\/\/[^"'\s<>]*mp4upload[^"'\s<>]*\.mp4[^"'\s<>]*)["']/i);
         if (!m) {
@@ -1833,7 +1866,7 @@ async function resolverAnime(epUrl) {
           if (em.length < 500 && intento < 3) continue; /* cuerpo racionado (glitch) → reintento */
           break;
         }
-      } catch (e) { ultimoError = e; }
+      } catch (e) {}
     }
     if (!m) continue; /* a probar el siguiente mp4upload */
     /* v93: ¿el mp4 SIRVE? un rangito con su Referer antes de prometer */
@@ -1842,13 +1875,61 @@ async function resolverAnime(epUrl) {
       try { hlsReferers.set(new URL(m[1]).hostname, mejor); } catch {}
       return { m3u8: m[1], mp4: true, proxy: true, subs: [] };
     }
-    ultimoError = new Error('El servidor de anime no entregó el video');
   }
+  return null;
+}
+async function resolverAnime(epUrl) {
+  /* v97: AnimeFLV también resuelve — sus servidores salen de un POST
+   * al sitio (data-encrypt en hex) y trae mp4upload entre ellos */
+  if (/animeflv\./i.test(epUrl)) return resolverAnimeflv(epUrl);
+  const html = await fetchTexto(epUrl, 'https://latanime.org/');
+  const links = [...html.matchAll(/<a\b[^>]*class="[^"]*play-video[^"]*"[^>]*data-player="([^"]+)"[^>]*>/gi)];
+  const embeds = links.map((m) => { try { return Buffer.from(m[1], 'base64').toString('utf8'); } catch { return ''; } }).filter((u) => /^https?:\/\//i.test(u));
+  const candidatos = [...new Set(embeds.filter((u) => /mp4upload\./i.test(u)))];
+  if (!candidatos.length) throw new Error('Este episodio no tiene servidor mp4upload — se ve en modo sala (👥 Juntos)');
+  const directo = await extraerMp4(candidatos, epUrl);
+  if (directo) return directo;
   /* v93: mp4upload agotado (borrado, como le pasó a Evangelion) → que
    * el navegador del servidor lo resuelva UNA vez y todos lo ven nativo */
   const nat = await resolverAnimePorNavegador(epUrl).catch(() => null);
   if (nat) return nat;
-  throw ultimoError || new Error('Los servidores de este episodio están caídos en Latanime (probé todos, hasta con navegador). Prueba otra versión del anime o más tarde');
+  throw new Error('Los servidores de este episodio están caídos en Latanime (probé todos, hasta con navegador). Prueba otra versión del anime o más tarde');
+}
+/* v97: episodio de AnimeFLV — la página trae el id en data-encrypt
+ * (hex); un POST a /flv devuelve los servidores como <li encrypt="hex">
+ * y cada hex es la URL del embed. Preferimos los mp4upload (extraíbles) */
+async function resolverAnimeflv(epUrl) {
+  const html = await fetchTexto(epUrl, 'https://vww.animeflv.one/');
+  const enc = (/class="opt"[^>]*data-encrypt="([0-9a-f]+)"/i.exec(html) || [])[1];
+  if (!enc) throw new Error('No pude leer los servidores de este episodio en AnimeFLV');
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 12000);
+  let cuerpo = '';
+  try {
+    const r = await fetch('https://vww.animeflv.one/flv', {
+      method: 'POST',
+      headers: {
+        'User-Agent': MIRROR_UA,
+        'Referer': epUrl,
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept-Language': 'es-MX,es;q=0.9,en;q=0.6',
+      },
+      body: 'acc=opt&i=' + enc,
+      signal: ctl.signal,
+      redirect: 'follow',
+    });
+    cuerpo = await r.text();
+  } catch (e) { throw new Error('AnimeFLV no respondió'); }
+  finally { clearTimeout(t); }
+  const embeds = [...cuerpo.matchAll(/<li[^>]*encrypt="([0-9a-f]+)"/gi)]
+    .map((m) => { try { return Buffer.from(m[1], 'hex').toString('utf8'); } catch { return ''; } })
+    .filter((u) => /^https?:\/\//i.test(u));
+  const candidatos = [...new Set(embeds.filter((u) => /mp4upload\./i.test(u)))];
+  if (!candidatos.length) throw new Error('Este episodio no tiene servidor mp4upload en AnimeFLV — sus otros servidores no se dejen extraer');
+  const directo = await extraerMp4(candidatos, epUrl);
+  if (directo) return directo;
+  throw new Error('Los servidores mp4upload de este episodio están caídos en AnimeFLV — prueba otra versión del anime o más tarde');
 }
 /* v93: el navegador del servidor abre el episodio, deja que su
  * reproductor cargue el video, lee la URL que pidió y cierra. El
@@ -2340,7 +2421,7 @@ const server = http.createServer(async (req, res) => {
       if (!/^https?:\/\/[a-z0-9.-]+/i.test(target)) return json(res, 400, { ok: false, error: 'URL no válida' });
       try {
         /* v90: episodio de Latanime → resolver de animes (mp4 directo) */
-        const esEpAnime = /latanime\.org\/ver\//i.test(target);
+        const esEpAnime = /latanime\.org\/ver\/|animeflv\.one\/ver\//i.test(target); /* v97: también AnimeFLV */
         const r = await (esEpAnime ? resolverAnime(target) : resolverSolo(target));
         return json(res, 200, { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy });
       } catch (e) {
