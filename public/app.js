@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v94';
+const APP_VERSION = 'v95';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1197,7 +1197,10 @@ function pintarEpisodios(temporada) {
       /* elegiste episodio → igual que una peli: carátula, sala, pausa y play */
       cerrarSeriePicker();
       const nombre = esAn ? `${spDatos.titulo} — Episodio ${ep.ep || ''}`.trim() : `${spDatos.titulo} ${temporada}x${ep.ep || ''}`.trim();
-      const imgEp = ep.img || spDatos.posterBase;
+      /* v95: la entrada del episodio lleva el PÓSTER DE LA SERIE (como
+       * los animes) — el still de la escena se queda solo en el picker;
+       * antes el continuar-viendo mostraba la foto del episodio */
+      const imgEp = spDatos.posterBase || ep.img;
       if (S.modoSolo) {
         /* v90: los animes TAMBIÉN se ven en Solo — el servidor saca el
          * mp4 directo de mp4upload (antes pedían la sala con navegador) */
