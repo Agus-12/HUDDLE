@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v90';
+const APP_VERSION = 'v91';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -928,10 +928,22 @@ let spDatos = null; /* lo que devolvió /api/serie */
 /* v62→v67: imágenes de AnimeFLV y Latanime pasan por NUESTRO proxy —
  * wsrv.nl ya no puede con ellas (las bloquean con 403) */
 function proxyAnimeImg(src, w) {
+  if (src && src.startsWith('/api/img')) return src; /* v91: ya proxieada */
   if (src && /animeflv\.|latanime\./i.test(src)) {
     return '/api/img?u=' + encodeURIComponent(src);
   }
   return src || '';
+}
+/* v91: normaliza CUALQUIER carátula de anime al proxy — si la URL ya
+ * viene proxieada (/api/img?u=…) la dejamos tal cual. Antes se
+ * proxieaba DOS veces (el regex veía "latanime" dentro de la URL ya
+ * codificada) y la imagen no cargaba: el recuadro azul con "?" en
+ * continuar-viendo. */
+function imgPorProxy(src) {
+  if (!src) return '';
+  if (src.startsWith('/api/img')) return src;
+  if (/animeflv\.|latanime\./i.test(src)) return '/api/img?u=' + encodeURIComponent(src);
+  return src;
 }
 function abrirSeriePicker(res, enSala, esAnime) {
   const slugM = /(?:serie|anime)\/([a-z0-9-]+)/i.exec(res.url || '');
@@ -2189,8 +2201,7 @@ function crearTarjetaResultado(res, alElegir) {
     card.type = 'button';
     /* v53: las carátulas de AnimeFLV van por un proxy de imágenes porque
      * en algunos teléfonos/compañías la página bloquea la imagen directa */
-    let srcImg = res.img || '';
-    if (srcImg && /animeflv\.|latanime\./i.test(srcImg)) srcImg = '/api/img?u=' + encodeURIComponent(srcImg);
+    const srcImg = imgPorProxy(res.img || ''); /* v91: nunca dos veces */
     card.innerHTML = `
       <span class="sr-badge"><img src="${logoDeSitio(res.site)}" alt=""></span>
       ${srcImg
@@ -2205,9 +2216,11 @@ function crearTarjetaResultado(res, alElegir) {
     const im = card.querySelector('img.sr-cover');
     if (im && res.img) {
       im.addEventListener('error', () => {
-        const respaldo = /animeflv\.|latanime\./i.test(res.img)
-          ? '/api/img?u=' + encodeURIComponent(res.img) /* v67: proxy propio */
-          : 'https://wsrv.nl/?url=' + res.img.replace(/^https?:\/\//, '').split('?')[0] + '&w=240';
+        const respaldo = /^\/api\/img/.test(res.img || '')
+          ? res.img /* v91: ya va por el proxy — reintento tal cual */
+          : /animeflv\.|latanime\./i.test(res.img)
+            ? imgPorProxy(res.img) /* v67: proxy propio */
+            : 'https://wsrv.nl/?url=' + res.img.replace(/^https?:\/\//, '').split('?')[0] + '&w=240';
         if (im.src !== respaldo) im.src = respaldo;
       }, { once: true });
     }
@@ -2275,6 +2288,10 @@ async function buscarInicio() {
     }
     renderResultados(box, d.results, (res) => {
       if (elegirTitulo(res)) return; /* v61: series → temporadas y episodios */
+      /* v91: en la pestaña Solo, lo que buscas se reproduce individual —
+       * antes la búsqueda SIEMPRE armaba una sala (pantalla de "Cargando
+       * tu sala…" aunque estuvieras en Solo) */
+      if (S.modoSolo) { abrirSolo(res.url, { title: res.title || '', img: res.img || '' }); return; }
       S.pendingStart = { url: res.url, name: res.title || res.site, img: res.img || '' };
       /* v60: pantalla completa de espera desde el toque */
       S.mirrorInfo = { title: res.title || '', img: res.img || '', url: res.url, sub: 'Cargando tu sala…' };
@@ -2341,8 +2358,7 @@ function crearTarjetaContinuar(e) {
   const card = document.createElement('button');
   card.type = 'button';
   card.className = 'sr-card cont-card';
-  let srcImg = e.img || '';
-  if (srcImg && /animeflv\.|latanime\./i.test(srcImg)) srcImg = '/api/img?u=' + encodeURIComponent(srcImg);
+  const srcImg = imgPorProxy(e.img || ''); /* v91: nunca dos veces */
   const pct = (e.d > 0) ? Math.max(4, Math.min(100, Math.round((e.t / e.d) * 100))) : 0;
   card.innerHTML = `
     ${srcImg
@@ -2383,9 +2399,11 @@ function crearTarjetaContinuar(e) {
   const im = card.querySelector('img.sr-cover');
   if (im && e.img) {
     im.addEventListener('error', () => {
-      const respaldo = /animeflv\.|latanime\./i.test(e.img)
-        ? '/api/img?u=' + encodeURIComponent(e.img)
-        : 'https://wsrv.nl/?url=' + e.img.replace(/^https?:\/\//, '').split('?')[0] + '&w=240';
+      const respaldo = /^\/api\/img/.test(e.img || '')
+        ? e.img /* v91: ya va por el proxy — reintento tal cual */
+        : /animeflv\.|latanime\./i.test(e.img)
+          ? imgPorProxy(e.img)
+          : 'https://wsrv.nl/?url=' + e.img.replace(/^https?:\/\//, '').split('?')[0] + '&w=240';
       if (im.src !== respaldo) im.src = respaldo;
     }, { once: true });
   }
