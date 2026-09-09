@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v88';
+const APP_VERSION = 'v89';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1616,6 +1616,7 @@ function autoFsPorOrientacion(landscape) {
         const xf = document.exitFullscreen || document.webkitExitFullscreen;
         if (xf) { try { xf.call(document); } catch {} }
       }
+      sincronizarGiros(); /* v89: el giro del reproductor SIGUE al teléfono (acostado↔enderezado) */
       return; /* en modo individual no aplica la lógica de la sala */
     }
     /* v78: el volteo solo amplía con la sala abierta y algo en el espejo;
@@ -2504,6 +2505,20 @@ async function abrirSolo(pageUrl, info, opts) {
   try { video.load(); } catch {}
   $('#soloPlayer').classList.remove('hidden');
   try { sincronizarGiros(); } catch {} /* v88: ¿celular vertical? → girado */
+  /* v89: en el celular, el reproductor NACE a pantalla completa — con el
+   * mismo toque con el que abriste la peli (el navegador solo permite
+   * pantalla completa con un gesto del usuario). Así, al voltear el
+   * teléfono, ya no hay que volver a pedirla: SE QUEDA ACOSTADO. */
+  if (esCelular()) {
+    try {
+      const spEl = $('#soloPlayer');
+      const rf = spEl.requestFullscreen || spEl.webkitRequestFullscreen;
+      if (rf && !document.fullscreenElement && !document.webkitFullscreenElement) {
+        const pr = rf.call(spEl);
+        if (pr && pr.catch) pr.catch(() => {});
+      }
+    } catch {}
+  }
   let rateInicial = 1;
   try { rateInicial = Math.min(2, Math.max(0.5, parseFloat(localStorage.getItem('huddle_rate')) || 1)); } catch {}
   SOLO = {
@@ -2695,6 +2710,12 @@ function mostrarSoloCtrls5s() {
 }
 function cerrarSolo() {
   if (soloCtrlTimer) { clearTimeout(soloCtrlTimer); soloCtrlTimer = null; }
+  try { /* v89: si el reproductor estaba a pantalla completa, se suelta */
+    if ((document.fullscreenElement || document.webkitFullscreenElement) === $('#soloPlayer')) {
+      const xf = document.exitFullscreen || document.webkitExitFullscreen;
+      if (xf) xf.call(document);
+    }
+  } catch {}
   cerrarMenusSolo();
   pararCuentaSiguiente(); /* v84 */
   if (SOLO) {
