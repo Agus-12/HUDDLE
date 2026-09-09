@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v89'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v90'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1642,6 +1642,20 @@ function decodificarDataSrc(enc) {
     return /^https?:\/\/[a-z0-9.-]+\//i.test(url) ? url : null;
   } catch { return null; }
 }
+/* v90: desempaca el ofuscador clásico eval(function(p,a,c,k,e,d)…) —
+ * lo ejecutamos tal cual (solo reemplaza cadenas, no toca el DOM) para
+ * leer el HLS que esconde el embed de vimeos */
+function desempacar(html) {
+  try {
+    const i = html.indexOf('eval(function(p,a,c,k,e,d)');
+    if (i < 0) return null;
+    const j = html.indexOf('</script>', i);
+    if (j < 0) return null;
+    let s = html.slice(i + 5, j).trim();
+    if (s.endsWith(')')) s = s.slice(0, -1); /* el paréntesis que cierra el eval */
+    return new Function('return ' + s)();
+  } catch { return null; }
+}
 async function fetchTexto(url, referer) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 25000);
@@ -1656,21 +1670,41 @@ async function fetchTexto(url, referer) {
 }
 async function resolverSolo(pageUrl) {
   const html = await fetchTexto(pageUrl, '');
-  /* 1) el botón play goodstream (data-src cifrado) */
-  let embed = null;
+  /* 1) los botones play (data-src cifrado): goodstream primero y
+   * vimeos de repuesto (v90: su embed esconde el HLS en un eval) */
+  let embed = null, embedVimeos = null;
   const tags = html.match(/<a\b[^>]*class="[^"]*\bplay\b[^"]*"[^>]*>/gi) || [];
   for (const t of tags) {
-    if ((t.match(/data-domain="([^"]*)"/i) || [])[1] !== 'goodstream') continue;
+    const dom = (t.match(/data-domain="([^"]*)"/i) || [])[1];
     const enc = (t.match(/data-src="([^"]*)"/i) || [])[1];
-    if (enc) { const u = decodificarDataSrc(enc); if (u) { embed = u; break; } }
+    if (!enc) continue;
+    const u = decodificarDataSrc(enc);
+    if (!u) continue;
+    if (dom === 'goodstream' && !embed) embed = u;
+    else if (dom === 'vimeos' && !embedVimeos) embedVimeos = u;
   }
   /* 2) plan B: algún embed goodstream a la vista */
   if (!embed) {
     const m = html.match(/https?:\/\/[^"'\s<>]*goodstream\.one\/embed[^"'\s<>]*/i);
     if (m) embed = m[0];
   }
-  if (!embed) throw new Error('Este título no tiene servidor goodstream — se ve en modo sala (👥 Juntos)');
-  /* 3) el embed contiene el master.m3u8 y los subtítulos VTT.
+  /* v90: goodstream… y si no hay (o falla), vimeos — así el modo Solo
+   * también cubre los títulos que antes pedían la sala */
+  let err = null;
+  if (embed) {
+    try { return await resolverGoodstream(embed, pageUrl); }
+    catch (e) { err = e; }
+  }
+  if (embedVimeos) {
+    try { return await resolverVimeos(embedVimeos, pageUrl); }
+    catch (e) { console.warn('[solo] vimeos también falló:', String(e.message || e).slice(0, 80)); }
+  }
+  throw err || new Error('Este título no tiene servidor goodstream — se ve en modo sala (👥 Juntos)');
+}
+/* v90: la parte goodstream (lo que antes era resolverSolo a partir del
+ * embed) — HLS + subtítulos VTT */
+async function resolverGoodstream(embed, pageUrl) {
+  /* el embed contiene el master.m3u8 y los subtítulos VTT.
    * El embed a veces se raciona por IP (403 por ráfagas): un reintento. */
   let em = null;
   for (let intento = 0; intento < 2; intento++) {
@@ -1690,10 +1724,41 @@ async function resolverSolo(pageUrl) {
   /* algunos nodos (hls1) solo sirven si el Referer es una página de
    * goodstream: recordamos el embed que funcionó para este host */
   try {
-    hlsReferers.set(new URL(m3u8).host, embed);
-    for (const s of subs) { try { hlsReferers.set(new URL(s.url).host, embed); } catch {} }
+    hlsReferers.set(new URL(m3u8).hostname, embed);
+    for (const s of subs) { try { hlsReferers.set(new URL(s.url).hostname, embed); } catch {} }
   } catch {}
   return { m3u8, subs };
+}
+/* v90: vimeos — el HLS (720p) vive dentro de un eval(p,a,c,k,e,d) */
+async function resolverVimeos(embed, pageUrl) {
+  const em = await fetchTexto(embed, pageUrl);
+  const out = desempacar(em);
+  const m3u8 = out && (out.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
+  if (!m3u8) throw new Error('vimeos no entregó el video');
+  /* los segmentos piden el Referer del embed: lo recordamos */
+  try { hlsReferers.set(new URL(m3u8).hostname, embed); } catch {}
+  return { m3u8, proxy: true, subs: [] }; /* directo no sirve → siempre proxy */
+}
+/* v90: episodios de Latanime en modo individual — el embed de mp4upload
+ * trae el mp4 DIRECTO en su HTML (player.src), sin navegador remoto */
+async function resolverAnime(epUrl) {
+  const html = await fetchTexto(epUrl, 'https://latanime.org/');
+  const links = [...html.matchAll(/<a\b[^>]*class="[^"]*play-video[^"]*"[^>]*data-player="([^"]+)"[^>]*>/gi)];
+  const embeds = links.map((m) => { try { return Buffer.from(m[1], 'base64').toString('utf8'); } catch { return ''; } }).filter((u) => /^https?:\/\//i.test(u));
+  const mejor = embeds.find((u) => /mp4upload\./i.test(u));
+  if (!mejor) throw new Error('Este episodio no tiene servidor mp4upload — se ve en modo sala (👥 Juntos)');
+  let em = '';
+  for (let intento = 0; intento < 2; intento++) {
+    if (intento > 0) await new Promise((r2) => setTimeout(r2, 2500));
+    try { em = await fetchTexto(mejor, epUrl); break; }
+    catch (e) { if (intento === 1) throw e; }
+  }
+  const m = em.match(/player\.src\(\{\s*type:\s*["']video\/mp4["']\s*,\s*src:\s*["'](https?:\/\/[^"']+)["']/i)
+    || em.match(/["'](https?:\/\/[^"'\s<>]*mp4upload[^"'\s<>]*\.mp4[^"'\s<>]*)["']/i);
+  if (!m) throw new Error('El servidor de anime no entregó el video — ábrelo en modo sala (👥 Juntos)');
+  /* el mp4 exige el Referer del embed: lo recordamos para el proxy */
+  try { hlsReferers.set(new URL(m[1]).hostname, mejor); } catch {}
+  return { m3u8: m[1], mp4: true, proxy: true, subs: [] };
 }
 
 /* v81: proxy HLS con allowlist — el token de goodstream puede venir
@@ -1705,6 +1770,14 @@ function esGoodstream(u) {
   try { const h = new URL(u).host; return /(^|\.)goodstream\.one$/i.test(h); }
   catch { return false; }
 }
+/* v90: hosts que podemos re-servir por el proxy — goodstream Y los
+ * nuevos: mp4upload (animes) y vimeos (pelis sin goodstream) */
+function esProxeable(u) {
+  try {
+    const h = new URL(u).hostname;
+    return /(^|\.)goodstream\.one$/i.test(h) || /(^|\.)mp4upload\.com$/i.test(h) || /(^|\.)vimeos\.(net|zip)$/i.test(h);
+  } catch { return false; }
+}
 /* v83: reescribe un m3u8 para que todo pase por el proxy */
 function servirPlaylist(res, codigo, txt, target) {
   const esLocal = /^\/test-media\//.test(target);
@@ -1713,7 +1786,7 @@ function servirPlaylist(res, codigo, txt, target) {
     if (/^\/[^/]/.test(u)) return '/api/hls?u=' + encodeURIComponent(u); /* v83: stream local de prueba */
     if (esLocal && !/^https?:/i.test(u)) return '/api/hls?u=' + encodeURIComponent(baseLocal + u);
     let abs; try { abs = new URL(u, target).href; } catch { return u; }
-    return esGoodstream(abs) ? '/api/hls?u=' + encodeURIComponent(abs) : abs;
+    return esProxeable(abs) ? '/api/hls?u=' + encodeURIComponent(abs) : abs; /* v90: también mp4upload/vimeos */
   };
   txt = txt.replace(/URI="([^"]+)"/g, (m, u) => 'URI="' + prox(u) + '"');
   txt = txt
@@ -1738,22 +1811,25 @@ async function proxearHls(req, res, target) {
     });
     return;
   }
-  if (!esGoodstream(target)) return json(res, 403, { ok: false, error: 'No permitido' });
+  if (!esProxeable(target)) return json(res, 403, { ok: false, error: 'No permitido' }); /* v90: allowlist ampliada */
   /* el origen de goodstream a veces suelta 403 transitorios (cache-miss):
    * reintentamos un par de veces antes de rendirnos */
   let ref = 'https://goodstream.one/';
-  try { ref = hlsReferers.get(new URL(target).host) || ref; } catch {}
+  try { ref = hlsReferers.get(new URL(target).hostname) || ref; } catch {}
+  /* v90: el mp4 de animes se adelanta/atrás por rangos — los pasamos */
+  const cabUp = {
+    'User-Agent': MIRROR_UA,
+    Referer: ref,
+    'Accept-Language': 'es-MX,es;q=0.9,en;q=0.6', /* igual que fetchTexto: hls1 amarra el token al fingerprint */
+  };
+  if (req.headers.range) cabUp.Range = String(req.headers.range);
   let upstream = null;
   for (let intento = 0; intento < 3; intento++) {
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 30000);
     try {
       upstream = await fetch(target, {
-        headers: {
-          'User-Agent': MIRROR_UA,
-          Referer: ref,
-          'Accept-Language': 'es-MX,es;q=0.9,en;q=0.6', /* igual que fetchTexto: hls1 amarra el token al fingerprint */
-        },
+        headers: cabUp,
         signal: ctl.signal, redirect: 'follow',
       });
       clearTimeout(t);
@@ -1783,8 +1859,12 @@ async function proxearHls(req, res, target) {
   const ct = upstream.headers.get('content-type') || '';
   const esLista = /mpegurl|m3u8/i.test(ct) || /\.m3u8(\?|$)/i.test(target);
   if (!esLista) {
-    /* segmento: tubería directa, sin tocar los bytes */
-    res.writeHead(upstream.status, { 'Content-Type': ct || 'video/MP2T', 'Cache-Control': 'no-store' });
+    /* segmento (o mp4 entero): tubería directa, sin tocar los bytes.
+     * v90: pasamos Range/Content-Range para poder moverse dentro del
+     * mp4 de animes sin descargarlo completo */
+    const cab = { 'Content-Type': ct || 'video/MP2T', 'Cache-Control': 'no-store', 'Accept-Ranges': 'bytes' };
+    for (const h of ['content-range', 'content-length']) { const v = upstream.headers.get(h); if (v) cab[h] = v; }
+    res.writeHead(upstream.status, cab);
     Readable.fromWeb(upstream.body).on('error', () => {}).pipe(res);
     return;
   }
@@ -2032,8 +2112,10 @@ const server = http.createServer(async (req, res) => {
       const target = url.searchParams.get('url') || '';
       if (!/^https?:\/\/[a-z0-9.-]+/i.test(target)) return json(res, 400, { ok: false, error: 'URL no válida' });
       try {
-        const r = await resolverSolo(target);
-        return json(res, 200, { ok: true, m3u8: r.m3u8, subs: r.subs });
+        /* v90: episodio de Latanime → resolver de animes (mp4 directo) */
+        const esEpAnime = /latanime\.org\/ver\//i.test(target);
+        const r = await (esEpAnime ? resolverAnime(target) : resolverSolo(target));
+        return json(res, 200, { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy });
       } catch (e) {
         console.warn('[solo] no pude resolver', target.slice(0, 70), '→', String(e.message || e).slice(0, 90));
         return json(res, 404, { ok: false, error: String(e.message || e).slice(0, 200) });

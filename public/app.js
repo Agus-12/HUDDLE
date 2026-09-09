@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v89';
+const APP_VERSION = 'v90';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1001,20 +1001,16 @@ function pintarEpisodios(temporada) {
       const nombre = esAn ? `${spDatos.titulo} — Episodio ${ep.ep || ''}`.trim() : `${spDatos.titulo} ${temporada}x${ep.ep || ''}`.trim();
       const imgEp = ep.img || spDatos.posterBase;
       if (S.modoSolo) {
-        /* v81: episodio en modo individual — los animes (filemoon) no
-         * tienen extracción directa y se quedan en la sala */
-        if (esAn) toast('Los animes se ven en la pestaña Juntos');
-        else {
-          /* v84: la lista desde este episodio alimenta "Sig. ▸" y "A continuación" */
-          const idx = eps.indexOf(ep);
-          const cadena = idx >= 0 ? eps.slice(idx) : [ep];
-          abrirSolo(ep.url, {
-            title: spDatos.titulo || '', ep: `${temporada}x${ep.ep || ''}`,
-            serie: spDatos.titulo || '', img: imgEp,
-            eps: cadena.map((x) => ({ url: x.url, ep: `${x.temporada}x${x.ep || ''}`, nombre: x.titulo || '' })),
-          });
-          return;
-        }
+        /* v90: los animes TAMBIÉN se ven en Solo — el servidor saca el
+         * mp4 directo de mp4upload (antes pedían la sala con navegador) */
+        const idx = eps.indexOf(ep);
+        const cadena = idx >= 0 ? eps.slice(idx) : [ep];
+        abrirSolo(ep.url, {
+          title: spDatos.titulo || '', ep: esAn ? String(ep.ep || '') : `${temporada}x${ep.ep || ''}`,
+          serie: spDatos.titulo || '', img: imgEp,
+          eps: cadena.map((x) => ({ url: x.url, ep: esAn ? String(x.ep || '') : `${x.temporada}x${x.ep || ''}`, nombre: x.titulo || '' })),
+        });
+        return;
       }
       if (spDatos.enSala) {
         S.mirrorInfo = { title: nombre, img: imgEp, url: ep.url, sub: 'Abriendo en el espejo…' };
@@ -2545,7 +2541,7 @@ async function abrirSolo(pageUrl, info, opts) {
     if (!d.ok) throw new Error(d.error || 'No pude resolver el video');
     if (!SOLO || SOLO.url !== pageUrl || SOLO.cerrado) return; /* cerraron mientras buscaba */
     SOLO.res = d;
-    montarSolo(d, false);
+    montarSolo(d, !!d.proxy); /* v90: animes (mp4upload) y vimeos exigen proxy desde el inicio */
   } catch (e) {
     if (SOLO && SOLO.url === pageUrl && !SOLO.cerrado) {
       toast(String(e.message || e).slice(0, 120) + ' — ábrelo en la pestaña Juntos');
@@ -2600,7 +2596,14 @@ function montarSolo(d, viaProxy) {
     if (!SOLO || SOLO.cerrado) return;
     ponerSubsSolo(d.subs || []);
     const hlsOk = okHls && window.Hls && window.Hls.isSupported();
-    if (hlsOk) {
+    if (d.mp4) {
+      /* v90: mp4 directo (animes de mp4upload) — el <video> nativo,
+       * sin hls.js; el proxy ya manda el Referer por nosotros */
+      video.src = src;
+      video.addEventListener('error', () => {
+        if (SOLO && !SOLO.cerrado) { toast('Se cortó el video — vuelve a abrirlo'); cerrarSolo(); }
+      }, { once: true });
+    } else if (hlsOk) {
       const hls = new window.Hls({ maxBufferLength: 30 });
       SOLO.hls = hls;
       /* v83: cuando llega el manifest sabemos qué calidades hay */
