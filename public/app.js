@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v83';
+const APP_VERSION = 'v84';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1004,7 +1004,14 @@ function pintarEpisodios(temporada) {
          * tienen extracción directa y se quedan en la sala */
         if (esAn) toast('Los animes se ven en modo 👥 Juntos');
         else {
-          abrirSolo(ep.url, { title: spDatos.titulo || '', ep: `${temporada}x${ep.ep || ''}`, serie: spDatos.titulo || '', img: imgEp });
+          /* v84: la lista desde este episodio alimenta "Sig. ▸" y "A continuación" */
+          const idx = eps.indexOf(ep);
+          const cadena = idx >= 0 ? eps.slice(idx) : [ep];
+          abrirSolo(ep.url, {
+            title: spDatos.titulo || '', ep: `${temporada}x${ep.ep || ''}`,
+            serie: spDatos.titulo || '', img: imgEp,
+            eps: cadena.map((x) => ({ url: x.url, ep: `${x.temporada}x${x.ep || ''}`, nombre: x.titulo || '' })),
+          });
           return;
         }
       }
@@ -2404,13 +2411,19 @@ async function abrirSolo(pageUrl, info, opts) {
   video.querySelectorAll('track').forEach((t) => t.remove());
   try { video.load(); } catch {}
   $('#soloPlayer').classList.remove('hidden');
+  let rateInicial = 1;
+  try { rateInicial = Math.min(2, Math.max(0.5, parseFloat(localStorage.getItem('huddle_rate')) || 1)); } catch {}
   SOLO = {
     url: pageUrl, info,
     startAt: Math.max(0, Math.floor(+opts.startAt || 0)),
     seekHecho: false, subsOn: false, viaProxy: false, cerrado: false,
     res: null, hls: null, timer: null, lastT: 0, reintentos: 0, tReconexion: 0, mountN: 0,
+    rate: rateInicial,
   };
+  $('#soloRate').textContent = (rateInicial === 1 ? '1' : String(rateInicial)) + 'x'; /* v84 */
+  $('#soloNext').classList.toggle('hidden', !(info && info.eps && info.eps.length > 1)); /* v84 */
   if (SOLO.startAt > 10) toast('Reanudando en ' + fmtTiempo(SOLO.startAt)); /* v82 */
+  pararCuentaSiguiente(); /* v84 */
   if (/^\/test-media\//.test(pageUrl)) {
     /* v83: stream local de prueba — directo, sin resolver nada */
     SOLO.res = { m3u8: pageUrl, subs: [{ url: '/test-media/es.vtt', lang: 'es' }] };
@@ -2441,7 +2454,8 @@ function montarSolo(d, viaProxy) {
   try { video.pause(); } catch {}
   try { video.removeAttribute('src'); video.load(); } catch {}
   SOLO.viaProxy = viaProxy;
-  cerrarQMenuSolo(); /* v83 */
+  cerrarMenusSolo(); /* v84 */
+  try { $('#soloNext').classList.toggle('hidden', !(SOLO.info && SOLO.info.eps && SOLO.info.eps.length > 1)); } catch {}
   try { $('#soloQ').classList.add('hidden'); } catch {}
   /* v82: si esto es una RE-conexión (cayó el directo y seguimos por el
    * proxy), volvemos al minuto donde iba y no desde el inicio.
@@ -2519,6 +2533,7 @@ function montarSolo(d, viaProxy) {
      * MediaSource destruido — arrancamos de nuevo cuando haya medios */
     const arrancar = () => {
       if (!SOLO || SOLO.cerrado) return;
+      try { $('#soloVideo').playbackRate = SOLO.rate || 1; } catch {} /* v84: el remount la devuelve a 1x */
       if ($('#soloVideo').paused) $('#soloVideo').play().catch(() => {});
     };
     video.addEventListener('loadedmetadata', arrancar, { once: true });
@@ -2578,13 +2593,14 @@ function mostrarSoloCtrls5s() {
   soloCtrlTimer = setTimeout(() => {
     c.classList.add('oculto');
     if (t) t.classList.add('oculto');
-    cerrarQMenuSolo(); /* v83: el menú no se queda flotando solo */
+    cerrarMenusSolo(); /* v84: ningún menú queda flotando solo */
     soloCtrlTimer = null;
   }, 5000);
 }
 function cerrarSolo() {
   if (soloCtrlTimer) { clearTimeout(soloCtrlTimer); soloCtrlTimer = null; }
-  cerrarQMenuSolo(); /* v83 */
+  cerrarMenusSolo();
+  pararCuentaSiguiente(); /* v84 */
   if (SOLO) {
     SOLO.cerrado = true;
     try { soloReportar(); } catch {}
@@ -2617,7 +2633,7 @@ function soloFlashSeek(delta) {
 }
 $('#soloVideo').addEventListener('pointerdown', (ev) => {
   if (!$('#soloCargando').classList.contains('hidden')) return; /* aún cargando */
-  cerrarQMenuSolo();
+  cerrarMenusSolo();
   const tipo = ev.pointerType || 'mouse';
   const rect = $('#soloPlayer').getBoundingClientRect();
   const x = (ev.clientX || 0) - rect.left;
@@ -2681,6 +2697,11 @@ $('#soloFs').addEventListener('click', soloToggleFs);
 /* v83: calidad — los niveles del hls.js (Auto / 480p / 360p…) para
  * cuidar los datos móviles; en HLS nativo (Safari) no se puede → oculto */
 function cerrarQMenuSolo() { const m = $('#soloQMenu'); if (m) m.classList.add('hidden'); }
+function cerrarMenusSolo() { /* v84: calidad y velocidad juntas */
+  cerrarQMenuSolo();
+  const m = $('#soloRateMenu');
+  if (m) m.classList.add('hidden');
+}
 function pintarQMenuSolo() {
   const btn = $('#soloQ');
   const menu = $('#soloQMenu');
@@ -2715,10 +2736,80 @@ function pintarQMenuSolo() {
 $('#soloQ').addEventListener('click', (ev) => {
   ev.stopPropagation();
   const m = $('#soloQMenu');
-  if (m.classList.contains('hidden')) { pintarQMenuSolo(); m.classList.remove('hidden'); }
-  else m.classList.add('hidden');
+  const abierto = !m.classList.contains('hidden');
+  cerrarMenusSolo(); /* v84: abre uno, cierra el otro */
+  if (!abierto) { pintarQMenuSolo(); m.classList.remove('hidden'); }
   mostrarSoloCtrls5s();
 });
+
+/* v84: velocidad de reproducción — 0.5x a 2x, se recuerda por perfil */
+const SOLO_RATES = [0.5, 1, 1.25, 1.5, 2];
+function soloSetRate(r, avisar) {
+  r = SOLO_RATES.includes(r) ? r : 1;
+  if (SOLO) SOLO.rate = r;
+  try { $('#soloVideo').playbackRate = r; } catch {}
+  $('#soloRate').textContent = (r === 1 ? '1' : String(r)) + 'x';
+  try { localStorage.setItem('huddle_rate', String(r)); } catch {}
+  if (avisar) toast(r === 1 ? 'Velocidad normal' : 'Velocidad ' + r + 'x');
+}
+function pintarRateMenuSolo() {
+  const menu = $('#soloRateMenu');
+  if (!menu) return;
+  menu.innerHTML = '';
+  const actual = (SOLO && SOLO.rate) || 1;
+  SOLO_RATES.forEach((r) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'solo-qitem' + (r === actual ? ' activa' : '');
+    b.textContent = (r === 1 ? '1' : String(r)) + 'x' + (r === 1 ? ' (normal)' : '');
+    b.addEventListener('click', () => { soloSetRate(r, true); cerrarMenusSolo(); mostrarSoloCtrls5s(); });
+    menu.appendChild(b);
+  });
+}
+$('#soloRate').addEventListener('click', (ev) => {
+  ev.stopPropagation();
+  const m = $('#soloRateMenu');
+  const abierto = !m.classList.contains('hidden');
+  cerrarMenusSolo(); /* v84: abre uno, cierra el otro */
+  if (!abierto) { pintarRateMenuSolo(); m.classList.remove('hidden'); }
+  mostrarSoloCtrls5s();
+});
+
+/* v84: siguiente episodio — la cadena viaja en info.eps (desde el actual) */
+function soloSiguiente() {
+  if (!SOLO || !SOLO.info || !SOLO.info.eps || SOLO.info.eps.length < 2) return;
+  const lista = SOLO.info.eps.slice(1);
+  const nxt = lista[0];
+  abrirSolo(nxt.url, {
+    title: SOLO.info.serie || SOLO.info.title || '',
+    ep: nxt.ep || '',
+    serie: SOLO.info.serie || SOLO.info.title || '',
+    img: SOLO.info.img || '',
+    eps: lista,
+  });
+}
+$('#soloNext').addEventListener('click', soloSiguiente);
+let cuentaTimer = null;
+function pararCuentaSiguiente() {
+  if (cuentaTimer) { clearInterval(cuentaTimer); cuentaTimer = null; }
+  const e = $('#soloEnd');
+  if (e) e.classList.add('hidden');
+}
+function iniciarCuentaSiguiente() {
+  const nxt = SOLO.info.eps[1];
+  $('#soloEndEp').textContent = nxt.ep ? 'Episodio ' + nxt.ep : (nxt.nombre || 'Siguiente');
+  $('#soloEnd').classList.remove('hidden');
+  let n = 5;
+  $('#soloEndCuenta').textContent = 'En 5…';
+  if (cuentaTimer) clearInterval(cuentaTimer);
+  cuentaTimer = setInterval(() => {
+    n -= 1;
+    if (n <= 0) { pararCuentaSiguiente(); soloSiguiente(); return; }
+    $('#soloEndCuenta').textContent = 'En ' + n + '…';
+  }, 1000);
+}
+$('#soloEndAhora').addEventListener('click', () => { pararCuentaSiguiente(); soloSiguiente(); });
+$('#soloEndCancelar').addEventListener('click', pararCuentaSiguiente);
 
 (() => {
   const video = $('#soloVideo');
@@ -2751,7 +2842,12 @@ $('#soloQ').addEventListener('click', (ev) => {
     mostrarSoloCtrls5s();
   });
   video.addEventListener('pause', () => { soloSetPlayIco(false); mostrarSoloCtrls5s(); });
-  video.addEventListener('ended', () => { soloReportar(); mostrarSoloCtrls5s(); });
+  video.addEventListener('ended', () => {
+    soloReportar();
+    mostrarSoloCtrls5s();
+    /* v84: si hay episodio siguiente → cuenta regresiva y avanza solo */
+    if (SOLO && !SOLO.cerrado && SOLO.info && SOLO.info.eps && SOLO.info.eps.length > 1) iniciarCuentaSiguiente();
+  });
   video.addEventListener('error', () => {
     if (SOLO && !SOLO.cerrado && !SOLO.hls && !SOLO.viaProxy && SOLO.res) {
       /* HLS nativo que no arrancó directo → por el proxy */

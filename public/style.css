@@ -1517,3 +1517,33 @@ body.ctrls-vis .msg-ticker {
 .solo-flash.anim { animation: soloFlash 0.7s ease-out; }
 @keyframes soloFlash { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
 /* =================== fin v83 =================== */
+
+/* ======================= v84: velocidad + siguiente ======================= */
+#soloEnd.solo-end {
+  position: absolute; inset: 0; z-index: 8;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(5, 3, 12, 0.72); backdrop-filter: blur(6px);
+}
+.solo-end.hidden { display: none; }
+.se-caja {
+  width: min(420px, calc(100% - 48px));
+  background: rgba(16, 12, 30, 0.97); border: 1px solid var(--line);
+  border-radius: 18px; padding: 26px 26px 22px; text-align: center;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+  animation: sePop 0.3s ease-out;
+}
+@keyframes sePop { from { opacity: 0; transform: scale(0.92) translateY(10px); } to { opacity: 1; transform: none; } }
+.se-tit {
+  font-size: 11px; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase;
+  color: #7ee0ff; margin-bottom: 8px;
+}
+.se-caja > b { display: block; font-size: 19px; line-height: 1.3; }
+.se-cuenta { color: var(--dim); font-size: 13px; margin: 10px 0 18px; font-variant-numeric: tabular-nums; }
+.se-btns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+/* fila de controles más densa en móvil (v84: se suman Rate y Sig.) */
+@media (max-width: 700px) {
+  .solo-ctrls { gap: 6px; padding-left: 8px; padding-right: 8px; }
+  .solo-q { min-width: 40px; padding: 6px 6px; }
+  .solo-time { font-size: 11px; }
+}
+/* =================== fin v84 =================== */
