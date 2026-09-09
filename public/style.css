@@ -1547,3 +1547,19 @@ body.ctrls-vis .msg-ticker {
   .solo-time { font-size: 11px; }
 }
 /* =================== fin v84 =================== */
+
+/* ======================= v85: episodios vistos ======================= */
+.sp-ep { position: relative; }
+.sp-ep .visto-chip {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  width: 20px; height: 20px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 800; line-height: 1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+.visto-chip.ok { background: #22c55e; color: #06130c; }
+.visto-chip.medio { background: #f59e0b; color: #241500; }
+.sp-ep.vista img { opacity: 0.42; }
+.sp-ep.vista .sp-ep-num { color: var(--dim); }
+.sp-ep.parcial img { opacity: 0.75; }
+/* =================== fin v85 =================== */

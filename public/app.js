@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v84';
+const APP_VERSION = 'v85';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -994,6 +994,7 @@ function pintarEpisodios(temporada) {
       + `<span><span class="sp-ep-num">${esAn ? 'Episodio ' + (ep.ep || '·') : temporada + 'x' + (ep.ep || '·')}</span>
       <span class="sp-ep-tit"></span></span>`;
     b.querySelector('.sp-ep-tit').textContent = esAn ? (spDatos.titulo || ep.titulo) : ep.titulo;
+    b.dataset.url = ep.url || ''; /* v85: para marcar los vistos */
     b.addEventListener('click', () => {
       /* elegiste episodio → igual que una peli: carátula, sala, pausa y play */
       cerrarSeriePicker();
@@ -1029,6 +1030,43 @@ function pintarEpisodios(temporada) {
     });
     box.appendChild(b);
   });
+  marcarVistos(eps); /* v85: ✓ en lo ya visto */
+}
+
+/* v85: pregunta al servidor cuáles de estos episodios ya vio el usuario */
+async function marcarVistos(eps) {
+  if (!S.profile || !eps.length) return;
+  try {
+    const r = await fetch('/api/vistos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: S.profile.name, token: S.profile.token, urls: eps.map((x) => x.url) }),
+    });
+    const d = await r.json();
+    if (!d || !d.ok || !d.vistos) return;
+    eps.forEach((ep) => {
+      const v = d.vistos[ep.url];
+      if (!v) return;
+      const b = document.querySelector('.sp-ep[data-url="' + CSS.escape(ep.url) + '"]');
+      if (!b) return;
+      const completa = v.t >= 60 || (v.d && v.t >= v.d * 0.9);
+      if (completa) {
+        b.classList.add('vista');
+        const c = document.createElement('span');
+        c.className = 'visto-chip ok';
+        c.textContent = '✓';
+        c.title = 'Ya la viste';
+        b.appendChild(c);
+      } else if (v.t >= 10) {
+        b.classList.add('parcial');
+        const c = document.createElement('span');
+        c.className = 'visto-chip medio';
+        c.textContent = '◐';
+        c.title = 'Quedaste en ' + fmtTiempo(v.t);
+        b.appendChild(c);
+      }
+    });
+  } catch {}
 }
 function cerrarSeriePicker() { $('#seriePicker').classList.add('hidden'); }
 $('#spClose').addEventListener('click', cerrarSeriePicker);

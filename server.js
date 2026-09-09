@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v84'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v85'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -113,6 +113,33 @@ function saveContinuar() {
     fs.mkdirSync(DATA_DIR, { recursive: true });
     fs.writeFileSync(CONT_FILE, JSON.stringify(Object.fromEntries(continuar)));
   } catch (e) { console.warn('⚠️ no pude guardar continuar-viendo:', e.message); }
+}
+
+/* v85: episodios vistos — por URL, sin el tope de 10 de continuar-viendo.
+ * Alimenta las ✓ del selector de episodios (y "Sig. ▸" ya sabe la cadena). */
+const VISTOS_FILE = path.join(DATA_DIR, 'vistos.json');
+const vistos = new Map(); // nameKey -> { url: { t, d, ts } }
+try {
+  const rawV = JSON.parse(fs.readFileSync(VISTOS_FILE, 'utf8'));
+  for (const [k, v] of Object.entries(rawV || {})) if (v && typeof v === 'object') vistos.set(k, v);
+} catch {}
+const VISTOS_MAX = 1000; // URLs por usuario (por si alguien ve MUCHAS series)
+function anotarVisto(nameKey, entry) {
+  const mapa = vistos.get(nameKey) || {};
+  mapa[entry.url] = { t: entry.t, d: entry.d, ts: Date.now() };
+  const claves = Object.keys(mapa);
+  if (claves.length > VISTOS_MAX) {
+    /* echa las más viejas */
+    claves.sort((a, b) => mapa[a].ts - mapa[b].ts);
+    for (const c of claves.slice(0, claves.length - VISTOS_MAX)) delete mapa[c];
+  }
+  vistos.set(nameKey, mapa);
+}
+function saveVistos() {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(VISTOS_FILE, JSON.stringify(Object.fromEntries(vistos)));
+  } catch (e) { console.warn('⚠️ no pude guardar vistos:', e.message); }
 }
 function registrarProgreso(room, m, r) {
   try {
@@ -2034,6 +2061,11 @@ const server = http.createServer(async (req, res) => {
         ts: Date.now(),
       };
       if (!entry.url) return json(res, 400, { ok: false, error: 'Falta la URL' });
+      /* v85: el episodio queda anotado como visto (para las ✓ del selector) */
+      if (entry.d >= 60) {
+        anotarVisto(name.toLowerCase(), entry);
+        saveVistos();
+      }
       /* mismo criterio que registrarProgreso: solo si hay algo que retomar */
       if (entry.d >= 60 && entry.t >= 5) {
         const key = name.toLowerCase();
@@ -2046,6 +2078,18 @@ const server = http.createServer(async (req, res) => {
         saveContinuar();
       }
       return json(res, 200, { ok: true });
+    }
+    if (url.pathname === '/api/vistos' && req.method === 'POST') {
+      /* v85: ¿cuáles de estas URLs ya vio el usuario? (marcas del selector) */
+      const body = await readBody(req);
+      const nameV = String(body.name || '').trim();
+      const urecV = users.get(nameV.toLowerCase());
+      if (!nameV || !urecV || urecV.token !== String(body.token || '')) return json(res, 403, { ok: false, error: 'Perfil no válido' });
+      const mapa = vistos.get(nameV.toLowerCase()) || {};
+      const urls = Array.isArray(body.urls) ? body.urls.slice(0, 400).map((u) => String(u).slice(0, 300)) : [];
+      const fuera = {};
+      for (const u of urls) if (mapa[u]) fuera[u] = { t: mapa[u].t || 0, d: mapa[u].d || 0 };
+      return json(res, 200, { ok: true, vistos: fuera });
     }
     if (url.pathname === '/api/rooms') {
       /* v31: salas en vivo con gente, qué ven y preview del espejo (estilo Rave) */
