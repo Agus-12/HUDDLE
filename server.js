@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v95'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v96'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -319,6 +319,21 @@ async function datosSerieCuevana(slug) {
     serieCache.set(slug, { at: Date.now(), d: out });
     return out;
   } catch { return null; }
+}
+
+/* v96: póster de una serie (para sanear las tarjetas de continuar) —
+ * cacheado un día; si falla, se queda la imagen que traía la entrada */
+const postersSeries = new Map();
+async function posterDeSerie(slug) {
+  try {
+    if (!/^[a-z0-9-]{2,90}$/.test(slug)) return '';
+    const c = postersSeries.get(slug);
+    if (c && Date.now() - c.ts < 864e5) return c.poster || '';
+    const d = await datosSerieCuevana(slug);
+    const poster = (d && d.poster) || '';
+    postersSeries.set(slug, { poster, ts: Date.now() });
+    return poster;
+  } catch { return ''; }
 }
 
 /* v74: episodios de un anime de Latanime — selector + botones de episodio */
@@ -2296,6 +2311,23 @@ const server = http.createServer(async (req, res) => {
         url: e.url, t: e.t, d: e.d, title: e.title, img: e.img, ep: e.ep, serie: e.serie, ts: e.ts, modo: e.modo || '',
         eps: Array.isArray(e.eps) ? e.eps : [], /* v86: para "Sigue con el próximo" */
       }));
+      /* v96: sana TAMBIÉN al leer — las entradas viejas de episodios (con
+       * el still de la escena) muestran el póster de la serie ya mismo,
+       * sin esperar a que se vuelvan a guardar */
+      const porSanear = [...new Set(items
+        .filter((e) => e.serie && e.ep && /\/episode\//i.test(e.url))
+        .map((e) => (/\/episode\/([a-z0-9-]+)-\d+x\d+(?:\/|$)/i.exec(e.url) || [])[1])
+        .filter(Boolean))];
+      if (porSanear.length) {
+        const posters = await Promise.all(porSanear.map((sl) => posterDeSerie(sl)));
+        const mapa = new Map(porSanear.map((sl, i) => [sl, posters[i]]));
+        for (const e of items) {
+          if (!e.serie || !e.ep || !/\/episode\//i.test(e.url)) continue;
+          const sl = (/\/episode\/([a-z0-9-]+)-\d+x\d+(?:\/|$)/i.exec(e.url) || [])[1];
+          const po = sl && mapa.get(sl);
+          if (po) e.img = po;
+        }
+      }
       return json(res, 200, { ok: true, items });
     }
     if (url.pathname === '/api/solo' && req.method === 'GET') {
@@ -2339,6 +2371,15 @@ const server = http.createServer(async (req, res) => {
         ts: Date.now(),
       };
       if (!entry.url) return json(res, 400, { ok: false, error: 'Falta la URL' });
+      /* v96: la entrada de un EPISODIO de serie lleva el PÓSTER DE LA
+       * SERIE — las entradas creadas antes (o re-guardadas al retomar y
+       * al avanzar en la cadena) traían el still de la escena; al guardar,
+       * el servidor las sanea él solo */
+      if (entry.serie && entry.ep && /\/episode\//i.test(entry.url)) {
+        const mSl = /\/episode\/([a-z0-9-]+)-\d+x\d+(?:\/|$)/i.exec(entry.url);
+        const posterSerie = mSl ? await posterDeSerie(mSl[1]) : '';
+        if (posterSerie) entry.img = posterSerie;
+      }
       /* v85: el episodio queda anotado como visto (para las ✓ del selector) */
       if (entry.d >= 60) {
         anotarVisto(name.toLowerCase(), entry);
