@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v98';
+const APP_VERSION = 'v99';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -420,9 +420,17 @@ function montarNativo(porProxy) {
        * el proxy — igual que el modo Solo */
       hls.on(window.Hls.Events.ERROR, (ev, data) => {
         if (!S.nativo || !data || !data.fatal) return;
-        if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR && !usaProxy) {
-          toast('Conectando por el servidor…');
-          montarNativo(true);
+        if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) {
+          /* v99: se invierte el camino (directo↔proxy), con tope — igual
+           * que el modo Solo: a veces goodstream raciona al servidor y el
+           * directo del usuario sí sirve (o al revés) */
+          S.nativoFallas = (S.nativoFallas || 0) + 1;
+          if (S.nativoFallas <= 2) {
+            const otro = !usaProxy;
+            toast(otro ? 'Conectando por el servidor…' : 'Probando directo…');
+            montarNativo(otro);
+            return;
+          }
         } else if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
           try { hls.recoverMediaError(); } catch {}
         }
@@ -2755,7 +2763,7 @@ async function abrirSolo(pageUrl, info, opts) {
     if (!d.ok) throw new Error(d.error || 'No pude resolver el video');
     if (!SOLO || SOLO.url !== pageUrl || SOLO.cerrado) return; /* cerraron mientras buscaba */
     SOLO.res = d;
-    montarSolo(d, !!d.proxy); /* v90: animes (mp4upload) y vimeos exigen proxy desde el inicio */
+    montarSolo(d, await elegirModoSolo(d)); /* v99: sonda — carrera proxy vs directo */
   } catch (e) {
     if (SOLO && SOLO.url === pageUrl && !SOLO.cerrado) {
       toast(String(e.message || e).slice(0, 120) + ' — ábrelo en la pestaña Juntos');
@@ -2763,6 +2771,32 @@ async function abrirSolo(pageUrl, info, opts) {
     }
   }
 }
+/* v99: ¿directo o por el servidor? El token de goodstream puede venir
+ * amarrado a la IP que lo pidió (el servidor) — el directo del usuario
+ * falla y hls.js tardaba media vida en rendirse (Fundación: 43 s). Y a la
+ * inversa, a veces goodstream raciona al SERVIDOR y el directo del usuario
+ * sí sirve. Sonda honesta: pedimos el master por AMBOS caminos a la vez y
+ * montamos el que traiga un playlist primero (default: proxy). */
+async function elegirModoSolo(d) {
+  if (!d.proxy || d.mp4) return !!d.proxy; /* mp4/playlist propio: sin carrera */
+  if (/^\/api\//.test(d.m3u8 || '')) return true; /* playlist local ya */
+  const sondeo = async (url) => {
+    try {
+      const r = await fetch(url, { cache: 'no-store' });
+      if (!r.ok) return null;
+      const tx = await r.text();
+      return /#EXTM3U/i.test(tx) ? 'ok' : null;
+    } catch { return null; }
+  };
+  const carrera = await Promise.race([
+    sondeo('/api/hls?u=' + encodeURIComponent(d.m3u8)).then((x) => (x ? 'proxy' : null)).catch(() => null),
+    sondeo(d.m3u8).then((x) => (x ? 'directo' : null)).catch(() => null),
+    new Promise((r2) => setTimeout(() => r2(null), 7000)),
+  ]);
+  if (carrera === 'directo') return false;
+  return true; /* proxy gana, o nadie contestó a tiempo */
+}
+
 function montarSolo(d, viaProxy) {
   const video = $('#soloVideo');
   /* v98: las pelis de PelisXD traen un playlist NUESTRO (/api/xd/…) — tal cual */
@@ -2829,11 +2863,25 @@ function montarSolo(d, viaProxy) {
       });
       hls.on(window.Hls.Events.ERROR, (ev, data) => {
         if (!SOLO || !data || !data.fatal) return;
-        if (!SOLO.viaProxy && data.type === window.Hls.ErrorTypes.NETWORK_ERROR && SOLO.res) {
-          /* el token puede venir amarrado a la IP del servidor → proxy */
-          toast('Conectando por el servidor…');
-          montarSolo(SOLO.res, true);
-        } else {
+        /* v99: fallo de RED → se invierte el camino (directo↔proxy): el
+         * token de goodstream puede venir amarrado a la IP del servidor
+         * (el directo del usuario no sirve)… o al revés, goodstream anda
+         * racionando AL SERVIDOR y el directo del usuario sí sirve */
+        if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR && SOLO.res && !/^\/api\//.test(SOLO.res.m3u8 || '')) {
+          SOLO.reintentos = (SOLO.reintentos || 0) + 1;
+          if (SOLO.reintentos <= 3) {
+            const otro = !SOLO.viaProxy;
+            toast(otro ? 'Conectando por el servidor…' : 'Probando directo…');
+            setTimeout(() => {
+              if (SOLO && !SOLO.cerrado && SOLO.res) montarSolo(SOLO.res, otro);
+            }, 1500);
+            return;
+          }
+          toast('Se cortó el video — vuelve a abrirlo');
+          cerrarSolo();
+          return;
+        }
+        {
           try { hls.destroy(); } catch {}
           if (!SOLO.cerrado) {
             /* v83: goodstream a veces suelta 403 por ráfagas — reintentamos

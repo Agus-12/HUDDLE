@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v98'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v99'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -329,7 +329,10 @@ async function posterDeSerie(slug) {
   try {
     if (!/^[a-z0-9-]{2,90}$/.test(slug)) return '';
     const c = postersSeries.get(slug);
-    if (c && Date.now() - c.ts < 864e5) return c.poster || '';
+    if (c && Date.now() - c.ts < (c.poster ? 864e5 : 2 * 60 * 1000)) return c.poster || '';
+    /* v99: un fallo (póster vacío) se cachea solo 2 minutos — antes quedaba
+     * envenenado un DÍA y el still del capítulo seguía apareciendo aunque
+     * el sitio ya respondiera */
     const d = await datosSerieCuevana(slug);
     const poster = (d && d.poster) || '';
     postersSeries.set(slug, { poster, ts: Date.now() });
@@ -2012,15 +2015,38 @@ async function resolverGoodstream(embed, pageUrl) {
   /* v93: además de reintentar cuando FALLA el fetch, reintenta cuando
    * responde 200 con el cuerpo racionado (sin m3u8) — el glitch que
    * hacía fallar pelis como Conclave */
-  let em = null, files = [], m3u8 = null;
-  for (let intento = 0; intento < 3 && !m3u8; intento++) {
-    if (intento > 0) await new Promise((r2) => setTimeout(r2, 2500));
-    try { em = await fetchTexto(embed, pageUrl); }
-    catch (e) { if (intento === 2) throw e; continue; }
-    files = [...em.matchAll(/file\s*:\s*["'](https?:\/\/[^"']+)["']/gi)].map((m) => m[1]);
-    m3u8 = files.find((f) => /\.m3u8/i.test(f));
-  }
-  if (!m3u8) throw new Error('El servidor no entregó el video — ábrelo en modo sala (👥 Juntos)');
+  /* v99: el nodo edge es LOTERÍA por fetch (enc10 a ratos 403, enc12
+   * inalcanzable según el enrutamiento) — pedimos el embed 3 veces EN
+   * PARALELO desfasadas (cada fetch reparte otro nodo), probamos el m3u8
+   * de cada una con un rangito de 3.5 s y nos quedamos con el primero
+   * que SIRVA de verdad. Antes: 43 s de arranque en Fundación. */
+  const pedirEmbed = async () => {
+    try {
+      const em = await fetchTexto(embed, pageUrl);
+      const files = [...em.matchAll(/file\s*:\s*["'](https?:\/\/[^"']+)["']/gi)].map((m) => m[1]);
+      const m3u8 = files.find((f) => /\.m3u8/i.test(f));
+      if (!m3u8) return null; /* cuerpo racionado (v93) */
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 3500);
+      let sirve = false;
+      try {
+        const r = await fetch(m3u8, { headers: { 'User-Agent': MIRROR_UA, Referer: embed, Range: 'bytes=0-1024' }, signal: ctl.signal, redirect: 'follow' });
+        sirve = r.ok || r.status === 206;
+      } catch {}
+      clearTimeout(t);
+      return sirve ? { m3u8, files } : null;
+    } catch { return null; }
+  };
+  const carreras = [
+    pedirEmbed(),
+    new Promise((r2) => setTimeout(r2, 700)).then(pedirEmbed),
+    new Promise((r2) => setTimeout(r2, 1400)).then(pedirEmbed),
+  ];
+  const resultados = await Promise.all(carreras);
+  const bueno = resultados.find(Boolean);
+  if (!bueno) throw new Error('El servidor no entregó el video — ábrelo en modo sala (👥 Juntos)');
+  const m3u8 = bueno.m3u8;
+  const files = bueno.files;
   const subs = files
     .filter((f) => /\.vtt/i.test(f))
     .map((f) => ({
@@ -2033,7 +2059,12 @@ async function resolverGoodstream(embed, pageUrl) {
     hlsReferers.set(new URL(m3u8).hostname, embed);
     for (const s of subs) { try { hlsReferers.set(new URL(s.url).hostname, embed); } catch {} }
   } catch {}
-  return { m3u8, subs };
+  /* v99: SIEMPRE por el proxy — el token del m3u8 puede venir amarrado a la
+   * IP del servidor que lo pidió (el resolver): del navegador del usuario
+   * el directo falla, y hls.js tardaba media vida en rendirse antes de la
+   * reconexión por el proxy (Fundación tardaba 43 s en arrancar). Así
+   * arranca en 2-3 s, igual que las pelis. */
+  return { m3u8, subs, proxy: true };
 }
 /* v90: vimeos — el HLS (720p) vive dentro de un eval(p,a,c,k,e,d) */
 async function resolverVimeos(embed, pageUrl) {
@@ -2592,16 +2623,19 @@ const server = http.createServer(async (req, res) => {
       }));
       /* v96: sana TAMBIÉN al leer — las entradas viejas de episodios (con
        * el still de la escena) muestran el póster de la serie ya mismo,
-       * sin esperar a que se vuelvan a guardar */
+       * sin esperar a que se vuelvan a guardar.
+       * v99: el slug sale de la PROPIA URL del episodio — no exigimos que
+       * la entrada traiga serie/ep (las guardadas en sala a veces no los
+       * tienen y el still se quedaba para siempre) */
       const porSanear = [...new Set(items
-        .filter((e) => e.serie && e.ep && /\/episode\//i.test(e.url))
+        .filter((e) => /\/episode\/[a-z0-9-]+-\d+x\d+/i.test(e.url))
         .map((e) => (/\/episode\/([a-z0-9-]+)-\d+x\d+(?:\/|$)/i.exec(e.url) || [])[1])
         .filter(Boolean))];
       if (porSanear.length) {
         const posters = await Promise.all(porSanear.map((sl) => posterDeSerie(sl)));
         const mapa = new Map(porSanear.map((sl, i) => [sl, posters[i]]));
         for (const e of items) {
-          if (!e.serie || !e.ep || !/\/episode\//i.test(e.url)) continue;
+          if (!/\/episode\//i.test(e.url)) continue;
           const sl = (/\/episode\/([a-z0-9-]+)-\d+x\d+(?:\/|$)/i.exec(e.url) || [])[1];
           const po = sl && mapa.get(sl);
           if (po) e.img = po;
@@ -2665,8 +2699,10 @@ const server = http.createServer(async (req, res) => {
       /* v96: la entrada de un EPISODIO de serie lleva el PÓSTER DE LA
        * SERIE — las entradas creadas antes (o re-guardadas al retomar y
        * al avanzar en la cadena) traían el still de la escena; al guardar,
-       * el servidor las sanea él solo */
-      if (entry.serie && entry.ep && /\/episode\//i.test(entry.url)) {
+       * el servidor las sanea él solo.
+       * v99: igual que al leer — el slug sale de la URL, sin exigir
+       * serie/ep en el cuerpo */
+      if (/\/episode\/[a-z0-9-]+-\d+x\d+/i.test(entry.url)) {
         const mSl = /\/episode\/([a-z0-9-]+)-\d+x\d+(?:\/|$)/i.exec(entry.url);
         const posterSerie = mSl ? await posterDeSerie(mSl[1]) : '';
         if (posterSerie) entry.img = posterSerie;
