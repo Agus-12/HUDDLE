@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
-<link rel="stylesheet" href="/style.css?v=82">
+<link rel="stylesheet" href="/style.css?v=83">
 </head>
 <body>
 
@@ -186,7 +186,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v82</span>
+        <span class="ver" id="verBadge">v83</span>
       </div>
       <!-- v36: gente, invitar y salir viven JUNTO al logo -->
       <div class="top-quick">
@@ -428,14 +428,17 @@
       </button>
       <input id="soloBar" class="solo-bar" type="range" min="0" max="1000" value="0" step="1" aria-label="Posición del video">
       <span id="soloTime" class="solo-time">0:00 / 0:00</span>
+      <button id="soloQ" class="btn small ghost solo-btn-osc solo-q hidden" title="Calidad">Auto</button>
       <button id="soloCC" class="btn small ghost solo-btn-osc" title="Subtítulos">CC</button>
       <button id="soloFs" class="btn small ghost solo-btn-osc" title="Pantalla completa">
         <svg class="icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
       </button>
+      <div id="soloQMenu" class="solo-qmenu hidden"></div>
     </div>
+    <div id="soloFlash" class="solo-flash"></div>
   </div>
 
   <div id="toasts" class="toasts"></div>
-  <script src="/app.js?v=82"></script>
+  <script src="/app.js?v=83"></script>
 </body>
 </html>

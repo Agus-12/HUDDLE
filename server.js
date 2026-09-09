@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v82'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v83'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1643,8 +1643,14 @@ async function resolverSolo(pageUrl) {
     if (m) embed = m[0];
   }
   if (!embed) throw new Error('Este título no tiene servidor goodstream — se ve en modo sala (👥 Juntos)');
-  /* 3) el embed contiene el master.m3u8 y los subtítulos VTT */
-  const em = await fetchTexto(embed, pageUrl);
+  /* 3) el embed contiene el master.m3u8 y los subtítulos VTT.
+   * El embed a veces se raciona por IP (403 por ráfagas): un reintento. */
+  let em = null;
+  for (let intento = 0; intento < 2; intento++) {
+    if (intento > 0) await new Promise((r2) => setTimeout(r2, 2500));
+    try { em = await fetchTexto(embed, pageUrl); break; }
+    catch (e) { if (intento === 1) throw e; }
+  }
   const files = [...em.matchAll(/file\s*:\s*["'](https?:\/\/[^"']+)["']/gi)].map((m) => m[1]);
   const m3u8 = files.find((f) => /\.m3u8/i.test(f));
   if (!m3u8) throw new Error('El servidor no entregó el video — ábrelo en modo sala (👥 Juntos)');
@@ -1672,7 +1678,39 @@ function esGoodstream(u) {
   try { const h = new URL(u).host; return /(^|\.)goodstream\.one$/i.test(h); }
   catch { return false; }
 }
+/* v83: reescribe un m3u8 para que todo pase por el proxy */
+function servirPlaylist(res, codigo, txt, target) {
+  const esLocal = /^\/test-media\//.test(target);
+  const baseLocal = target.slice(0, target.lastIndexOf('/') + 1);
+  const prox = (u) => {
+    if (/^\/[^/]/.test(u)) return '/api/hls?u=' + encodeURIComponent(u); /* v83: stream local de prueba */
+    if (esLocal && !/^https?:/i.test(u)) return '/api/hls?u=' + encodeURIComponent(baseLocal + u);
+    let abs; try { abs = new URL(u, target).href; } catch { return u; }
+    return esGoodstream(abs) ? '/api/hls?u=' + encodeURIComponent(abs) : abs;
+  };
+  txt = txt.replace(/URI="([^"]+)"/g, (m, u) => 'URI="' + prox(u) + '"');
+  txt = txt
+    .split('\n')
+    .map((l) => { const s = l.trim(); return !s || s.startsWith('#') ? l : prox(s); })
+    .join('\n');
+  res.writeHead(codigo, { 'Content-Type': 'application/vnd.apple.mpegurl', 'Cache-Control': 'no-store' });
+  res.end(txt);
+}
 async function proxearHls(req, res, target) {
+  /* v83: streams locales de prueba (public/test-media) — así el modo
+   * proxy se prueba igual con un m3u8 propio, sin depender de la CDN */
+  if (/^\/test-media\//.test(target)) {
+    const ruta = path.join(PUBLIC_DIR, path.normalize(target));
+    if (!ruta.startsWith(PUBLIC_DIR)) return json(res, 403, { ok: false, error: 'No permitido' });
+    fs.readFile(ruta, (e, buf) => {
+      if (e) return json(res, 404, { ok: false, error: 'No existe' });
+      if (/\.m3u8$/i.test(ruta)) return servirPlaylist(res, 200, buf.toString('utf8'), target);
+      const ct = /\.ts$/i.test(ruta) ? 'video/MP2T' : /\.vtt$/i.test(ruta) ? 'text/vtt; charset=utf-8' : 'application/octet-stream';
+      res.writeHead(200, { 'Content-Type': ct, 'Cache-Control': 'no-store' });
+      res.end(buf);
+    });
+    return;
+  }
   if (!esGoodstream(target)) return json(res, 403, { ok: false, error: 'No permitido' });
   /* el origen de goodstream a veces suelta 403 transitorios (cache-miss):
    * reintentamos un par de veces antes de rendirnos */
@@ -1707,8 +1745,12 @@ async function proxearHls(req, res, target) {
       await new Promise((r2) => setTimeout(r2, 1500 * (intento + 1)));
     }
   }
-  if (!upstream) return json(res, 502, { ok: false, error: 'El servidor de video no respondió' });
+  if (!upstream) {
+    console.warn('[hls-proxy] me rendí tras reintentos:', decodeURIComponent(target).slice(0, 90));
+    return json(res, 502, { ok: false, error: 'El servidor de video no respondió' });
+  }
   if (!upstream.ok && upstream.status !== 404) {
+    console.warn('[hls-proxy] estado ' + upstream.status + ':', decodeURIComponent(target).slice(0, 90));
     return json(res, 502, { ok: false, error: 'El servidor de video respondió ' + upstream.status });
   }
   const ct = upstream.headers.get('content-type') || '';
@@ -1719,18 +1761,8 @@ async function proxearHls(req, res, target) {
     Readable.fromWeb(upstream.body).on('error', () => {}).pipe(res);
     return;
   }
-  let txt = await upstream.text();
-  const prox = (u) => {
-    let abs; try { abs = new URL(u, target).href; } catch { return u; }
-    return esGoodstream(abs) ? '/api/hls?u=' + encodeURIComponent(abs) : abs;
-  };
-  txt = txt.replace(/URI="([^"]+)"/g, (m, u) => 'URI="' + prox(u) + '"');
-  txt = txt
-    .split('\n')
-    .map((l) => { const s = l.trim(); return !s || s.startsWith('#') ? l : prox(s); })
-    .join('\n');
-  res.writeHead(upstream.status, { 'Content-Type': 'application/vnd.apple.mpegurl', 'Cache-Control': 'no-store' });
-  res.end(txt);
+  const txt = await upstream.text();
+  servirPlaylist(res, upstream.status, txt, target);
 }
 /* =================== fin v81: modo individual =================== */
 
@@ -1975,6 +2007,7 @@ const server = http.createServer(async (req, res) => {
         const r = await resolverSolo(target);
         return json(res, 200, { ok: true, m3u8: r.m3u8, subs: r.subs });
       } catch (e) {
+        console.warn('[solo] no pude resolver', target.slice(0, 70), '→', String(e.message || e).slice(0, 90));
         return json(res, 404, { ok: false, error: String(e.message || e).slice(0, 200) });
       }
     }

@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v82';
+const APP_VERSION = 'v83';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -2408,9 +2408,15 @@ async function abrirSolo(pageUrl, info, opts) {
     url: pageUrl, info,
     startAt: Math.max(0, Math.floor(+opts.startAt || 0)),
     seekHecho: false, subsOn: false, viaProxy: false, cerrado: false,
-    res: null, hls: null, timer: null, lastT: 0,
+    res: null, hls: null, timer: null, lastT: 0, reintentos: 0, tReconexion: 0, mountN: 0,
   };
   if (SOLO.startAt > 10) toast('Reanudando en ' + fmtTiempo(SOLO.startAt)); /* v82 */
+  if (/^\/test-media\//.test(pageUrl)) {
+    /* v83: stream local de prueba — directo, sin resolver nada */
+    SOLO.res = { m3u8: pageUrl, subs: [{ url: '/test-media/es.vtt', lang: 'es' }] };
+    montarSolo(SOLO.res, false);
+    return;
+  }
   try {
     const r = await fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(pageUrl));
     const d = await r.json();
@@ -2429,12 +2435,22 @@ function montarSolo(d, viaProxy) {
   const video = $('#soloVideo');
   const src = viaProxy ? '/api/hls?u=' + encodeURIComponent(d.m3u8) : d.m3u8;
   if (SOLO.hls) { try { SOLO.hls.destroy(); } catch {} SOLO.hls = null; }
+  /* v83: reset del elemento — al reusar un <video> cuyo MediaSource se
+   * destruyó a medias, el attach nuevo a veces nunca pega (readyState 0
+   * con play() pendiente por siempre). load() lo deja como nuevo. */
+  try { video.pause(); } catch {}
+  try { video.removeAttribute('src'); video.load(); } catch {}
   SOLO.viaProxy = viaProxy;
+  cerrarQMenuSolo(); /* v83 */
+  try { $('#soloQ').classList.add('hidden'); } catch {}
   /* v82: si esto es una RE-conexión (cayó el directo y seguimos por el
    * proxy), volvemos al minuto donde iba y no desde el inicio.
    * Ojo: hay que congelarlo AQUÍ — al remontar, un timeupdate con t=0
-   * pisa SOLO.lastT antes de que llegue el loadedmetadata. */
-  const reT = SOLO.seekHecho ? SOLO.lastT : 0;
+   * pisa SOLO.lastT antes de que llegue el loadedmetadata. v83: si el
+   * remount ANTERIOR falló, lastT ya quedó en 0 → recordamos el último
+   * minuto sano en tReconexion y lo reutilizamos. */
+  const reT = SOLO.seekHecho ? Math.max(SOLO.lastT || 0, SOLO.tReconexion || 0) : 0;
+  SOLO.tReconexion = reT;
   const reSeek = () => {
     if (!SOLO || SOLO.cerrado) return;
     if (SOLO.seekHecho && reT > 5 && isFinite(video.duration) && reT < video.duration - 10) {
@@ -2443,6 +2459,20 @@ function montarSolo(d, viaProxy) {
   };
   video.addEventListener('loadedmetadata', reSeek, { once: true });
   setTimeout(reSeek, 1200);
+  /* v83: perro guardián — si tras 25s no llegó ni un byte (readyState 0
+   * con el play colgado), remontamos por el proxy como si hubiera error */
+  const token = ++SOLO.mountN;
+  setTimeout(() => {
+    if (!SOLO || SOLO.cerrado || SOLO.mountN !== token) return;
+    const v = $('#soloVideo');
+    if (v.readyState === 0 && !v.paused && SOLO.res) {
+      SOLO.reintentos = (SOLO.reintentos || 0) + 1;
+      if (SOLO.reintentos <= 2) {
+        toast('Reconectando… (' + SOLO.reintentos + ' de 2)');
+        montarSolo(SOLO.res, true);
+      } else { toast('Se cortó el video — vuelve a abrirlo'); cerrarSolo(); }
+    }
+  }, 25000);
   cargarHlsJs((okHls) => {
     if (!SOLO || SOLO.cerrado) return;
     ponerSubsSolo(d.subs || []);
@@ -2450,6 +2480,10 @@ function montarSolo(d, viaProxy) {
     if (hlsOk) {
       const hls = new window.Hls({ maxBufferLength: 30 });
       SOLO.hls = hls;
+      /* v83: cuando llega el manifest sabemos qué calidades hay */
+      hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+        try { $('#soloQ').textContent = 'Auto'; cerrarQMenuSolo(); pintarQMenuSolo(); } catch {}
+      });
       hls.on(window.Hls.Events.ERROR, (ev, data) => {
         if (!SOLO || !data || !data.fatal) return;
         if (!SOLO.viaProxy && data.type === window.Hls.ErrorTypes.NETWORK_ERROR && SOLO.res) {
@@ -2458,7 +2492,17 @@ function montarSolo(d, viaProxy) {
           montarSolo(SOLO.res, true);
         } else {
           try { hls.destroy(); } catch {}
-          if (!SOLO.cerrado) { toast('Se cortó el video — vuelve a abrirlo'); cerrarSolo(); }
+          if (!SOLO.cerrado) {
+            /* v83: goodstream a veces suelta 403 por ráfagas — reintentamos
+             * un par de veces (volviendo al minuto, gracias a v82) */
+            SOLO.reintentos = (SOLO.reintentos || 0) + 1;
+            if (SOLO.reintentos <= 2) {
+              toast('Reconectando… (' + SOLO.reintentos + ' de 2)');
+              setTimeout(() => {
+                if (SOLO && !SOLO.cerrado && SOLO.res) montarSolo(SOLO.res, true);
+              }, 2500);
+            } else { toast('Se cortó el video — vuelve a abrirlo'); cerrarSolo(); }
+          }
         }
       });
       hls.loadSource(src);
@@ -2471,6 +2515,16 @@ function montarSolo(d, viaProxy) {
       cerrarSolo();
       return;
     }
+    /* v83: tras un remount, el primer play() puede quedarse colgado en el
+     * MediaSource destruido — arrancamos de nuevo cuando haya medios */
+    const arrancar = () => {
+      if (!SOLO || SOLO.cerrado) return;
+      if ($('#soloVideo').paused) $('#soloVideo').play().catch(() => {});
+    };
+    video.addEventListener('loadedmetadata', arrancar, { once: true });
+    video.addEventListener('loadeddata', arrancar, { once: true });
+    setTimeout(arrancar, 1500);
+    setTimeout(arrancar, 4000);
     video.play().catch(() => {});
   });
 }
@@ -2524,11 +2578,13 @@ function mostrarSoloCtrls5s() {
   soloCtrlTimer = setTimeout(() => {
     c.classList.add('oculto');
     if (t) t.classList.add('oculto');
+    cerrarQMenuSolo(); /* v83: el menú no se queda flotando solo */
     soloCtrlTimer = null;
   }, 5000);
 }
 function cerrarSolo() {
   if (soloCtrlTimer) { clearTimeout(soloCtrlTimer); soloCtrlTimer = null; }
+  cerrarQMenuSolo(); /* v83 */
   if (SOLO) {
     SOLO.cerrado = true;
     try { soloReportar(); } catch {}
@@ -2546,11 +2602,47 @@ function cerrarSolo() {
   cargarContinuar(); /* refresca la fila de "Continuar viendo" */
 }
 $('#soloBack').addEventListener('click', cerrarSolo);
-$('#soloVideo').addEventListener('click', () => {
+/* v83: toque simple = controles o play/pausa; DOBLE toque a los lados
+ * adelanta/atrasa 10s (como YouTube) y al centro pausa; en escritorio
+ * el doble clic amplía a pantalla completa */
+const soloTap = { t: 0, x: -1, tipo: '', timer: null };
+function soloFlashSeek(delta) {
+  const f = $('#soloFlash');
+  if (!f) return;
+  f.textContent = (delta < 0 ? '\u23EA ' : '\u23E9 ') + Math.abs(delta) + ' s';
+  f.classList.toggle('izq', delta < 0);
+  f.classList.remove('anim');
+  void f.offsetWidth; /* reinicia la animación */
+  f.classList.add('anim');
+}
+$('#soloVideo').addEventListener('pointerdown', (ev) => {
   if (!$('#soloCargando').classList.contains('hidden')) return; /* aún cargando */
-  if ($('#soloCtrls').classList.contains('oculto')) { mostrarSoloCtrls5s(); return; }
-  const video = $('#soloVideo');
-  if (video.paused) video.play().catch(() => {}); else video.pause();
+  cerrarQMenuSolo();
+  const tipo = ev.pointerType || 'mouse';
+  const rect = $('#soloPlayer').getBoundingClientRect();
+  const x = (ev.clientX || 0) - rect.left;
+  const ahora = Date.now();
+  if (ahora - soloTap.t < 330 && soloTap.tipo === tipo && Math.abs(x - soloTap.x) < 90) {
+    /* doble toque */
+    if (soloTap.timer) { clearTimeout(soloTap.timer); soloTap.timer = null; }
+    soloTap.t = 0;
+    const v = $('#soloVideo');
+    const w = rect.width || 1;
+    if (tipo === 'mouse') soloToggleFs(); /* escritorio: doble clic = ampliar */
+    else if (x < w * 0.35) { try { v.currentTime = Math.max(0, v.currentTime - 10); } catch {} soloFlashSeek(-10); }
+    else if (x > w * 0.65) { try { v.currentTime = Math.min(Math.max(0, (v.duration || 1e9) - 2), v.currentTime + 10); } catch {} soloFlashSeek(10); }
+    else if (v.paused) v.play().catch(() => {}); else v.pause();
+    mostrarSoloCtrls5s();
+    return;
+  }
+  soloTap.t = ahora; soloTap.x = x; soloTap.tipo = tipo;
+  if (soloTap.timer) clearTimeout(soloTap.timer);
+  soloTap.timer = setTimeout(() => {
+    soloTap.timer = null;
+    if ($('#soloCtrls').classList.contains('oculto')) { mostrarSoloCtrls5s(); return; }
+    const video = $('#soloVideo');
+    if (video.paused) video.play().catch(() => {}); else video.pause();
+  }, 300);
 });
 $('#soloPlay').addEventListener('click', () => {
   const video = $('#soloVideo');
@@ -2577,14 +2669,57 @@ $('#soloCC').addEventListener('click', () => {
   tt.mode = SOLO.subsOn ? 'showing' : 'hidden';
   $('#soloCC').classList.toggle('activa', SOLO.subsOn);
 });
-$('#soloFs').addEventListener('click', () => {
+function soloToggleFs() {
   const el = $('#soloPlayer');
   try {
-    if (document.fullscreenElement) document.exitFullscreen();
-    else if (el.requestFullscreen) el.requestFullscreen();
+    if (document.fullscreenElement) { const p = document.exitFullscreen(); if (p && p.catch) p.catch(() => {}); }
+    else if (el.requestFullscreen) { const p = el.requestFullscreen(); if (p && p.catch) p.catch(() => {}); }
     else if ($('#soloVideo').webkitEnterFullscreen) $('#soloVideo').webkitEnterFullscreen(); /* iOS */
   } catch {}
+}
+$('#soloFs').addEventListener('click', soloToggleFs);
+/* v83: calidad — los niveles del hls.js (Auto / 480p / 360p…) para
+ * cuidar los datos móviles; en HLS nativo (Safari) no se puede → oculto */
+function cerrarQMenuSolo() { const m = $('#soloQMenu'); if (m) m.classList.add('hidden'); }
+function pintarQMenuSolo() {
+  const btn = $('#soloQ');
+  const menu = $('#soloQMenu');
+  if (!btn || !menu) return;
+  const niveles = [];
+  if (SOLO && SOLO.hls && SOLO.hls.levels) {
+    SOLO.hls.levels.forEach((l, i) => { if (l && (l.height || l.bitrate)) niveles.push({ i, h: l.height || 0 }); });
+  }
+  niveles.sort((a, b) => b.h - a.h);
+  if (!niveles.length) { btn.classList.add('hidden'); menu.innerHTML = ''; cerrarQMenuSolo(); return; }
+  btn.classList.remove('hidden');
+  menu.innerHTML = '';
+  const items = [{ i: -1, txt: 'Auto' }].concat(niveles.map((n) => ({ i: n.i, txt: n.h ? n.h + 'p' : 'Nivel ' + (n.i + 1) })));
+  items.forEach((it) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    const auto = SOLO.hls.autoLevelEnabled;
+    b.className = 'solo-qitem' + ((it.i === -1 && auto) || (it.i >= 0 && !auto && SOLO.hls.currentLevel === it.i) ? ' activa' : '');
+    b.textContent = it.txt;
+    b.addEventListener('click', () => {
+      if (SOLO && SOLO.hls) {
+        SOLO.hls.nextLevel = it.i; /* -1 = automática */
+        btn.textContent = it.i === -1 ? 'Auto' : it.txt;
+        toast(it.i === -1 ? 'Calidad: autom\u00e1tica' : 'Calidad: ' + it.txt);
+      }
+      cerrarQMenuSolo();
+      mostrarSoloCtrls5s();
+    });
+    menu.appendChild(b);
+  });
+}
+$('#soloQ').addEventListener('click', (ev) => {
+  ev.stopPropagation();
+  const m = $('#soloQMenu');
+  if (m.classList.contains('hidden')) { pintarQMenuSolo(); m.classList.remove('hidden'); }
+  else m.classList.add('hidden');
+  mostrarSoloCtrls5s();
 });
+
 (() => {
   const video = $('#soloVideo');
   video.addEventListener('timeupdate', () => {
@@ -2612,6 +2747,7 @@ $('#soloFs').addEventListener('click', () => {
   video.addEventListener('playing', () => {
     $('#soloCargando').classList.add('hidden');
     soloSetPlayIco(true);
+    if (SOLO) SOLO.reintentos = 0; /* v83: ya está corriendo de nuevo */
     mostrarSoloCtrls5s();
   });
   video.addEventListener('pause', () => { soloSetPlayIco(false); mostrarSoloCtrls5s(); });
