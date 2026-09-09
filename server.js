@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v97'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v98'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -218,6 +218,7 @@ function stateOf(room) {
  * El mismo resolver del modo Solo: goodstream/vimeos y animes mp4upload */
 async function resolverNativo(url) {
   if (/latanime\.org\/ver\//i.test(url)) return resolverAnime(url);
+  if (/pelisxd\.com\/pelicula\//i.test(url)) return resolverPelisxd(url); /* v98 */
   return resolverSolo(url);
 }
 
@@ -1577,6 +1578,10 @@ async function metaDePelicula(url) {
           if (p) d = { title: p.title, poster: p.posterPath ? `https://image.tmdb.org/t/p/w342${p.posterPath}` : '' };
         }
       } catch {}
+    } else if (/pelisxd\./.test(dom)) {
+      /* v98: la misma fuente del buscador (caché compartida) */
+      const m2 = await pelisxdMeta(slug).catch(() => null);
+      if (m2) d = { title: m2.title, poster: m2.poster };
     }
     if (!d) d = { title: bonito, poster: '' };
   }
@@ -1701,12 +1706,205 @@ async function buscarAnimeflv(q) {
   return out;
 }
 
+/* ===================== v98: PelisXD — el catálogo grande de películas =====================
+ * pelisxd.com: 4,678 pelis en el sitemap (sin series). Sus "Opción 1" son
+ * embeds de Streamwish que esconden un HLS 1080p detrás de un challenge
+ * anti-bot (access/attest + captcha) que un navegador resuelve solo.
+ * El master.m3u8 que sale es de UN solo uso: lo que guardamos es el CUERPO
+ * del playlist variante — sus segmentos llevan firma propia y viven ~3 h.
+ * Test de vida honesto: el botón ">Opción 1</button>" renderizado en el
+ * HTML (las pelis con enlaces caídos no lo traen). */
+const PELISXD_STREAM_TTL = 2 * 60 * 60 * 1000;   /* la firma de los segmentos vive ~3 h */
+const PELISXD_IDX_TTL = 24 * 60 * 60 * 1000;     /* sitemap: refresco diario */
+const pelisxdIdx = { slugs: [], at: 0, buscando: null };
+const pelisxdMetaCache = new Map();  /* slug → { at, d: {title, poster, year, alive} } */
+const pelisxdStreams = new Map();    /* token → { body, base, ref, slug, at } */
+
+async function pelisxdIndice() {
+  if (pelisxdIdx.slugs.length && Date.now() - pelisxdIdx.at < PELISXD_IDX_TTL) return pelisxdIdx.slugs;
+  if (pelisxdIdx.buscando) return pelisxdIdx.buscando;
+  pelisxdIdx.buscando = (async () => {
+    let slugs = [];
+    try {
+      const r = await fetchSeguro('https://www.pelisxd.com/sitemap.xml', 20000);
+      if (r.ok) {
+        const t = await r.text();
+        slugs = [...t.matchAll(/<loc>https:\/\/pelisxd\.com\/pelicula\/([a-z0-9-]+)<\/loc>/gi)].map((m) => m[1]);
+      }
+    } catch {}
+    if (slugs.length) {
+      pelisxdIdx.slugs = slugs;
+      pelisxdIdx.at = Date.now();
+      console.log('[pelisxd] índice: ' + slugs.length + ' pelis del sitemap');
+    }
+    pelisxdIdx.buscando = null;
+    return pelisxdIdx.slugs;
+  })();
+  return pelisxdIdx.buscando;
+}
+
+async function pelisxdMeta(slug) {
+  const c = pelisxdMetaCache.get(slug);
+  if (c && Date.now() - c.at < 15 * 60 * 1000) return c.d;
+  const d = await (async () => {
+    try {
+      const r = await fetchSeguro('https://www.pelisxd.com/pelicula/' + slug, 10000);
+      if (!r.ok) return null;
+      const html = await r.text();
+      const og = (p) => {
+        const a1 = new RegExp(`<meta[^>]+property=["']${p}["'][^>]+content=["']([^"']+)`, 'i').exec(html);
+        const a2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${p}["']`, 'i').exec(html);
+        return (a1 || a2 || [])[1] || '';
+      };
+      const crudo = og('og:title') || '';
+      const year = (/\((\d{4})\)/.exec(crudo) || [])[1] || '';
+      const title = crudo
+        .replace(/\s*\|.*$/, '')            /* "| PelisXD | PelisXD" */
+        .replace(/^Ver\s+/i, '')
+        .replace(/\s*\(\d{4}\).*$/, '')     /* "(2022) Online Gratis en Latino HD" */
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+        .slice(0, 90);
+      return { title: title || slug, poster: og('og:image') || '', year, alive: />Opción 1<\/button>/.test(html) };
+    } catch { return null; }
+  })();
+  if (d) pelisxdMetaCache.set(slug, { at: Date.now(), d });
+  return d;
+}
+
+async function buscarPelisxd(q) {
+  const slugs = await pelisxdIndice();
+  if (!slugs.length) return [];
+  const sinAcentos = (s) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const tokens = sinAcentos(q).split(/[^a-z0-9]+/).filter((t) => t.length > 1);
+  if (!tokens.length) return [];
+  const cand = [];
+  for (const s of slugs) {
+    let ok = true, score = 0;
+    for (const t of tokens) {
+      const i = s.indexOf(t);
+      if (i < 0) { ok = false; break; }
+      score += i === 0 ? 2 : 1;
+    }
+    if (ok) cand.push({ s, score: score - s.length / 100 });
+  }
+  cand.sort((a, b) => b.score - a.score);
+  /* v98: con ~la mitad del catálogo caído, miramos hasta 14 candidatas —
+   * las mejores primero y, si salen pocas vivas, seguimos escarbando —
+   * para no dejar fuera pelis vivas que quedan atrás de muertas */
+  const top = cand.slice(0, 14);
+  const metas = await Promise.all(top.map((c) => pelisxdMeta(c.s).catch(() => null)));
+  return top
+    .map((c, i) => ({ c, m: metas[i] }))
+    .filter((x) => x.m && x.m.alive)
+    .slice(0, 6)
+    .map((x) => ({
+      title: x.m.title,
+      url: 'https://www.pelisxd.com/pelicula/' + x.c.s,
+      img: x.m.poster,
+      site: 'PelisXD',
+      extra: [x.m.year, 'HD'].filter(Boolean).join(' · '),
+    }));
+}
+
+/* v98: abre la peli en un navegador del servidor, clic en "Opción 1",
+ * insiste en darle play (el gate de captcha se abre solo) y captura el
+ * CUERPO del playlist variante que pide el player. Verificado con pelis
+ * de duración completa (113.6, 113.8 y 101.3 min — nada de teasers). */
+async function extraerStreamwishPeli(pageUrl) {
+  if (!PUPPETEER) { try { PUPPETEER = require('puppeteer'); } catch { throw new Error('El navegador del servidor no está disponible'); } }
+  const browser = await PUPPETEER.launch({
+    headless: 'new',
+    ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
+    args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required', '--disable-blink-features=AutomationControlled'],
+  }).catch(() => null);
+  if (!browser) throw new Error('No pude abrir el navegador del servidor');
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 720 });
+    await page.setUserAgent(MIRROR_UA).catch(() => {});
+    await page.evaluateOnNewDocument(() => {
+      try { window.open = function () { return null; }; } catch {}
+      try { Object.defineProperty(navigator, 'webdriver', { get: () => false }); } catch {}
+    });
+    let cap = null;
+    page.on('response', async (r) => {
+      try {
+        const u = r.url();
+        if (cap || !/\.m3u8(\?|$)/i.test(u) || !/hls2|sprintcdn/i.test(u)) return;
+        const body = await r.text();
+        if (/#EXTINF/.test(body) && /\.ts/i.test(body)) {
+          cap = { body, url: u, ref: (r.request().headers() || {}).referer || '' };
+        }
+      } catch {}
+    });
+    page.on('dialog', async (d) => { try { await d.dismiss(); } catch {} });
+    await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await new Promise((r2) => setTimeout(r2, 4000));
+    await page.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find((x) => /opción 1/i.test(x.textContent || ''));
+      if (b) b.click();
+    }).catch(() => {});
+    /* hasta ~60 s: el challenge se resuelve solo mientras el player cree que hay un usuario */
+    for (let i = 0; i < 20 && !cap; i++) {
+      await new Promise((r2) => setTimeout(r2, 3000));
+      for (const fr of page.frames()) {
+        const fu = fr.url();
+        if (/pelisxd\.|facebook\.|google\.|^about:/i.test(fu)) continue;
+        try {
+          await fr.evaluate(() => {
+            const b = document.querySelector('.captcha-gate__play, .jw-icon-display, button[class*="play"], [class*="play"] button');
+            if (b) b.click();
+            const v = document.querySelector('video');
+            if (v) { v.muted = true; v.play().catch(() => {}); }
+          });
+        } catch {}
+      }
+    }
+    if (!cap) throw new Error('El servidor de la peli no entregó el video (intenté con el navegador)');
+    return cap;
+  } finally {
+    try { await browser.close(); } catch {}
+  }
+}
+
+async function resolverPelisxd(pageUrl) {
+  const slug = (/\/pelicula\/([a-z0-9-]+)/i.exec(pageUrl) || [])[1];
+  if (!slug) throw new Error('Peli de PelisXD no válida');
+  /* limpiar streams vencidos y ver si esta peli ya está resuelta */
+  const ahora = Date.now();
+  for (const [tok, s] of pelisxdStreams) {
+    if (ahora - s.at > PELISXD_STREAM_TTL + 30 * 60 * 1000) pelisxdStreams.delete(tok);
+  }
+  for (const [tok, s] of pelisxdStreams) {
+    if (s.slug === slug && ahora - s.at < PELISXD_STREAM_TTL) {
+      return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
+    }
+  }
+  /* 1) ¿tiene enlaces vivos? (falla rápido, sin abrir navegador) */
+  const m = await pelisxdMeta(slug);
+  if (m && !m.alive) throw new Error('Esta peli tiene los enlaces caídos en PelisXD');
+  /* 2) el navegador resuelve el challenge y captura el playlist (~20 s la primera vez) */
+  const cap = await extraerStreamwishPeli('https://www.pelisxd.com/pelicula/' + slug);
+  const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
+  pelisxdStreams.set(tok, { body: cap.body, base: cap.url, ref: cap.ref || 'https://f7hyg4q.org/', slug, at: ahora });
+  /* los segmentos pasan por el proxy con el Referer del espejo que sirvió */
+  try {
+    for (const u of cap.body.match(/https?:\/\/[^\s"']+\.ts[^\s"']*/gi) || []) {
+      try { hlsReferers.set(new URL(u).hostname, cap.ref); } catch {}
+    }
+  } catch {}
+  console.log('[pelisxd] ' + slug + ' → playlist ' + (cap.body.match(/#EXTINF/g) || []).length + ' segmentos, ref ' + cap.ref);
+  return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
+}
+
 async function buscarEnSitios(q) {
   /* v68: fuera GoPelis (poco catálogo) y AnimeFLV — queda Cuevana + Latanime */
   const grupos = await Promise.all([
     buscarCuevana(q).catch(() => []),
     buscarLatanime(q).catch(() => []),
     buscarAnimeflv(q).catch(() => []), /* v97 */
+    buscarPelisxd(q).catch(() => []), /* v98: el catálogo grande de pelis */
   ]);
   /* v63: intercalados por sitio para que ningún sitio tape a los demás */
   const resultados = [];
@@ -2422,12 +2620,24 @@ const server = http.createServer(async (req, res) => {
       try {
         /* v90: episodio de Latanime → resolver de animes (mp4 directo) */
         const esEpAnime = /latanime\.org\/ver\/|animeflv\.one\/ver\//i.test(target); /* v97: también AnimeFLV */
-        const r = await (esEpAnime ? resolverAnime(target) : resolverSolo(target));
+        const esPeliXd = /pelisxd\.com\/pelicula\//i.test(target); /* v98 */
+        const r = await (esEpAnime ? resolverAnime(target) : esPeliXd ? resolverPelisxd(target) : resolverSolo(target));
         return json(res, 200, { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy });
       } catch (e) {
         console.warn('[solo] no pude resolver', target.slice(0, 70), '→', String(e.message || e).slice(0, 90));
         return json(res, 404, { ok: false, error: String(e.message || e).slice(0, 200) });
       }
+    }
+    if (url.pathname.startsWith('/api/xd/')) {
+      /* v98: el playlist de una peli de PelisXD ya resuelto (cuerpo cacheado
+       * en el servidor — el original es de un solo uso). Los segmentos se
+       * reescriben al proxy /api/hls con el Referer del espejo. */
+      const tok = (url.pathname.split('/')[3] || '').replace(/[^a-z0-9]/gi, '');
+      const s = pelisxdStreams.get(tok);
+      if (!s || Date.now() - s.at > PELISXD_STREAM_TTL + 30 * 60 * 1000) {
+        return json(res, 404, { ok: false, error: 'El stream expiró — vuelve a abrir la peli' });
+      }
+      return servirPlaylist(res, 200, s.body, s.base);
     }
     if (url.pathname === '/api/hls') {
       /* v81: proxy del stream (solo goodstream) cuando directo falla */

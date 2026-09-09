@@ -32,6 +32,8 @@ PORT=8080 node server.js
 - **Fuentes de video**:
   - URLs directas `.mp4` / `.webm` (http/https).
   - Streams **HLS** `.m3u8` (vía `hls.js`, incluido localmente).
+  - **PelisXD** (v98): catálogo grande de **películas en HD** — 4,678 pelis indexadas del sitemap, con las caídas filtradas. El server resuelve el HLS (1080p, duración completa) con un navegador que pasa el challenge anti-bot solo, y lo sirve por su propio proxy. La primera reproducción de cada peli tarda ~15-25 s; después queda en caché ~2 h.
+  - **Cuevana** (pelis y series), **Latanime** y **AnimeFLV** (animes con audio latino/sub).
   - Los clips de ejemplo se sirven desde `/videos/`.
 - Indicador de sync (desvío en segundos), volumen local, pantalla completa.
 

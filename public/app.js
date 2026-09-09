@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v97';
+const APP_VERSION = 'v98';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -396,7 +396,9 @@ function prefiereEspanol(video, hls) {
 function montarNativo(porProxy) {
   const v = $('#roomVideo');
   const usaProxy = !!porProxy || !!S.nativo.proxy;
-  const src = usaProxy ? '/api/hls?u=' + encodeURIComponent(S.nativo.m3u8) : S.nativo.m3u8;
+  /* v98: las pelis de PelisXD traen un playlist NUESTRO (/api/xd/…) — tal cual */
+  const src = /^\/api\//.test(S.nativo.m3u8) ? S.nativo.m3u8
+    : usaProxy ? '/api/hls?u=' + encodeURIComponent(S.nativo.m3u8) : S.nativo.m3u8;
   /* montaje limpio (puede ser un remount por el proxy) */
   if (S.nativo.hls) { try { S.nativo.hls.destroy(); } catch {} S.nativo.hls = null; }
   try { v.pause(); v.removeAttribute('src'); v.load(); } catch {}
@@ -1359,6 +1361,7 @@ let SITES = [
    * v68: fuera GoPelis y AnimeFLV — v70: fuera AnimeD23 también */
   { name: 'Latanime', full: 'Latanime — animes con audio latino', url: 'https://latanime.org/', logo: '/sites/latanime.png' },
   { name: 'Cuevana', full: 'Cuevana — películas y series', url: 'https://cuevana.mov/', logo: '/sites/cuevana.png' },
+  { name: 'PelisXD', full: 'PelisXD — películas en HD (catálogo grande)', url: 'https://www.pelisxd.com/', logo: '/sites/pelisxd.png' }, /* v98 */
   { name: 'YouTube', full: 'YouTube — videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
 ];
 function renderPageDrop() {
@@ -2446,7 +2449,7 @@ function renderResultados(box, results, alElegir, conAnime) {
   };
   /* v70: solo Cuevana y Latanime, siempre en ese orden y con su sección
    * (si alguno no tiene resultados para lo que buscaste, lo dice) */
-  const ordenFijo = ['Cuevana', 'Latanime'];
+  const ordenFijo = ['Cuevana', 'PelisXD', 'Latanime']; /* v98: PelisXD con su sección */
   const extras = [...porSitio.keys()].filter((s) => !ordenFijo.includes(s));
   for (const sitio of [...ordenFijo, ...extras]) {
     const items = porSitio.get(sitio) || [];
@@ -2762,7 +2765,9 @@ async function abrirSolo(pageUrl, info, opts) {
 }
 function montarSolo(d, viaProxy) {
   const video = $('#soloVideo');
-  const src = viaProxy ? '/api/hls?u=' + encodeURIComponent(d.m3u8) : d.m3u8;
+  /* v98: las pelis de PelisXD traen un playlist NUESTRO (/api/xd/…) — tal cual */
+  const src = /^\/api\//.test(d.m3u8) ? d.m3u8
+    : viaProxy ? '/api/hls?u=' + encodeURIComponent(d.m3u8) : d.m3u8;
   if (SOLO.hls) { try { SOLO.hls.destroy(); } catch {} SOLO.hls = null; }
   /* v83: reset del elemento — al reusar un <video> cuyo MediaSource se
    * destruyó a medias, el attach nuevo a veces nunca pega (readyState 0
