@@ -1563,3 +1563,7 @@ body.ctrls-vis .msg-ticker {
 .sp-ep.vista .sp-ep-num { color: var(--dim); }
 .sp-ep.parcial img { opacity: 0.75; }
 /* =================== fin v85 =================== */
+
+/* ======================= v86: sigue con el próximo ======================= */
+.cont-tiempo.proximo { color: #7ee0ff; font-weight: 700; }
+/* =================== fin v86 =================== */

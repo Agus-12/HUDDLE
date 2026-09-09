@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v85'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v86'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -2019,6 +2019,7 @@ const server = http.createServer(async (req, res) => {
       if (!name || !urec || urec.token !== tok) return json(res, 403, { ok: false, error: 'Perfil no válido' });
       const items = (continuar.get(name.toLowerCase()) || []).map((e) => ({
         url: e.url, t: e.t, d: e.d, title: e.title, img: e.img, ep: e.ep, serie: e.serie, ts: e.ts, modo: e.modo || '',
+        eps: Array.isArray(e.eps) ? e.eps : [], /* v86: para "Sigue con el próximo" */
       }));
       return json(res, 200, { ok: true, items });
     }
@@ -2066,10 +2067,22 @@ const server = http.createServer(async (req, res) => {
         anotarVisto(name.toLowerCase(), entry);
         saveVistos();
       }
+      /* v86: la cadena de episodios restante viaja con el reporte — y si
+       * venimos de avanzar al siguiente, la entrada del episodio anterior
+       * (ya terminado) se quita para no acumular la misma serie */
+      const epsArr = Array.isArray(body.eps)
+        ? body.eps.slice(0, 100).map((x) => ({ url: String((x && x.url) || '').slice(0, 300), ep: String((x && x.ep) || '').slice(0, 30) })).filter((x) => x.url)
+        : [];
+      if (epsArr.length) entry.eps = epsArr;
+      const prevUrl = String(body.prevUrl || '').slice(0, 300);
       /* mismo criterio que registrarProgreso: solo si hay algo que retomar */
       if (entry.d >= 60 && entry.t >= 5) {
         const key = name.toLowerCase();
         const lista = continuar.get(key) || [];
+        if (prevUrl && prevUrl !== entry.url) {
+          const j = lista.findIndex((e) => e.url === prevUrl);
+          if (j >= 0) lista.splice(j, 1);
+        }
         const i = lista.findIndex((e) => e.url === entry.url);
         if (i >= 0) lista.splice(i, 1);
         lista.unshift(entry);

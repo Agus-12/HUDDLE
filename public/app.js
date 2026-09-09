@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v85';
+const APP_VERSION = 'v86';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -2350,7 +2350,15 @@ function crearTarjetaContinuar(e) {
     ${e.modo === 'solo' ? '<span class="cont-modo">solo</span>' : ''}`;
   card.querySelector('.sr-nombre').textContent = e.title || e.serie || 'Película';
   if (e.ep) card.querySelector('.cont-ep').textContent = e.ep;
-  card.querySelector('.cont-tiempo').textContent = `Quedaste en ${fmtTiempo(e.t)} de ${fmtTiempo(e.d)}`;
+  /* v86: episodio terminado con siguiente en la cadena → invita al próximo */
+  const proximo = e.eps && e.eps.length > 1 && e.d > 0 && (+e.t >= e.d - 20 || (+e.t / e.d) >= 0.9);
+  const tEl = card.querySelector('.cont-tiempo');
+  if (proximo) {
+    tEl.textContent = `Sigue con ${e.eps[1].ep || 'el próximo'} ▸`;
+    tEl.classList.add('proximo');
+  } else {
+    tEl.textContent = `Quedaste en ${fmtTiempo(e.t)} de ${fmtTiempo(e.d)}`;
+  }
   /* v79: X para quitar la entrada de la lista */
   const x = document.createElement('span');
   x.className = 'cont-x';
@@ -2384,8 +2392,19 @@ function retomar(e) {
   const t = Math.floor(+e.t || 0);
   const reanudar = !!(e.d && t > 10 && t < e.d - 20); /* si casi terminó, desde el inicio */
   if (e.modo === 'solo') {
+    /* v86: terminó este episodio y hay siguiente → sigue con el próximo */
+    const terminada = !!(e.d && (+e.t >= e.d - 20 || (+e.t / e.d) >= 0.9));
+    const nxt = (e.eps && e.eps.length > 1) ? e.eps[1] : null;
+    if (terminada && nxt && nxt.url) {
+      abrirSolo(nxt.url, {
+        title: e.serie || e.title || '', ep: nxt.ep || '',
+        serie: e.serie || e.title || '', img: e.img || '',
+        eps: e.eps.slice(1),
+      });
+      return;
+    }
     /* v81: se estaba viendo en modo individual → vuelve al reproductor */
-    abrirSolo(e.url, { title: e.title || '', ep: e.ep || '', serie: e.serie || '', img: e.img || '' }, { startAt: reanudar ? t : 0 });
+    abrirSolo(e.url, { title: e.title || '', ep: e.ep || '', serie: e.serie || '', img: e.img || '', eps: e.eps || [] }, { startAt: reanudar ? t : 0 });
     return;
   }
   S.resumeAt = reanudar ? { url: e.url, t } : null;
@@ -2457,6 +2476,7 @@ async function abrirSolo(pageUrl, info, opts) {
     seekHecho: false, subsOn: false, viaProxy: false, cerrado: false,
     res: null, hls: null, timer: null, lastT: 0, reintentos: 0, tReconexion: 0, mountN: 0,
     rate: rateInicial,
+    prevUrl: (opts && opts.prevUrl) || (info && info.prevUrl) || '', /* v86: de dónde venimos (avance de episodio) */
   };
   $('#soloRate').textContent = (rateInicial === 1 ? '1' : String(rateInicial)) + 'x'; /* v84 */
   $('#soloNext').classList.toggle('hidden', !(info && info.eps && info.eps.length > 1)); /* v84 */
@@ -2612,6 +2632,8 @@ function soloReportar() {
       name: S.profile.name, token: S.profile.token, url: SOLO.url, t, d,
       title: SOLO.info.title || '', img: SOLO.info.img || '',
       ep: String(SOLO.info.ep || ''), serie: SOLO.info.serie || '', modo: 'solo',
+      prevUrl: SOLO.prevUrl || '', /* v86 */
+      eps: (SOLO.info.eps || []).slice(0, 100).map((x) => ({ url: x.url, ep: String(x.ep || '') })), /* v86 */
     }),
   }).catch(() => {});
 }
@@ -2824,6 +2846,7 @@ function soloSiguiente() {
     serie: SOLO.info.serie || SOLO.info.title || '',
     img: SOLO.info.img || '',
     eps: lista,
+    prevUrl: SOLO.url, /* v86: que la entrada anterior no se acumule */
   });
 }
 $('#soloNext').addEventListener('click', soloSiguiente);
