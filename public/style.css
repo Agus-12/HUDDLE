@@ -1587,3 +1587,30 @@ body.ctrls-vis .msg-ticker {
   .modo-tab { flex: 1; justify-content: center; padding: 7px 8px; font-size: 12.5px; }
 }
 /* =================== fin v87 =================== */
+
+/* ======================= v88: orientación por pestaña ======================= */
+/* reproductor individual SIEMPRE horizontal: con el celular vertical se gira
+ * (voltea el teléfono) — igual que la pantalla completa de la sala (v77) */
+body.solo-girado #soloPlayer {
+  position: fixed;
+  top: 50%; left: 50%;
+  width: 100vh; height: 100vw;
+  width: 100dvh; height: 100dvw;
+  transform: translate(-50%, -50%) rotate(90deg); /* SIEMPRE igual, como la sala (v77) */
+  overflow: hidden;
+}
+/* el inicio también se ve VERTICAL en el celular acostado — como la sala,
+ * el login y el selector: solo el video se ve horizontal (v79 completa) */
+body.movil-horizontal #homeFull {
+  position: fixed;
+  top: 50%; left: 50%;
+  width: min(1080px, 100dvh);
+  height: 100dvw;
+  min-height: 0;
+  transform: translate(-50%, -50%) rotate(var(--giro-sala));
+  overflow: auto;
+}
+/* destello ±10s con icono (v88) */
+.solo-flash { display: flex; align-items: center; gap: 8px; }
+.solo-flash b { font-size: 20px; font-weight: 800; }
+/* =================== fin v88 =================== */

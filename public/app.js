@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v87';
+const APP_VERSION = 'v88';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1560,6 +1560,14 @@ function sincronizarGiros() {
   /* v79: con el celular horizontal (y sin ampliar), TODO se ve vertical —
    * login/invitación, pantalla de espera y selector de episodios */
   try { document.body.classList.toggle('movil-horizontal', mqOrient.matches && esCelular() && !fsActive()); } catch {}
+  /* v88: el reproductor individual SIEMPRE se ve horizontal — con el
+   * celular vertical se gira (voltea el teléfono para verla derecha),
+   * como la pantalla completa de la sala desde v77 */
+  try {
+    const sp = document.querySelector('#soloPlayer');
+    document.body.classList.toggle('solo-girado',
+      !!sp && !sp.classList.contains('hidden') && !mqOrient.matches && esCelular());
+  } catch {}
   /* v80: ¿hacia qué lado está acostado el teléfono? La vista girada debe
    * quedar con su parte de ARRIBA hacia la parte de arriba del teléfono,
    * pa' que se lea derecho — no al revés */
@@ -2325,8 +2333,10 @@ async function cargarContinuar() {
     const r = await fetch('/api/continue?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token));
     const d = await r.json();
     fila.innerHTML = '';
-    if (!d.ok || !d.items || !d.items.length) { box.classList.add('hidden'); return; }
-    d.items.slice(0, 10).forEach((e) => fila.appendChild(crearTarjetaContinuar(e)));
+    /* v88: cada pestaña ve lo suyo — lo de la sala en Juntos, lo individual en Solo */
+    const items = (d.items || []).filter((e) => (e.modo === 'solo') === (S.tab === 'solo'));
+    if (!d.ok || !items.length) { box.classList.add('hidden'); return; }
+    items.slice(0, 10).forEach((e) => fila.appendChild(crearTarjetaContinuar(e)));
     box.classList.remove('hidden');
   } catch {}
 }
@@ -2457,6 +2467,7 @@ function setTab(tab, avisar) {
   } catch {}
   pintarTabs();
   if (avisar && tab === 'solo') toast('Modo individual — lo que abras se reproduce aquí mismo');
+  cargarContinuar(); /* v88: la fila de "Continuar viendo" cambia con la pestaña */
 }
 $('#tabSalas').addEventListener('click', () => setTab('salas'));
 $('#tabJuntos').addEventListener('click', () => setTab('juntos'));
@@ -2492,6 +2503,7 @@ async function abrirSolo(pageUrl, info, opts) {
   video.querySelectorAll('track').forEach((t) => t.remove());
   try { video.load(); } catch {}
   $('#soloPlayer').classList.remove('hidden');
+  try { sincronizarGiros(); } catch {} /* v88: ¿celular vertical? → girado */
   let rateInicial = 1;
   try { rateInicial = Math.min(2, Math.max(0.5, parseFloat(localStorage.getItem('huddle_rate')) || 1)); } catch {}
   SOLO = {
@@ -2693,6 +2705,7 @@ function cerrarSolo() {
   }
   const video = $('#soloVideo');
   try { video.pause(); } catch {}
+  try { document.body.classList.remove('solo-girado'); } catch {} /* v88 */
   video.removeAttribute('src');
   video.querySelectorAll('track').forEach((t) => t.remove());
   try { video.load(); } catch {}
@@ -2709,7 +2722,11 @@ const soloTap = { t: 0, x: -1, tipo: '', timer: null };
 function soloFlashSeek(delta) {
   const f = $('#soloFlash');
   if (!f) return;
-  f.textContent = (delta < 0 ? '\u23EA ' : '\u23E9 ') + Math.abs(delta) + ' s';
+  /* v88: iconos SVG — nada de emojis */
+  f.innerHTML = (delta < 0
+    ? '<svg class="icon icon-20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 2.6-6.3"/><path d="M3 3v5h5"/><path d="m13 9-3 3 3 3"/></svg>'
+    : '<svg class="icon icon-20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.3"/><path d="M21 3v5h-5"/><path d="m11 9 3 3-3 3"/></svg>')
+    + '<b>' + Math.abs(delta) + ' s</b>';
   f.classList.toggle('izq', delta < 0);
   f.classList.remove('anim');
   void f.offsetWidth; /* reinicia la animación */
