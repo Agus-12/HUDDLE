@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
-<link rel="stylesheet" href="/style.css?v=86">
+<link rel="stylesheet" href="/style.css?v=87">
 </head>
 <body>
 
@@ -74,20 +74,32 @@
             <button id="btnVolver" class="btn primary">Volver</button>
           </div>
           <div class="home-hero">
-            <h2 class="home-title">¿Qué van a ver hoy?</h2>
-            <p class="home-sub">Crea una sala, comparte el link y míralo juntos — todo sincronizado.</p>
-            <div id="modoPills" class="modo-pills" title="Cómo quieres verlo">
-              <button id="pillJuntos" class="modo-pill activa" type="button">👥 Juntos</button>
-              <button id="pillSolo" class="modo-pill" type="button">🎬 Solo</button>
-            </div>
-            <div class="home-actions">
-              <button id="btnCreate" class="btn primary big">
-                <svg class="icon icon-16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.9z"/><path d="M19 15l.9 2.6 2.6.9-2.6.9L19 22l-.9-2.6-2.6-.9 2.6-.9z" opacity=".7"/></svg>
-                Crear sala
+            <!-- v87: tres pestañas — Salas (en vivo + código), Juntos (sala
+                 automática al elegir) y Solo (sin ningún compañero) -->
+            <div id="modoTabs" class="modo-tabs" title="Cómo quieres verlo">
+              <button id="tabSalas" class="modo-tab" type="button">
+                <svg class="icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="m10 9.5 5 3-5 3z" fill="currentColor" stroke="none"/><path d="M8 22h8"/></svg>
+                Salas
               </button>
+              <button id="tabJuntos" class="modo-tab activa" type="button">
+                <svg class="icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                Juntos
+              </button>
+              <button id="tabSolo" class="modo-tab" type="button">
+                <svg class="icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                Solo
+              </button>
+            </div>
+            <h2 class="home-title" id="heroTitle">¿Qué van a ver hoy?</h2>
+            <p class="home-sub" id="heroSub">Elige una película o serie y la sala se crea sola — comparte el link y míralo juntos.</p>
+            <!-- v87: entrar a una sala por código (pestaña Salas) -->
+            <div id="tabSalasBody" class="salas-body">
               <div class="join-inline">
                 <input id="joinCode" class="input code" placeholder="CÓDIGO" maxlength="8" autocomplete="off" spellcheck="false" autocapitalize="characters" autocorrect="off">
-                <button id="btnJoin" class="btn big">Unirme</button>
+                <button id="btnJoin" class="btn big">
+                  <svg class="icon icon-16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="m10 17 5-5-5-5"/><path d="M15 12H3"/></svg>
+                  Unirme
+                </button>
               </div>
             </div>
             <div class="home-search">
@@ -139,10 +151,12 @@
             <div id="seriesRow" class="sr-fila"></div>
           </div>
 
-          <!-- v31: salas en vivo ahora, con preview de lo que ven -->
-          <div class="rooms-head"><span class="live-dot"></span> En vivo ahora</div>
-          <div id="liveRooms" class="rooms-grid"></div>
-          <p id="noRooms" class="hint hidden">No hay nadie en salas por ahora — crea la tuya y comparte el link</p>
+          <!-- v31/87: salas en vivo — su lugar es la pestaña Salas -->
+          <div id="salasSec" class="salas-sec">
+            <div class="rooms-head"><span class="live-dot"></span> En vivo ahora</div>
+            <div id="liveRooms" class="rooms-grid"></div>
+            <p id="noRooms" class="hint hidden">No hay nadie en salas por ahora — entra con un código o empieza una eligiendo algo en Juntos</p>
+          </div>
         </section>
 
         <!-- v43/44: preparar la sala — a pantalla completa, como la app -->
@@ -186,7 +200,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v86</span>
+        <span class="ver" id="verBadge">v87</span>
       </div>
       <!-- v36: gente, invitar y salir viven JUNTO al logo -->
       <div class="top-quick">
@@ -454,6 +468,6 @@
   </div>
 
   <div id="toasts" class="toasts"></div>
-  <script src="/app.js?v=86"></script>
+  <script src="/app.js?v=87"></script>
 </body>
 </html>

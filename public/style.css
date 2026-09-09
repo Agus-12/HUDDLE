@@ -1431,21 +1431,33 @@ body.ctrls-vis .msg-ticker {
 
 
 /* ======================= v81: modo individual ======================= */
-.modo-pills {
-  display: flex; gap: 4px; width: max-content; margin: 2px 0 16px;
+/* v87: tres pestañas — Salas / Juntos / Solo */
+.modo-tabs {
+  display: flex; gap: 4px; width: max-content; max-width: 100%; margin: 2px 0 16px;
   background: rgba(255, 255, 255, 0.07); border-radius: 999px; padding: 4px;
 }
-.modo-pill {
+.modo-tab {
   border: 0; background: transparent; color: var(--dim);
   font: inherit; font-size: 13px; font-weight: 600;
-  padding: 7px 14px; border-radius: 999px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 999px; cursor: pointer; white-space: nowrap;
   transition: background .15s, color .15s;
 }
-.modo-pill:active { transform: scale(0.96); }
-.modo-pill.activa {
+.modo-tab .icon { flex: 0 0 auto; }
+.modo-tab:active { transform: scale(0.96); }
+.modo-tab.activa {
   background: linear-gradient(135deg, var(--violet), #5a8bff);
   color: #fff;
 }
+/* pestaña Salas: el buscador y las filas se van, entra lo de salas */
+#homeMain.tab-salas .home-search,
+#homeMain.tab-salas #searchResults,
+#homeMain.tab-salas .sr-sec { display: none; }
+#homeMain:not(.tab-salas) .salas-sec,
+#homeMain:not(.tab-salas) #tabSalasBody { display: none; }
+.salas-body { margin: 0 0 14px; }
+.salas-body .join-inline { display: flex; gap: 8px; max-width: 420px; }
+.salas-body .join-inline .input { flex: 1; }
 .solo-player {
   position: fixed; inset: 0; z-index: 90;
   background: #000; display: flex; align-items: center; justify-content: center;
@@ -1567,3 +1579,11 @@ body.ctrls-vis .msg-ticker {
 /* ======================= v86: sigue con el próximo ======================= */
 .cont-tiempo.proximo { color: #7ee0ff; font-weight: 700; }
 /* =================== fin v86 =================== */
+
+/* ======================= v87: pestañas Salas/Juntos/Solo ======================= */
+.modo-tabs { margin-top: 0; }
+@media (max-width: 640px) {
+  .modo-tabs { width: 100%; }
+  .modo-tab { flex: 1; justify-content: center; padding: 7px 8px; font-size: 12.5px; }
+}
+/* =================== fin v87 =================== */

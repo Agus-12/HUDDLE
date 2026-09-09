@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v86'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v87'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1409,7 +1409,7 @@ async function buscarCuevana(q) {
   const d = await r.json().catch(() => ({}));
   return (d.posts || []).slice(0, 12).map((p) => ({
     title: String(p.title || ''),
-    url: (p.type === 'movies') ? `https://cuevana.mov/pelicula/${p.tmdb}/${p.slug}` : `https://cine-calidad.mx/serie/${p.slug}`,
+    url: (p.type === 'movies') ? `https://cine-calidad.mx/pelicula/${p.slug}/` : `https://cine-calidad.mx/serie/${p.slug}`, /* v87: cuevana.mov ya responde 404 — las pelis viven en cine-calidad */
     img: String(p.featured_image || '').replace('/w780/', '/w342/'),
     site: 'Cuevana',
     extra: [p.year, p.duration ? `${p.duration} min` : ''].filter(Boolean).join(' · '),
@@ -1517,7 +1517,7 @@ async function tendenciasCuevana(periodo, cache) {
   const d = await r.json().catch(() => ({}));
   const items = (d.posts || []).slice(0, 16).map((p) => ({
     title: String(p.title || ''),
-    url: (p.type === 'serie') ? `https://cine-calidad.mx/serie/${p.slug}` : `https://cuevana.mov/pelicula/${p.tmdb}/${p.slug}`,
+    url: (p.type === 'serie') ? `https://cine-calidad.mx/serie/${p.slug}` : `https://cine-calidad.mx/pelicula/${p.slug}/`, /* v87: fix 404 — cuevana.mov ya no sirve esas URLs */
     img: String(p.featured_image || '').replace('/w780/', '/w342/'),
     site: 'Cuevana',
     extra: [p.year, p.duration ? `${p.duration} min` : ''].filter(Boolean).join(' · '),

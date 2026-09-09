@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v86';
+const APP_VERSION = 'v87';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1003,7 +1003,7 @@ function pintarEpisodios(temporada) {
       if (S.modoSolo) {
         /* v81: episodio en modo individual — los animes (filemoon) no
          * tienen extracción directa y se quedan en la sala */
-        if (esAn) toast('Los animes se ven en modo 👥 Juntos');
+        if (esAn) toast('Los animes se ven en la pestaña Juntos');
         else {
           /* v84: la lista desde este episodio alimenta "Sig. ▸" y "A continuación" */
           const idx = eps.indexOf(ep);
@@ -1901,10 +1901,8 @@ async function pollRooms() {
 }
 roomsTimer = setInterval(pollRooms, 5000);
 
-$('#btnCreate').addEventListener('click', () => {
-  if (!S.profile) { toast('Primero elige tu nombre de usuario'); initLanding(); return; }
-  abrirSetup(); // v43: antes de entrar, eliges con qué página arrancar
-});
+/* v87: ya no hay botón "Crear sala" — al elegir una peli o serie en
+ * Juntos la sala se crea sola (S.pendingStart + connect). */
 
 function joinFromInput() {
   const code = $('#joinCode').value.trim().toUpperCase();
@@ -2342,7 +2340,7 @@ function crearTarjetaContinuar(e) {
   card.innerHTML = `
     ${srcImg
       ? `<img class="sr-cover" src="${srcImg}" alt="" loading="lazy" referrerpolicy="no-referrer">`
-      : `<span class="sr-cover sr-cover-anime">🎬</span>`}
+      : `<span class="sr-cover sr-cover-anime"><svg class="icon icon-20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 4v16M17 4v16M2 9h5M2 15h5M17 9h5M17 15h5"/></svg></span>`}
     <span class="sr-nombre"></span>
     ${e.ep ? '<span class="cont-ep"></span>' : ''}
     <span class="cont-barra"><i style="width:${pct}%"></i></span>
@@ -2422,25 +2420,51 @@ function retomar(e) {
  * sirve directo (el token puede venir amarrado a la IP del servidor),
  * re-servimos el stream por /api/hls. Los animes (filemoon) se quedan
  * en modo sala — no tienen extracción directa. */
-try { S.modoSolo = localStorage.getItem('huddle_modo_solo') === '1'; } catch {}
-function pintarModoPills() {
-  $('#pillJuntos').classList.toggle('activa', !S.modoSolo);
-  $('#pillSolo').classList.toggle('activa', S.modoSolo);
-  const sub = document.querySelector('.home-sub');
-  if (sub) sub.textContent = S.modoSolo
-    ? 'Modo individual: se reproduce directo en tu dispositivo, sin sala ni espejo.'
-    : 'Crea una sala, comparte el link y míralo juntos — todo sincronizado.';
+/* v87: tres pestañas — Salas / Juntos / Solo (con iconos, sin emojis) */
+try {
+  let guardada = localStorage.getItem('huddle_tab');
+  if (['salas', 'juntos', 'solo'].indexOf(guardada) < 0) guardada = null;
+  if (guardada) S.tab = guardada;
+  else {
+    const viejo = localStorage.getItem('huddle_modo_solo');
+    S.tab = viejo === '1' ? 'solo' : 'juntos'; /* migración desde el toggle viejo */
+    if (viejo !== null) { try { localStorage.setItem('huddle_tab', S.tab); } catch {} } /* se consume una sola vez */
+  }
+} catch { S.tab = 'juntos'; }
+const TAB_TEXTOS = {
+  salas: ['Salas', 'Entra con el código de tu sala o únete a una que esté en vivo.'],
+  juntos: ['¿Qué van a ver hoy?', 'Elige una película o serie y la sala se crea sola — comparte el link y míralo juntos.'],
+  solo: ['¿Qué vas a ver hoy?', 'Mira películas y series sin ningún compañero — a tu ritmo.'],
+};
+function pintarTabs() {
+  const t = TAB_TEXTOS[S.tab] ? S.tab : 'juntos';
+  $('#tabSalas').classList.toggle('activa', t === 'salas');
+  $('#tabJuntos').classList.toggle('activa', t === 'juntos');
+  $('#tabSolo').classList.toggle('activa', t === 'solo');
+  const main = $('#homeMain');
+  if (main) main.classList.toggle('tab-salas', t === 'salas');
+  const tt = TAB_TEXTOS[t];
+  $('#heroTitle').textContent = tt[0];
+  $('#heroSub').textContent = tt[1];
 }
-function setModoSolo(v) {
-  if (S.modoSolo === !!v) { pintarModoPills(); return; }
-  S.modoSolo = !!v;
-  try { localStorage.setItem('huddle_modo_solo', S.modoSolo ? '1' : '0'); } catch {}
-  pintarModoPills();
-  if (S.modoSolo) toast('Modo individual — lo que abras se reproduce aquí mismo');
+function setTab(tab, avisar) {
+  if (!TAB_TEXTOS[tab]) tab = 'juntos';
+  S.tab = tab;
+  S.modoSolo = tab === 'solo';
+  try {
+    localStorage.setItem('huddle_tab', tab);
+    localStorage.setItem('huddle_modo_solo', tab === 'solo' ? '1' : '0'); /* compatibilidad */
+  } catch {}
+  pintarTabs();
+  if (avisar && tab === 'solo') toast('Modo individual — lo que abras se reproduce aquí mismo');
 }
-$('#pillJuntos').addEventListener('click', () => setModoSolo(false));
-$('#pillSolo').addEventListener('click', () => setModoSolo(true));
-pintarModoPills();
+$('#tabSalas').addEventListener('click', () => setTab('salas'));
+$('#tabJuntos').addEventListener('click', () => setTab('juntos'));
+$('#tabSolo').addEventListener('click', () => setTab('solo', true));
+/* al arrancar solo se pinta — nada de escribir: así la migración desde el
+ * toggle viejo (huddle_modo_solo) sigue funcionando en dispositivos viejos */
+S.modoSolo = S.tab === 'solo';
+pintarTabs();
 
 let SOLO = null; /* { url, info, res, hls, viaProxy, startAt, seekHecho, timer, subsOn, cerrado } */
 function cargarHlsJs(cb) {
@@ -2497,7 +2521,7 @@ async function abrirSolo(pageUrl, info, opts) {
     montarSolo(d, false);
   } catch (e) {
     if (SOLO && SOLO.url === pageUrl && !SOLO.cerrado) {
-      toast(String(e.message || e).slice(0, 120) + ' — ábrelo en modo 👥 Juntos');
+      toast(String(e.message || e).slice(0, 120) + ' — ábrelo en la pestaña Juntos');
       cerrarSolo();
     }
   }
@@ -2583,7 +2607,7 @@ function montarSolo(d, viaProxy) {
       /* Safari / iPhone: HLS nativo, sin hls.js */
       video.src = src;
     } else {
-      toast('Tu navegador no reproduce este video — ábrelo en modo 👥 Juntos');
+      toast('Tu navegador no reproduce este video — ábrelo en la pestaña Juntos');
       cerrarSolo();
       return;
     }
