@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v91'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v92'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -189,6 +189,8 @@ function getOrCreateRoom(code) {
     users: new Map(),   // id -> {id, name, joinedAt}
     clients: new Set(), // respuestas SSE; cada una lleva .rrUserId
     chat: [],
+    native: null, /* v92: { m3u8, mp4, proxy, subs } — video directo (como Solo) */
+    videoImg: '', /* v92: carátula para la sala nativa */
   };
   rooms.set(code, room);
   return room;
@@ -207,7 +209,16 @@ function stateOf(room) {
     updatedAt: room.updatedAt,
     serverNow: Date.now(),
     anyoneCanControl: room.anyoneCanControl,
+    /* v92: sala nativa — el video directo (como el modo Solo) */
+    native: room.native || null,
+    videoImg: room.videoImg || '',
   };
+}
+/* v92: ¿esta URL se puede reproducir NATIVA (sin navegador remoto)?
+ * El mismo resolver del modo Solo: goodstream/vimeos y animes mp4upload */
+async function resolverNativo(url) {
+  if (/latanime\.org\/ver\//i.test(url)) return resolverAnime(url);
+  return resolverSolo(url);
 }
 
 function usersOf(room) {
@@ -1013,6 +1024,31 @@ async function handleAction(req, res, body) {
     const op = action.op;
     try {
       if (op === 'start' || op === 'nav') {
+        /* v92: primero el camino NATIVO — si sabemos sacar el video
+         * directo (goodstream/vimeos/mp4upload), TODOS lo reproducen en
+         * su navegador, sincronizados por el reloj de la sala. Sin
+         * Chrome, sin frames: full calidad y carga rapidísima. Si no
+         * se puede, caemos al espejo de siempre. */
+        const urlNat = String(action.url || '').trim();
+        if (/^https?:\/\//i.test(urlNat)) {
+          const nat = await resolverNativo(urlNat).catch((e) => {
+            console.log('[sala] nativo no pudo (' + String(e.message || e).slice(0, 60) + ') → espejo');
+            return null;
+          });
+          if (nat) {
+            if (mirrors.has(room.code)) stopMirror(room).catch(() => {});
+            room.videoUrl = urlNat;
+            room.videoTitle = String(action.title || guessTitle(urlNat)).slice(0, 80);
+            room.videoImg = String(action.img || '').slice(0, 400);
+            room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
+            room.position = 0;
+            room.isPlaying = true; /* arranca sonando; el que no pueda, ve el botón de play */
+            room.updatedAt = Date.now();
+            sysMsg(room, `${room.users.get(userId).name} puso: ${room.videoTitle}`);
+            broadcast(room, 'state', stateOf(room));
+            return json(res, 200, { ok: true, nativo: true });
+          }
+        }
         await startMirror(room, action.url, userId);
         /* v78: título y carátula de lo que abrieron (para "Continuar viendo") */
         const nm = mirrors.get(room.code);
@@ -1029,7 +1065,20 @@ async function handleAction(req, res, body) {
         }
         return json(res, 200, { ok: true });
       }
-      if (op === 'stop') { await stopMirror(room); return json(res, 200, { ok: true }); }
+      if (op === 'stop') {
+        /* v92: si la sala iba nativa, se suelta igual */
+        if (room.native) {
+          room.native = null;
+          room.videoUrl = '';
+          room.videoImg = '';
+          room.position = 0;
+          room.isPlaying = false;
+          room.updatedAt = Date.now();
+          broadcast(room, 'state', stateOf(room));
+        }
+        await stopMirror(room);
+        return json(res, 200, { ok: true });
+      }
       if (op === 'epPrev' || op === 'epNext') {
         /* v74: episodio anterior/siguiente — cambia para toda la sala */
         const m = mirrors.get(room.code);
@@ -1175,6 +1224,8 @@ async function handleAction(req, res, body) {
         // v18: detener — quitar el video de la sala (devuelve las opciones a todos)
         room.videoUrl = '';
         room.videoTitle = '';
+        room.native = null; /* v92 */
+        room.videoImg = ''; /* v92 */
         room.position = 0;
         room.isPlaying = false;
         room.updatedAt = now;

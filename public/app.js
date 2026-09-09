@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v91';
+const APP_VERSION = 'v92';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -318,9 +318,140 @@ function applyState(st) {
   S.offset = st.serverNow - Date.now();
   if (S.room) S.room.anyoneCanControl = !!st.anyoneCanControl;
   S.canControl = !!st.anyoneCanControl || (S.room && S.room.hostId === S.userId);
+  /* v92: sala nativa — video directo (como el modo Solo) sincronizado
+   * por el reloj del servidor; sin nativo, se apaga */
+  if (st.videoUrl && st.native) activarNativo(st);
+  else if (S.nativo) desactivarNativo();
   updateControlUi();
   updateBadge();
 }
+
+/* ======================= v92: sala nativa (video directo) =======================
+ * El servidor resolvió la peli como en el modo Solo (goodstream, vimeos,
+ * mp4upload) y todos la reproducimos en nuestro navegador, sincronizados
+ * por el reloj de la sala (position + updatedAt + serverNow). */
+S.nativo = null; /* { url, m3u8, mp4, proxy, subs, isPlaying, position, updatedAt, hls } */
+function posEsperada() {
+  if (!S.nativo) return 0;
+  return S.nativo.isPlaying
+    ? S.nativo.position + Math.max(0, (Date.now() + (S.offset || 0) - S.nativo.updatedAt) / 1000)
+    : S.nativo.position;
+}
+function activarNativo(st) {
+  const primero = !S.nativo || S.nativo.url !== st.videoUrl;
+  if (primero) {
+    if (S.nativo) desmontarNativo();
+    S.nativo = {
+      url: st.videoUrl, m3u8: st.native.m3u8, mp4: !!st.native.mp4,
+      proxy: !!st.native.proxy, subs: st.native.subs || [],
+      isPlaying: !!st.isPlaying, position: +st.position || 0,
+      updatedAt: +st.updatedAt || Date.now(), hls: null,
+    };
+    /* la capa del espejo nos sirve de marco: canvas fuera, video dentro */
+    S.mirror.active = false; S.mirror.ready = false; S.mirror.playing = false; S.mirror.gotFrame = true;
+    $('#mirrorImg').classList.add('hidden');
+    $('#roomVideo').classList.remove('hidden');
+    $('#mirrorLayer').classList.remove('hidden');
+    $('#mirrorLoading').classList.add('hidden');
+    $('#videoEmpty').classList.add('hidden');
+    $('#seekWrap').classList.add('hidden'); /* hasta saber la duración */
+    S.mirrorTime = null;
+    document.body.classList.add('mirroring');
+    document.body.classList.add('cine-listo');
+    ocultarPlayBtn();
+    montarNativo();
+  } else {
+    Object.assign(S.nativo, { isPlaying: !!st.isPlaying, position: +st.position || 0, updatedAt: +st.updatedAt || Date.now() });
+    sincronizarNativo();
+  }
+}
+function montarNativo(porProxy) {
+  const v = $('#roomVideo');
+  const usaProxy = !!porProxy || !!S.nativo.proxy;
+  const src = usaProxy ? '/api/hls?u=' + encodeURIComponent(S.nativo.m3u8) : S.nativo.m3u8;
+  /* montaje limpio (puede ser un remount por el proxy) */
+  if (S.nativo.hls) { try { S.nativo.hls.destroy(); } catch {} S.nativo.hls = null; }
+  try { v.pause(); v.removeAttribute('src'); v.load(); } catch {}
+  /* v92: la pantalla de carga se va cuando DE VERDAD suena — y dura
+   * mínimo 5 segundos, como debe ser (carga rapidísima ahora) */
+  v.addEventListener('playing', () => {
+    if (!S.nativo) return;
+    ocultarPeliLoadingSuave();
+    ocultarPlayBtn();
+  }, { once: true });
+  cargarHlsJs((okHls) => {
+    if (!S.nativo) return;
+    const hlsOk = !S.nativo.mp4 && okHls && window.Hls && window.Hls.isSupported();
+    if (hlsOk) {
+      const hls = new window.Hls({ maxBufferLength: 30 });
+      S.nativo.hls = hls;
+      /* v92: si el directo no sirve (CORS del origen), re-servimos por
+       * el proxy — igual que el modo Solo */
+      hls.on(window.Hls.Events.ERROR, (ev, data) => {
+        if (!S.nativo || !data || !data.fatal) return;
+        if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR && !usaProxy) {
+          toast('Conectando por el servidor…');
+          montarNativo(true);
+        } else if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) {
+          try { hls.recoverMediaError(); } catch {}
+        }
+      });
+      hls.loadSource(src);
+      hls.attachMedia(v);
+    } else {
+      v.src = src; /* mp4 directo, o Safari con HLS nativo */
+    }
+    const alListo = () => {
+      if (!S.nativo) return;
+      let t = posEsperada();
+      /* v78: retomar donde iba (continuar-viendo de la sala) */
+      if (S.resumeAt && S.resumeAt.url === S.nativo.url && S.resumeAt.t > 5) { t = S.resumeAt.t; S.resumeAt = null; }
+      try { if (t > 5 && isFinite(v.duration) && t < v.duration - 5) v.currentTime = t; } catch {}
+      if (S.nativo.isPlaying) v.play().catch(() => { mostrarPlayBtn(); });
+    };
+    v.addEventListener('loadedmetadata', alListo, { once: true });
+    v.addEventListener('loadeddata', alListo, { once: true });
+    setTimeout(alListo, 1500);
+  });
+}
+function sincronizarNativo() {
+  const v = $('#roomVideo');
+  if (!v || !S.nativo) return;
+  const esp = posEsperada();
+  if (S.nativo.isPlaying) {
+    if (Math.abs(v.currentTime - esp) > 2 && isFinite(v.duration) && esp < v.duration - 1) { try { v.currentTime = esp; } catch {} }
+    if (v.paused) v.play().catch(() => { mostrarPlayBtn(); });
+  } else {
+    if (!v.paused) { try { v.pause(); } catch {} }
+    if (Math.abs(v.currentTime - esp) > 1) { try { v.currentTime = esp; } catch {} }
+  }
+}
+function desmontarNativo() {
+  const v = $('#roomVideo');
+  if (S.nativo && S.nativo.hls) { try { S.nativo.hls.destroy(); } catch {} }
+  if (v) { try { v.pause(); v.removeAttribute('src'); v.load(); } catch {} }
+  S.nativo = null;
+}
+function desactivarNativo() {
+  desmontarNativo();
+  $('#roomVideo').classList.add('hidden');
+  $('#mirrorImg').classList.remove('hidden');
+  $('#mirrorLayer').classList.add('hidden');
+  $('#videoEmpty').classList.remove('hidden');
+  document.body.classList.remove('mirroring', 'cine-listo');
+  ocultarPeliLoading(); ocultarPlayBtn(); ocultarCtrls();
+  $('#seekWrap').classList.add('hidden');
+  S.mirrorTime = null;
+  S.mirrorInfo = null;
+}
+/* reloj propio: barrita al día + resincronización suave cada 3s */
+setInterval(() => {
+  if (!S.nativo) return;
+  const v = $('#roomVideo');
+  if (v && isFinite(v.duration) && v.duration > 0) { S.mirrorTime = { t: v.currentTime, d: v.duration }; pintarSeekBar(); }
+  sincronizarNativo();
+}, 3000);
+$('#roomVideo').addEventListener('click', tocarPantallaCine);
 
 /* v33: la app ya no reproduce videos por URL — solo espeja páginas.
  * El badge de sync vivía en la barra del reproductor, que ya no existe. */
@@ -817,8 +948,11 @@ $('#mirrorLayer').addEventListener('wheel', (e) => {
 
 /* v33: detener el espejo vive en la barra de arriba, junto a Salir */
 $('#btnStopMirrorTop').addEventListener('click', () => {
-  if (S.canControl) sendAction({ type: 'mirror', op: 'stop' });
-  else toast('Solo el anfitrión controla el espejo');
+  if (S.canControl) {
+    /* v92: sala nativa — se suelta con la acción de video */
+    if (S.nativo) sendAction({ type: 'video', url: '' });
+    else sendAction({ type: 'mirror', op: 'stop' });
+  } else toast('Solo el anfitrión controla la sala');
 });
 
 /* v33: navegar el espejo como un navegador normal — atrás / adelante */
@@ -873,7 +1007,11 @@ function pintarSeekBar(previewT) {
     arrastrando = false;
     const t = Math.round(tDe(ev));
     if (S.mirrorTime) S.mirrorTime.t = t;
-    sendAction({ type: 'mirror', op: 'seekTo', time: t }).catch(() => {});
+    /* v92: sala nativa — mover por el reloj de la sala */
+    if (S.nativo) {
+      S.nativo.position = t; S.nativo.updatedAt = Date.now() + (S.offset || 0); S.nativo.isPlaying = true;
+      sendAction({ type: 'seek', position: t }).catch(() => {});
+    } else sendAction({ type: 'mirror', op: 'seekTo', time: t }).catch(() => {});
   };
   bar.addEventListener('pointerup', soltar);
   bar.addEventListener('pointercancel', soltar);
@@ -881,6 +1019,16 @@ function pintarSeekBar(previewT) {
 
 /* v60: adelantar / atrasar la película (mueve el video del espejo) */
 function moverPelicula(delta) {
+  /* v92: sala nativa — ±N segundos por el reloj de la sala */
+  if (S.nativo) {
+    const v = $('#roomVideo');
+    const base = (v && isFinite(v.duration)) ? v.currentTime : posEsperada();
+    const t = Math.max(0, Math.round(base + delta));
+    S.nativo.position = t; S.nativo.updatedAt = Date.now() + (S.offset || 0); S.nativo.isPlaying = true;
+    if (v) { try { v.currentTime = t; } catch {} }
+    sendAction({ type: 'seek', position: t }).catch(() => {});
+    return;
+  }
   if (!S.mirror.active) { toast('Primero pon una película'); return; }
   sendAction({ type: 'mirror', op: 'seek', delta }).then((r) => {
     if (r && r.ok === false) toast(r.error || 'No se pudo mover');
@@ -896,6 +1044,7 @@ function mostrarPeliLoading() {
   const info = S.mirrorInfo;
   const box = $('#peliLoading');
   if (!box) return;
+  S.peliLoadingAt = Date.now(); /* v92: la sala carga rapidísimo ahora — la pantalla dura mínimo 5s */
   if (info) {
     const po = $('#peliPoster');
     if (info.img) {
@@ -921,6 +1070,13 @@ function ocultarPeliLoading() {
     b.classList.add('hidden');
     if (S.peliTimer) { clearTimeout(S.peliTimer); S.peliTimer = null; }
   }
+}
+/* v92: la sala nativa carga rapidísimo — la pantalla de carga se queda
+ * un mínimo de 5 segundos (que no sea un destello) */
+function ocultarPeliLoadingSuave() {
+  const falta = 5000 - (Date.now() - (S.peliLoadingAt || 0));
+  if (falta <= 0) return ocultarPeliLoading();
+  setTimeout(() => ocultarPeliLoading(), falta);
 }
 $('#peliLoading').addEventListener('click', () => ocultarPeliLoading());
 /* v61: selector de temporadas y episodios para series */
@@ -1104,7 +1260,9 @@ function ocultarCtrls() {
 function tocarPantallaCine() {
   if ($('#ctrlLayer').classList.contains('visible')) {
     ocultarCtrls();
-    sendAction({ type: 'mirror', op: S.mirror.playing ? 'pause' : 'play' }).catch(() => {});
+    /* v92: en sala nativa el play/pausa va por el reloj de la sala */
+    if (S.nativo) sendAction({ type: S.nativo.isPlaying ? 'pause' : 'play' }).catch(() => {});
+    else sendAction({ type: 'mirror', op: S.mirror.playing ? 'pause' : 'play' }).catch(() => {});
   } else mostrarCtrls5s();
 }
 
@@ -1119,7 +1277,9 @@ function ocultarPlayBtn() {
 }
 $('#playBtn').addEventListener('click', () => {
   ocultarPlayBtn();
-  sendAction({ type: 'mirror', op: 'play' }).catch(() => {});
+  /* v92: sala nativa — play por el reloj de la sala */
+  if (S.nativo) sendAction({ type: 'play' }).catch(() => {});
+  else sendAction({ type: 'mirror', op: 'play' }).catch(() => {});
 });
 
 /* v60: si la peli tarda demasiado, te dejamos entrar igual (sin quedarte atascado) */
