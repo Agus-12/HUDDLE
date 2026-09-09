@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v81';
+const APP_VERSION = 'v82';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1550,6 +1550,21 @@ function dirGiro() {
 }
 function autoFsPorOrientacion(landscape) {
   try {
+    /* v82: modo individual — el celular acostado se amplía solo (como
+     * v76 en la sala); vertical se regresa. Aquí no hay giros: el video
+     * se acomoda solo con object-fit. */
+    const sp = document.querySelector('#soloPlayer');
+    if (sp && !sp.classList.contains('hidden') && typeof SOLO !== 'undefined' && SOLO && esCelular()) {
+      const rf = sp.requestFullscreen || sp.webkitRequestFullscreen;
+      if (landscape && !document.fullscreenElement && !document.webkitFullscreenElement && rf) {
+        const pr = rf.call(sp);
+        if (pr && pr.catch) pr.catch(() => {});
+      } else if (!landscape && (document.fullscreenElement || document.webkitFullscreenElement)) {
+        const xf = document.exitFullscreen || document.webkitExitFullscreen;
+        if (xf) { try { xf.call(document); } catch {} }
+      }
+      return; /* en modo individual no aplica la lógica de la sala */
+    }
     /* v78: el volteo solo amplía con la sala abierta y algo en el espejo;
      * los giros de la vista se sincronizan SIEMPRE (la sala es vertical
      * aunque no haya nada reproduciéndose) */
@@ -2380,6 +2395,7 @@ async function abrirSolo(pageUrl, info, opts) {
   $('#soloEp').textContent = info.ep ? 'Episodio ' + info.ep : '';
   $('#soloCargando').classList.remove('hidden');
   $('#soloCtrls').classList.add('oculto');
+  $('#soloTop').classList.remove('oculto'); /* v82: visible mientras carga, se esconde al reproducir */
   $('#soloBar').value = 0;
   $('#soloTime').textContent = '0:00 / 0:00';
   $('#soloCC').classList.remove('activa');
@@ -2392,8 +2408,9 @@ async function abrirSolo(pageUrl, info, opts) {
     url: pageUrl, info,
     startAt: Math.max(0, Math.floor(+opts.startAt || 0)),
     seekHecho: false, subsOn: false, viaProxy: false, cerrado: false,
-    res: null, hls: null, timer: null,
+    res: null, hls: null, timer: null, lastT: 0,
   };
+  if (SOLO.startAt > 10) toast('Reanudando en ' + fmtTiempo(SOLO.startAt)); /* v82 */
   try {
     const r = await fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(pageUrl));
     const d = await r.json();
@@ -2413,6 +2430,19 @@ function montarSolo(d, viaProxy) {
   const src = viaProxy ? '/api/hls?u=' + encodeURIComponent(d.m3u8) : d.m3u8;
   if (SOLO.hls) { try { SOLO.hls.destroy(); } catch {} SOLO.hls = null; }
   SOLO.viaProxy = viaProxy;
+  /* v82: si esto es una RE-conexión (cayó el directo y seguimos por el
+   * proxy), volvemos al minuto donde iba y no desde el inicio.
+   * Ojo: hay que congelarlo AQUÍ — al remontar, un timeupdate con t=0
+   * pisa SOLO.lastT antes de que llegue el loadedmetadata. */
+  const reT = SOLO.seekHecho ? SOLO.lastT : 0;
+  const reSeek = () => {
+    if (!SOLO || SOLO.cerrado) return;
+    if (SOLO.seekHecho && reT > 5 && isFinite(video.duration) && reT < video.duration - 10) {
+      try { video.currentTime = reT; } catch {}
+    }
+  };
+  video.addEventListener('loadedmetadata', reSeek, { once: true });
+  setTimeout(reSeek, 1200);
   cargarHlsJs((okHls) => {
     if (!SOLO || SOLO.cerrado) return;
     ponerSubsSolo(d.subs || []);
@@ -2486,10 +2516,16 @@ function soloSetPlayIco(playing) {
 let soloCtrlTimer = null;
 function mostrarSoloCtrls5s() {
   const c = $('#soloCtrls');
+  const t = $('#soloTop'); /* v82: la barra de arriba también se va con los controles */
   if (!c) return;
   c.classList.remove('oculto');
+  if (t) t.classList.remove('oculto');
   if (soloCtrlTimer) clearTimeout(soloCtrlTimer);
-  soloCtrlTimer = setTimeout(() => { c.classList.add('oculto'); soloCtrlTimer = null; }, 5000);
+  soloCtrlTimer = setTimeout(() => {
+    c.classList.add('oculto');
+    if (t) t.classList.add('oculto');
+    soloCtrlTimer = null;
+  }, 5000);
 }
 function cerrarSolo() {
   if (soloCtrlTimer) { clearTimeout(soloCtrlTimer); soloCtrlTimer = null; }
@@ -2521,6 +2557,7 @@ $('#soloPlay').addEventListener('click', () => {
   if (video.paused) video.play().catch(() => {}); else video.pause();
 });
 $('#soloBar').addEventListener('input', () => {
+  mostrarSoloCtrls5s(); /* v82: mientras arrastras, los controles no se esconden */
   const video = $('#soloVideo');
   if (isFinite(video.duration) && video.duration > 0) {
     $('#soloTime').textContent = fmtTiempo((+$('#soloBar').value / 1000) * video.duration) + ' / ' + fmtTiempo(video.duration);
@@ -2552,6 +2589,7 @@ $('#soloFs').addEventListener('click', () => {
   const video = $('#soloVideo');
   video.addEventListener('timeupdate', () => {
     if (!SOLO) return;
+    SOLO.lastT = video.currentTime; /* v82: por si hay que reconectar en medio */
     if (!SOLO.seekHecho && isFinite(video.duration) && video.duration > 0) {
       /* retomar donde se quedó (o desde el inicio si ya casi la termina) */
       if (SOLO.startAt > 0 && SOLO.startAt < video.duration - 5) {

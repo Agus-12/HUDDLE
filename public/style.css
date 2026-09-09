@@ -1461,7 +1461,9 @@ body.ctrls-vis .msg-ticker {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px;
   background: linear-gradient(rgba(0, 0, 0, 0.75), transparent);
   z-index: 2;
+  transition: opacity 0.25s; /* v82: se esconde con los controles */
 }
+.solo-top.oculto { opacity: 0; pointer-events: none; }
 .solo-tit { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .solo-tit b { color: #fff; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .solo-tit span { color: #aeb8c6; font-size: 12px; }
