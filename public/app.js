@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v93';
+const APP_VERSION = 'v94';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -365,6 +365,34 @@ function activarNativo(st) {
     sincronizarNativo();
   }
 }
+/* v94: los masters de goodstream traen el audio inglés marcado como
+ * DEFAULT (por eso las series "venían en inglés") — cuando el stream
+ * tiene pista de audio en español (latino/castellano), la elegimos */
+function prefiereEspanol(video, hls) {
+  const esPista = (t) => /^es/i.test(String((t && t.lang) || '')) || /espa/i.test(String((t && t.name) || ''));
+  if (hls) {
+    const elegir = () => {
+      try {
+        const pistas = hls.audioTracks || [];
+        const at = pistas.find(esPista);
+        const idx = at ? pistas.indexOf(at) : -1;
+        if (idx >= 0 && hls.audioTrack !== idx) hls.audioTrack = idx;
+      } catch {}
+    };
+    try { hls.on(window.Hls.Events.MANIFEST_PARSED, elegir); hls.on(window.Hls.Events.AUDIO_TRACKS_UPDATED, elegir); } catch {}
+  } else if (video) {
+    /* Safari / HLS nativo / mp4: AudioTrackList si el navegador lo tiene */
+    video.addEventListener('loadedmetadata', () => {
+      try {
+        const ts = video.audioTracks;
+        if (!ts || !ts.length) return;
+        for (let i = 0; i < ts.length; i++) {
+          if (esPista({ lang: ts[i].language, name: ts[i].label || ts[i].id })) ts[i].enabled = true;
+        }
+      } catch {}
+    }, { once: true });
+  }
+}
 function montarNativo(porProxy) {
   const v = $('#roomVideo');
   const usaProxy = !!porProxy || !!S.nativo.proxy;
@@ -385,6 +413,7 @@ function montarNativo(porProxy) {
     if (hlsOk) {
       const hls = new window.Hls({ maxBufferLength: 30 });
       S.nativo.hls = hls;
+      prefiereEspanol(v, hls); /* v94: audio español si lo hay */
       /* v92: si el directo no sirve (CORS del origen), re-servimos por
        * el proxy — igual que el modo Solo */
       hls.on(window.Hls.Events.ERROR, (ev, data) => {
@@ -400,6 +429,7 @@ function montarNativo(porProxy) {
       hls.attachMedia(v);
     } else {
       v.src = src; /* mp4 directo, o Safari con HLS nativo */
+      prefiereEspanol(v, null);
     }
     const alListo = () => {
       if (!S.nativo) return;
@@ -2784,6 +2814,7 @@ function montarSolo(d, viaProxy) {
     } else if (hlsOk) {
       const hls = new window.Hls({ maxBufferLength: 30 });
       SOLO.hls = hls;
+      prefiereEspanol(video, hls); /* v94: audio español si lo hay */
       /* v83: cuando llega el manifest sabemos qué calidades hay */
       hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
         try { $('#soloQ').textContent = 'Auto'; cerrarQMenuSolo(); pintarQMenuSolo(); } catch {}
@@ -2814,6 +2845,7 @@ function montarSolo(d, viaProxy) {
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
       /* Safari / iPhone: HLS nativo, sin hls.js */
       video.src = src;
+      prefiereEspanol(video, null);
     } else {
       toast('Tu navegador no reproduce este video — ábrelo en la pestaña Juntos');
       cerrarSolo();
