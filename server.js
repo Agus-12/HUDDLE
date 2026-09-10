@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v105'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v106'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1901,7 +1901,9 @@ async function extraerStreamwishPeli(pageUrl) {
     page.on('response', async (r) => {
       try {
         const u = r.url();
-        if (cap || !/\.m3u8(\?|$)/i.test(u) || !/hls2|sprintcdn/i.test(u)) return;
+        /* v106: también cfglobalcdn — los episodios detrás del reproductor
+         * propio del sitio (player.miscaricaturas.com) usan ese CDN */
+        if (cap || !/\.m3u8(\?|$)/i.test(u) || !/hls2|sprintcdn|cfglobalcdn/i.test(u)) return;
         const body = await r.text();
         if (/#EXTINF/.test(body) && /\.ts/i.test(body)) {
           cap = { body, url: u, ref: (r.request().headers() || {}).referer || '' };
@@ -1960,6 +1962,7 @@ async function resolverPelisxd(pageUrl) {
   pelisxdStreams.set(tok, { body: cap.body, base: cap.url, ref: cap.ref || 'https://f7hyg4q.org/', slug, at: ahora });
   /* los segmentos pasan por el proxy con el Referer del espejo que sirvió */
   try {
+    hlsReferers.set(new URL(cap.url).hostname, cap.ref || 'https://f7hyg4q.org/'); /* v106: host del playlist (segmentos relativos) */
     for (const u of cap.body.match(/https?:\/\/[^\s"']+\.ts[^\s"']*/gi) || []) {
       try { hlsReferers.set(new URL(u).hostname, cap.ref); } catch {}
     }
@@ -2202,10 +2205,27 @@ async function resolverCaricatura(epUrl) {
       return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
     }
   }
-  const cap = await extraerStreamwishPeli(CARI_BASE + slug + '/');
+  /* v106: si el capítulo no entrega video y su página es de MEGA, dilo claro
+   * (el chequeo va DESPUÉS del intento — el HTML crudo no muestra los players
+   * que se inyectan por JS y no hay que fiarse de él antes de intentar) */
+  let cap = null;
+  try {
+    cap = await extraerStreamwishPeli(CARI_BASE + slug + '/');
+  } catch (e) {
+    try {
+      const rPre = await fetchSeguro(CARI_BASE + slug + '/', 8000);
+      if (rPre && rPre.ok && /<iframe[^>]+src="https?:\/\/[^"]*mega\.nz/i.test(await rPre.text())) {
+        throw new Error('Ese capítulo solo está en MEGA — prueba otro capítulo');
+      }
+    } catch (e2) { if (/MEGA/.test(String(e2.message))) throw e2; }
+    throw e;
+  }
   const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
   pelisxdStreams.set(tok, { body: cap.body, base: cap.url, ref: cap.ref || 'https://f7hyg4q.org/', slug, at: ahora });
   try {
+    /* v106: el host del PROPIO playlist también lleva Referer — los playlists
+     * de cfglobalcdn traen segmentos relativos y no aparecen en el cuerpo */
+    hlsReferers.set(new URL(cap.url).hostname, cap.ref || 'https://player.miscaricaturas.com/');
     for (const u of cap.body.match(/https?:\/\/[^\s"']+\.ts[^\s"']*/gi) || []) {
       try { hlsReferers.set(new URL(u).hostname, cap.ref); } catch {}
     }
