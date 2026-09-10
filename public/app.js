@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v100';
+const APP_VERSION = 'v101';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -3269,7 +3269,7 @@ async function cargarPopulares() {
     const d = await r.json();
     /* v69: cada sección se muestra con lo que llegue — los animes (arriba)
      * no dependen de que las películas hayan cargado */
-    const hayAlgo = (d.results && d.results.length) || (d.series && d.series.length) || (d.animes && d.animes.length);
+    const hayAlgo = (d.results && d.results.length) || (d.series && d.series.length) || (d.animes && d.animes.length) || (d.generos && d.generos.length);
     if (!d.ok || !hayAlgo) { delete wrap.dataset.cargado; return; }
     const alTocar = (res) => () => {
       if (elegirTitulo(res)) return; /* v61: series → temporadas y episodios */
@@ -3298,6 +3298,43 @@ async function cargarPopulares() {
     if (wrapA && filaA && d.animes && d.animes.length) {
       d.animes.slice(0, 16).forEach((res) => filaA.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrapA.classList.remove('hidden');
+    }
+    /* v101: filas de GÉNERO — seis secciones que rotan cada día; cada una
+     * con su ícono y color, y las mismas tarjetas que todo el feed */
+    const wrapG = document.querySelector('#generosBox');
+    if (wrapG && d.generos && d.generos.length) {
+      const PALETA = ['var(--pink)', 'var(--amber)', 'var(--violet)', 'var(--cyan)', 'var(--green)'];
+      const SVG = (d2, color) => `<svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: ${color};">${d2}</svg>`;
+      const ICONOS = {
+        accion: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+        animacion: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>',
+        aventura: '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
+        belica: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+        'ciencia-ficcion': '<circle cx="12" cy="12" r="10"/><line x1="14.31" y1="8" x2="20.05" y2="17.94"/><line x1="9.69" y1="8" x2="21.17" y2="8"/><line x1="7.38" y1="12" x2="13.12" y2="2.06"/><line x1="9.69" y1="16" x2="3.95" y2="6.06"/><line x1="14.31" y1="16" x2="2.83" y2="16"/><line x1="16.62" y1="12" x2="10.88" y2="21.94"/>',
+        comedia: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>',
+        crimen: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+        documental: '<path d="m23 7-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>',
+        drama: '<rect x="2" y="2" width="20" height="20" rx="2.18"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5"/>',
+        familia: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+        fantasia: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+        historia: '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+        misterio: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+        musica: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+        romance: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
+        suspense: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+        terror: '<path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9"/><polyline points="13 11 9 17 15 17 11 23"/>',
+      };
+      d.generos.forEach((g, i) => {
+        if (!g.items || !g.items.length) return;
+        const sec = document.createElement('div');
+        sec.className = 'sr-sec';
+        sec.innerHTML =
+          `<div class="sr-sec-titulo">${SVG(ICONOS[g.slug] || ICONOS.drama, PALETA[i % PALETA.length])}<span>${g.nombre}</span></div>` +
+          '<div class="sr-fila"></div>';
+        const filaG = sec.querySelector('.sr-fila');
+        g.items.slice(0, 16).forEach((res) => filaG.appendChild(crearTarjetaResultado(res, alTocar(res))));
+        wrapG.appendChild(sec);
+      });
     }
   } catch {
     delete wrap.dataset.cargado; /* si falló, se reintenta la próxima vez */

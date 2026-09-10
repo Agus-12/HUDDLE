@@ -1,4 +1,4 @@
-/* E2E v98: PELISXD — el catálogo grande de películas (streamwish 1080p)
+/* E2E v101: FILAS DE GÉNERO — el feed más vivo: 6 géneros que rotan cada día
  * (servidores via POST /flv con ids en hex): búsqueda, episodios y
  * resolución nativa; respaldo cuando la versión de Latanime está
  * muerta + todo v96→v81. */
@@ -30,10 +30,10 @@ const ok = (cond, msg) => { console.log((cond ? '  ✔ ' : '  ✘ ') + msg); if 
   const css = fs.readFileSync('public/style.css', 'utf8');
   const js = fs.readFileSync('public/app.js', 'utf8');
   const srv = fs.readFileSync('server.js', 'utf8');
-  ok(srv.includes("const UI_VERSION = 'v98'"), 'servidor en v98');
-  ok(js.includes("const APP_VERSION = 'v98'"), 'cliente en v98');
-  ok(idx.includes('id="verBadge">v98'), 'badge v98');
-  ok(idx.includes('/app.js?v=98') && idx.includes('/style.css?v=98'), 'cache-busters v98');
+  ok(srv.includes("const UI_VERSION = 'v101'"), 'servidor en v101');
+  ok(js.includes("const APP_VERSION = 'v101'"), 'cliente en v101');
+  ok(idx.includes('id="verBadge">v101'), 'badge v101');
+  ok(idx.includes('/app.js?v=101') && idx.includes('/style.css?v=101'), 'cache-busters v101');
   /* hls.js vendored */
   const hlsStat = fs.statSync('public/hls.min.js');
   const hlsSrc = fs.readFileSync('public/hls.min.js', 'utf8');
@@ -136,6 +136,26 @@ const ok = (cond, msg) => { console.log((cond ? '  ✔ ' : '  ✘ ') + msg); if 
   ok(srv.includes('resolverPelisxd(target)') && srv.includes('resolverPelisxd(url)'), 'server: pelisxd enruta en solo Y en sala nativa');
   ok(js.includes('/^\\/api\\//.test(d.m3u8) ? d.m3u8') && js.includes('/^\\/api\\//.test(S.nativo.m3u8) ? S.nativo.m3u8'), 'JS: playlist local se monta directo (sin doble proxy), solo y sala');
   ok(js.includes("['Cuevana', 'PelisXD', 'Latanime']") && js.includes("name: 'PelisXD'"), 'JS: sección PelisXD en resultados + sitio con logo');
+  /* v99 — arranque rápido de series + póster a prueba de bala */
+  ok(srv.includes('return { m3u8, subs, proxy: true };') && srv.includes('43 s en arrancar'), 'server: goodstream SIEMPRE por el proxy (el directo fallaba y tardaba 43 s)');
+  ok(srv.includes('const pedirEmbed = async () => {') && srv.includes('3500'), 'server: 3 embeds en paralelo + sonda del m3u8 (nodo edge vivo)');
+  ok(srv.includes('c.poster ? 864e5 : 2 * 60 * 1000'), 'server: un póster fallido se cachea 2 min (antes 24 h de still)');
+  ok(srv.includes('\\/episode\\/[a-z0-9-]+-\\d+x\\d+/i.test(entry.url)'), 'server: saneo del póster por la URL del episodio al guardar (sin exigir serie/ep)');
+  ok(srv.includes('\\/episode\\/[a-z0-9-]+-\\d+x\\d+/i.test(e.url)'), 'server: saneo también al LEER (por URL, cubre entradas de sala)');
+  ok(js.includes('async function elegirModoSolo(d)') && js.includes('const sondeo = async (url)'), 'JS: sonda — carrera proxy vs directo antes de montar');
+  ok(js.includes('const otro = !SOLO.viaProxy;') && js.includes('const otro = !usaProxy;'), 'JS: fallo de red invierte el camino (proxy↔directo) en Solo y en sala');
+  /* v101 — filas de género en el feed */
+  ok(srv.includes('const GENEROS_ES = ['), 'server: catálogo de géneros en español');
+  ok(srv.includes('function generosDelDia()'), 'server: rotación diaria de 6 géneros');
+  ok(srv.includes('async function peliculasPorGenero(slug)'), 'server: listado por género (list-posts?category=)');
+  ok(srv.includes('Promise.all(generosDelDia().map'), 'server: los 6 géneros se piden EN PARALELO');
+  ok(idx.includes('id="generosBox"'), 'index: contenedor de las filas de género');
+  ok(js.includes('const ICONOS = {') && js.includes('const PALETA = ['), 'cliente: ícono y color por género');
+  /* v100 — el póster de verdad (WP API), nunca el still del episodio 1 */
+  ok(srv.includes('async function posterSerieWP(slug)'), 'server: póster de serie por el WP API (featured_image)');
+  ok(srv.includes('let poster = await posterSerieWP(slug);'), 'server: posterDeSerie pregunta PRIMERO al WP API');
+  ok(!srv.includes("(eps[0] ? eps[0].img : '')"), 'server: NADIE usa el still del episodio 1 como póster (el bug desde v95)');
+  ok(srv.includes("((og('og:image') || '').replace('/w780/', '/w342/') || await posterSerieWP(slug))"), 'server: datosSerieCuevana completa el póster con el WP API');
   /* v90 — modo Solo 100%: animes + pelis sin goodstream */
   ok(srv.includes('async function resolverAnime(') && srv.includes('/mp4upload\\./i.test(u)'), 'server: resolver de animes (mp4upload preferido)');
   ok(srv.includes('player\\.src\\(\\{') && srv.includes('video\\/mp4') && srv.includes('async function extraerMp4('), 'server: lee el mp4 directo del embed de mp4upload (extraerMp4, v97)');
@@ -145,7 +165,7 @@ const ok = (cond, msg) => { console.log((cond ? '  ✔ ' : '  ✘ ') + msg); if 
   ok(srv.includes('esEpAnime ? resolverAnime(target) : esPeliXd ? resolverPelisxd(target) : resolverSolo(target)') && srv.includes('mp4: !!r.mp4, proxy: !!r.proxy'), 'server: /api/solo enruta animes, pelisxd y pelis (v98)');
   ok(!js.includes("Los animes se ven en la pestaña Juntos"), 'JS: YA no mandamos los animes a Juntos');
   ok(js.includes('ep: esAn ? String(ep.ep || \'\')') && js.includes('abrirSolo(ep.url'), 'JS: episodio de anime abre en Solo con su cadena');
-  ok(js.includes('montarSolo(d, !!d.proxy)'), 'JS: arranca por el proxy cuando el origen lo exige');
+  ok(js.includes('montarSolo(d, await elegirModoSolo(d))'), 'JS: arranca por el camino que la sonda encontró vivo (v99)');
   ok(js.includes('if (d.mp4)') && js.includes('sin hls.js'), 'JS: el mp4 directo se monta en el <video> nativo');
   /* v91 — búsqueda en Solo + carátulas sin doble proxy */
   ok(js.includes('function imgPorProxy(') && js.includes("if (src.startsWith('/api/img')) return src;"), 'JS: imgPorProxy deja pasar lo ya proxieado (nunca dos veces)');
@@ -159,7 +179,7 @@ const ok = (cond, msg) => { console.log((cond ? '  ✔ ' : '  ✘ ') + msg); if 
   ok(srv.includes('file was deleted') && srv.includes('em.length < 500 && intento < 3'), 'server: mp4upload — detecta archivo borrado y reintenta el cuerpo racionado');
   ok(srv.includes('async function sirveElVideo(') && srv.includes('if (await sirveElVideo(m[1], mejor))'), 'server: verifica que el mp4 SIRVA antes de prometerlo');
   ok(srv.includes('async function resolverAnimePorNavegador(') && srv.includes('hlsReferers.has(h)'), 'server: fallback por navegador + hosts dinámicos en el proxy');
-  ok(srv.includes('intento < 3 && !m3u8'), 'server: goodstream reintenta también el cuerpo SIN m3u8 (Conclave)');
+  ok(srv.includes('if (!m3u8) return null; /* cuerpo racionado (v93) */'), 'server: goodstream reintenta también el cuerpo SIN m3u8 (Conclave)');
   ok(srv.includes('caídos en Latanime'), 'server: mensaje honesto cuando todos los servidores están muertos');
   /* v94 — audio español */
   ok(js.includes('function prefiereEspanol(') && js.includes('prefiereEspanol(video, hls)') && js.includes('prefiereEspanol(v, hls)'), 'JS: elige la pista de audio español (Solo y sala)');
@@ -181,7 +201,7 @@ const ok = (cond, msg) => { console.log((cond ? '  ✔ ' : '  ✘ ') + msg); if 
   ok(js.includes('if (st.videoUrl && st.native) activarNativo(st);'), 'JS: el estado de la sala enciende lo nativo');
   ok(js.includes('function ocultarPeliLoadingSuave()') && js.includes('5000 - (Date.now() - (S.peliLoadingAt || 0))'), 'JS: la pantalla de carga dura mínimo 5 segundos');
   ok(js.includes("if (S.nativo) sendAction({ type: S.nativo.isPlaying ? 'pause' : 'play' })"), 'JS: tocar la pantalla pausa/reanuda por el reloj');
-  ok(js.includes('montarNativo(true)') && js.includes('Conectando por el servidor'), 'JS: si el directo falla (CORS), remonta por el proxy');
+  ok(js.includes('montarNativo(otro)') && js.includes('Conectando por el servidor'), 'JS: si un camino falla, remonta por el otro (proxy↔directo, v99)');
   ok(idx.includes('id="roomVideo"') && css.includes('#roomVideo {'), 'HTML/CSS: el video nativo vive en el marco del espejo');
 
   /* ---------- 0b) APIs v81/v83 ---------- */
@@ -200,8 +220,13 @@ const ok = (cond, msg) => { console.log((cond ? '  ✔ ' : '  ✘ ') + msg); if 
   ok(!!soloX && soloX.status === 403, '/api/solo exige perfil (403)');
   if (cdnOK) {
     ok(!!solo && solo.ok === true, '/api/solo resuelve la peli SIN navegador');
-    ok(!!solo && /goodstream\.one\/.*\.m3u8/i.test(solo.m3u8 || ''), `m3u8 goodstream (${solo ? (solo.m3u8 || '').slice(8, 60) + '…' : '—'})`);
-    ok(!!solo && (solo.subs || []).length >= 1, `/api/solo trae subtítulos (${solo ? (solo.subs || []).length : 0} VTT)`);
+    /* v99: goodstream verificado… o su respaldo vimeos si los edges andan
+     * caídos — ambos son éxito */
+    const porGS = /goodstream\.one\/.*\.m3u8/i.test(solo.m3u8 || '');
+    const porVim = /vimeos\./i.test(solo.m3u8 || '');
+    ok(porGS || porVim, 'm3u8 goodstream' + (porGS ? '' : ' → respaldo VIMEOS (goodstream racionando)') + ' (' + ((solo && solo.m3u8) || '').slice(8, 55) + '…)');
+    ok(solo && solo.proxy === true, 'llega listo para el proxy (v99: sin maratón de hls.js)');
+    if (porGS) ok(!!solo && (solo.subs || []).length >= 1, `/api/solo trae subtítulos (${solo ? (solo.subs || []).length : 0} VTT)`);
   }
   /* v90: peli SIN goodstream → vimeos (HLS escondido en un eval) */
   const qsV = 'name=' + encodeURIComponent(login.name) + '&tok=' + encodeURIComponent(login.token) + '&url=' + encodeURIComponent(PELI_SIN_GOODSTREAM);
@@ -244,6 +269,38 @@ const ok = (cond, msg) => { console.log((cond ? '  ✔ ' : '  ✘ ') + msg); if 
   } else {
     console.log('  · pelisxd sin resultados en este momento — checks en vivo omitidos');
   }
+  /* v101 en vivo: /api/trending trae las filas de género */
+  const trend1 = await fetch(BASE + '/api/trending').then((r) => r.json()).catch(() => null);
+  const genTrend = (trend1 && trend1.generos) || [];
+  ok(trend1 && trend1.ok && genTrend.length >= 3, 'el feed trae filas de género (' + genTrend.length + ')');
+  ok(genTrend.every((g) => g.nombre && g.items && g.items.length >= 8), 'cada fila de género tiene nombre y contenido');
+  ok(genTrend.every((g) => g.items.every((it) => it.title && it.img && /cine-calidad\.mx\/(pelicula|serie)\//.test(it.url) && it.site === 'Cuevana')), 'las tarjetas de género tienen título, póster, URL válida y sitio');
+  const trend2 = await fetch(BASE + '/api/trending').then((r) => r.json()).catch(() => null);
+  ok(JSON.stringify((trend2 || {}).generos || []) === JSON.stringify(genTrend), 'la rotación del día es estable (misma elección en ambas llamadas)');
+  /* v100 en vivo: el póster de /api/serie es el DE LA SERIE, no el still del 1x1 */
+  const serieF = await fetch(BASE + '/api/serie/fundacion').then((r) => r.json()).catch(() => null);
+  const still1x1 = (serieF && serieF.episodios && serieF.episodios[0] && serieF.episodios[0].img) || 'STILL_';
+  ok(!!serieF && !!serieF.poster && serieF.poster !== still1x1, 'el póster de la serie DIFIERE del still del episodio 1 (' + (serieF ? (serieF.poster || '').slice(30, 55) : '—') + ' ≠ ' + still1x1.slice(30, 55) + ')');
+  /* v99 en vivo: episodio de serie — goodstream verificado, proxy, y rápido */
+  const qsE = 'name=' + encodeURIComponent(login.name) + '&tok=' + encodeURIComponent(login.token) + '&url=' + encodeURIComponent('https://cine-calidad.mx/episode/fundacion-1x2/');
+  const t0E = Date.now();
+  const soloE = await fetch(BASE + '/api/solo?' + qsE).then((r) => r.json()).catch(() => null);
+  if (soloE && soloE.ok) {
+    ok(soloE.proxy === true, 'episodio de serie resuelve listo para el proxy (sin maratón de hls.js)');
+    ok(Date.now() - t0E < 25000, 'resolver del episodio en menos de 25 s (' + ((Date.now() - t0E) / 1000).toFixed(1) + ' s — antes 43 s solo en arrancar)');
+    const mE = await fetch(BASE + '/api/hls?u=' + encodeURIComponent(soloE.m3u8)).catch(() => null);
+    const mT = mE ? await mE.text() : '';
+    ok(!!mE && mE.ok && /#EXTM3U/.test(mT), 'el m3u8 del episodio SIRVE por el proxy (sondeado antes de prometer)');
+  } else {
+    ok(false, 'episodio de serie responde (got: ' + JSON.stringify(soloE || {}).slice(0, 80) + ')');
+  }
+  /* v99 en vivo: entrada de sala VIEJA (sin serie/ep, still como img) → saneada al leer
+   * (usuario aparte: no contaminar la fila por pestañas del usuario A) */
+  const loginSala = await fetch(BASE + '/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Sala' + String(Date.now()).slice(-6) }) }).then((r) => r.json()).catch(() => null);
+  await fetch(BASE + '/api/progress', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: loginSala.name, token: loginSala.token, url: 'https://cine-calidad.mx/episode/fundacion-1x3/', t: 300, d: 2700, title: 'Still del capítulo', img: 'https://image.tmdb.org/t/p/w342/STILL_DEL_CAPITULO.jpg', modo: '' }) });
+  const contSala = await fetch(BASE + '/api/continue?name=' + encodeURIComponent(loginSala.name) + '&tok=' + encodeURIComponent(loginSala.token)).then((r) => r.json()).catch(() => null);
+  const entSala = contSala && (contSala.items || []).find((e) => /fundacion-1x3/.test(e.url));
+  ok(!!entSala && !/STILL_DEL_CAPITULO/.test(entSala.img || '') && (entSala.img || '') === (serieF && serieF.poster || ''), 'entrada vieja de sala (sin serie/ep) saneada al PÓSTER de la serie');
   const hlsX = await fetch(BASE + '/api/hls?u=' + encodeURIComponent('https://www.google.com/video.m3u8')).catch(() => null);
   ok(!!hlsX && hlsX.status === 403, '/api/hls rechaza hosts fuera de goodstream (403)');
   /* el proxy sirve y reescribe nuestro m3u8 LOCAL (determinista) */
@@ -310,6 +367,14 @@ const ok = (cond, msg) => { console.log((cond ? '  ✔ ' : '  ✘ ') + msg); if 
   }, login.name, login.token);
   await pA.reload({ waitUntil: 'networkidle2' });
   await pA.waitForSelector('#trendingBox:not(.hidden)', { timeout: 30000 });
+  await pA.waitForSelector('#generosBox .sr-sec', { timeout: 30000 });
+  const generosUI = await pA.evaluate(() => [...document.querySelectorAll('#generosBox .sr-sec')].map((s) => ({
+    titulo: (s.querySelector('.sr-sec-titulo span') || {}).textContent || '',
+    icono: !!s.querySelector('.sr-sec-titulo svg'),
+    cards: s.querySelectorAll('.sr-fila > *').length,
+  })));
+  ok(generosUI.length >= 3, 'el feed muestra filas de género (' + generosUI.length + ': ' + generosUI.slice(0, 3).map((g) => g.titulo).join(', ') + '…)');
+  ok(generosUI.every((g) => g.icono && g.cards >= 8), 'cada fila de género tiene su ícono y tarjetas');
 
   /* v87: pestañas Salas / Juntos / Solo */
   const tabInfo = await pA.evaluate(() => ({
@@ -918,7 +983,7 @@ const ok = (cond, msg) => { console.log((cond ? '  ✔ ' : '  ✘ ') + msg); if 
   /* ---------- v94: las series suenan en ESPAÑOL ---------- */
   console.log('— v94: audio español —');
   const fund = await fetch(BASE + '/api/solo?' + qsSolo(FUNDACION)).then((r) => r.json()).catch(() => null);
-  ok(fund && fund.ok && /goodstream/i.test(fund.m3u8 || ''), 'Fundación 1x1 resuelve (goodstream, con pista en/ES)');
+  ok(fund && fund.ok && /(goodstream|vimeos)/i.test(fund.m3u8 || ''), 'Fundación 1x1 resuelve (goodstream, o vimeos si raciona — v99)');
   if (fund && fund.ok) {
     await pA.evaluate((u) => { abrirSolo(u, { title: 'Fundación', serie: 'Fundación', ep: '1x1', eps: [{ url: u, ep: '1x1' }] }); }, FUNDACION);
     await pA.waitForSelector('#soloPlayer:not(.hidden)', { timeout: 15000 });

@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v100'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v101'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1656,6 +1656,48 @@ async function seriesRecientes() {
   return items;
 }
 
+/* v101: filas de GÉNERO — el feed se ve más vivo: además de populares,
+ * series y animes, seis géneros que rotan cada día (de los 17 en español
+ * que trae el API de cuevana). Cada fila mezcla pelis y series del género */
+const GENEROS_ES = [
+  ['accion', 'Acción'], ['animacion', 'Animación'], ['aventura', 'Aventura'],
+  ['belica', 'Bélica'], ['ciencia-ficcion', 'Ciencia ficción'], ['comedia', 'Comedia'],
+  ['crimen', 'Crimen'], ['documental', 'Documental'], ['drama', 'Drama'],
+  ['familia', 'Familia'], ['fantasia', 'Fantasía'], ['historia', 'Historia'],
+  ['misterio', 'Misterio'], ['musica', 'Música'], ['romance', 'Romance'],
+  ['suspense', 'Suspense'], ['terror', 'Terror'],
+];
+const generosCache = new Map(); /* slug → {at, items} */
+function generosDelDia() {
+  /* rotación diaria determinista: 6 géneros barajados por la fecha —
+   * mañana el feed se ve distinto sin tocar nada */
+  const dia = Math.floor(Date.now() / 864e5);
+  return GENEROS_ES
+    .map((g, i) => ({ g, k: ((i * 2654435761 + dia * 40503) >>> 0) % 9973 }))
+    .sort((a, b) => a.k - b.k)
+    .slice(0, 6)
+    .map((x) => x.g);
+}
+async function peliculasPorGenero(slug) {
+  const c = generosCache.get(slug);
+  if (c && Date.now() - c.at < 60 * 60 * 1000 && c.items.length) return c.items;
+  const r = await fetchSeguro(`https://cine-calidad.mx/wp-json/mycustom/v1/list-posts?category=${slug}&page=1`, 10000);
+  if (!r.ok) return [];
+  const d = await r.json().catch(() => ({}));
+  const items = (d.posts || []).slice(0, 18).map((p) => ({
+    title: String(p.title || ''),
+    url: p.type === 'serie' ? `https://cine-calidad.mx/serie/${p.slug}` : `https://cine-calidad.mx/pelicula/${p.slug}/`,
+    img: String(p.featured_image || '').replace('/w780/', '/w342/'),
+    site: 'Cuevana',
+    extra: [
+      String(p.date || '').slice(0, 4),
+      p.rating ? `★ ${(+p.rating).toFixed(1)}` : '',
+    ].filter(Boolean).join(' · '),
+  })).filter((x) => x.title && x.img);
+  if (items.length) generosCache.set(slug, { at: Date.now(), items });
+  return items;
+}
+
 /* v67: animes del momento — los "animes de estreno" de Latanime (en emisión),
  * con sus carátulas, para la fila de animes en el inicio */
 const animesCache = { at: 0, items: [] };
@@ -2478,13 +2520,22 @@ const server = http.createServer(async (req, res) => {
       }
     }
     if (url.pathname === '/api/trending' && req.method === 'GET') {
-      /* v55: populares del día + v57: series recién agregadas */
-      const [day, series, animes] = await Promise.all([
+      /* v55: populares del día + v57: series recién agregadas
+       * v101: + 6 filas de género que rotan cada día */
+      const [day, series, animes, generos] = await Promise.all([
         popularesDeHoy().catch(() => []),
         seriesRecientes().catch(() => []),
         animesDelMomento().catch(() => []), /* v67: animes del momento (Latanime) */
+        Promise.all(generosDelDia().map(([slug, nombre]) =>
+          peliculasPorGenero(slug)
+            .then((items) => ({ slug, nombre, items }))
+            .catch(() => ({ slug, nombre, items: [] }))
+        )),
       ]);
-      return json(res, 200, { ok: true, results: day, series, animes });
+      return json(res, 200, {
+        ok: true, results: day, series, animes,
+        generos: (generos || []).filter((g) => g.items && g.items.length),
+      });
     }
     if (url.pathname.startsWith('/api/serie/')) {
       /* v61: temporadas y episodios de una serie (para elegirla bonito) */
