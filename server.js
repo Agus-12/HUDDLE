@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v99'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v100'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -286,6 +286,22 @@ const MIRROR_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 
 
 /* v74: datos de una serie de Cuevana (temporadas y episodios) — los usa
  * el selector (/api/serie) y los botones de siguiente/anterior episodio */
+/* v100: póster REAL de una serie por el WP API de cine-calidad — la página
+ * de la serie NO trae og:image y el viejo fallback era el STILL del
+ * episodio 1 (por eso las tarjetas salían con la foto del capítulo).
+ * El featured_image del post tipo "series" es el póster vertical bueno. */
+async function posterSerieWP(slug) {
+  try {
+    if (!/^[a-z0-9-]{2,90}$/.test(slug)) return '';
+    const r = await fetchSeguro('https://cine-calidad.mx/wp-json/mycustom/v1/search/?s=' + encodeURIComponent(slug.replace(/-/g, ' ')) + '&page=1', 9000);
+    if (!r.ok) return '';
+    const d = await r.json().catch(() => ({}));
+    const posts = d.posts || [];
+    const p = posts.find((x) => x.slug === slug && x.type === 'series') || posts.find((x) => x.slug === slug);
+    return p && p.featured_image ? String(p.featured_image).replace('/w780/', '/w342/') : '';
+  } catch { return ''; }
+}
+
 async function datosSerieCuevana(slug) {
   const c = serieCache.get(slug);
   if (c && Date.now() - c.at < 30 * 60 * 1000) return c.d;
@@ -314,7 +330,9 @@ async function datosSerieCuevana(slug) {
     const out = {
       ok: true, slug,
       titulo: (og('og:title') || slug).replace(/\s*[-–|].*$/, '').trim().slice(0, 80),
-      poster: (og('og:image') || (eps[0] ? eps[0].img : '')).replace('/w780/', '/w342/'),
+      /* v100: el póster sale del WP API — la página no trae og:image y el
+       * viejo fallback (eps[0].img) era el STILL del episodio 1 */
+      poster: ((og('og:image') || '').replace('/w780/', '/w342/') || await posterSerieWP(slug)),
       episodios: eps,
     };
     serieCache.set(slug, { at: Date.now(), d: out });
@@ -332,9 +350,15 @@ async function posterDeSerie(slug) {
     if (c && Date.now() - c.ts < (c.poster ? 864e5 : 2 * 60 * 1000)) return c.poster || '';
     /* v99: un fallo (póster vacío) se cachea solo 2 minutos — antes quedaba
      * envenenado un DÍA y el still del capítulo seguía apareciendo aunque
-     * el sitio ya respondiera */
-    const d = await datosSerieCuevana(slug);
-    const poster = (d && d.poster) || '';
+     * el sitio ya respondiera.
+     * v100: primero el WP API (featured_image del post de la serie, el
+     * póster de verdad) — la página de la serie no trae og:image y su
+     * "poster" era el still del episodio 1 */
+    let poster = await posterSerieWP(slug);
+    if (!poster) {
+      const d = await datosSerieCuevana(slug).catch(() => null);
+      poster = (d && d.poster) || '';
+    }
     postersSeries.set(slug, { poster, ts: Date.now() });
     return poster;
   } catch { return ''; }
