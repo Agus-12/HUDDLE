@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v103';
+const APP_VERSION = 'v104';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1213,7 +1213,7 @@ function abrirCaricaturasPicker(res, enSala) {
       $('#spMeta').textContent = '';
       return;
     }
-    spDatos = { ...d, esAnime: false, sinImg: true, episodios: eps, enSala: !!enSala, posterBase: proxyAnimeImg(d.poster || res.img, 400) };
+    spDatos = { ...d, esAnime: false, sinImg: true, episodios: eps, enSala: !!enSala, posterBase: proxyAnimeImg(d.cover || d.poster || res.img, 400) }; /* v104: portada curada primero */
     $('#spTitle').textContent = d.titulo || res.title || '';
     $('#spMeta').textContent = eps.length + ' episodios';
     if (spDatos.posterBase) { po.src = spDatos.posterBase; po.style.display = ''; }

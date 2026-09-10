@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v103'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v104'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1994,20 +1994,71 @@ function cariLimpia(t) {
 }
 
 /* título (h1) y póster de una serie — una sola descarga de la página */
+/* v104: portadas CURADAS — archivos locales en public/covers/{slug}.jpg para
+ * las series cuya página no tiene ningún póster (Simpsons, Futurama, Oye
+ * Arnold, Dexter, Coraje, Daria, Sabrina, Kenan y Kel). Se leen del disco al
+ * arrancar: agrega un .jpg ahí y reinicia. */
+const CARI_PORTADAS = new Map();
+try {
+  for (const f of fs.readdirSync(path.join(__dirname, 'public', 'covers'))) {
+    const m = /^([a-z0-9-]{2,90})\.(jpe?g|png|webp)$/i.exec(f);
+    if (m) CARI_PORTADAS.set(m[1], '/covers/' + f);
+  }
+} catch {}
+
+/* v104: la home del sitio solo trae miniaturas de 250px y la página de cada
+ * serie a veces solo tiene los banners del widget de «relacionados» (crp).
+ * Este extractor elige la portada de verdad: og:image → primera imagen de
+ * wp-content que NO sea del widget ni una miniatura -150x124 */
+function cariPosterDeHtml(html) {
+  const og = /property="og:image" content="(https:\/\/miscaricaturas\.com\/wp-content\/uploads\/[^"]+)"/i.exec(html);
+  if (og) return og[1];
+  for (const m of html.matchAll(/data-src="(https:\/\/miscaricaturas\.com\/wp-content\/uploads\/[^"]+)"/gi)) {
+    const url = m[1];
+    const ctx = html.slice(Math.max(0, m.index - 300), m.index);
+    if (/crp_|crp-thumb|related/i.test(ctx)) continue; /* widget de relacionados */
+    if (/-\d{2,3}x\d{2,3}\.(jpe?g|png|webp)$/i.test(url)) continue; /* miniatura pequeña */
+    return url;
+  }
+  return null;
+}
+
+/* v104: listado de la home (slug → {img, alt}) — la imagen propia de cada
+ * serie en el catálogo, para respaldo cuando la página no tiene póster */
+const cariHome = { at: 0, items: new Map() }; /* 6 h */
+async function cariHomeImgs() {
+  if (Date.now() - cariHome.at < 6 * 3600 * 1000 && cariHome.items.size) return cariHome.items;
+  const r = await fetchSeguro(CARI_BASE, 10000);
+  if (!r.ok) return cariHome.items;
+  const html = await r.text();
+  const art = (/<article[\s\S]*?<\/article>/i.exec(html) || [''])[0];
+  const out = new Map();
+  for (const m of art.matchAll(/<p><a href="https:\/\/miscaricaturas\.com\/([a-z0-9-]+)\/"[^>]*>\s*<img[^>]*data-src="(https:[^"]+)"[^>]*alt="([^"]*)"/gi)) {
+    if (!out.has(m[1])) out.set(m[1], { img: m[2], alt: m[3] });
+  }
+  if (out.size) { cariHome.items = out; cariHome.at = Date.now(); }
+  return out;
+}
+
 async function cariMetaDe(slug) {
   try {
     const c = cariMeta.get(slug);
     if (c && Date.now() - c.at < 6 * 3600 * 1000) return c;
     const r = await fetchSeguro(CARI_BASE + slug + '/', 10000);
-    if (!r.ok) return null;
-    const html = await r.text();
+    const html = r && r.ok ? await r.text() : '';
     const h1 = (/<h1[^>]*>([^<]+)<\/h1>/i.exec(html) || [])[1];
-    const pm = /data-src="(https:\/\/miscaricaturas\.com\/wp-content\/uploads\/[^"]+)"/i.exec(html)
-      || /<img[^>]+src="(https:\/\/miscaricaturas\.com\/wp-content\/uploads\/[^"]+)"/i.exec(html);
+    /* v104: póster de verdad (og:image o el bueno de la página); si la serie
+     * no tiene, la miniatura de su entrada en la home del sitio */
+    let poster = html ? cariPosterDeHtml(html) : null;
+    if (!poster) {
+      const home = await cariHomeImgs();
+      poster = ((home.get(slug) || {}).img) || '';
+    }
     const out = {
       at: Date.now(),
       titulo: cariLimpia(h1 || cariBonito(slug)).slice(0, 80),
-      poster: pm ? pm[1] : '',
+      poster,
+      cover: CARI_PORTADAS.get(slug) || '', /* v104: portada curada local */
     };
     cariMeta.set(slug, out);
     return out;
@@ -2030,31 +2081,48 @@ async function buscarMiscaricaturas(q) {
     }
     const items = await Promise.all(series.map(async (s) => {
       const meta = await cariMetaDe(s.slug).catch(() => null);
-      return { title: meta && meta.titulo ? meta.titulo : s.title, url: CARI_BASE + s.slug + '/', img: meta ? meta.poster : '', site: 'Caricaturas' };
+      return { title: meta && meta.titulo ? meta.titulo : s.title, url: CARI_BASE + s.slug + '/', img: meta ? (meta.cover || meta.poster) : '', site: 'Caricaturas' }; /* v104: portada curada primero */
     }));
     return items.filter((x) => x.title && x.url);
   } catch { return []; }
 }
 
 /* fila del feed: las series de la portada, con póster de su página */
+/* v104: la fila de Caricaturas — las clásicas primero y con portada de
+ * verdad: portada curada local → póster de la página de la serie → la
+ * miniatura de la home. Nunca más banners del widget de relacionados */
+const CARI_ORDEN = [
+  'bob-esponja-capitulos-completos', 'hora-de-aventura-capitulos-completos', 'el-chavo-del-8-capitulos-completoss',
+  'rick-y-morty-capitulos-completos', 'south-park', 'los-simpsons', 'phineas-y-ferb-capitulos-completos',
+  'los-padrinos-magicos-capitulos-completos', 'ben-10-capitulos-completos', 'danny-phantom-capitulos-completos',
+  'jimmy-neutron-capitulos-completos', 'oye-arnold', 'el-laboratorio-de-dexter-capitulos-completos',
+  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos', 'coraje-el-perro-cobarde-latino', 'futurama-latino',
+  '31-minutos-capitulos-y-canciones', 'daria-capitulos-completos', 'sabrina-la-bruja-adolescente-latino',
+  'un-show-mas-capitulos-completos', 'invasor-zim-temporada-1', 'las-chicas-superpoderosas-capitulos-completos',
+  'johnny-bravo-capitulos-completos', 'samurai-jack-temporada-1', 'kenan-y-kel-latino', 'mucha-lucha-capitulos-completos',
+  'mansion-foster-para-amigos-imaginarios-capitulos-completos', 'escuadron-del-tiempo-capitulos-completos',
+  'ozzy-y-drix-capitulos-completos', 'la-pantera-rosa-capitulos-completos', 'rocket-power-capitulos-completos',
+  'gallo-claudio-capitulos-completos', 'la-vaca-y-el-pollito-capitulos-completos', 'los-chicos-del-barrio-capitulos-completos',
+  'megas-xlr-capitulos-completos', 'monstruos-de-verdad-latino', 'soy-la-comadreja-latino',
+];
 async function caricaturasDestacadas() {
   if (Date.now() - cariFeedCache.at < 60 * 60 * 1000 && cariFeedCache.items.length) return cariFeedCache.items;
-  const r = await fetchSeguro(CARI_BASE, 10000);
-  if (!r.ok) return cariFeedCache.items;
-  const html = await r.text();
-  const vistos = new Set();
-  const slugs = [];
-  for (const m of html.matchAll(/href="(https:\/\/miscaricaturas\.com\/([a-z0-9-]+)\/?)"/gi)) {
-    const slug = m[2].toLowerCase();
-    if (!cariEsSerie(slug) || vistos.has(slug)) continue;
-    vistos.add(slug);
-    slugs.push(slug);
-    if (slugs.length >= 18) break;
-  }
+  const home = await cariHomeImgs();
+  if (!home.size) return cariFeedCache.items;
+  const enHome = [...home.keys()];
+  const slugs = [
+    ...CARI_ORDEN.filter((s) => home.has(s)),
+    ...enHome.filter((s) => !CARI_ORDEN.includes(s) && cariEsSerie(s)),
+  ].slice(0, 16);
   if (!slugs.length) return cariFeedCache.items;
   const items = (await Promise.all(slugs.map(async (slug) => {
     const meta = await cariMetaDe(slug).catch(() => null);
-    return { title: (meta && meta.titulo) || cariBonito(slug), url: CARI_BASE + slug + '/', img: meta ? meta.poster : '', site: 'Caricaturas' };
+    const h = home.get(slug) || {};
+    const img = (meta && (meta.cover || meta.poster)) || h.img || '';
+    return {
+      title: (meta && meta.titulo) || cariLimpia(h.alt || cariBonito(slug)),
+      url: CARI_BASE + slug + '/', img, site: 'Caricaturas',
+    };
   }))).filter((x) => x.title && x.img);
   if (items.length) { cariFeedCache.at = Date.now(); cariFeedCache.items = items; }
   return items;
@@ -2084,7 +2152,14 @@ async function datosCaricatura(slug) {
     if (!r.ok) return null;
     const html = await r.text();
     const h1 = (/<h1[^>]*>([^<]+)<\/h1>/i.exec(html) || [])[1];
-    const pm = /data-src="(https:\/\/miscaricaturas\.com\/wp-content\/uploads\/[^"]+)"/i.exec(html);
+    /* v104: póster de verdad — og:image o la imagen buena de la página;
+     * si la serie no tiene, la miniatura de su entrada en la home */
+    let poster = cariPosterDeHtml(html);
+    if (!poster) {
+      const home = await cariHomeImgs();
+      poster = ((home.get(slug) || {}).img) || '';
+    }
+    const cover = CARI_PORTADAS.get(slug) || '';
     let eps = await cariEpsDeHtml(html);
     /* v103: posts de temporada de ESTA serie (la base es el slug sin la
      * cola «-capitulos-completos»), en paralelo */
@@ -2106,11 +2181,12 @@ async function datosCaricatura(slug) {
     const out = {
       ok: true, slug,
       titulo: cariLimpia(h1 || cariBonito(slug)).slice(0, 80),
-      poster: pm ? pm[1] : '',
+      poster,
+      cover, /* v104: portada curada local (si existe) */
       episodios: eps,
     };
     cariDatos.set(slug, { at: Date.now(), d: out });
-    if (h1 || pm) cariMeta.set(slug, { at: Date.now(), titulo: out.titulo, poster: out.poster });
+    if (h1 || poster) cariMeta.set(slug, { at: Date.now(), titulo: out.titulo, poster: out.poster, cover });
     return out;
   } catch { return null; }
 }
@@ -2667,7 +2743,7 @@ const server = http.createServer(async (req, res) => {
       const iu = url.searchParams.get('u') || '';
       let host = '';
       try { host = new URL(iu).hostname; } catch {}
-      if (!/^(www\.|vww\.)?(latanime\.org|animeflv\.one)$/i.test(host)) {
+      if (!/^(www\.|vww\.)?(latanime\.org|animeflv\.one|miscaricaturas\.com)$/i.test(host)) {
         return json(res, 403, { ok: false, error: 'Host no permitido' });
       }
       const key = iu.split('?')[0];
@@ -2899,6 +2975,23 @@ const server = http.createServer(async (req, res) => {
           const sl = (/\/episode\/([a-z0-9-]+)-\d+x\d+(?:\/|$)/i.exec(e.url) || [])[1];
           const po = sl && mapa.get(sl);
           if (po) e.img = po;
+        }
+      }
+      /* v104: caricaturas — las entradas de episodios muestran el PÓSTER de la
+       * serie (portada curada o la de su página), como los animes; arregla las
+       * entradas viejas que quedaron con el recuadro sin imagen */
+      const porSanearC = [...new Set(items
+        .filter((e) => /miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}/i.test(e.url))
+        .map((e) => (/miscaricaturas\.com\/([a-z0-9-]+)-\d{2}x\d{2}/i.exec(e.url) || [])[1])
+        .filter(Boolean))];
+      if (porSanearC.length) {
+        const metas = await Promise.all(porSanearC.map((sl) => cariMetaDe(sl).catch(() => null)));
+        const mapaC = new Map(porSanearC.map((sl, i) => [sl, metas[i]]));
+        for (const e of items) {
+          if (!/miscaricaturas\.com\//i.test(e.url)) continue;
+          const sl = (/miscaricaturas\.com\/([a-z0-9-]+)-\d{2}x\d{2}/i.exec(e.url) || [])[1];
+          const mt = sl && mapaC.get(sl);
+          if (mt && (mt.cover || mt.poster)) e.img = mt.cover || mt.poster;
         }
       }
       return json(res, 200, { ok: true, items });
