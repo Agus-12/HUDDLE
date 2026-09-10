@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v101'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v102'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -219,6 +219,7 @@ function stateOf(room) {
 async function resolverNativo(url) {
   if (/latanime\.org\/ver\//i.test(url)) return resolverAnime(url);
   if (/pelisxd\.com\/pelicula\//i.test(url)) return resolverPelisxd(url); /* v98 */
+  if (/miscaricaturas\.com\//i.test(url)) return resolverCaricatura(url); /* v102 */
   return resolverSolo(url);
 }
 
@@ -1967,6 +1968,154 @@ async function resolverPelisxd(pageUrl) {
   return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
 }
 
+/* v102: CARICATURAS — Mis Caricaturas (miscaricaturas.com): las series
+ * clásicas de nick/CN en latino (Bob Esponja, Hora de Aventura, Billy
+ * y Mandy, Padrinos Mágicos…). Los capítulos viven en un embed de la
+ * familia streamwish con reto PoW — el mismo truco que PelisXD: el
+ * navegador del servidor lo resuelve y captura el playlist sprintcdn. */
+const CARI_BASE = 'https://miscaricaturas.com/';
+const cariMeta = new Map();   /* slug → {at, titulo, poster} — 6 h */
+const cariDatos = new Map();  /* slug → {at, d} — 30 min */
+const cariFeedCache = { at: 0, items: [] }; /* 1 h */
+function cariSlugDe(u) { return ((/miscaricaturas\.com\/([a-z0-9-]+)/i.exec(u || '') || [])[1] || '').toLowerCase(); }
+function cariEsSerie(slug) { return !!slug && !/temporada/i.test(slug) && !/\d{2}x\d{2}/i.test(slug); }
+function cariBonito(slug) { return slug.replace(/-+/g, ' ').replace(/\b(capitulos completos|completos|ver|latino|online)\b/gi, '').trim(); }
+/* v102: el h1 a veces trae entidades y colas («– Capítulos completos»,
+ * «| Español latino») — se decodifican y se cortan */
+function cariLimpia(t) {
+  return String(t || '')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(+n))
+    .replace(/&[a-z]+;/gi, ' ')
+    .replace(/\s*[|–—-]\s*(cap[ií]tulos?|espa[nñ]ol|latino|online|completos?|temp\w*).*$|\s+\|\s+.*$/i, '')
+    .replace(/\s*cap[ií]tulos?(\s+y\s+canciones)?(\s+completos?)?\s*$/i, '')
+    .replace(/\s*[|–—-]\s*$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/* título (h1) y póster de una serie — una sola descarga de la página */
+async function cariMetaDe(slug) {
+  try {
+    const c = cariMeta.get(slug);
+    if (c && Date.now() - c.at < 6 * 3600 * 1000) return c;
+    const r = await fetchSeguro(CARI_BASE + slug + '/', 10000);
+    if (!r.ok) return null;
+    const html = await r.text();
+    const h1 = (/<h1[^>]*>([^<]+)<\/h1>/i.exec(html) || [])[1];
+    const pm = /data-src="(https:\/\/miscaricaturas\.com\/wp-content\/uploads\/[^"]+)"/i.exec(html)
+      || /<img[^>]+src="(https:\/\/miscaricaturas\.com\/wp-content\/uploads\/[^"]+)"/i.exec(html);
+    const out = {
+      at: Date.now(),
+      titulo: cariLimpia(h1 || cariBonito(slug)).slice(0, 80),
+      poster: pm ? pm[1] : '',
+    };
+    cariMeta.set(slug, out);
+    return out;
+  } catch { return null; }
+}
+
+async function buscarMiscaricaturas(q) {
+  try {
+    const r = await fetchSeguro(CARI_BASE + '?s=' + encodeURIComponent(q), 10000);
+    if (!r.ok) return [];
+    const html = await r.text();
+    const vistos = new Set();
+    const series = [];
+    for (const m of html.matchAll(/<h2 class="entry-title[^"]*"><a href="(https:\/\/miscaricaturas\.com\/[a-z0-9-]+\/?)"[^>]*>([^<]+)<\/a>/gi)) {
+      const slug = cariSlugDe(m[1]);
+      if (!cariEsSerie(slug) || vistos.has(slug)) continue;
+      vistos.add(slug);
+      series.push({ slug, title: m[2].replace(/&#\d+;|&amp;|&\w+;/g, '').trim() });
+      if (series.length >= 5) break;
+    }
+    const items = await Promise.all(series.map(async (s) => {
+      const meta = await cariMetaDe(s.slug).catch(() => null);
+      return { title: meta && meta.titulo ? meta.titulo : s.title, url: CARI_BASE + s.slug + '/', img: meta ? meta.poster : '', site: 'Caricaturas' };
+    }));
+    return items.filter((x) => x.title && x.url);
+  } catch { return []; }
+}
+
+/* fila del feed: las series de la portada, con póster de su página */
+async function caricaturasDestacadas() {
+  if (Date.now() - cariFeedCache.at < 60 * 60 * 1000 && cariFeedCache.items.length) return cariFeedCache.items;
+  const r = await fetchSeguro(CARI_BASE, 10000);
+  if (!r.ok) return cariFeedCache.items;
+  const html = await r.text();
+  const vistos = new Set();
+  const slugs = [];
+  for (const m of html.matchAll(/href="(https:\/\/miscaricaturas\.com\/([a-z0-9-]+)\/?)"/gi)) {
+    const slug = m[2].toLowerCase();
+    if (!cariEsSerie(slug) || vistos.has(slug)) continue;
+    vistos.add(slug);
+    slugs.push(slug);
+    if (slugs.length >= 18) break;
+  }
+  if (!slugs.length) return cariFeedCache.items;
+  const items = (await Promise.all(slugs.map(async (slug) => {
+    const meta = await cariMetaDe(slug).catch(() => null);
+    return { title: (meta && meta.titulo) || cariBonito(slug), url: CARI_BASE + slug + '/', img: meta ? meta.poster : '', site: 'Caricaturas' };
+  }))).filter((x) => x.title && x.img);
+  if (items.length) { cariFeedCache.at = Date.now(); cariFeedCache.items = items; }
+  return items;
+}
+
+/* episodios de una caricatura — la tabla de la página de la serie */
+async function datosCaricatura(slug) {
+  try {
+    if (!/^[a-z0-9-]{2,90}$/.test(slug)) return null;
+    const c = cariDatos.get(slug);
+    if (c && Date.now() - c.at < 30 * 60 * 1000) return c.d;
+    const r = await fetchSeguro(CARI_BASE + slug + '/', 10000);
+    if (!r.ok) return null;
+    const html = await r.text();
+    const h1 = (/<h1[^>]*>([^<]+)<\/h1>/i.exec(html) || [])[1];
+    const pm = /data-src="(https:\/\/miscaricaturas\.com\/wp-content\/uploads\/[^"]+)"/i.exec(html);
+    const eps = [];
+    const vistosEp = new Set();
+    for (const m of html.matchAll(/<a href="(https:\/\/miscaricaturas\.com\/([a-z0-9-]+?)-(\d{2})x(\d{2})([ab])?(?:-[a-z0-9-]*)?\/?)"[^>]*>\s*([^<]+?)\s*<\/a>/gi)) {
+      const url = m[1];
+      if (vistosEp.has(url)) continue;
+      vistosEp.add(url);
+      eps.push({ temporada: +m[3], ep: +m[4], parte: (m[5] || '').toUpperCase(), url, titulo: m[6].slice(0, 90) });
+    }
+    eps.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep || String(a.parte).localeCompare(String(b.parte)));
+    if (!eps.length) return null;
+    const out = {
+      ok: true, slug,
+      titulo: cariLimpia(h1 || cariBonito(slug)).slice(0, 80),
+      poster: pm ? pm[1] : '',
+      episodios: eps,
+    };
+    cariDatos.set(slug, { at: Date.now(), d: out });
+    if (h1 || pm) cariMeta.set(slug, { at: Date.now(), titulo: out.titulo, poster: out.poster });
+    return out;
+  } catch { return null; }
+}
+
+/* capítulo → playlist: mismo navegador del servidor que PelisXD (el
+ * embed es de la misma familia streamwish y sirve sprintcdn) */
+async function resolverCaricatura(epUrl) {
+  const slug = cariSlugDe(epUrl);
+  if (!slug) throw new Error('Capítulo de caricatura no válido');
+  const ahora = Date.now();
+  for (const [tok, s] of pelisxdStreams) {
+    if (s.slug === slug && ahora - s.at < PELISXD_STREAM_TTL) {
+      return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
+    }
+  }
+  const cap = await extraerStreamwishPeli(CARI_BASE + slug + '/');
+  const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
+  pelisxdStreams.set(tok, { body: cap.body, base: cap.url, ref: cap.ref || 'https://f7hyg4q.org/', slug, at: ahora });
+  try {
+    for (const u of cap.body.match(/https?:\/\/[^\s"']+\.ts[^\s"']*/gi) || []) {
+      try { hlsReferers.set(new URL(u).hostname, cap.ref); } catch {}
+    }
+  } catch {}
+  console.log('[caricaturas] ' + slug + ' → playlist ' + (cap.body.match(/#EXTINF/g) || []).length + ' segmentos');
+  return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
+}
+
 async function buscarEnSitios(q) {
   /* v68: fuera GoPelis (poco catálogo) y AnimeFLV — queda Cuevana + Latanime */
   const grupos = await Promise.all([
@@ -1974,6 +2123,7 @@ async function buscarEnSitios(q) {
     buscarLatanime(q).catch(() => []),
     buscarAnimeflv(q).catch(() => []), /* v97 */
     buscarPelisxd(q).catch(() => []), /* v98: el catálogo grande de pelis */
+    buscarMiscaricaturas(q).catch(() => []), /* v102: caricaturas nick/CN */
   ]);
   /* v63: intercalados por sitio para que ningún sitio tape a los demás */
   const resultados = [];
@@ -1981,7 +2131,7 @@ async function buscarEnSitios(q) {
   for (let i = 0; i < maximo; i++) {
     for (const g of grupos) if (g[i]) resultados.push(g[i]);
   }
-  console.log(`[buscar] "${q}" en Cuevana+Latanime+AnimeFLV → ${resultados.length} resultados`);
+  console.log(`[buscar] "${q}" en Cuevana+Latanime+AnimeFLV+Caricaturas → ${resultados.length} resultados`);
   return resultados.slice(0, 24);
 }
 
@@ -2521,8 +2671,9 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname === '/api/trending' && req.method === 'GET') {
       /* v55: populares del día + v57: series recién agregadas
-       * v101: + 6 filas de género que rotan cada día */
-      const [day, series, animes, generos] = await Promise.all([
+       * v101: + 6 filas de género que rotan cada día
+       * v102: + caricaturas (debajo de los animes) */
+      const [day, series, animes, generos, caricaturas] = await Promise.all([
         popularesDeHoy().catch(() => []),
         seriesRecientes().catch(() => []),
         animesDelMomento().catch(() => []), /* v67: animes del momento (Latanime) */
@@ -2531,11 +2682,21 @@ const server = http.createServer(async (req, res) => {
             .then((items) => ({ slug, nombre, items }))
             .catch(() => ({ slug, nombre, items: [] }))
         )),
+        caricaturasDestacadas().catch(() => []),
       ]);
       return json(res, 200, {
         ok: true, results: day, series, animes,
+        caricaturas,
         generos: (generos || []).filter((g) => g.items && g.items.length),
       });
+    }
+    if (url.pathname.startsWith('/api/caricaturas/')) {
+      /* v102: episodios de una caricatura (para el selector) */
+      const slug = decodeURIComponent(url.pathname.split('/')[3] || '').toLowerCase();
+      if (!/^[a-z0-9-]{2,90}$/.test(slug)) return json(res, 400, { ok: false, error: 'Caricatura inválida' });
+      const d = await datosCaricatura(slug);
+      if (!d) return json(res, 502, { ok: false, error: 'No pude leer esa caricatura' });
+      return json(res, 200, d);
     }
     if (url.pathname.startsWith('/api/serie/')) {
       /* v61: temporadas y episodios de una serie (para elegirla bonito) */
@@ -2730,7 +2891,8 @@ const server = http.createServer(async (req, res) => {
         /* v90: episodio de Latanime → resolver de animes (mp4 directo) */
         const esEpAnime = /latanime\.org\/ver\/|animeflv\.one\/ver\//i.test(target); /* v97: también AnimeFLV */
         const esPeliXd = /pelisxd\.com\/pelicula\//i.test(target); /* v98 */
-        const r = await (esEpAnime ? resolverAnime(target) : esPeliXd ? resolverPelisxd(target) : resolverSolo(target));
+        const esCari = /miscaricaturas\.com\//i.test(target); /* v102: caricaturas */
+        const r = await (esEpAnime ? resolverAnime(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : resolverSolo(target));
         return json(res, 200, { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy });
       } catch (e) {
         console.warn('[solo] no pude resolver', target.slice(0, 70), '→', String(e.message || e).slice(0, 90));

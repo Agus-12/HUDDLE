@@ -11,7 +11,7 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
-<link rel="stylesheet" href="/style.css?v=101">
+<link rel="stylesheet" href="/style.css?v=102">
 </head>
 <body>
 
@@ -133,6 +133,15 @@
             <div id="animesRow" class="sr-fila"></div>
           </div>
 
+          <!-- v102: caricaturas — las clásicas de nick/CN en latino, debajo de los animes -->
+          <div id="cariBox" class="sr-sec hidden">
+            <div class="sr-sec-titulo">
+              <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--cyan);"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
+              <span>Caricaturas</span>
+            </div>
+            <div id="cariRow" class="sr-fila"></div>
+          </div>
+
           <!-- v55: populares del día — un toque y a ver -->
           <div id="trendingBox" class="sr-sec hidden">
             <div class="sr-sec-titulo">
@@ -203,7 +212,7 @@
     <header class="topbar">
       <div class="brand">
         <img src="/logo.png" class="brand-logo" alt="Huddle">
-        <span class="ver" id="verBadge">v101</span>
+        <span class="ver" id="verBadge">v102</span>
       </div>
       <!-- v36: gente, invitar y salir viven JUNTO al logo -->
       <div class="top-quick">
@@ -474,6 +483,6 @@
   </div>
 
   <div id="toasts" class="toasts"></div>
-  <script src="/app.js?v=101"></script>
+  <script src="/app.js?v=102"></script>
 </body>
 </html>

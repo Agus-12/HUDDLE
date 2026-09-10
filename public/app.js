@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v101';
+const APP_VERSION = 'v102';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1125,7 +1125,7 @@ let spDatos = null; /* lo que devolvió /api/serie */
  * wsrv.nl ya no puede con ellas (las bloquean con 403) */
 function proxyAnimeImg(src, w) {
   if (src && src.startsWith('/api/img')) return src; /* v91: ya proxieada */
-  if (src && /animeflv\.|latanime\./i.test(src)) {
+  if (src && /animeflv\.|latanime\.|miscaricaturas\./i.test(src)) { /* v102: pósters de caricaturas */
     return '/api/img?u=' + encodeURIComponent(src);
   }
   return src || '';
@@ -1138,7 +1138,7 @@ function proxyAnimeImg(src, w) {
 function imgPorProxy(src) {
   if (!src) return '';
   if (src.startsWith('/api/img')) return src;
-  if (/animeflv\.|latanime\./i.test(src)) return '/api/img?u=' + encodeURIComponent(src);
+  if (/animeflv\.|latanime\.|miscaricaturas\./i.test(src)) return '/api/img?u=' + encodeURIComponent(src); /* v102 */
   return src;
 }
 function abrirSeriePicker(res, enSala, esAnime) {
@@ -1190,6 +1190,56 @@ function abrirSeriePicker(res, enSala, esAnime) {
     $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">Sin conexión — inténtalo de nuevo</div>';
   });
 }
+/* v102: caricaturas de Mis Caricaturas — el mismo selector de la serie,
+ * pero con episodios en lista limpia (sin stills: no los hay) y
+ * temporadas de verdad (Bob Esponja tiene 13) */
+function abrirCaricaturasPicker(res, enSala) {
+  const slugM = /miscaricaturas\.com\/([a-z0-9-]+)/i.exec(res.url || '');
+  if (!slugM) { toast('No pude leer esa caricatura'); return; }
+  const slug = slugM[1];
+  const pk = $('#seriePicker');
+  pk.classList.remove('hidden');
+  $('#spTitle').textContent = res.title || '';
+  $('#spMeta').textContent = 'Cargando episodios…';
+  const po = $('#spPoster');
+  const poster0 = proxyAnimeImg(res.img, 400);
+  if (poster0) { po.src = poster0; po.style.display = ''; } else po.style.display = 'none';
+  $('#spTemporadas').innerHTML = '';
+  $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">Buscando episodios…</div>';
+  fetch('/api/caricaturas/' + slug).then((r) => r.json()).then((d) => {
+    const eps = (d.episodios || []);
+    if (!d.ok || !eps.length) {
+      $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">No encontré episodios de esta caricatura</div>';
+      $('#spMeta').textContent = '';
+      return;
+    }
+    spDatos = { ...d, esAnime: false, sinImg: true, episodios: eps, enSala: !!enSala, posterBase: proxyAnimeImg(d.poster || res.img, 400) };
+    $('#spTitle').textContent = d.titulo || res.title || '';
+    $('#spMeta').textContent = eps.length + ' episodios';
+    if (spDatos.posterBase) { po.src = spDatos.posterBase; po.style.display = ''; }
+    const temps = [...new Set(eps.map((x) => x.temporada))].sort((a, b) => a - b);
+    const tBox = $('#spTemporadas');
+    tBox.innerHTML = '';
+    if (temps.length > 1) {
+      temps.forEach((T, i) => {
+        const b = document.createElement('button');
+        b.className = 'sp-temp-btn' + (i === 0 ? ' activa' : '');
+        b.textContent = 'Temporada ' + T;
+        b.addEventListener('click', () => {
+          tBox.querySelectorAll('.sp-temp-btn').forEach((x) => x.classList.remove('activa'));
+          b.classList.add('activa');
+          pintarEpisodios(T);
+        });
+        tBox.appendChild(b);
+      });
+    }
+    pintarEpisodios(temps[0]);
+  }).catch(() => {
+    $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">No pude leer los episodios — prueba de nuevo</div>';
+    $('#spMeta').textContent = '';
+  });
+}
+
 function pintarEpisodios(temporada) {
   const box = $('#spEpisodios');
   box.innerHTML = '';
@@ -1197,16 +1247,17 @@ function pintarEpisodios(temporada) {
   eps.forEach((ep) => {
     const b = document.createElement('button');
     const esAn = !!spDatos.esAnime;
-    b.className = 'sp-ep' + (esAn ? ' sin-img' : '');
-    b.innerHTML = (esAn ? '' : `<img src="${ep.img || spDatos.posterBase}" alt="" loading="lazy" referrerpolicy="no-referrer">`)
-      + `<span><span class="sp-ep-num">${esAn ? 'Episodio ' + (ep.ep || '·') : temporada + 'x' + (ep.ep || '·')}</span>
+    const sinImg = esAn || !!spDatos.sinImg; /* v102: caricaturas — lista limpia */
+    b.className = 'sp-ep' + (sinImg ? ' sin-img' : '');
+    b.innerHTML = (sinImg ? '' : `<img src="${ep.img || spDatos.posterBase}" alt="" loading="lazy" referrerpolicy="no-referrer">`)
+      + `<span><span class="sp-ep-num">${esAn ? 'Episodio ' + (ep.ep || '·') : temporada + 'x' + (ep.ep || '·') + (ep.parte || '')}</span>
       <span class="sp-ep-tit"></span></span>`;
     b.querySelector('.sp-ep-tit').textContent = esAn ? (spDatos.titulo || ep.titulo) : ep.titulo;
     b.dataset.url = ep.url || ''; /* v85: para marcar los vistos */
     b.addEventListener('click', () => {
       /* elegiste episodio → igual que una peli: carátula, sala, pausa y play */
       cerrarSeriePicker();
-      const nombre = esAn ? `${spDatos.titulo} — Episodio ${ep.ep || ''}`.trim() : `${spDatos.titulo} ${temporada}x${ep.ep || ''}`.trim();
+      const nombre = esAn ? `${spDatos.titulo} — Episodio ${ep.ep || ''}`.trim() : `${spDatos.titulo} ${temporada}x${ep.ep || ''}${ep.parte || ''}`.trim();
       /* v95: la entrada del episodio lleva el PÓSTER DE LA SERIE (como
        * los animes) — el still de la escena se queda solo en el picker;
        * antes el continuar-viendo mostraba la foto del episodio */
@@ -1219,7 +1270,7 @@ function pintarEpisodios(temporada) {
         abrirSolo(ep.url, {
           title: spDatos.titulo || '', ep: esAn ? String(ep.ep || '') : `${temporada}x${ep.ep || ''}`,
           serie: spDatos.titulo || '', img: imgEp,
-          eps: cadena.map((x) => ({ url: x.url, ep: esAn ? String(x.ep || '') : `${x.temporada}x${x.ep || ''}`, nombre: x.titulo || '' })),
+          eps: cadena.map((x) => ({ url: x.url, ep: esAn ? String(x.ep || '') : `${x.temporada}x${x.ep || ''}${x.parte || ''}`, nombre: x.titulo || '' })),
         });
         return;
       }
@@ -1283,6 +1334,7 @@ $('#seriePicker').addEventListener('click', (e) => { if (e.target === e.currentT
 function elegirTitulo(res, enSala) {
   if (/\/serie\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, false); return true; }
   if (/\/anime\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, true); return true; }
+  if (/miscaricaturas\.com\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v102 */
   return false;
 }
 
@@ -1370,6 +1422,7 @@ let SITES = [
   { name: 'Latanime', full: 'Latanime — animes con audio latino', url: 'https://latanime.org/', logo: '/sites/latanime.png' },
   { name: 'Cuevana', full: 'Cuevana — películas y series', url: 'https://cuevana.mov/', logo: '/sites/cuevana.png' },
   { name: 'PelisXD', full: 'PelisXD — películas en HD (catálogo grande)', url: 'https://www.pelisxd.com/', logo: '/sites/pelisxd.png' }, /* v98 */
+  { name: 'Caricaturas', full: 'Mis Caricaturas — las clásicas de nick/CN en latino', url: 'https://miscaricaturas.com/', logo: '/sites/caricaturas.png' }, /* v102 */
   { name: 'YouTube', full: 'YouTube — videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
 ];
 function renderPageDrop() {
@@ -3269,7 +3322,7 @@ async function cargarPopulares() {
     const d = await r.json();
     /* v69: cada sección se muestra con lo que llegue — los animes (arriba)
      * no dependen de que las películas hayan cargado */
-    const hayAlgo = (d.results && d.results.length) || (d.series && d.series.length) || (d.animes && d.animes.length) || (d.generos && d.generos.length);
+    const hayAlgo = (d.results && d.results.length) || (d.series && d.series.length) || (d.animes && d.animes.length) || (d.caricaturas && d.caricaturas.length) || (d.generos && d.generos.length);
     if (!d.ok || !hayAlgo) { delete wrap.dataset.cargado; return; }
     const alTocar = (res) => () => {
       if (elegirTitulo(res)) return; /* v61: series → temporadas y episodios */
@@ -3298,6 +3351,13 @@ async function cargarPopulares() {
     if (wrapA && filaA && d.animes && d.animes.length) {
       d.animes.slice(0, 16).forEach((res) => filaA.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrapA.classList.remove('hidden');
+    }
+    /* v102: caricaturas — debajo de los animes; un toque abre el selector */
+    const wrapC = document.querySelector('#cariBox');
+    const filaC = document.querySelector('#cariRow');
+    if (wrapC && filaC && d.caricaturas && d.caricaturas.length) {
+      d.caricaturas.slice(0, 16).forEach((res) => filaC.appendChild(crearTarjetaResultado(res, alTocar(res))));
+      wrapC.classList.remove('hidden');
     }
     /* v101: filas de GÉNERO — seis secciones que rotan cada día; cada una
      * con su ícono y color, y las mismas tarjetas que todo el feed */
