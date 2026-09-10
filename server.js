@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v102'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v103'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -2060,7 +2060,21 @@ async function caricaturasDestacadas() {
   return items;
 }
 
-/* episodios de una caricatura — la tabla de la página de la serie */
+/* episodios de una caricatura — la tabla de la página de la serie.
+ * v103: las temporadas viejas viven en posts aparte («serie-temporada-N»)
+ * enlazados desde la propia página — se bajan EN PARALELO y se fusionan
+ * (Bob Esponja pasa de 4 temporadas a las ~13 de verdad) */
+async function cariEpsDeHtml(html) {
+  const eps = [];
+  const vistosEp = new Set();
+  for (const m of html.matchAll(/<a href="(https:\/\/miscaricaturas\.com\/([a-z0-9-]+?)-(\d{2})x(\d{2})([ab])?(?:-[a-z0-9-]*)?\/?)"[^>]*>\s*([^<]+?)\s*<\/a>/gi)) {
+    const url = m[1];
+    if (vistosEp.has(url)) continue;
+    vistosEp.add(url);
+    eps.push({ temporada: +m[3], ep: +m[4], parte: (m[5] || '').toUpperCase(), url, titulo: m[6].slice(0, 90) });
+  }
+  return eps;
+}
 async function datosCaricatura(slug) {
   try {
     if (!/^[a-z0-9-]{2,90}$/.test(slug)) return null;
@@ -2071,13 +2085,21 @@ async function datosCaricatura(slug) {
     const html = await r.text();
     const h1 = (/<h1[^>]*>([^<]+)<\/h1>/i.exec(html) || [])[1];
     const pm = /data-src="(https:\/\/miscaricaturas\.com\/wp-content\/uploads\/[^"]+)"/i.exec(html);
-    const eps = [];
-    const vistosEp = new Set();
-    for (const m of html.matchAll(/<a href="(https:\/\/miscaricaturas\.com\/([a-z0-9-]+?)-(\d{2})x(\d{2})([ab])?(?:-[a-z0-9-]*)?\/?)"[^>]*>\s*([^<]+?)\s*<\/a>/gi)) {
-      const url = m[1];
-      if (vistosEp.has(url)) continue;
-      vistosEp.add(url);
-      eps.push({ temporada: +m[3], ep: +m[4], parte: (m[5] || '').toUpperCase(), url, titulo: m[6].slice(0, 90) });
+    let eps = await cariEpsDeHtml(html);
+    /* v103: posts de temporada de ESTA serie (la base es el slug sin la
+     * cola «-capitulos-completos»), en paralelo */
+    const base = slug.replace(/-(capitulos-completos[a-z]*|capitulos-y-canciones|completos|ver|latino|online)$/, '');
+    const temps = [...new Set((html.match(new RegExp('miscaricaturas\\.com/(' + base + '-temporada-\\d+)/?', 'gi')) || [])
+      .map((s) => (new RegExp('(' + base + '-temporada-\\d+)', 'i').exec(s) || [])[1]))]
+      .filter((s) => s && new RegExp('^' + base + '-temporada-\\d+$').test(s));
+    if (temps.length) {
+      const extra = await Promise.all(temps.slice(0, 16).map(async (t) => {
+        const rt = await fetchSeguro(CARI_BASE + t + '/', 10000).catch(() => null);
+        if (!rt || !rt.ok) return [];
+        return cariEpsDeHtml(await rt.text());
+      }));
+      const vistosEp = new Set(eps.map((e) => e.url));
+      for (const lista of extra) for (const e of lista) if (!vistosEp.has(e.url)) { vistosEp.add(e.url); eps.push(e); }
     }
     eps.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep || String(a.parte).localeCompare(String(b.parte)));
     if (!eps.length) return null;
@@ -2115,6 +2137,8 @@ async function resolverCaricatura(epUrl) {
   console.log('[caricaturas] ' + slug + ' → playlist ' + (cap.body.match(/#EXTINF/g) || []).length + ' segmentos');
   return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
 }
+
+
 
 async function buscarEnSitios(q) {
   /* v68: fuera GoPelis (poco catálogo) y AnimeFLV — queda Cuevana + Latanime */
