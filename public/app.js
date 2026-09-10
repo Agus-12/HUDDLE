@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v104';
+const APP_VERSION = 'v105';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1545,17 +1545,26 @@ function updateEpNav() {
 })();
 
 /* v43: cargar el directorio real del servidor (crece al pegar URLs) */
+/* v105: el directorio del servidor se MEZCLA con la lista local — las fuentes
+ * de la app (Caricaturas, PelisXd…) conservan su logo; las que agregues tú se
+ * suman al final */
+function mezclarSitios(lista) {
+  const base = SITES.filter((s) => s.logo); /* las locales, con logo */
+  const misma = (a, b) => String(a || '').toLowerCase().replace(/\/+$/, '').replace(/^https?:\/\/(www\.)?/, '') === String(b || '').toLowerCase().replace(/\/+$/, '').replace(/^https?:\/\/(www\.)?/, '');
+  const nuevas = (lista || []).filter((s) => s && s.url && !base.some((x) => misma(x.url, s.url)));
+  return [...base, ...nuevas.map((s) => ({ ...s, full: s.desc ? `${s.name} — ${s.desc}` : s.name }))];
+}
 async function cargarSitios() {
   try {
     const r = await fetch('/api/sites');
     const d = await r.json();
     if (d.ok && Array.isArray(d.sites) && d.sites.length) {
-      SITES = d.sites.map((s) => ({ ...s, full: s.desc ? `${s.name} — ${s.desc}` : s.name }));
+      SITES = mezclarSitios(d.sites);
       renderPageDrop();
       renderSetupGrid();
       renderLastCard();
     }
-  } catch { /* sin directorio: seguimos con los 4 de siempre */ }
+  } catch { /* sin directorio: seguimos con los de siempre */ }
 }
 cargarSitios();
 
@@ -2402,7 +2411,7 @@ async function quitarSitio(s) {
     const r = await fetch('/api/sites?url=' + encodeURIComponent(s.url), { method: 'DELETE' });
     const d = await r.json();
     if (d.ok && Array.isArray(d.sites)) {
-      SITES = d.sites.map((x) => ({ ...x, full: x.desc ? `${x.name} — ${x.desc}` : x.name }));
+      SITES = mezclarSitios(d.sites); /* v105: mezclar, no reemplazar */
       renderPageDrop();
       renderSetupGrid();
       if (S.setupUrl === s.url) { S.setupUrl = ''; S.setupName = ''; $('#btnCreateGo').textContent = 'Crear la sala'; }
@@ -2449,7 +2458,7 @@ $('#btnCreateGo').addEventListener('click', () => {
 function logoDeSitio(nombre) {
   const s = (typeof SITES !== 'undefined' ? SITES : []).find((x) => x.name === nombre);
   if (s && s.logo) return s.logo;
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(String(nombre).toLowerCase())}&sz=64`;
+  return '/carita.png'; /* v105: si no hay logo, la carita de Huddle */
 }
 
 function crearTarjetaResultado(res, alElegir) {
