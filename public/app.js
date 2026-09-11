@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v106';
+const APP_VERSION = 'v107';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -3365,7 +3365,7 @@ async function cargarPopulares() {
     const wrapC = document.querySelector('#cariBox');
     const filaC = document.querySelector('#cariRow');
     if (wrapC && filaC && d.caricaturas && d.caricaturas.length) {
-      d.caricaturas.slice(0, 16).forEach((res) => filaC.appendChild(crearTarjetaResultado(res, alTocar(res))));
+      d.caricaturas.slice(0, 18).forEach((res) => filaC.appendChild(crearTarjetaResultado(res, alTocar(res)))); /* v107 */
       wrapC.classList.remove('hidden');
     }
     /* v101: filas de GÉNERO — seis secciones que rotan cada día; cada una

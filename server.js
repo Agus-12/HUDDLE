@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v106'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v107'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -2099,10 +2099,11 @@ const CARI_ORDEN = [
   'rick-y-morty-capitulos-completos', 'south-park', 'los-simpsons', 'phineas-y-ferb-capitulos-completos',
   'los-padrinos-magicos-capitulos-completos', 'ben-10-capitulos-completos', 'danny-phantom-capitulos-completos',
   'jimmy-neutron-capitulos-completos', 'oye-arnold', 'el-laboratorio-de-dexter-capitulos-completos',
-  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos', 'coraje-el-perro-cobarde-latino', 'futurama-latino',
-  '31-minutos-capitulos-y-canciones', 'daria-capitulos-completos', 'sabrina-la-bruja-adolescente-latino',
+  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos', 'coraje-el-perro-cobarde-latino',
+  'sabrina-la-bruja-adolescente-latino', 'kenan-y-kel-latino', /* v107: live-action de nick visibles en la fila */
+  'futurama-latino', '31-minutos-capitulos-y-canciones', 'daria-capitulos-completos',
   'un-show-mas-capitulos-completos', 'invasor-zim-temporada-1', 'las-chicas-superpoderosas-capitulos-completos',
-  'johnny-bravo-capitulos-completos', 'samurai-jack-temporada-1', 'kenan-y-kel-latino', 'mucha-lucha-capitulos-completos',
+  'johnny-bravo-capitulos-completos', 'samurai-jack-temporada-1', 'mucha-lucha-capitulos-completos',
   'mansion-foster-para-amigos-imaginarios-capitulos-completos', 'escuadron-del-tiempo-capitulos-completos',
   'ozzy-y-drix-capitulos-completos', 'la-pantera-rosa-capitulos-completos', 'rocket-power-capitulos-completos',
   'gallo-claudio-capitulos-completos', 'la-vaca-y-el-pollito-capitulos-completos', 'los-chicos-del-barrio-capitulos-completos',
@@ -2116,7 +2117,7 @@ async function caricaturasDestacadas() {
   const slugs = [
     ...CARI_ORDEN.filter((s) => home.has(s)),
     ...enHome.filter((s) => !CARI_ORDEN.includes(s) && cariEsSerie(s)),
-  ].slice(0, 16);
+  ].slice(0, 18); /* v107: 18 — entran Sabrina y Kenan y Kel */
   if (!slugs.length) return cariFeedCache.items;
   const items = (await Promise.all(slugs.map(async (slug) => {
     const meta = await cariMetaDe(slug).catch(() => null);
