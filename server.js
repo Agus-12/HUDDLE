@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v114'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v115'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -2056,6 +2056,20 @@ const LCT_SERIES = new Map([
   ['15', { slug: 'flapjack', lctId: 15, titulo: 'Las Maravillosas Desventuras de FlapJack' }],
   ['32', { slug: 'jovenes-titanes', lctId: 32, titulo: 'Los Jóvenes Titanes' }],
   ['27', { slug: 'samurai-jack', lctId: 27, titulo: 'Samurai Jack' }],
+  /* v115: lote Hanna-Barbera/acción auditado con ASR: xmen evo es(0.98),
+   * ultimate spider-man es(0.99), generador rex es(0.97), picapiedras
+   * es(0.92), supersónicos es(0.88 — su pista «Español» viene etiquetada
+   * «Latine», el resolver la reconoce). Muertas tras revisar (embeds
+   * retirados o video borrado): X-Men 90s, Spiderman 90s y Nueva, Static
+   * Shock, Code Lyoko, Scooby (todas sus variantes), Titán Sim-Biónico,
+   * Hombres de Negro, Cazafantasmas, Wolverine, Ben 10 Fuerza
+   * Alienígena/Supremacia, Chicas Z, Duck Dodgers, Garfield, Godzilla,
+   * Meteoro, Super Mario, Tintin y Capitán Planeta */
+  ['38', { slug: 'x-men-evolucion', lctId: 38, titulo: 'X-Men Evolución' }],
+  ['390', { slug: 'ultimate-spider-man', lctId: 390, titulo: 'Ultimate Spider-Man' }],
+  ['10', { slug: 'generador-rex', lctId: 10, titulo: 'Generador Rex' }],
+  ['21', { slug: 'los-picapiedras', lctId: 21, titulo: 'Los Picapiedras' }],
+  ['22', { slug: 'los-supersonicos', lctId: 22, titulo: 'Los Supersónicos' }],
 ]);
 /* v113: series de MisCaricaturas cuyas temporadas en inglés se
  * reemplazan por las de lacartoons (latino, auditadas). «tomar» = qué
@@ -2684,7 +2698,9 @@ async function resolverLacartoons(epUrl) {
   let body = null, base = master, nSeg = 0;
   const medios = txtM.split('\n').filter((l) => /^#EXT-X-MEDIA:TYPE=AUDIO/i.test(l.trim()));
   if (medios.length) {
-    const lineaEs = medios.find((l) => /LANGUAGE="es"/i.test(l) || /NAME="[^"]*Espa/i.test(l));
+    /* v115: la pista «Español» de Los Supersónicos viene etiquetada
+     * «Latine» (LANGUAGE="la") — también cuenta como español */
+    const lineaEs = medios.find((l) => /LANGUAGE="es"/i.test(l) || /NAME="[^"]*(Espa|Latin)/i.test(l));
     if (!lineaEs) throw new Error('Ese capítulo no está en español en Lacartoons — prueba otro');
     const uriEs = (/URI="([^"]+)"/.exec(lineaEs) || [])[1];
     const rA = uriEs ? await fetchSeguro(new URL(uriEs, master).href, 15000) : null;
