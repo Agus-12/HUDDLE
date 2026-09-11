@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v110'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v111'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -303,9 +303,42 @@ async function posterSerieWP(slug) {
   } catch { return ''; }
 }
 
+/* v111: CACHÉ A DISCO para los pickers — las cachés eran solo memoria y
+ * tras cada reinicio (cada actualizar.sh) todo se volvía a descargar y el
+ * selector de series tardaba otra vez. Ahora viven en data/cache/*.json:
+ * sobreviven reinicios, se invalidan solas al cambiar de versión y los
+ * datos VENCIDOS se sirven al instante mientras se refrescan por detrás
+ * (stale-while-revalidate) — el picker abre en milisegundos. */
+const CACHE_DIR = path.join(DATA_DIR, 'cache');
+try { fs.mkdirSync(CACHE_DIR, { recursive: true }); } catch {}
+function cacheLeer(nombre) {
+  try {
+    const d = JSON.parse(fs.readFileSync(path.join(CACHE_DIR, nombre + '.json'), 'utf8'));
+    return (d && d.v === UI_VERSION && d.e) ? d.e : null;
+  } catch { return null; }
+}
+const cacheTimers = new Map();
+function cacheGuardar(nombre, entradas) {
+  if (cacheTimers.has(nombre)) return; /* se agrupan escrituras cada 4 s */
+  const t = setTimeout(() => {
+    cacheTimers.delete(nombre);
+    try {
+      const tmp = path.join(CACHE_DIR, nombre + '.json.tmp');
+      fs.writeFileSync(tmp, JSON.stringify({ v: UI_VERSION, e: entradas() }));
+      fs.renameSync(tmp, path.join(CACHE_DIR, nombre + '.json'));
+    } catch {}
+  }, 4000);
+  t.unref();
+  cacheTimers.set(nombre, t);
+}
+
 async function datosSerieCuevana(slug) {
   const c = serieCache.get(slug);
   if (c && Date.now() - c.at < 30 * 60 * 1000) return c.d;
+  if (c) { refrescarSerieCuevana(slug).catch(() => {}); return c.d; } /* v111: vencido → se sirve YA y se refresca por detrás */
+  return await refrescarSerieCuevana(slug);
+}
+async function refrescarSerieCuevana(slug) {
   try {
     const r = await fetchSeguro(`https://cine-calidad.mx/serie/${slug}/`, 10000);
     if (!r.ok) return null;
@@ -337,6 +370,7 @@ async function datosSerieCuevana(slug) {
       episodios: eps,
     };
     serieCache.set(slug, { at: Date.now(), d: out });
+    cacheGuardar('serieCache', () => [...serieCache.entries()]); /* v111: a disco */
     return out;
   } catch { return null; }
 }
@@ -349,6 +383,12 @@ async function posterDeSerie(slug) {
     if (!/^[a-z0-9-]{2,90}$/.test(slug)) return '';
     const c = postersSeries.get(slug);
     if (c && Date.now() - c.ts < (c.poster ? 864e5 : 2 * 60 * 1000)) return c.poster || '';
+    if (c) { refrescarPosterSerie(slug).catch(() => {}); return c.poster || ''; } /* v111: vencido → se sirve y se refresca por detrás */
+    return await refrescarPosterSerie(slug);
+  } catch { return ''; }
+}
+async function refrescarPosterSerie(slug) {
+  try {
     /* v99: un fallo (póster vacío) se cachea solo 2 minutos — antes quedaba
      * envenenado un DÍA y el still del capítulo seguía apareciendo aunque
      * el sitio ya respondiera.
@@ -361,6 +401,7 @@ async function posterDeSerie(slug) {
       poster = (d && d.poster) || '';
     }
     postersSeries.set(slug, { poster, ts: Date.now() });
+    cacheGuardar('postersSeries', () => [...postersSeries.entries()]); /* v111: a disco */
     return poster;
   } catch { return ''; }
 }
@@ -397,6 +438,7 @@ async function datosAnimeLatanime(slug) {
       episodios: epsL,
     };
     serieCache.set('latanime:' + slug, { at: Date.now(), d: outL });
+    cacheGuardar('serieCache', () => [...serieCache.entries()]); /* v111: a disco */
     return outL;
   } catch { return null; }
 }
@@ -1980,6 +2022,22 @@ const CARI_BASE = 'https://miscaricaturas.com/';
 const cariMeta = new Map();   /* slug → {at, titulo, poster} — 6 h */
 const cariDatos = new Map();  /* slug → {at, d} — 30 min */
 const cariFeedCache = { at: 0, items: [] }; /* 1 h */
+/* v111: al arrancar, las cachés de los pickers se leen del DISCO — el
+ * selector abre rápido incluso recién reiniciado el servidor (antes,
+ * cada actualizar.sh dejaba todo lento otra vez). Si la versión cambió,
+ * los archivos se ignoran y se empieza de cero. */
+try {
+  for (const [k, v] of cacheLeer('cariDatos') || []) cariDatos.set(k, v);
+  for (const [k, v] of cacheLeer('cariMeta') || []) cariMeta.set(k, v);
+  for (const [k, v] of cacheLeer('serieCache') || []) serieCache.set(k, v);
+  for (const [k, v] of cacheLeer('postersSeries') || []) postersSeries.set(k, v);
+  const ch = cacheLeer('cariHome');
+  if (ch && ch.at) { cariHome.at = ch.at; for (const [k, v] of (ch.items || [])) cariHome.items.set(k, v); }
+  const cf = cacheLeer('cariFeed');
+  if (cf && cf.at && Array.isArray(cf.items) && cf.items.length) { cariFeedCache.at = cf.at; cariFeedCache.items = cf.items; }
+  const nCari = cariDatos.size, nSerie = serieCache.size;
+  if (nCari || nSerie) console.log('[cache] del disco: ' + nCari + ' caricaturas, ' + nSerie + ' series/animes, ' + cariMeta.size + ' metas' + (cariFeedCache.items.length ? ', feed listo' : ''));
+} catch {}
 function cariSlugDe(u) { return ((/miscaricaturas\.com\/([a-z0-9-]+)/i.exec(u || '') || [])[1] || '').toLowerCase(); }
 function cariEsSerie(slug) { return !!slug && !/temporada/i.test(slug) && !/\d{2}x\d{2}/i.test(slug); }
 function cariBonito(slug) { return slug.replace(/-+/g, ' ').replace(/\b(capitulos completos|completos|ver|latino|online)\b/gi, '').trim(); }
@@ -2088,6 +2146,10 @@ function cariPosterDeHtml(html) {
 const cariHome = { at: 0, items: new Map() }; /* 6 h */
 async function cariHomeImgs() {
   if (Date.now() - cariHome.at < 6 * 3600 * 1000 && cariHome.items.size) return cariHome.items;
+  if (cariHome.items.size) { refrescarCariHome().catch(() => {}); return cariHome.items; } /* v111: vencido → se sirve y se refresca por detrás */
+  return await refrescarCariHome();
+}
+async function refrescarCariHome() {
   const r = await fetchSeguro(CARI_BASE, 10000);
   if (!r.ok) return cariHome.items;
   const html = await r.text();
@@ -2096,7 +2158,10 @@ async function cariHomeImgs() {
   for (const m of art.matchAll(/<p><a href="https:\/\/miscaricaturas\.com\/([a-z0-9-]+)\/"[^>]*>\s*<img[^>]*data-src="(https:[^"]+)"[^>]*alt="([^"]*)"/gi)) {
     if (!out.has(m[1])) out.set(m[1], { img: m[2], alt: m[3] });
   }
-  if (out.size) { cariHome.items = out; cariHome.at = Date.now(); }
+  if (out.size) {
+    cariHome.items = out; cariHome.at = Date.now();
+    cacheGuardar('cariHome', () => ({ at: cariHome.at, items: [...cariHome.items.entries()] })); /* v111: a disco */
+  }
   return out;
 }
 
@@ -2104,6 +2169,12 @@ async function cariMetaDe(slug) {
   try {
     const c = cariMeta.get(slug);
     if (c && Date.now() - c.at < 6 * 3600 * 1000) return c;
+    if (c) { refrescarCariMetaDe(slug).catch(() => {}); return c; } /* v111: vencido → se sirve y se refresca por detrás */
+    return await refrescarCariMetaDe(slug);
+  } catch { return null; }
+}
+async function refrescarCariMetaDe(slug) {
+  try {
     const r = await fetchSeguro(CARI_BASE + slug + '/', 10000);
     const html = r && r.ok ? await r.text() : '';
     const h1 = (/<h1[^>]*>([^<]+)<\/h1>/i.exec(html) || [])[1];
@@ -2121,6 +2192,7 @@ async function cariMetaDe(slug) {
       cover: CARI_PORTADAS.get(slug) || '', /* v104: portada curada local */
     };
     cariMeta.set(slug, out);
+    cacheGuardar('cariMeta', () => [...cariMeta.entries()]); /* v111: a disco */
     return out;
   } catch { return null; }
 }
@@ -2168,6 +2240,10 @@ const CARI_ORDEN = [
 ];
 async function caricaturasDestacadas() {
   if (Date.now() - cariFeedCache.at < 60 * 60 * 1000 && cariFeedCache.items.length) return cariFeedCache.items;
+  if (cariFeedCache.items.length) { refrescarCariFeed().catch(() => {}); return cariFeedCache.items; } /* v111: vencido → se sirve y se refresca por detrás */
+  return await refrescarCariFeed();
+}
+async function refrescarCariFeed() {
   const home = await cariHomeImgs();
   if (!home.size) return cariFeedCache.items;
   const enHome = [...home.keys()];
@@ -2185,7 +2261,7 @@ async function caricaturasDestacadas() {
       url: CARI_BASE + slug + '/', img, site: 'Caricaturas',
     };
   }))).filter((x) => x.title && x.img);
-  if (items.length) { cariFeedCache.at = Date.now(); cariFeedCache.items = items; }
+  if (items.length) { cariFeedCache.at = Date.now(); cariFeedCache.items = items; cacheGuardar('cariFeed', () => ({ at: cariFeedCache.at, items: cariFeedCache.items })); } /* v111: a disco */
   return items;
 }
 
@@ -2209,6 +2285,12 @@ async function datosCaricatura(slug) {
     if (!/^[a-z0-9-]{2,90}$/.test(slug)) return null;
     const c = cariDatos.get(slug);
     if (c && Date.now() - c.at < 30 * 60 * 1000) return c.d;
+    if (c) { refrescarDatosCaricatura(slug).catch(() => {}); return c.d; } /* v111: vencido → se sirve y se refresca por detrás */
+    return await refrescarDatosCaricatura(slug);
+  } catch { return null; }
+}
+async function refrescarDatosCaricatura(slug) {
+  try {
     const r = await fetchSeguro(CARI_BASE + slug + '/', 10000);
     if (!r.ok) return null;
     const html = await r.text();
@@ -2248,7 +2330,9 @@ async function datosCaricatura(slug) {
       episodios: eps,
     };
     cariDatos.set(slug, { at: Date.now(), d: out });
+    cacheGuardar('cariDatos', () => [...cariDatos.entries()]); /* v111: a disco */
     if (h1 || poster) cariMeta.set(slug, { at: Date.now(), titulo: out.titulo, poster: out.poster, cover });
+    cacheGuardar('cariMeta', () => [...cariMeta.entries()]); /* v111 */
     return out;
   } catch { return null; }
 }
@@ -2948,6 +3032,7 @@ const server = http.createServer(async (req, res) => {
         };
         if (!eps.length) return json(res, 404, { ok: false, error: 'Sin episodios' });
         serieCache.set('anime:' + slug, { at: Date.now(), d: out });
+        cacheGuardar('serieCache', () => [...serieCache.entries()]); /* v111: a disco */
         return json(res, 200, out);
       } catch {
         return json(res, 500, { ok: false, error: 'Error leyendo el anime' });
