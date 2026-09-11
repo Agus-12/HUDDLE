@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v111'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v112'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -2022,6 +2022,25 @@ const CARI_BASE = 'https://miscaricaturas.com/';
 const cariMeta = new Map();   /* slug → {at, titulo, poster} — 6 h */
 const cariDatos = new Map();  /* slug → {at, d} — 30 min */
 const cariFeedCache = { at: 0, items: [] }; /* 1 h */
+/* v112: LACARTOONS (lacartoons.com) — fuente nueva de series clásicas.
+ * Aporta lo que MisCaricaturas no tiene: las temporadas 1-5 de Billy y
+ * Mandy en LATINO (allí solo la T6 está doblada) e iCarly y Drake & Josh
+ * completas. Auditado con ASR (2026-09-11): billy T1-T6, iCarly y Drake
+ * & Josh hablan español; Zoey 101, Kenan & Kel y Sabrina tienen los
+ * embeds retirados en esa fuente (muertos) y no se integran.
+ * El player es cubeembed.rpmvid.com: el navegador del servidor clica el
+ * play (el botón vive en shadow DOM de vidstack y además quiere un clic
+ * físico) y captura un m3u8 «hlsmod» servido por el propio rpmvid cuyos
+ * segmentos son TS camuflados de PNG en tiktokcdn (el proxy los
+ * despelleja). El Chavo del 8 también vive ahí, pero ya está en
+ * MisCaricaturas — no se duplica. */
+const LCT_BASE = 'https://www.lacartoons.com/';
+const LCT_SERIES = new Map([
+  ['150', { slug: 'icarly', lctId: 150, titulo: 'iCarly' }],
+  ['144', { slug: 'drake-y-josh', lctId: 144, titulo: 'Drake & Josh' }],
+]);
+const LCT_BILLY = { slug: 'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos', lctId: 16, temporadas: [1, 2, 3, 4, 5] };
+const lctEps = new Map(); /* lctId → {at, eps} — 6 h */
 /* v111: al arrancar, las cachés de los pickers se leen del DISCO — el
  * selector abre rápido incluso recién reiniciado el servidor (antes,
  * cada actualizar.sh dejaba todo lento otra vez). Si la versión cambió,
@@ -2029,6 +2048,7 @@ const cariFeedCache = { at: 0, items: [] }; /* 1 h */
 try {
   for (const [k, v] of cacheLeer('cariDatos') || []) cariDatos.set(k, v);
   for (const [k, v] of cacheLeer('cariMeta') || []) cariMeta.set(k, v);
+  for (const [k, v] of cacheLeer('lctEps') || []) lctEps.set(k, v); /* v112: episodios de lacartoons */
   for (const [k, v] of cacheLeer('serieCache') || []) serieCache.set(k, v);
   for (const [k, v] of cacheLeer('postersSeries') || []) postersSeries.set(k, v);
   const ch = cacheLeer('cariHome');
@@ -2073,16 +2093,13 @@ function cariSerieDeEp(prefijo) {
  * no hay metadata de idioma en streamwish, así que esto se verificó
  * ESCUCHANDO segmentos del medio de cada capítulo. Resultado:
  * - Billy y Mandy: T1-T5 en inglés (9 muestras 96-98%), T6 en latino
+ *   → v112: las T1-T5 ahora vienen de LACARTOONS en latino y salieron
+ *     de esta lista; MisCaricaturas ya no las aporta
  * - Jimmy Neutrón: T2 en inglés (3 muestras 97-99%), T1 y T3 latino
  * - Ben 10: T3 y T4 en inglés (99%), T1 y T2 latino (salvo 2x12, inglés)
  * - las demás 16 series del feed: latino confirmado
  * Formato: 'slug|TxEPp' (exacto) o 'slug|Tx*' (toda la temporada). */
 const EPS_INGLESES = new Set([
-  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos|1x*',
-  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos|2x*',
-  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos|3x*',
-  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos|4x*',
-  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos|5x*',
   'jimmy-neutron-capitulos-completos|2x*',
   'ben-10-capitulos-completos|2x12',
   'ben-10-capitulos-completos|3x*',
@@ -2092,6 +2109,89 @@ function cariEsIngles(slug, e) {
   const p = String(e.parte || '').toLowerCase();
   return EPS_INGLESES.has(slug + '|' + e.temporada + 'x' + e.ep + p)
     || EPS_INGLESES.has(slug + '|' + e.temporada + 'x*');
+}
+/* v112: LACARTOONS — lista de episodios de la página de una serie
+ * (/serie/{id}): links «/serie/capitulo/{capId}?t={temporada}» con
+ * «<span>Capitulo N-</span> Título». El mismo capítulo aparece dos
+ * veces en el HTML (duplicado de maquetación) — se deduplica por capId. */
+function lctEpsDeHtml(html) {
+  const eps = [];
+  const vistos = new Set();
+  for (const m of html.matchAll(/href="\/serie\/capitulo\/(\d+)\?t=(\d+)"[^>]*>\s*(?:<span>\s*Capitulo\s*(\d+)\s*-?\s*<\/span>\s*)?([^<]*)/gi)) {
+    if (vistos.has(m[1])) continue;
+    vistos.add(m[1]);
+    const t = +m[2];
+    eps.push({
+      temporada: t,
+      ep: +m[3] || eps.filter((x) => x.temporada === t).length + 1,
+      parte: '',
+      url: LCT_BASE + 'serie/capitulo/' + m[1] + '?t=' + t,
+      titulo: (m[4] || '').replace(/\s+/g, ' ').trim().slice(0, 90),
+    });
+  }
+  eps.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep);
+  return eps;
+}
+async function lctEpisodios(lctId) {
+  const c = lctEps.get(String(lctId));
+  if (c && Date.now() - c.at < 6 * 60 * 60 * 1000) return c;
+  if (c) { refrescarLctEps(lctId).catch(() => {}); return c; } /* v111: vencido → se sirve y se refresca por detrás */
+  return await refrescarLctEps(lctId);
+}
+async function refrescarLctEps(lctId) {
+  try {
+    const r = await fetchSeguro(LCT_BASE + 'serie/' + lctId, 15000);
+    if (!r.ok) return null;
+    const eps = lctEpsDeHtml(await r.text());
+    if (!eps.length) return null;
+    const out = { at: Date.now(), eps };
+    lctEps.set(String(lctId), out);
+    cacheGuardar('lctEps', () => [...lctEps.entries()]);
+    lctBarrerVivos(lctId, eps).catch(() => {}); /* v112: en fondo, sin frenar la lista */
+    return out;
+  } catch { return null; }
+}
+/* v112: barrido de vivos — los embeds retirados NO se marcan en la
+ * página de la serie (el 1x01 de Billy está muerto y no se nota ahí),
+ * así que cada capítulo se checa en fondo (lotes de 8) y la lista
+ * cacheada se limpia de los que ya no traen iframe de player. */
+async function lctBarrerVivos(lctId, eps) {
+  const vivos = [];
+  let lote = [];
+  const checar = async (e) => {
+    try {
+      const r = await fetchSeguro(e.url, 12000);
+      const html = r && r.ok ? await r.text() : '';
+      if (!html || /cubeembed\.rpmvid\.com\/#[a-z0-9]+/i.test(html)) vivos.push(e);
+    } catch { vivos.push(e); } /* si no se pudo checar, no se tira */
+  };
+  for (const e of eps.slice(0, 220)) {
+    lote.push(checar(e));
+    if (lote.length >= 8) { await Promise.all(lote); lote = []; }
+  }
+  await Promise.all(lote);
+  if (!vivos.length || vivos.length === eps.length) return;
+  vivos.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep);
+  console.log('[lacartoons] serie ' + lctId + ': ' + (eps.length - vivos.length) + ' capítulos muertos fuera de la lista');
+  lctEps.set(String(lctId), { at: Date.now(), eps: vivos });
+  cacheGuardar('lctEps', () => [...lctEps.entries()]);
+  /* si la serie ya se sirvió, su cariDatos se reconstruirá con la lista limpia */
+  const slug = String(lctId) === String(LCT_BILLY.lctId)
+    ? LCT_BILLY.slug
+    : (([...LCT_SERIES.values()].find((x) => String(x.lctId) === String(lctId)) || {}).slug || '');
+  if (slug) cariDatos.delete(slug);
+}
+/* v112: ¿de qué serie es este capítulo de lacartoons? (para el póster
+ * de continuar-viendo) — busca el capId en las listas ya cacheadas */
+function lctSerieDeCap(capId) {
+  const marca = '/serie/capitulo/' + capId + '?';
+  for (const [id, c] of lctEps) {
+    if (!(c && c.eps && c.eps.some((e) => e.url.includes(marca)))) continue;
+    if (id === String(LCT_BILLY.lctId)) return LCT_BILLY.slug;
+    const s = [...LCT_SERIES.values()].find((x) => String(x.lctId) === id);
+    return s ? s.slug : '';
+  }
+  return '';
 }
 /* v102: el h1 a veces trae entidades y colas («– Capítulos completos»,
  * «| Español latino») — se decodifican y se cortan */
@@ -2261,6 +2361,15 @@ async function refrescarCariFeed() {
       url: CARI_BASE + slug + '/', img, site: 'Caricaturas',
     };
   }))).filter((x) => x.title && x.img);
+  /* v112: iCarly y Drake & Josh de LACARTOONS entran al mismo carril */
+  for (const lct of LCT_SERIES.values()) {
+    try {
+      const d = await datosCaricatura(String(lct.lctId));
+      if (d && d.poster && d.episodios && d.episodios.length) {
+        items.push({ title: d.titulo, url: LCT_BASE + 'serie/' + lct.lctId, img: d.poster, site: 'Caricaturas' });
+      }
+    } catch {}
+  }
   if (items.length) { cariFeedCache.at = Date.now(); cariFeedCache.items = items; cacheGuardar('cariFeed', () => ({ at: cariFeedCache.at, items: cariFeedCache.items })); } /* v111: a disco */
   return items;
 }
@@ -2280,9 +2389,41 @@ async function cariEpsDeHtml(html) {
   }
   return eps;
 }
+/* v112: datos de una serie de LACARTOONS (mismo formato que las de
+ * MisCaricaturas para que el selector no distinga). El póster es el
+ * <img> de rails que no es el fondo de la página. */
+async function datosLacartoons(lct) {
+  try {
+    const c = cariDatos.get(lct.slug);
+    if (c && Date.now() - c.at < 30 * 60 * 1000) return c.d;
+    if (c) { refrescarDatosLacartoons(lct).catch(() => {}); return c.d; } /* v111: stale-while-revalidate */
+    return await refrescarDatosLacartoons(lct);
+  } catch { return null; }
+}
+async function refrescarDatosLacartoons(lct) {
+  try {
+    const r = await fetchSeguro(LCT_BASE + 'serie/' + lct.lctId, 15000);
+    if (!r.ok) return null;
+    const html = await r.text();
+    const posters = [...html.matchAll(/<img[^>]+src="(\/rails\/active_storage\/[^"]+)"/gi)].map((m) => m[1]);
+    let poster = posters.find((p) => !/fondo/i.test(p)) || posters[0] || '';
+    if (poster) poster = LCT_BASE.replace(/\/+$/, '') + poster;
+    const lista = await lctEpisodios(lct.lctId);
+    const eps = (lista && lista.eps) || lctEpsDeHtml(html);
+    if (!eps.length) return null;
+    const out = { ok: true, slug: lct.slug, titulo: lct.titulo, poster, cover: '', episodios: eps };
+    cariDatos.set(lct.slug, { at: Date.now(), d: out });
+    cacheGuardar('cariDatos', () => [...cariDatos.entries()]);
+    if (poster) cariMeta.set(lct.slug, { at: Date.now(), titulo: out.titulo, poster, cover: '' });
+    cacheGuardar('cariMeta', () => [...cariMeta.entries()]);
+    return out;
+  } catch { return null; }
+}
 async function datosCaricatura(slug) {
   try {
     if (!/^[a-z0-9-]{2,90}$/.test(slug)) return null;
+    const lct = LCT_SERIES.get(slug); /* v112: '/api/caricaturas/150' → iCarly de lacartoons */
+    if (lct) return await datosLacartoons(lct);
     const c = cariDatos.get(slug);
     if (c && Date.now() - c.at < 30 * 60 * 1000) return c.d;
     if (c) { refrescarDatosCaricatura(slug).catch(() => {}); return c.d; } /* v111: vencido → se sirve y se refresca por detrás */
@@ -2320,6 +2461,21 @@ async function refrescarDatosCaricatura(slug) {
       for (const lista of extra) for (const e of lista) if (!vistosEp.has(e.url)) { vistosEp.add(e.url); eps.push(e); }
     }
     eps.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep || String(a.parte).localeCompare(String(b.parte)));
+    /* v112: Billy y Mandy — las T1-T5 llegan de LACARTOONS en latino
+     * (auditado con ASR); las copias en inglés de MisCaricaturas se
+     * tiran y la T6 se queda con MisCaricaturas (21 eps vs 11). */
+    if (slug === LCT_BILLY.slug) {
+      const lb = await lctEpisodios(LCT_BILLY.lctId).catch(() => null);
+      if (lb && lb.eps.length) {
+        eps = eps.filter((e) => e.temporada >= 6);
+        const claves = new Set(eps.map((e) => e.temporada + 'x' + e.ep));
+        for (const e of lb.eps) {
+          if (!LCT_BILLY.temporadas.includes(e.temporada)) continue;
+          if (!claves.has(e.temporada + 'x' + e.ep)) { eps.push(e); claves.add(e.temporada + 'x' + e.ep); }
+        }
+        eps.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep);
+      }
+    }
     eps = eps.filter((e) => !cariEsIngles(slug, e)); /* v109: sin capítulos que solo existen en inglés */
     if (!eps.length) return null;
     const out = {
@@ -2385,6 +2541,114 @@ async function resolverCaricatura(epUrl) {
     }
   } catch {}
   console.log('[caricaturas] ' + slug + ' → playlist ' + (cap.body.match(/#EXTINF/g) || []).length + ' segmentos');
+  return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
+}
+
+/* v112: LACARTOONS — capítulo → playlist. El player cubeembed.rpmvid
+ * guarda el m3u8 detrás de una API cifrada que solo él sabe descifrar:
+ * el navegador del servidor abre el capítulo, CLICA el play (botón en
+ * shadow DOM de vidstack + clic físico sobre el iframe, que los clics
+ * sintéticos no le bastan) y captura el master «hlsmod». Los segmentos
+ * son TS camuflados de PNG en tiktokcdn — el proxy /api/hls los
+ * despelleja al servirlos. */
+async function extraerRpmvid(pageUrl) {
+  if (!PUPPETEER) { try { PUPPETEER = require('puppeteer'); } catch { throw new Error('El navegador del servidor no está disponible'); } }
+  const browser = await PUPPETEER.launch({
+    headless: 'new',
+    ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
+    args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required', '--disable-blink-features=AutomationControlled'],
+  }).catch(() => null);
+  if (!browser) throw new Error('No pude abrir el navegador del servidor');
+  try {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 1280, height: 720 });
+    await page.setUserAgent(MIRROR_UA).catch(() => {});
+    await page.evaluateOnNewDocument(() => {
+      try { window.open = function () { return null; }; } catch {}
+      try { Object.defineProperty(navigator, 'webdriver', { get: () => false }); } catch {}
+    });
+    let master = null;
+    page.on('response', (r) => {
+      const u = r.url();
+      if (master || !/\/hlsmod\/.*master\.m3u8/i.test(u)) return;
+      master = u;
+    });
+    page.on('dialog', async (d) => { try { await d.dismiss(); } catch {} });
+    await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    for (let i = 0; i < 12 && !master; i++) {
+      await new Promise((r2) => setTimeout(r2, 3000));
+      for (const fr of page.frames()) {
+        if (!/rpmvid/i.test(fr.url())) continue;
+        try {
+          await fr.evaluate(() => {
+            const walk = (root, depth) => {
+              if (!root || depth > 6) return;
+              for (const el of root.querySelectorAll('*')) {
+                if (el.tagName && /button|media-play-button/i.test(el.tagName)) { try { el.click(); } catch {} }
+                if (el.shadowRoot) walk(el.shadowRoot, depth + 1);
+              }
+            };
+            walk(document, 0);
+            const v = document.querySelector('video');
+            if (v) { v.muted = true; v.play().catch(() => {}); }
+          });
+        } catch {}
+      }
+      const ifr = await page.$('iframe');
+      if (ifr) {
+        const bb = await ifr.boundingBox().catch(() => null);
+        if (bb) {
+          try {
+            await page.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2);
+            await page.mouse.down(); await new Promise((r2) => setTimeout(r2, 120)); await page.mouse.up();
+          } catch {}
+        }
+      }
+    }
+    if (!master) throw new Error('Ese capítulo ya no está disponible en Lacartoons');
+    return master;
+  } finally { try { await browser.close(); } catch {} }
+}
+async function resolverLacartoons(epUrl) {
+  const m = /lacartoons\.com\/serie\/capitulo\/(\d+)\?t=\d+/i.exec(epUrl || '');
+  if (!m) throw new Error('Capítulo de Lacartoons no válido');
+  const slugLct = 'lct-' + m[1];
+  const ahora = Date.now();
+  for (const [tok, s] of pelisxdStreams) {
+    if (s.slug === slugLct && ahora - s.at < PELISXD_STREAM_TTL) {
+      return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
+    }
+  }
+  /* v112: chequeo rápido — si la página ya no trae el iframe del player
+   * (embed retirado), el error sale claro sin abrir el navegador */
+  {
+    const rPre = await fetchSeguro(epUrl, 10000).catch(() => null);
+    const html = rPre && rPre.ok ? await rPre.text().catch(() => '') : '';
+    if (html && !/cubeembed\.rpmvid\.com\/#[a-z0-9]+/i.test(html)) {
+      throw new Error('Ese capítulo ya no está disponible en Lacartoons — prueba otro');
+    }
+  }
+  /* el navegador clica el player y suelta el master; el master trae una
+   * sola variante relativa — se baja su cuerpo y se cachea como los
+   * demás playlists (los segmentos van absolutos a tiktokcdn) */
+  const master = await extraerRpmvid(epUrl);
+  const rM = await fetchSeguro(master, 15000);
+  if (!rM.ok) throw new Error('El player de Lacartoons no respondió');
+  const txtM = await rM.text();
+  const linea = txtM.split('\n').map((s) => s.trim()).find((s) => s && !s.startsWith('#'));
+  const vari = linea ? new URL(linea, master).href : master;
+  const rV = await fetchSeguro(vari, 15000);
+  const body = await rV.text();
+  if (!rV.ok || !/#EXTINF/.test(body)) throw new Error('No pude leer el playlist de Lacartoons');
+  const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
+  pelisxdStreams.set(tok, { body, base: vari, ref: 'https://cubeembed.rpmvid.com/', slug: slugLct, at: ahora });
+  try {
+    hlsReferers.set(new URL(vari).hostname, 'https://cubeembed.rpmvid.com/');
+    for (const u of body.match(/https?:\/\/[^\s"']+/g) || []) {
+      try { hlsReferers.set(new URL(u).hostname, 'https://cubeembed.rpmvid.com/'); } catch {}
+    }
+  } catch {}
+  console.log('[lacartoons] cap ' + m[1] + ' → playlist ' + (body.match(/#EXTINF/g) || []).length + ' segmentos');
   return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
 }
 
@@ -2785,6 +3049,7 @@ function esProxeable(u) {
   try {
     const h = new URL(u).hostname;
     return /(^|\.)goodstream\.one$/i.test(h) || /(^|\.)mp4upload\.com$/i.test(h) || /(^|\.)vimeos\.(net|zip)$/i.test(h)
+      || /(^|\.)rpmvid\.com$/i.test(h) || /(^|\.)tiktokcdn\.com$/i.test(h) /* v112: lacartoons (cubeembed) y sus segmentos camuflados */
       || hlsReferers.has(h); /* v93: hosts que ya resolvimos (con su Referer) */
   } catch { return false; }
 }
@@ -2869,6 +3134,23 @@ async function proxearHls(req, res, target) {
   const ct = upstream.headers.get('content-type') || '';
   const esLista = /mpegurl|m3u8/i.test(ct) || /\.m3u8(\?|$)/i.test(target);
   if (!esLista) {
+    /* v112: los segmentos de lacartoons (tiktokcdn vía cubeembed/rpmvid)
+     * llegan camuflados de PNG: un header de imagen de ~120 bytes pegado
+     * al MPEG-TS (el CDN solo acepta «imágenes», así que el player real
+     * se lo quita en el navegador). Aquí se corta todo hasta el IEND y
+     * queda el TS limpio que espera hls.js. */
+    let hSeg = '';
+    try { hSeg = new URL(target).hostname; } catch {}
+    if (/(^|\.)tiktokcdn\.com$/i.test(hSeg)) {
+      try {
+        const buf = Buffer.from(await upstream.arrayBuffer());
+        const i = buf.indexOf(Buffer.from('IEND'));
+        const ts = i >= 0 && i < 4096 ? buf.slice(i + 8) : buf;
+        res.writeHead(200, { 'Content-Type': 'video/MP2T', 'Cache-Control': 'no-store', 'Content-Length': ts.length });
+        res.end(ts);
+        return;
+      } catch { /* si falla el despelleje, se cae a la tubería cruda */ }
+    }
     /* segmento (o mp4 entero): tubería directa, sin tocar los bytes.
      * v90: pasamos Range/Content-Range para poder moverse dentro del
      * mp4 de animes sin descargarlo completo */
@@ -2917,7 +3199,7 @@ const server = http.createServer(async (req, res) => {
       const iu = url.searchParams.get('u') || '';
       let host = '';
       try { host = new URL(iu).hostname; } catch {}
-      if (!/^(www\.|vww\.)?(latanime\.org|animeflv\.one|miscaricaturas\.com)$/i.test(host)) {
+      if (!/^(www\.|vww\.)?(latanime\.org|animeflv\.one|miscaricaturas\.com|lacartoons\.com)$/i.test(host)) {
         return json(res, 403, { ok: false, error: 'Host no permitido' });
       }
       const key = iu.split('?')[0];
@@ -3191,7 +3473,8 @@ const server = http.createServer(async (req, res) => {
         const esEpAnime = /latanime\.org\/ver\/|animeflv\.one\/ver\//i.test(target); /* v97: también AnimeFLV */
         const esPeliXd = /pelisxd\.com\/pelicula\//i.test(target); /* v98 */
         const esCari = /miscaricaturas\.com\//i.test(target); /* v102: caricaturas */
-        const r = await (esEpAnime ? resolverAnime(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : resolverSolo(target));
+        const esLct = /lacartoons\.com\/serie\/capitulo\//i.test(target); /* v112: lacartoons */
+        const r = await (esEpAnime ? resolverAnime(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : resolverSolo(target));
         return json(res, 200, { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy });
       } catch (e) {
         console.warn('[solo] no pude resolver', target.slice(0, 70), '→', String(e.message || e).slice(0, 90));
@@ -3248,6 +3531,15 @@ const server = http.createServer(async (req, res) => {
       if (/miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}/i.test(entry.url)) {
         const pref = (/miscaricaturas\.com\/([a-z0-9-]+)-\d{2}x\d{2}/i.exec(entry.url) || [])[1];
         const serie = pref && (cariSerieDeEp(pref) || pref);
+        const mt = serie ? await cariMetaDe(serie).catch(() => null) : null;
+        const po = (serie && CARI_PORTADAS.get(serie)) || (mt && (mt.cover || mt.poster)) || '';
+        if (po) entry.img = po;
+      }
+      /* v112: lo mismo para EPISODIOS DE LACARTOONS — el capId se mapea
+       * a la serie real (billy / icarly / drake-y-josh) y viaja su póster */
+      if (/lacartoons\.com\/serie\/capitulo\/\d+/i.test(entry.url)) {
+        const capId = (/lacartoons\.com\/serie\/capitulo\/(\d+)/i.exec(entry.url) || [])[1];
+        const serie = capId && lctSerieDeCap(capId);
         const mt = serie ? await cariMetaDe(serie).catch(() => null) : null;
         const po = (serie && CARI_PORTADAS.get(serie)) || (mt && (mt.cover || mt.poster)) || '';
         if (po) entry.img = po;

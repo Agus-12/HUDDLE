@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v111';
+const APP_VERSION = 'v112';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1125,7 +1125,7 @@ let spDatos = null; /* lo que devolvió /api/serie */
  * wsrv.nl ya no puede con ellas (las bloquean con 403) */
 function proxyAnimeImg(src, w) {
   if (src && src.startsWith('/api/img')) return src; /* v91: ya proxieada */
-  if (src && /animeflv\.|latanime\.|miscaricaturas\./i.test(src)) { /* v102: pósters de caricaturas */
+  if (src && /animeflv\.|latanime\.|miscaricaturas\.|lacartoons\./i.test(src)) { /* v102 pósters de caricaturas; v112 lacartoons */
     return '/api/img?u=' + encodeURIComponent(src);
   }
   return src || '';
@@ -1194,7 +1194,8 @@ function abrirSeriePicker(res, enSala, esAnime) {
  * pero con episodios en lista limpia (sin stills: no los hay) y
  * temporadas de verdad (Bob Esponja tiene 13) */
 function abrirCaricaturasPicker(res, enSala) {
-  const slugM = /miscaricaturas\.com\/([a-z0-9-]+)/i.exec(res.url || '');
+  const slugM = /miscaricaturas\.com\/([a-z0-9-]+)/i.exec(res.url || '') /* v102 */
+    || /lacartoons\.com\/serie\/(\d+)/i.exec(res.url || ''); /* v112: el id numérico de la serie viaja como slug y el servidor lo mapea */
   if (!slugM) { toast('No pude leer esa caricatura'); return; }
   const slug = slugM[1];
   const pk = $('#seriePicker');
@@ -1332,6 +1333,7 @@ $('#seriePicker').addEventListener('click', (e) => { if (e.target === e.currentT
 
 /* v61: ¿es una serie? → abrir el selector en vez del espejo directo */
 function elegirTitulo(res, enSala) {
+  if (/lacartoons\.com\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v112: antes que el genérico /serie/ (sus urls también lo traen) */
   if (/\/serie\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, false); return true; }
   if (/\/anime\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, true); return true; }
   if (/miscaricaturas\.com\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v102 */
@@ -1422,7 +1424,7 @@ let SITES = [
   { name: 'Latanime', full: 'Latanime — animes con audio latino', url: 'https://latanime.org/', logo: '/sites/latanime.png' },
   { name: 'Cuevana', full: 'Cuevana — películas y series', url: 'https://cuevana.mov/', logo: '/sites/cuevana.png' },
   { name: 'PelisXD', full: 'PelisXD — películas en HD (catálogo grande)', url: 'https://www.pelisxd.com/', logo: '/sites/pelisxd.png' }, /* v98 */
-  { name: 'Caricaturas', full: 'Mis Caricaturas — las clásicas de nick/CN en latino', url: 'https://miscaricaturas.com/', logo: '/sites/caricaturas.png' }, /* v102 */
+  { name: 'Caricaturas', full: 'Mis Caricaturas + Lacartoons — clásicas de nick/CN en latino', url: 'https://miscaricaturas.com/', logo: '/sites/caricaturas.png' }, /* v102; v112: también lacartoons */
   { name: 'YouTube', full: 'YouTube — videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
 ];
 function renderPageDrop() {
