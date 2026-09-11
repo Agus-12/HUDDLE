@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v107'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v108'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -2000,12 +2000,15 @@ function cariLimpia(t) {
 /* v104: portadas CURADAS — archivos locales en public/covers/{slug}.jpg para
  * las series cuya página no tiene ningún póster (Simpsons, Futurama, Oye
  * Arnold, Dexter, Coraje, Daria, Sabrina, Kenan y Kel). Se leen del disco al
- * arrancar: agrega un .jpg ahí y reinicia. */
+ * arrancar: agrega un .jpg ahí y reinicia.
+ * v108: Bob Esponja, Dexter, Los Simpson, Padrinos Mágicos y El Chavo del 8
+ * usan el póster primario de IMDB (el usuario los pidió de ahí) — el Chavo
+ * es la serie ANIMADA (2006) y su archivo es nuevo. */
 const CARI_PORTADAS = new Map();
 try {
   for (const f of fs.readdirSync(path.join(__dirname, 'public', 'covers'))) {
     const m = /^([a-z0-9-]{2,90})\.(jpe?g|png|webp)$/i.exec(f);
-    if (m) CARI_PORTADAS.set(m[1], '/covers/' + f);
+    if (m) CARI_PORTADAS.set(m[1], '/covers/' + f + '?v=' + UI_VERSION); /* v108: ?v= para que el navegador no sirva una portada vieja de su caché al reemplazar el archivo */
   }
 } catch {}
 
