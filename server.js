@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v112'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v113'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -2025,21 +2025,45 @@ const cariFeedCache = { at: 0, items: [] }; /* 1 h */
 /* v112: LACARTOONS (lacartoons.com) — fuente nueva de series clásicas.
  * Aporta lo que MisCaricaturas no tiene: las temporadas 1-5 de Billy y
  * Mandy en LATINO (allí solo la T6 está doblada) e iCarly y Drake & Josh
- * completas. Auditado con ASR (2026-09-11): billy T1-T6, iCarly y Drake
- * & Josh hablan español; Zoey 101, Kenan & Kel y Sabrina tienen los
- * embeds retirados en esa fuente (muertos) y no se integran.
+ * completas. v113: + Ed, Edd y Eddy completa y las T3/T4 + 2x12 de Ben 10
+ * (en MisCaricaturas solo existían en inglés). Todo auditado con ASR
+ * (2026-09-11): billy T1-T6, iCarly, Drake & Josh, Ed Edd T1-T3 y Ben 10
+ * T2x12/T3/T4 hablan español; en lacartoons están MUERTAS (embeds
+ * retirados): Zoey 101, Kenan & Kel, Sabrina, Jimmy Neutrón T2, Tom y
+ * Jerry y Looney Tunes. Ojo: Ben 10 4x02 declara pista «Español» pero
+ * trae audio FRANCÉS (verificado) y 4x01 está muerto — ambos excluidos.
  * El player es cubeembed.rpmvid.com: el navegador del servidor clica el
  * play (el botón vive en shadow DOM de vidstack y además quiere un clic
  * físico) y captura un m3u8 «hlsmod» servido por el propio rpmvid cuyos
  * segmentos son TS camuflados de PNG en tiktokcdn (el proxy los
- * despelleja). El Chavo del 8 también vive ahí, pero ya está en
- * MisCaricaturas — no se duplica. */
+ * despelleja). Los masters nuevos (Ben 10, Ed Edd) traen el audio en
+ * renditions aparte CON IDIOMA DECLARADO — el resolver arma un master
+ * con la pista «Español» como única opción. El Chavo del 8 también vive
+ * ahí, pero ya está en MisCaricaturas — no se duplica. */
 const LCT_BASE = 'https://www.lacartoons.com/';
 const LCT_SERIES = new Map([
   ['150', { slug: 'icarly', lctId: 150, titulo: 'iCarly' }],
   ['144', { slug: 'drake-y-josh', lctId: 144, titulo: 'Drake & Josh' }],
+  ['31', { slug: 'ed-edd-y-eddy', lctId: 31, titulo: 'Ed, Edd y Eddy' }], /* v113 */
 ]);
-const LCT_BILLY = { slug: 'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos', lctId: 16, temporadas: [1, 2, 3, 4, 5] };
+/* v113: series de MisCaricaturas cuyas temporadas en inglés se
+ * reemplazan por las de lacartoons (latino, auditadas). «tomar» = qué
+ * eps de lacartoons entran; «dejarMisc» = qué eps de MisCaricaturas se
+ * conservan (el resto de esa serie se tira); «excluirCaps» = capIds de
+ * lacartoons que se saben rotos (muertos o idioma mentiroso). */
+const LCT_MERGE = [
+  {
+    slug: 'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos', lctId: 16,
+    tomar: (e) => e.temporada <= 5,
+    dejarMisc: (e) => e.temporada >= 6,
+  },
+  {
+    slug: 'ben-10-capitulos-completos', lctId: 280,
+    tomar: (e) => e.temporada >= 3 || (e.temporada === 2 && e.ep === 12),
+    dejarMisc: (e) => e.temporada <= 2 && !(e.temporada === 2 && e.ep === 12),
+    excluirCaps: new Set([16693, 16694]), /* v113: 4x01 muerto; 4x02 «español» que es francés */
+  },
+];
 const lctEps = new Map(); /* lctId → {at, eps} — 6 h */
 /* v111: al arrancar, las cachés de los pickers se leen del DISCO — el
  * selector abre rápido incluso recién reiniciado el servidor (antes,
@@ -2095,15 +2119,17 @@ function cariSerieDeEp(prefijo) {
  * - Billy y Mandy: T1-T5 en inglés (9 muestras 96-98%), T6 en latino
  *   → v112: las T1-T5 ahora vienen de LACARTOONS en latino y salieron
  *     de esta lista; MisCaricaturas ya no las aporta
+ * - Ben 10: T3 y T4 en inglés (99%), 2x12 inglés
+ *   → v113: igual — ahora vienen de LACARTOONS en latino (auditado de
+ *     nuevo ahí: 2x12 0.99, T3 0.96-0.98, T4 0.97-0.99) y salió de la
+ *     lista. Queda FUERA el 4x01 (muerto) y el 4x02 (pista «Español»
+ *     que en realidad trae audio francés — verificado con ASR)
  * - Jimmy Neutrón: T2 en inglés (3 muestras 97-99%), T1 y T3 latino
- * - Ben 10: T3 y T4 en inglés (99%), T1 y T2 latino (salvo 2x12, inglés)
+ *   → v113: en lacartoons la serie entera está muerta, sigue oculta
  * - las demás 16 series del feed: latino confirmado
  * Formato: 'slug|TxEPp' (exacto) o 'slug|Tx*' (toda la temporada). */
 const EPS_INGLESES = new Set([
   'jimmy-neutron-capitulos-completos|2x*',
-  'ben-10-capitulos-completos|2x12',
-  'ben-10-capitulos-completos|3x*',
-  'ben-10-capitulos-completos|4x*',
 ]);
 function cariEsIngles(slug, e) {
   const p = String(e.parte || '').toLowerCase();
@@ -2185,11 +2211,13 @@ async function lctBarrerVivos(lctId, eps) {
  * de continuar-viendo) — busca el capId en las listas ya cacheadas */
 function lctSerieDeCap(capId) {
   const marca = '/serie/capitulo/' + capId + '?';
-  for (const [id, c] of lctEps) {
-    if (!(c && c.eps && c.eps.some((e) => e.url.includes(marca)))) continue;
-    if (id === String(LCT_BILLY.lctId)) return LCT_BILLY.slug;
-    const s = [...LCT_SERIES.values()].find((x) => String(x.lctId) === id);
-    return s ? s.slug : '';
+  const candidatas = [
+    ...LCT_MERGE.map((x) => [String(x.lctId), x.slug]), /* v113: billy, ben 10 */
+    ...[...LCT_SERIES.values()].map((x) => [String(x.lctId), x.slug]),
+  ];
+  for (const [id, slug] of candidatas) {
+    const c = lctEps.get(id);
+    if (c && c.eps && c.eps.some((e) => e.url.includes(marca))) return slug;
   }
   return '';
 }
@@ -2461,16 +2489,18 @@ async function refrescarDatosCaricatura(slug) {
       for (const lista of extra) for (const e of lista) if (!vistosEp.has(e.url)) { vistosEp.add(e.url); eps.push(e); }
     }
     eps.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep || String(a.parte).localeCompare(String(b.parte)));
-    /* v112: Billy y Mandy — las T1-T5 llegan de LACARTOONS en latino
-     * (auditado con ASR); las copias en inglés de MisCaricaturas se
-     * tiran y la T6 se queda con MisCaricaturas (21 eps vs 11). */
-    if (slug === LCT_BILLY.slug) {
-      const lb = await lctEpisodios(LCT_BILLY.lctId).catch(() => null);
+    /* v112→v113: series con temporadas que MisCaricaturas solo tiene en
+     * inglés — llegan de LACARTOONS en latino (auditado con ASR) y
+     * reemplazan a las copias inglesas (Billy T1-T5, Ben 10 T3/T4 + 2x12). */
+    const lctCfg = LCT_MERGE.find((x) => x.slug === slug);
+    if (lctCfg) {
+      const lb = await lctEpisodios(lctCfg.lctId).catch(() => null);
       if (lb && lb.eps.length) {
-        eps = eps.filter((e) => e.temporada >= 6);
+        eps = eps.filter((e) => lctCfg.dejarMisc(e));
         const claves = new Set(eps.map((e) => e.temporada + 'x' + e.ep));
         for (const e of lb.eps) {
-          if (!LCT_BILLY.temporadas.includes(e.temporada)) continue;
+          const capId = +((/capitulo\/(\d+)\?/.exec(e.url) || [])[1] || 0);
+          if (!lctCfg.tomar(e) || (lctCfg.excluirCaps && lctCfg.excluirCaps.has(capId))) continue;
           if (!claves.has(e.temporada + 'x' + e.ep)) { eps.push(e); claves.add(e.temporada + 'x' + e.ep); }
         }
         eps.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep);
@@ -2628,27 +2658,52 @@ async function resolverLacartoons(epUrl) {
       throw new Error('Ese capítulo ya no está disponible en Lacartoons — prueba otro');
     }
   }
-  /* el navegador clica el player y suelta el master; el master trae una
-   * sola variante relativa — se baja su cuerpo y se cachea como los
-   * demás playlists (los segmentos van absolutos a tiktokcdn) */
+  /* el navegador clica el player y suelta el master. Hay DOS formatos:
+   * - viejo (billy, iCarly): master con una sola variante muxada a+v —
+   *   se baja su cuerpo y se cachea como los demás playlists.
+   * - nuevo v113 (Ben 10, Ed Edd): audio DEMULTICANALIZADO en renditions
+   *   #EXT-X-MEDIA con IDIOMA DECLARADO y video aparte — se arma un
+   *   master propio que deja SOLO la pista «Español» como default, para
+   *   que hls.js no pueda equivocarse de idioma. Sin pista es → error
+   *   claro (capítulo que solo existe en inglés/portugués/francés). */
   const master = await extraerRpmvid(epUrl);
   const rM = await fetchSeguro(master, 15000);
   if (!rM.ok) throw new Error('El player de Lacartoons no respondió');
   const txtM = await rM.text();
-  const linea = txtM.split('\n').map((s) => s.trim()).find((s) => s && !s.startsWith('#'));
-  const vari = linea ? new URL(linea, master).href : master;
-  const rV = await fetchSeguro(vari, 15000);
-  const body = await rV.text();
-  if (!rV.ok || !/#EXTINF/.test(body)) throw new Error('No pude leer el playlist de Lacartoons');
+  let body = null, base = master, nSeg = 0;
+  const medios = txtM.split('\n').filter((l) => /^#EXT-X-MEDIA:TYPE=AUDIO/i.test(l.trim()));
+  if (medios.length) {
+    const lineaEs = medios.find((l) => /LANGUAGE="es"/i.test(l) || /NAME="[^"]*Espa/i.test(l));
+    if (!lineaEs) throw new Error('Ese capítulo no está en español en Lacartoons — prueba otro');
+    const uriEs = (/URI="([^"]+)"/.exec(lineaEs) || [])[1];
+    const rA = uriEs ? await fetchSeguro(new URL(uriEs, master).href, 15000) : null;
+    const bodyA = rA ? await rA.text() : '';
+    if (!rA || !rA.ok || !/#EXTINF/.test(bodyA)) throw new Error('No pude leer la pista de audio de Lacartoons');
+    nSeg = (bodyA.match(/#EXTINF/g) || []).length;
+    body = txtM
+      .split('\n')
+      .filter((l) => !/^#EXT-X-MEDIA:TYPE=AUDIO/i.test(l.trim()) || l.trim() === lineaEs.trim())
+      .map((l) => l.trim() === lineaEs.trim() ? l.replace(/AUTOSELECT=\w+/i, 'AUTOSELECT=YES').replace(/DEFAULT=\w+/i, 'DEFAULT=YES') : l)
+      .join('\n');
+    try { for (const u of bodyA.match(/https?:\/\/[^\s"']+/g) || []) { try { hlsReferers.set(new URL(u).hostname, 'https://cubeembed.rpmvid.com/'); } catch {} } } catch {}
+  } else {
+    const linea = txtM.split('\n').map((s) => s.trim()).find((s) => s && !s.startsWith('#'));
+    const vari = linea ? new URL(linea, master).href : master;
+    const rV = await fetchSeguro(vari, 15000);
+    body = await rV.text();
+    if (!rV.ok || !/#EXTINF/.test(body)) throw new Error('No pude leer el playlist de Lacartoons');
+    base = vari;
+    nSeg = (body.match(/#EXTINF/g) || []).length;
+  }
   const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
-  pelisxdStreams.set(tok, { body, base: vari, ref: 'https://cubeembed.rpmvid.com/', slug: slugLct, at: ahora });
+  pelisxdStreams.set(tok, { body, base, ref: 'https://cubeembed.rpmvid.com/', slug: slugLct, at: ahora });
   try {
-    hlsReferers.set(new URL(vari).hostname, 'https://cubeembed.rpmvid.com/');
+    hlsReferers.set(new URL(base).hostname, 'https://cubeembed.rpmvid.com/');
     for (const u of body.match(/https?:\/\/[^\s"']+/g) || []) {
       try { hlsReferers.set(new URL(u).hostname, 'https://cubeembed.rpmvid.com/'); } catch {}
     }
   } catch {}
-  console.log('[lacartoons] cap ' + m[1] + ' → playlist ' + (body.match(/#EXTINF/g) || []).length + ' segmentos');
+  console.log('[lacartoons] cap ' + m[1] + ' → ' + (medios.length ? 'master con audio es (' + medios.length + ' pistas)' : 'playlist') + ' ' + nSeg + ' segmentos');
   return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
 }
 
