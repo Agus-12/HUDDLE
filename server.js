@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v115'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v116'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -220,6 +220,7 @@ async function resolverNativo(url) {
   if (/latanime\.org\/ver\//i.test(url)) return resolverAnime(url);
   if (/pelisxd\.com\/pelicula\//i.test(url)) return resolverPelisxd(url); /* v98 */
   if (/miscaricaturas\.com\//i.test(url)) return resolverCaricatura(url); /* v102 */
+  if (/lacartoons\.com\/serie\/capitulo\//i.test(url)) return resolverLacartoons(url); /* v116: sin esto, los capítulos de lacartoons en SALA caían al espejo de navegador (abría la página web en vez de reproducir nativo) */
   return resolverSolo(url);
 }
 
