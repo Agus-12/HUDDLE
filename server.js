@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v113'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v114'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -2045,6 +2045,17 @@ const LCT_SERIES = new Map([
   ['150', { slug: 'icarly', lctId: 150, titulo: 'iCarly' }],
   ['144', { slug: 'drake-y-josh', lctId: 144, titulo: 'Drake & Josh' }],
   ['31', { slug: 'ed-edd-y-eddy', lctId: 31, titulo: 'Ed, Edd y Eddy' }], /* v113 */
+  /* v114: lote CN/acción auditado con ASR (todas es 0.85-0.98):
+   * Johnny Test y Xiaolin Chronicles también se revisaron pero están
+   * muertas en lacartoons (embeds retirados) y quedan fuera */
+  ['14', { slug: 'chicas-superpoderosas', lctId: 14, titulo: 'Las Chicas Superpoderosas' }],
+  ['17', { slug: 'vaca-y-pollito', lctId: 17, titulo: 'La Vaca y El Pollito' }],
+  ['133', { slug: 'animaniacs', lctId: 133, titulo: 'Animaniacs' }],
+  ['223', { slug: 'knd-chicos-del-barrio', lctId: 223, titulo: 'KND: Los Chicos Del Barrio' }],
+  ['206', { slug: 'johnny-bravo', lctId: 206, titulo: 'Johnny Bravo' }],
+  ['15', { slug: 'flapjack', lctId: 15, titulo: 'Las Maravillosas Desventuras de FlapJack' }],
+  ['32', { slug: 'jovenes-titanes', lctId: 32, titulo: 'Los Jóvenes Titanes' }],
+  ['27', { slug: 'samurai-jack', lctId: 27, titulo: 'Samurai Jack' }],
 ]);
 /* v113: series de MisCaricaturas cuyas temporadas en inglés se
  * reemplazan por las de lacartoons (latino, auditadas). «tomar» = qué
