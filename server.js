@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v108'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v109'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1983,6 +1983,46 @@ const cariFeedCache = { at: 0, items: [] }; /* 1 h */
 function cariSlugDe(u) { return ((/miscaricaturas\.com\/([a-z0-9-]+)/i.exec(u || '') || [])[1] || '').toLowerCase(); }
 function cariEsSerie(slug) { return !!slug && !/temporada/i.test(slug) && !/\d{2}x\d{2}/i.test(slug); }
 function cariBonito(slug) { return slug.replace(/-+/g, ' ').replace(/\b(capitulos completos|completos|ver|latino|online)\b/gi, '').trim(); }
+/* v109: el prefijo del slug de un EPISODIO («el-chavo-del-8-1978»,
+ * «las-sombrias-aventuras-de-billy-y-mandy») NO es el slug de la serie:
+ * el Chavo intercala el año y las series llevan colas como
+ * «-capitulos-completos». Este núcleo + búsqueda por prefijo mapea
+ * episodio → serie real (arregla el póster en blanco de continuar-viendo
+ * del Chavo: «el-chavo-del-8-1978» no existe como página y el saneo
+ * viejo se quedaba sin póster). */
+function cariCore(slug) {
+  let s = String(slug || ''), prev = null;
+  while (prev !== s) {
+    prev = s;
+    s = s.replace(/-(capitulos-y-canciones|capitulos-completos[a-z]*|temporada-\d+|completos|ver|latino|online)$/, '');
+  }
+  return s.replace(/-(19|20)\d{2}$/, ''); /* el año final de los eps del Chavo */
+}
+function cariSerieDeEp(prefijo) {
+  const nucleo = cariCore(prefijo);
+  if (!nucleo) return '';
+  const candidatas = [...new Set([...CARI_PORTADAS.keys(), ...CARI_ORDEN, ...cariMeta.keys(), ...cariDatos.keys()])];
+  let mejor = '';
+  for (const s of candidatas) {
+    const c = cariCore(s);
+    if (nucleo.startsWith(c) && c.length > cariCore(mejor).length) mejor = s; /* la más específica gana; las locales primero */
+  }
+  return mejor;
+}
+/* v109: capítulos cuya ÚNICA copia en la fuente está en inglés — se
+ * ocultan de la lista (el usuario quiere todo latino). Verificado a mano
+ * en los uploads: no hay metadata de idioma en streamwish, así que esta
+ * lista se llena con lo que se confirma escuchando. Billy y Mandy 1x01a/
+ * b/c son el MISMO video (mismo embed) y ese upload es el piloto en
+ * inglés; del 1x02 en adelante la serie está en latino. */
+const EPS_INGLESES = new Set([
+  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos|1x1a',
+  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos|1x1b',
+  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos|1x1c',
+]);
+function cariEsIngles(slug, e) {
+  return EPS_INGLESES.has(slug + '|' + e.temporada + 'x' + e.ep + String(e.parte || '').toLowerCase());
+}
 /* v102: el h1 a veces trae entidades y colas («– Capítulos completos»,
  * «| Español latino») — se decodifican y se cortan */
 function cariLimpia(t) {
@@ -2002,8 +2042,10 @@ function cariLimpia(t) {
  * Arnold, Dexter, Coraje, Daria, Sabrina, Kenan y Kel). Se leen del disco al
  * arrancar: agrega un .jpg ahí y reinicia.
  * v108: Bob Esponja, Dexter, Los Simpson, Padrinos Mágicos y El Chavo del 8
- * usan el póster primario de IMDB (el usuario los pidió de ahí) — el Chavo
- * es la serie ANIMADA (2006) y su archivo es nuevo. */
+ * usan el póster primario de IMDB (el usuario los pidió de ahí).
+ * v109: Sabrina (sitcom 1996) y el Chavo del 8 CORREGIDO — la serie del
+ * feed es la ORIGINAL de Chespirito (1973-1978, eps con año en el slug),
+ * no la animada; su póster de IMDB es el de la serie original. */
 const CARI_PORTADAS = new Map();
 try {
   for (const f of fs.readdirSync(path.join(__dirname, 'public', 'covers'))) {
@@ -2184,6 +2226,7 @@ async function datosCaricatura(slug) {
       for (const lista of extra) for (const e of lista) if (!vistosEp.has(e.url)) { vistosEp.add(e.url); eps.push(e); }
     }
     eps.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep || String(a.parte).localeCompare(String(b.parte)));
+    eps = eps.filter((e) => !cariEsIngles(slug, e)); /* v109: sin capítulos que solo existen en inglés */
     if (!eps.length) return null;
     const out = {
       ok: true, slug,
@@ -2203,6 +2246,16 @@ async function datosCaricatura(slug) {
 async function resolverCaricatura(epUrl) {
   const slug = cariSlugDe(epUrl);
   if (!slug) throw new Error('Capítulo de caricatura no válido');
+  /* v109: capítulos ocultos por estar solo en inglés — mensaje claro */
+  {
+    const mE = /^([a-z0-9-]+?)-(\d{2})x(\d{2})([ab])?(?:-|$)/i.exec(slug);
+    if (mE) {
+      const serie = cariSerieDeEp(mE[1]) || mE[1];
+      if (EPS_INGLESES.has(serie + '|' + (+mE[2]) + 'x' + (+mE[3]) + (mE[4] || '').toLowerCase())) {
+        throw new Error('Ese capítulo solo existe en inglés en la fuente — empieza en el siguiente');
+      }
+    }
+  }
   const ahora = Date.now();
   for (const [tok, s] of pelisxdStreams) {
     if (s.slug === slug && ahora - s.at < PELISXD_STREAM_TTL) {
@@ -3009,13 +3062,20 @@ const server = http.createServer(async (req, res) => {
         .map((e) => (/miscaricaturas\.com\/([a-z0-9-]+)-\d{2}x\d{2}/i.exec(e.url) || [])[1])
         .filter(Boolean))];
       if (porSanearC.length) {
-        const metas = await Promise.all(porSanearC.map((sl) => cariMetaDe(sl).catch(() => null)));
+        /* v109: el prefijo del ep se mapea a la SERIE real (los eps del
+         * Chavo llevan el año intercalado y el prefijo no existe como
+         * página — por eso las entradas quedaban en blanco); portada
+         * local curada primero, sin red */
+        const metas = await Promise.all(porSanearC.map((sl) => cariMetaDe(cariSerieDeEp(sl) || sl).catch(() => null)));
         const mapaC = new Map(porSanearC.map((sl, i) => [sl, metas[i]]));
         for (const e of items) {
           if (!/miscaricaturas\.com\//i.test(e.url)) continue;
           const sl = (/miscaricaturas\.com\/([a-z0-9-]+)-\d{2}x\d{2}/i.exec(e.url) || [])[1];
-          const mt = sl && mapaC.get(sl);
-          if (mt && (mt.cover || mt.poster)) e.img = mt.cover || mt.poster;
+          if (!sl) continue;
+          const serie = cariSerieDeEp(sl) || sl;
+          const mt = mapaC.get(sl);
+          const po = CARI_PORTADAS.get(serie) || (mt && (mt.cover || mt.poster)) || '';
+          if (po) e.img = po;
         }
       }
       return json(res, 200, { ok: true, items });
@@ -3084,6 +3144,15 @@ const server = http.createServer(async (req, res) => {
         const mSl = /\/episode\/([a-z0-9-]+)-\d+x\d+(?:\/|$)/i.exec(entry.url);
         const posterSerie = mSl ? await posterDeSerie(mSl[1]) : '';
         if (posterSerie) entry.img = posterSerie;
+      }
+      /* v109: lo mismo para EPISODIOS DE CARICATURAS — el prefijo del ep
+       * se mapea a la serie real y se prefiere la portada local curada */
+      if (/miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}/i.test(entry.url)) {
+        const pref = (/miscaricaturas\.com\/([a-z0-9-]+)-\d{2}x\d{2}/i.exec(entry.url) || [])[1];
+        const serie = pref && (cariSerieDeEp(pref) || pref);
+        const mt = serie ? await cariMetaDe(serie).catch(() => null) : null;
+        const po = (serie && CARI_PORTADAS.get(serie)) || (mt && (mt.cover || mt.poster)) || '';
+        if (po) entry.img = po;
       }
       /* v85: el episodio queda anotado como visto (para las ✓ del selector) */
       if (entry.d >= 60) {
