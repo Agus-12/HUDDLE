@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v109'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v110'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -2009,19 +2009,31 @@ function cariSerieDeEp(prefijo) {
   }
   return mejor;
 }
-/* v109: capítulos cuya ÚNICA copia en la fuente está en inglés — se
- * ocultan de la lista (el usuario quiere todo latino). Verificado a mano
- * en los uploads: no hay metadata de idioma en streamwish, así que esta
- * lista se llena con lo que se confirma escuchando. Billy y Mandy 1x01a/
- * b/c son el MISMO video (mismo embed) y ese upload es el piloto en
- * inglés; del 1x02 en adelante la serie está en latino. */
+/* v109→v110: capítulos/temporadas cuya ÚNICA copia en la fuente está en
+ * inglés — se ocultan de la lista (el usuario quiere todo latino).
+ * AUDITADOS CON IA DE VOZ (whisper, 29 episodios muestreados, 2026-09-11):
+ * no hay metadata de idioma en streamwish, así que esto se verificó
+ * ESCUCHANDO segmentos del medio de cada capítulo. Resultado:
+ * - Billy y Mandy: T1-T5 en inglés (9 muestras 96-98%), T6 en latino
+ * - Jimmy Neutrón: T2 en inglés (3 muestras 97-99%), T1 y T3 latino
+ * - Ben 10: T3 y T4 en inglés (99%), T1 y T2 latino (salvo 2x12, inglés)
+ * - las demás 16 series del feed: latino confirmado
+ * Formato: 'slug|TxEPp' (exacto) o 'slug|Tx*' (toda la temporada). */
 const EPS_INGLESES = new Set([
-  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos|1x1a',
-  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos|1x1b',
-  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos|1x1c',
+  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos|1x*',
+  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos|2x*',
+  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos|3x*',
+  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos|4x*',
+  'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos|5x*',
+  'jimmy-neutron-capitulos-completos|2x*',
+  'ben-10-capitulos-completos|2x12',
+  'ben-10-capitulos-completos|3x*',
+  'ben-10-capitulos-completos|4x*',
 ]);
 function cariEsIngles(slug, e) {
-  return EPS_INGLESES.has(slug + '|' + e.temporada + 'x' + e.ep + String(e.parte || '').toLowerCase());
+  const p = String(e.parte || '').toLowerCase();
+  return EPS_INGLESES.has(slug + '|' + e.temporada + 'x' + e.ep + p)
+    || EPS_INGLESES.has(slug + '|' + e.temporada + 'x*');
 }
 /* v102: el h1 a veces trae entidades y colas («– Capítulos completos»,
  * «| Español latino») — se decodifican y se cortan */
@@ -2246,13 +2258,14 @@ async function datosCaricatura(slug) {
 async function resolverCaricatura(epUrl) {
   const slug = cariSlugDe(epUrl);
   if (!slug) throw new Error('Capítulo de caricatura no válido');
-  /* v109: capítulos ocultos por estar solo en inglés — mensaje claro */
+  /* v109/v110: capítulos o temporadas ocultas por estar solo en inglés — mensaje claro */
   {
     const mE = /^([a-z0-9-]+?)-(\d{2})x(\d{2})([ab])?(?:-|$)/i.exec(slug);
     if (mE) {
       const serie = cariSerieDeEp(mE[1]) || mE[1];
-      if (EPS_INGLESES.has(serie + '|' + (+mE[2]) + 'x' + (+mE[3]) + (mE[4] || '').toLowerCase())) {
-        throw new Error('Ese capítulo solo existe en inglés en la fuente — empieza en el siguiente');
+      const k = serie + '|' + (+mE[2]) + 'x' + (+mE[3]) + (mE[4] || '').toLowerCase();
+      if (EPS_INGLESES.has(k) || EPS_INGLESES.has(serie + '|' + (+mE[2]) + 'x*')) {
+        throw new Error('Ese capítulo solo existe en inglés en la fuente — prueba otra temporada');
       }
     }
   }
