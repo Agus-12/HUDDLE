@@ -1627,25 +1627,25 @@ body.movil-horizontal #homeFull {
 /* =================== v121: página de búsqueda =================== */
 /* Cubre el feed POR COMPLETO (fondo opaco): nada de ver las filas de
  * atrás al deslizar los resultados. Botón «Feed» para volver. */
+/* v126: la página es una caja FIJA en columnas — la barra arriba (FUERA del
+ * scroll) y los resultados en su propia caja que scrollea DEBAJO de ella.
+ * Antes TODO scrolleaba junto y la barra iba sticky: en el móvil el scroll
+ * con inercia se ATASCABA con el sticky (dejabas de deslizar y ya no
+ * respondía) y las tarjetas asomaban por encima de la barra hasta la zona
+ * del reloj. Con este layout eso es físicamente imposible. */
 .search-page {
   position: fixed; inset: 0; z-index: 90;
   background: var(--bg);
-  overflow-y: auto; -webkit-overflow-scrolling: touch;
-  /* v122: respeta el notch/borde del móvil (viewport-fit=cover) — la barra
-   * del buscador ya no queda pegada/arriba del todo en la app instalada */
-  padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px calc(env(safe-area-inset-bottom, 0px) + 48px);
+  display: flex; flex-direction: column;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px calc(env(safe-area-inset-bottom, 0px) + 14px);
 }
 .search-page.hidden { display: none; }
-/* v125: UN solo header sticky para la barra Y el chip — antes los
- * resultados se colaban alrededor (la barra tapaba el chip y las tarjetas
- * asomaban por encima al dar scroll). Ahora todo eso queda dentro de una
- * caja opaca por encima del contenido: el chip SIEMPRE visible y las
- * tarjetas pasan por debajo. */
+/* v126: barra normal EN EL FLUJO — nada de sticky (nada que se atasque) y
+ * el contenido no puede pasar por debajo ni por encima de ella */
 .sp-top-wrap {
-  position: sticky; top: 0; z-index: 5;
-  background: var(--bg);
-  margin: calc(-1 * (env(safe-area-inset-top, 0px) + 12px)) -14px 12px;
-  padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px 10px;
+  flex: none;
+  margin: 0 -14px 10px;
+  padding: 0 14px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 .sp-top { display: flex; align-items: center; gap: 8px; }
@@ -1670,4 +1670,13 @@ body.movil-horizontal #homeFull {
  * badge del logo. Ahora la carátula llena su columna (100%) sin desbordar. */
 .sr-grid .sr-card { width: 100%; min-width: 0; }
 .sr-grid .sr-cover { width: 100%; height: auto; aspect-ratio: 2 / 3; }
-.sp-results { padding-bottom: 24px; }
+/* v126: los resultados scrollean en SU PROPIA caja, que empieza DEBAJO de
+ * la barra — las películas jamás se pintan sobre la barra ni en la zona del
+ * reloj. min-height: 0 es la clave para que un hijo de flex SÍ scrollee. */
+.sp-results {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; /* el jalón fuerte no se pasa a la página de atrás */
+  padding-bottom: 24px;
+}

@@ -2560,7 +2560,7 @@ function abrirBuscador(q) {
   $('#spInput').value = q;
   $('#spInput').blur(); /* el teclado se guarda solo al dar Enter/Buscar */
   $('#searchPage').classList.remove('hidden');
-  $('#searchPage').scrollTop = 0;
+  $('#spResults').scrollTop = 0; /* v126: el scroller ahora es la caja de resultados */
   buscarGlobal(q);
 }
 function cerrarBuscador() {
@@ -2576,6 +2576,7 @@ function cerrarBuscador() {
 }
 async function buscarGlobal(q) {
   const box = $('#spResults');
+  box.scrollTop = 0; /* v126: cada búsqueda nueva arranca desde arriba */
   $('#spSugiere').classList.add('hidden');
   box.innerHTML = '<div class="sr-info"><div class="spinner"></div> Buscando en todas las fuentes…</div>';
   try {
