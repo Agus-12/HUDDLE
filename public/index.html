@@ -111,9 +111,6 @@
             </div>
           </div>
 
-          <!-- v45: resultados de búsqueda del inicio -->
-          <div id="searchResults" class="sr hidden"></div>
-
           <!-- v78: continuar viendo — retoma donde te quedaste (también
                para el invitado con el que lo estaban viendo) -->
           <div id="continueBox" class="sr-sec hidden">
@@ -180,6 +177,25 @@
             <p id="noRooms" class="hint hidden">No hay nadie en salas por ahora — entra con un código o empieza una eligiendo algo en Juntos</p>
           </div>
         </section>
+
+        <!-- v121: página de BÚSQUEDA — pantalla propia que cubre el feed por
+             completo (como una página de resultados aparte), con botón de
+             volver al feed. Cada pestaña (Salas/Juntos/Solo) tiene su
+             búsqueda: al cambiar de pestaña esta página se cierra y limpia. -->
+        <div id="searchPage" class="search-page hidden">
+          <div class="sp-top">
+            <button id="spBack" class="btn small sp-volver" type="button">
+              <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+              <span>Feed</span>
+            </button>
+            <div class="sp-caja">
+              <input id="spInput" class="input" placeholder="Busca en todas las fuentes…" autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off">
+              <button id="spGo" class="btn primary" type="button">Buscar</button>
+            </div>
+          </div>
+          <div id="spSugiere" class="sp-sug hidden"></div>
+          <div id="spResults" class="sr sp-results"></div>
+        </div>
 
         <!-- v43/44: preparar la sala — a pantalla completa, como la app -->
         <section id="setupBox" class="hidden">

@@ -1623,3 +1623,39 @@ body.movil-horizontal #homeFull {
 .solo-flash { display: flex; align-items: center; gap: 8px; }
 .solo-flash b { font-size: 20px; font-weight: 800; }
 /* =================== fin v88 =================== */
+
+/* =================== v121: página de búsqueda =================== */
+/* Cubre el feed POR COMPLETO (fondo opaco): nada de ver las filas de
+ * atrás al deslizar los resultados. Botón «Feed» para volver. */
+.search-page {
+  position: fixed; inset: 0; z-index: 90;
+  background: var(--bg);
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 12px 14px 48px;
+}
+.search-page.hidden { display: none; }
+.sp-top {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg);
+  margin: -12px -14px 12px; padding: 12px 14px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.sp-volver { flex: none; }
+.sp-caja { display: flex; gap: 8px; flex: 1; min-width: 0; }
+.sp-caja .input { flex: 1; min-width: 0; }
+.sp-sug { margin: 2px 0 12px; }
+.sp-sug.hidden { display: none; }
+.sp-sug-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(138, 92, 246, 0.14);
+  border: 1px solid rgba(138, 92, 246, 0.45);
+  color: var(--txt); font-family: inherit; font-size: 14px;
+  border-radius: 999px; padding: 8px 14px; cursor: pointer;
+}
+.sp-sug-btn:active { opacity: 0.85; }
+.sp-sug-btn b { color: #c4a9ff; }
+/* resultados en rejilla (una sola lista global, nada de filas por sitio) */
+.sr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(106px, 1fr)); gap: 14px 10px; padding: 2px 2px 8px; }
+.sr-grid .sr-card { width: auto; }
+.sp-results { padding-bottom: 24px; }

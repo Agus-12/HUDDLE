@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v120'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v121'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -3031,23 +3031,134 @@ async function resolverLacartoons(epUrl) {
 
 
 
+/* v121: BÚSQUEDA GLOBAL INTELIGENTE — tolerante a errores de dedo.
+ * normalizarTxt: minúsculas, sin acentos, solo letras/números.
+ * levenshtein: distancia de edición clásica (títulos cortos, DP chico).
+ * similitud: 0..1 — combina distancia completa con coincidencia de
+ * palabras ("los simpson" vs "the simpsons"), para ordenar TODOS los
+ * resultados de TODAS las fuentes en una sola lista por parecido. */
+function normalizarTxt(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+}
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
+}
+const TXT_STOP = new Set(['de', 'del', 'la', 'el', 'los', 'las', 'the', 'y', 'en', 'un', 'una', 'que', 'con', 'por', 'para', 'of', 'a']);
+function similitud(q, t) {
+  if (!q || !t) return 0;
+  if (q === t) return 1;
+  const base = 1 - levenshtein(q, t) / Math.max(q.length, t.length);
+  const qts = q.split(' ').filter((w) => w.length >= 3 && !TXT_STOP.has(w));
+  if (!qts.length) return base;
+  const tts = t.split(' ');
+  let hits = 0;
+  for (const qt of qts) if (tts.some((w) => w.startsWith(qt))) hits++;
+  return Math.max(base, (hits / qts.length) * 0.92);
+}
+
+/* v121: catálogo LOCAL de títulos (Cartoons de Lacartoons + Caricaturas +
+ * lo que esté cacheado del feed) — sirve para buscar en Cartoons (el sitio
+ * no tiene buscador: sus series viven aquí) y para el chip de
+ * «¿Quisiste decir…?» cuando lo escrito tiene un error de dedo. */
+let catalogoCache = { at: 0, items: [] }; /* 1 h */
+async function catalogoLocal() {
+  if (Date.now() - catalogoCache.at < 3600 * 1000 && catalogoCache.items.length) return catalogoCache.items;
+  const items = [];
+  for (const lct of LCT_SERIES.values()) {
+    const meta = cariMeta.get(lct.slug);
+    items.push({ title: lct.titulo, url: LCT_BASE + 'serie/' + lct.lctId, img: (meta && (meta.cover || meta.poster)) || '', site: 'Cartoons' });
+  }
+  try {
+    const home = await cariHomeImgs();
+    for (const [slug, h] of home) {
+      if (!cariEsSerie(slug)) continue;
+      const meta = cariMeta.get(slug);
+      items.push({ title: (meta && meta.titulo) || cariLimpia(h.alt || cariBonito(slug)), url: CARI_BASE + slug + '/', img: (meta && (meta.cover || meta.poster)) || h.img || '', site: 'Caricaturas' });
+    }
+  } catch {}
+  for (const [fn, site] of [[popularesDeHoy, 'Cuevana'], [seriesRecientes, 'Cuevana'], [animesDelMomento, 'Latanime']]) {
+    try {
+      for (const it of (await fn()) || []) {
+        if (it && it.title && it.url) items.push({ title: String(it.title), url: String(it.url), img: it.img || '', site, extra: it.extra || '' });
+      }
+    } catch {}
+  }
+  if (items.length) catalogoCache = { at: Date.now(), items };
+  return items.length ? items : catalogoCache.items;
+}
+
 async function buscarEnSitios(q) {
-  /* v68: fuera GoPelis (poco catálogo) y AnimeFLV — queda Cuevana + Latanime */
-  const grupos = await Promise.all([
+  const nq = normalizarTxt(q);
+  const [cuevana, latanime, animeflv, pelisxd, cari, catalogo] = await Promise.all([
     buscarCuevana(q).catch(() => []),
     buscarLatanime(q).catch(() => []),
     buscarAnimeflv(q).catch(() => []), /* v97 */
     buscarPelisxd(q).catch(() => []), /* v98: el catálogo grande de pelis */
     buscarMiscaricaturas(q).catch(() => []), /* v102: caricaturas nick/CN */
+    catalogoLocal().catch(() => []), /* v121 */
   ]);
-  /* v63: intercalados por sitio para que ningún sitio tape a los demás */
-  const resultados = [];
-  const maximo = Math.max(0, ...grupos.map((g) => g.length));
-  for (let i = 0; i < maximo; i++) {
-    for (const g of grupos) if (g[i]) resultados.push(g[i]);
+  /* v121: Cartoons (Lacartoons) entra a la búsqueda — se filtra LOCAL del
+   * catálogo. Todo se puntúa por parecido y queda en UNA sola lista
+   * ordenada (nada de secciones por sitio: el badge de la tarjeta dice
+   * de dónde sale cada una). */
+  const vistos = new Set();
+  const puntuar = (arr) => arr.filter((r) => r && r.title && r.url).map((r) => {
+    const key = String(r.url).toLowerCase();
+    if (vistos.has(key)) return null;
+    vistos.add(key);
+    return { title: r.title, url: r.url, img: r.img || '', site: r.site, extra: r.extra || '', _score: similitud(nq, normalizarTxt(r.title)) };
+  }).filter(Boolean);
+  const lctHits = puntuar(catalogo.filter((x) => x.site === 'Cartoons')).filter((r) => r._score >= 0.5);
+  const todos = [
+    ...lctHits,
+    ...puntuar(cuevana),
+    ...puntuar(pelisxd),
+    ...puntuar(latanime),
+    ...puntuar(animeflv),
+    ...puntuar(cari),
+    ...puntuar(catalogo.filter((x) => x.site !== 'Cartoons')),
+  ];
+  /* v121: por NIVELES de relevancia — primero lo que se parece de verdad
+   * (≥0.62), luego lo medio (≥0.42) y al final lo flojo; dentro del nivel,
+   * gana el puntaje (empate → el orden de llegada, por fuente) */
+  const nivel = (s) => (s >= 0.62 ? 0 : s >= 0.42 ? 1 : 2);
+  todos.sort((a, b) => nivel(a._score) !== nivel(b._score) ? nivel(a._score) - nivel(b._score) : b._score - a._score);
+  /* v121: «¿Quisiste decir…?» — el título de NUESTRO catálogo (Cartoons +
+   * Caricaturas) que más se parece a lo escrito cuando no coincide exacto.
+   * Sale si el propio candidato es el #1 de la lista (Google-style:
+   * «mostrando resultados para…») o si lo de arriba es flojo (<0.75);
+   * si la lista ya arranca con un hit clarito, no molesta con el chip. */
+  let sugiere = null;
+  const top = todos[0];
+  for (const r of todos) {
+    if (r.site !== 'Cartoons' && r.site !== 'Caricaturas') continue;
+    const nr = normalizarTxt(r.title);
+    if (nr === nq || r._score < 0.45 || r._score > 0.995) continue;
+    if (top && r !== top && top._score >= 0.75) break;
+    sugiere = { q: r.title, titulo: r.title, site: r.site };
+    break;
   }
-  console.log(`[buscar] "${q}" en Cuevana+Latanime+AnimeFLV+Caricaturas → ${resultados.length} resultados`);
-  return resultados.slice(0, 24);
+  /* si hay hits fuertes (≥0.62), se cuela el ruido flojo (<0.42) — la
+   * lista queda con lo parecido de verdad; si no hay ninguno fuerte, se
+   * muestra TODO (las opciones que cada fuente encontró a su manera) */
+  const hayFuerte = todos.some((r) => r._score >= 0.62);
+  const resultados = todos
+    .filter((r) => !hayFuerte || r._score >= 0.42)
+    .slice(0, 30)
+    .map(({ _score, ...r }) => r);
+  console.log(`[buscar] "${q}" global → ${resultados.length} resultados${sugiere ? ` (¿quisiste decir ${sugiere.titulo}?)` : ''}`);
+  return { resultados, sugiere };
 }
 
 function readBody(req) {
@@ -3716,9 +3827,9 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/search' && req.method === 'GET') {
       const q = (url.searchParams.get('q') || '').trim().slice(0, 120);
       if (!q) return json(res, 400, { ok: false, error: 'Escribe qué quieren ver' });
-      const results = await buscarEnSitios(q);
-      if (!results.length) return json(res, 200, { ok: true, results: [], error: 'No encontré nada en Cuevana ni GoPelis — prueba con otras palabras' });
-      return json(res, 200, { ok: true, results });
+      const r = await buscarEnSitios(q); /* v121: global + fuzzy + sugiere */
+      if (!r.resultados.length) return json(res, 200, { ok: true, results: [], sugiere: r.sugiere, error: 'No encontré nada — prueba con otras palabras' });
+      return json(res, 200, { ok: true, results: r.resultados, sugiere: r.sugiere });
     }
     if (url.pathname === '/api/sites' && req.method === 'GET') {
       return json(res, 200, { ok: true, sites: sitesList() });

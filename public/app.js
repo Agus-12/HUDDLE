@@ -2505,45 +2505,24 @@ function crearTarjetaResultado(res, alElegir) {
   return card;
 }
 
-function renderResultados(box, results, alElegir, conAnime) {
+/* v121: resultados PLANOS — una sola lista con TODAS las fuentes mezcladas,
+ * ordenadas por parecido con lo buscado (el badge de cada tarjeta dice su
+ * sitio). nada de secciones "Cuevana / PelisXD / Latanime".
+ * enGrid: rejilla multilínea (página de búsqueda, setup) — si no, fila
+ * horizontal (el selector rápido dentro de la sala). */
+function renderResultados(box, results, alElegir, enGrid) {
   box.innerHTML = '';
-  const porSitio = new Map();
-  results.forEach((r) => {
-    if (!porSitio.has(r.site)) porSitio.set(r.site, []);
-    porSitio.get(r.site).push(r);
-  });
-  const crearTarjeta = (res) => crearTarjetaResultado(res, (r, c) => alElegir(r, c));
-  const crearSeccion = (sitio) => {
-    const sec = document.createElement('div');
-    sec.className = 'sr-sec';
-    const t = document.createElement('div');
-    t.className = 'sr-sec-titulo';
-    t.innerHTML = `<img src="${logoDeSitio(sitio)}" alt="">`;
-    const tt = document.createElement('span');
-    tt.textContent = sitio;
-    t.appendChild(tt);
-    const fila = document.createElement('div');
-    fila.className = 'sr-fila';
-    sec.append(t, fila);
-    box.appendChild(sec);
-    return fila;
-  };
-  /* v70: solo Cuevana y Latanime, siempre en ese orden y con su sección
-   * (si alguno no tiene resultados para lo que buscaste, lo dice) */
-  const ordenFijo = ['Cuevana', 'PelisXD', 'Latanime']; /* v98: PelisXD con su sección */
-  const extras = [...porSitio.keys()].filter((s) => !ordenFijo.includes(s));
-  for (const sitio of [...ordenFijo, ...extras]) {
-    const items = porSitio.get(sitio) || [];
-    if (!items.length && !ordenFijo.includes(sitio)) continue;
-    const fila = crearSeccion(sitio);
-    items.forEach((res) => fila.appendChild(crearTarjeta(res)));
-    if (!items.length) {
-      const v = document.createElement('div');
-      v.className = 'sr-vacio-sec';
-      v.textContent = sitio === 'Latanime' ? 'Sin resultados de anime para esta búsqueda' : 'Sin resultados para esta búsqueda';
-      fila.appendChild(v);
-    }
+  const fila = document.createElement('div');
+  fila.className = enGrid ? 'sr-grid' : 'sr-fila';
+  if (!results.length) {
+    const v = document.createElement('div');
+    v.className = 'sr-info';
+    v.textContent = 'Sin resultados para esta búsqueda';
+    box.appendChild(v);
+    return;
   }
+  results.forEach((res) => fila.appendChild(crearTarjetaResultado(res, (r, c) => alElegir(r, c))));
+  box.appendChild(fila);
 }
 
 async function buscarEnServer(q) {
@@ -2551,37 +2530,79 @@ async function buscarEnServer(q) {
   return r.json();
 }
 
-async function buscarInicio() {
-  const q = $('#homeSearch').value.trim();
-  const box = $('#searchResults');
-  if (!q) { box.classList.add('hidden'); box.innerHTML = ''; return; }
-  box.classList.remove('hidden');
-  box.innerHTML = '<div class="sr-info"><div class="spinner"></div> Buscando…</div>';
+/* v121: PÁGINA DE BÚSQUEDA — pantalla propia que cubre el feed (con botón
+ * «Feed» para volver). Al dar Enter el teclado se guarda (blur) y los
+ * resultados se muestran aquí, no sobre el feed. Cada pestaña tiene su
+ * propia búsqueda: al cambiar de pestaña la página se cierra y limpia. */
+function abrirBuscador(q) {
+  q = String(q || '').trim();
+  if (!q) return;
+  $('#spInput').value = q;
+  $('#spInput').blur(); /* el teclado se guarda solo al dar Enter/Buscar */
+  $('#searchPage').classList.remove('hidden');
+  $('#searchPage').scrollTop = 0;
+  buscarGlobal(q);
+}
+function cerrarBuscador() {
+  const pg = $('#searchPage');
+  if (pg.classList.contains('hidden')) return;
+  pg.classList.add('hidden');
+  $('#spResults').innerHTML = '';
+  $('#spSugiere').classList.add('hidden');
+  $('#spSugiere').innerHTML = '';
+}
+async function buscarGlobal(q) {
+  const box = $('#spResults');
+  $('#spSugiere').classList.add('hidden');
+  box.innerHTML = '<div class="sr-info"><div class="spinner"></div> Buscando en todas las fuentes…</div>';
   try {
     const d = await buscarEnServer(q);
+    if (d && d.sugiere && d.sugiere.q) {
+      const chip = $('#spSugiere');
+      chip.innerHTML = '';
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'sp-sug-btn';
+      b.innerHTML = '¿Quisiste decir: <b></b>?';
+      b.querySelector('b').textContent = d.sugiere.q;
+      b.addEventListener('click', () => abrirBuscador(d.sugiere.q));
+      chip.appendChild(b);
+      chip.classList.remove('hidden');
+    }
     if (!d.ok || !d.results || !d.results.length) {
       box.innerHTML = `<div class="sr-info">${(d && d.error) || 'No encontré nada — prueba con otras palabras'}</div>`;
       return;
     }
-    renderResultados(box, d.results, (res) => {
-      if (elegirTitulo(res)) return; /* v61: series → temporadas y episodios */
-      /* v91: en la pestaña Solo, lo que buscas se reproduce individual —
-       * antes la búsqueda SIEMPRE armaba una sala (pantalla de "Cargando
-       * tu sala…" aunque estuvieras en Solo) */
-      if (S.modoSolo) { abrirSolo(res.url, { title: res.title || '', img: res.img || '' }); return; }
-      S.pendingStart = { url: res.url, name: res.title || res.site, img: res.img || '' };
-      /* v60: pantalla completa de espera desde el toque */
-      S.mirrorInfo = { title: res.title || '', img: res.img || '', url: res.url, sub: 'Cargando tu sala…' };
-      mostrarPeliLoading();
-      const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
-      connect(code);
-    }, true);
+    renderResultados(box, d.results, elegirResultadoBusqueda, true);
   } catch {
     box.innerHTML = '<div class="sr-info">Sin conexión con el servidor</div>';
   }
 }
+function elegirResultadoBusqueda(res) {
+  cerrarBuscador(); /* al elegir, esto ya no vive arriba del feed */
+  if (elegirTitulo(res)) return; /* v61: series → temporadas y episodios */
+  /* v91: en la pestaña Solo, lo que buscas se reproduce individual —
+   * antes la búsqueda SIEMPRE armaba una sala (pantalla de "Cargando
+   * tu sala…" aunque estuvieras en Solo) */
+  if (S.modoSolo) { abrirSolo(res.url, { title: res.title || '', img: res.img || '' }); return; }
+  S.pendingStart = { url: res.url, name: res.title || res.site, img: res.img || '' };
+  /* v60: pantalla completa de espera desde el toque */
+  S.mirrorInfo = { title: res.title || '', img: res.img || '', url: res.url, sub: 'Cargando tu sala…' };
+  mostrarPeliLoading();
+  const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+  connect(code);
+}
+async function buscarInicio() {
+  const q = $('#homeSearch').value.trim();
+  if (!q) { cerrarBuscador(); return; }
+  abrirBuscador(q);
+}
 $('#btnHomeSearch').addEventListener('click', buscarInicio);
-$('#homeSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); buscarInicio(); } });
+$('#homeSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#homeSearch').blur(); buscarInicio(); } });
+$('#spGo').addEventListener('click', () => abrirBuscador($('#spInput').value));
+$('#spInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); abrirBuscador($('#spInput').value); } });
+$('#spInput').addEventListener('input', () => $('#spSugiere').classList.add('hidden')); /* el chip viejo no molesta mientras escribes */
+$('#spBack').addEventListener('click', cerrarBuscador);
 
 /* v47: buscador también al preparar la sala — el resultado se ELIGE (como las
  * tarjetas) y el botón grande queda listo con "Crear y espejar …" */
@@ -2758,6 +2779,7 @@ function setTab(tab, avisar) {
     localStorage.setItem('huddle_modo_solo', tab === 'solo' ? '1' : '0'); /* compatibilidad */
   } catch {}
   pintarTabs();
+  cerrarBuscador(); /* v121: la búsqueda es de CADA pestaña — al cambiar, la página de resultados se cierra y limpia */
   if (avisar && tab === 'solo') toast('Modo individual — lo que abras se reproduce aquí mismo');
   cargarContinuar(); /* v88: la fila de "Continuar viendo" cambia con la pestaña */
 }
