@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v116';
+const APP_VERSION = 'v117';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -1405,8 +1405,12 @@ function startMirrorFromPicker() {
   // aprovechamos el clic (gesto del usuario) para desbloquear el audio
   ensureAudioCtx().then((ctx) => { if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {}); });
   sendAction({ type: 'mirror', op: 'start', url, title: (S.mirrorInfo && S.mirrorInfo.title) || '', img: (S.mirrorInfo && S.mirrorInfo.img) || '' }).then((r) => {
-    // si falló (RAM, URL mala, etc.) volvemos a la pantalla normal al instante
-    if (r && r.ok === false) applyMirrorState({ active: false, url: '' });
+    // si falló (RAM, URL mala, capítulo caído…) volvemos a la pantalla normal al instante
+    if (r && r.ok === false) {
+      applyMirrorState({ active: false, url: '' });
+      ocultarPeliLoading();
+      toast(r.error || 'No se pudo abrir — prueba otro capítulo');
+    }
   });
   $('#mirrorUrl').value = '';
   $('#customRow').classList.add('hidden'); // la fila de URL solo se usa al escribirla

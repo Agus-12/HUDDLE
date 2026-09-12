@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v116'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v117'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1118,8 +1118,10 @@ async function handleAction(req, res, body) {
          * se puede, caemos al espejo de siempre. */
         const urlNat = String(action.url || '').trim();
         if (/^https?:\/\//i.test(urlNat)) {
+          let errNat = '';
           const nat = await resolverNativo(urlNat).catch((e) => {
-            console.log('[sala] nativo no pudo (' + String(e.message || e).slice(0, 60) + ') → espejo');
+            errNat = String(e.message || e).slice(0, 140);
+            console.log('[sala] nativo no pudo (' + errNat.slice(0, 60) + ')');
             return null;
           });
           if (nat) {
@@ -1134,6 +1136,14 @@ async function handleAction(req, res, body) {
             sysMsg(room, `${room.users.get(userId).name} puso: ${room.videoTitle}`);
             broadcast(room, 'state', stateOf(room));
             return json(res, 200, { ok: true, nativo: true });
+          }
+          /* v117: si es contenido NUESTRO (capítulos de nuestras fuentes)
+           * y no se pudo resolver, NO se abre el espejo — el error viaja
+           * claro a la sala. Antes se abría la página web en el navegador
+           * remoto: mala experiencia y un Chrome extra comiendo RAM que
+           * después tumbaba las demás resoluciones. */
+          if (/lacartoons\.com\/serie\/capitulo\/|miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}|pelisxd\.com\/pelicula\//i.test(urlNat)) {
+            return json(res, 200, { ok: false, error: errNat || 'No pude resolver ese capítulo — prueba otro' });
           }
         }
         await startMirror(room, action.url, userId);
@@ -2194,12 +2204,18 @@ async function refrescarLctEps(lctId) {
   try {
     const r = await fetchSeguro(LCT_BASE + 'serie/' + lctId, 15000);
     if (!r.ok) return null;
-    const eps = lctEpsDeHtml(await r.text());
+    const parsed = lctEpsDeHtml(await r.text());
+    if (!parsed.length) return null;
+    /* v117: los capítulos confirmados muertos en barridos anteriores
+     * salen de la lista desde ya (no resucitan en cada refresco) */
+    const prev = lctEps.get(String(lctId)) || {};
+    const muertos = new Set(prev.muertos || []);
+    const eps = parsed.filter((e) => !muertos.has(lctCapIdDe(e.url)));
     if (!eps.length) return null;
-    const out = { at: Date.now(), eps };
+    const out = { at: Date.now(), eps, muertos: [...muertos] };
     lctEps.set(String(lctId), out);
     cacheGuardar('lctEps', () => [...lctEps.entries()]);
-    lctBarrerVivos(lctId, eps).catch(() => {}); /* v112: en fondo, sin frenar la lista */
+    encolarBarrido(lctId, parsed); /* v117: en cola, sin ahogar al servidor */
     return out;
   } catch { return null; }
 }
@@ -2207,7 +2223,33 @@ async function refrescarLctEps(lctId) {
  * página de la serie (el 1x01 de Billy está muerto y no se nota ahí),
  * así que cada capítulo se checa en fondo (lotes de 8) y la lista
  * cacheada se limpia de los que ya no traen iframe de player. */
+/* v117: los barridos van por una COLA — uno a la vez, lotes de 4 y
+ * pausas de 200 ms. El arranque en frío con 16 series de lacartoons
+ * llegó a soltar ~1100 peticiones en ráfaga y ahogaba al servidor
+ * (y hacía lento todo lo demás: los capítulos de MisCaricaturas
+ * dejaban de resolver por timeouts). Los capIds confirmados muertos
+ * se recuerdan y no se vuelven a checar en los refrescos. */
+const lctBarridoCola = [];
+let lctBarridoActivo = false;
+function encolarBarrido(lctId, eps) {
+  lctBarridoCola.push({ lctId, eps });
+  if (!lctBarridoActivo) procesarColaBarrido().catch(() => {});
+}
+async function procesarColaBarrido() {
+  lctBarridoActivo = true;
+  try {
+    while (lctBarridoCola.length) {
+      const j = lctBarridoCola.shift();
+      await lctBarrerVivos(j.lctId, j.eps).catch(() => {});
+    }
+  } finally { lctBarridoActivo = false; }
+}
+function lctCapIdDe(u) { return +((/capitulo\/(\d+)\?/.exec(u || '') || [])[1] || 0); }
 async function lctBarrerVivos(lctId, eps) {
+  const c = lctEps.get(String(lctId)) || {};
+  const muertos = new Set(c.muertos || []);
+  const lista = eps.slice(0, 220);
+  const porChecar = lista.filter((e) => !muertos.has(lctCapIdDe(e.url)));
   const vivos = [];
   let lote = [];
   const checar = async (e) => {
@@ -2217,21 +2259,25 @@ async function lctBarrerVivos(lctId, eps) {
       if (!html || /cubeembed\.rpmvid\.com\/#[a-z0-9]+/i.test(html)) vivos.push(e);
     } catch { vivos.push(e); } /* si no se pudo checar, no se tira */
   };
-  for (const e of eps.slice(0, 220)) {
+  for (const e of porChecar) {
     lote.push(checar(e));
-    if (lote.length >= 8) { await Promise.all(lote); lote = []; }
+    if (lote.length >= 4) { await Promise.all(lote); lote = []; await new Promise((r) => setTimeout(r, 200)); }
   }
   await Promise.all(lote);
-  if (!vivos.length || vivos.length === eps.length) return;
-  vivos.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep);
-  console.log('[lacartoons] serie ' + lctId + ': ' + (eps.length - vivos.length) + ' capítulos muertos fuera de la lista');
-  lctEps.set(String(lctId), { at: Date.now(), eps: vivos });
+  if (!lista.length) return;
+  const vivosIds = new Set(vivos.map((e) => lctCapIdDe(e.url)));
+  const nuevosMuertos = porChecar.filter((e) => !vivosIds.has(lctCapIdDe(e.url))).map((e) => lctCapIdDe(e.url));
+  if (!nuevosMuertos.length && !muertos.size) return;
+  const todosMuertos = [...new Set([...muertos, ...nuevosMuertos])];
+  const final = lista.filter((e) => !todosMuertos.has(lctCapIdDe(e.url)));
+  if (!final.length) return;
+  if (nuevosMuertos.length) console.log('[lacartoons] serie ' + lctId + ': ' + nuevosMuertos.length + ' capítulos muertos fuera de la lista');
+  lctEps.set(String(lctId), { at: Date.now(), eps: final, muertos: todosMuertos });
   cacheGuardar('lctEps', () => [...lctEps.entries()]);
   /* si la serie ya se sirvió, su cariDatos se reconstruirá con la lista limpia */
-  const slug = String(lctId) === String(LCT_BILLY.lctId)
-    ? LCT_BILLY.slug
-    : (([...LCT_SERIES.values()].find((x) => String(x.lctId) === String(lctId)) || {}).slug || '');
-  if (slug) cariDatos.delete(slug);
+  const slug = (LCT_MERGE.find((x) => String(x.lctId) === String(lctId)) || {}).slug
+    || (([...LCT_SERIES.values()].find((x) => String(x.lctId) === String(lctId)) || {}).slug || '');
+  if (slug && nuevosMuertos.length) cariDatos.delete(slug);
 }
 /* v112: ¿de qué serie es este capítulo de lacartoons? (para el póster
  * de continuar-viendo) — busca el capId en las listas ya cacheadas */
@@ -2415,15 +2461,19 @@ async function refrescarCariFeed() {
       url: CARI_BASE + slug + '/', img, site: 'Caricaturas',
     };
   }))).filter((x) => x.title && x.img);
-  /* v112: iCarly y Drake & Josh de LACARTOONS entran al mismo carril */
-  for (const lct of LCT_SERIES.values()) {
+  /* v112→v117: iCarly, Drake & Josh y las demás de LACARTOONS entran al
+   * mismo carril — en PARALELO (16 fetches a la vez, no uno por uno:
+   * el arranque en frío baja de ~70 s a unos segundos) */
+  const lctItems = await Promise.all([...LCT_SERIES.values()].map(async (lct) => {
     try {
       const d = await datosCaricatura(String(lct.lctId));
       if (d && d.poster && d.episodios && d.episodios.length) {
-        items.push({ title: d.titulo, url: LCT_BASE + 'serie/' + lct.lctId, img: d.poster, site: 'Caricaturas' });
+        return { title: d.titulo, url: LCT_BASE + 'serie/' + lct.lctId, img: d.poster, site: 'Caricaturas' };
       }
     } catch {}
-  }
+    return null;
+  }));
+  for (const it of lctItems) if (it) items.push(it);
   if (items.length) { cariFeedCache.at = Date.now(); cariFeedCache.items = items; cacheGuardar('cariFeed', () => ({ at: cariFeedCache.at, items: cariFeedCache.items })); } /* v111: a disco */
   return items;
 }
@@ -2570,6 +2620,14 @@ async function resolverCaricatura(epUrl) {
     if (s.slug === slug && ahora - s.at < PELISXD_STREAM_TTL) {
       return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
     }
+  }
+  /* v117: si la página del capítulo responde 404, el capítulo NO EXISTE
+   * — error claro al instante. Antes el resolvedor seguía hasta el
+   * navegador remoto y tardaba UN MINUTO en rendirse; en sala, espera
+   * eterna. (Solo 404: un 5xx o timeout se deja pasar al camino normal.) */
+  {
+    const rHead = await fetchSeguro(CARI_BASE + slug + '/', 8000).catch(() => null);
+    if (rHead && rHead.status === 404) throw new Error('Ese capítulo ya no existe en la fuente — prueba otro');
   }
   /* v106: si el capítulo no entrega video y su página es de MEGA, dilo claro
    * (el chequeo va DESPUÉS del intento — el HTML crudo no muestra los players
