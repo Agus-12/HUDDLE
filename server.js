@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v117'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v118'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -212,6 +212,16 @@ function stateOf(room) {
     /* v92: sala nativa — el video directo (como el modo Solo) */
     native: room.native || null,
     videoImg: room.videoImg || '',
+    /* v118: si están viendo una SERIE en nativo, la sala sabe cuál cap
+     * toca y si hay siguiente/anterior (para los botoncitos) — igual
+     * que mirrorState hace para el espejo, pero sin la lista pesada */
+    serie: room.serieCtx ? {
+      titulo: room.serieCtx.titulo, poster: room.serieCtx.poster,
+      total: room.serieCtx.eps.length,
+      num: room.serieCtx.eps[room.serieCtx.idx] ? room.serieCtx.eps[room.serieCtx.idx].num : '',
+      hayPrev: room.serieCtx.idx > 0,
+      hayNext: room.serieCtx.idx >= 0 && room.serieCtx.idx < room.serieCtx.eps.length - 1,
+    } : null,
   };
 }
 /* v92: ¿esta URL se puede reproducir NATIVA (sin navegador remoto)?
@@ -466,6 +476,41 @@ async function serieCtxFromUrl(u) {
       if (idx < 0) return null;
       return { tipo: 'cuevana', titulo: d.titulo, poster: d.poster, idx, eps: d.episodios.map((e) => ({ url: e.url, num: e.temporada + 'x' + e.ep })) };
     }
+    /* v118: caricaturas de MisCaricaturas — el slug del episodio
+     * («hora-de-aventura-01x02-…») se mapea a su serie y de ahí sale
+     * la cadena completa (incluye lo fusionado de Lacartoons: Billy
+     * T1-5, Ben 10 T3+) para los botones de siguiente/anterior. */
+    if (host.endsWith('miscaricaturas.com')) {
+      const slugEp = cariSlugDe(u);
+      const mE = /^(.+)-(\d{2})x(\d{2})([ab])?(?:-|$)/.exec(slugEp);
+      const serie = mE ? (cariSerieDeEp(mE[1]) || '') : (cariEsSerie(slugEp) ? slugEp : '');
+      if (serie) {
+        const d = await datosCaricatura(serie);
+        if (d && d.episodios && d.episodios.length) {
+          const idx = d.episodios.findIndex((e) => cariSlugDe(e.url) === slugEp);
+          if (idx >= 0) {
+            return { tipo: 'caricaturas', titulo: d.titulo, poster: d.poster, idx,
+              eps: d.episodios.map((e) => ({ url: e.url, num: `${e.temporada}x${e.ep || '·'}${e.parte || ''}` })) };
+          }
+        }
+      }
+    }
+    /* v118: capítulos de Lacartoons — el capId dice la serie y la
+     * cadena sale de la misma lista fusionada (misma fuente de verdad) */
+    if (host.endsWith('lacartoons.com')) {
+      const capId = +((/\/serie\/capitulo\/(\d+)/i.exec(url.pathname) || [])[1] || 0);
+      const slug = capId ? lctSerieDeCap(capId) : '';
+      if (slug) {
+        const d = await datosCaricatura(slug);
+        if (d && d.episodios && d.episodios.length) {
+          const idx = d.episodios.findIndex((e) => lctCapIdDe(e.url) === capId);
+          if (idx >= 0) {
+            return { tipo: 'caricaturas', titulo: d.titulo, poster: d.poster, idx,
+              eps: d.episodios.map((e) => ({ url: e.url, num: `${e.temporada}x${e.ep || '·'}${e.parte || ''}` })) };
+          }
+        }
+      }
+    }
     return null;
   } catch { return null; }
 }
@@ -582,6 +627,16 @@ async function startMirror(room, rawUrl, userId) {
 
   const m = { browser, page, cdp, url, frame: null, dirty: false, timer: null, emptySince: null, ownerId: userId, startedAt: Date.now(), serie: null };
   mirrors.set(room.code, m);
+  /* v118: un espejo nuevo APAGA lo nativo — antes el room.native viejo
+   * seguía vivo en el estado y el cliente se peleaba entre el video
+   * directo y el espejo (parpadeo/tira y afloja al cambiar de modo) */
+  if (room.native) {
+    room.native = null;
+    room.serieCtx = null;
+    room.videoUrl = '';
+    room.videoImg = '';
+    broadcast(room, 'state', stateOf(room));
+  }
 
   /* v74: si la URL es un episodio de serie, cargamos su lista de
    * episodios para los botones de siguiente/anterior */
@@ -1133,6 +1188,16 @@ async function handleAction(req, res, body) {
             room.position = 0;
             room.isPlaying = true; /* arranca sonando; el que no pueda, ve el botón de play */
             room.updatedAt = Date.now();
+            /* v118: si es un episodio de serie, la cadena completa
+             * (siguiente/anterior) se arma por detrás — llega con el
+             * siguiente broadcast de estado y prende los botoncitos */
+            room.serieCtx = null;
+            serieCtxFromUrl(urlNat).then((sc) => {
+              if (sc && room.videoUrl === urlNat) {
+                room.serieCtx = sc;
+                broadcast(room, 'state', stateOf(room));
+              }
+            }).catch(() => {});
             sysMsg(room, `${room.users.get(userId).name} puso: ${room.videoTitle}`);
             broadcast(room, 'state', stateOf(room));
             return json(res, 200, { ok: true, nativo: true });
@@ -1166,6 +1231,7 @@ async function handleAction(req, res, body) {
         /* v92: si la sala iba nativa, se suelta igual */
         if (room.native) {
           room.native = null;
+          room.serieCtx = null; /* v118 */
           room.videoUrl = '';
           room.videoImg = '';
           room.position = 0;
@@ -1178,6 +1244,55 @@ async function handleAction(req, res, body) {
       }
       if (op === 'epPrev' || op === 'epNext') {
         /* v74: episodio anterior/siguiente — cambia para toda la sala */
+        /* v118: modo NATIVO — la cadena vive en room.serieCtx y cada
+         * episodio se resuelve como al abrirlo (video directo, como
+         * Solo). Si el siguiente está caído, se salta hasta 3 y se
+         * avanza al primero que SÍ dé video. */
+        if (room.native && room.serieCtx) {
+          const sc = room.serieCtx;
+          const dir = op === 'epNext' ? 1 : -1;
+          const actual = sc.eps.findIndex((e) => e.url === room.videoUrl);
+          const desde = actual >= 0 ? actual : sc.idx;
+          if (desde < 0) return json(res, 400, { ok: false, error: 'No sé qué episodio están viendo — ábrelo del selector' });
+          if (desde + dir < 0 || desde + dir >= sc.eps.length) {
+            return json(res, 400, { ok: false, error: op === 'epNext' ? 'Ya estás en el último episodio' : 'Ya estás en el primer episodio' });
+          }
+          /* v118: se SALTA el episodio si la fuente confirma que está
+           * muerto/sin español, o si su player existe pero nunca suelta
+           * video («muerto por dentro», como el 1x03 de Billy) — así el
+           * botón no se atora en un cap roto. Lo brincado se anuncia en
+           * el chat para que nadie pierda la cuenta. */
+          const MUERTO_RE = /ya no está disponible|ya no existe en la fuente|solo está en MEGA|no está en español|solo existe en inglés|no respondió|no entregó el video/i;
+          let elegido = null, nat = null, errN = '';
+          const saltados = [];
+          for (let paso = 1; paso <= 3 && desde + dir * paso >= 0 && desde + dir * paso < sc.eps.length; paso++) {
+            const cand = sc.eps[desde + dir * paso];
+            errN = '';
+            nat = await resolverNativo(cand.url).catch((e) => { errN = String(e.message || e).slice(0, 140); return null; });
+            if (nat) { elegido = { cand, idx: desde + dir * paso }; break; }
+            if (!MUERTO_RE.test(errN)) {
+              /* error raro (navegador, red) — mejor reintentar que brincar */
+              return json(res, 200, { ok: false, error: /reintenta/i.test(errN) ? errN : errN + ' — reintenta' });
+            }
+            console.log('[sala] episodio caído (' + cand.num + '), sigo al próximo');
+            saltados.push(cand.num);
+          }
+          if (!elegido) {
+            return json(res, 200, { ok: false, error: errN || 'No pude resolver el episodio siguiente — prueba del selector' });
+          }
+          const notaSalto = saltados.length ? ' (sin ' + saltados.join(', ') + ')' : '';
+          room.videoUrl = elegido.cand.url;
+          room.videoTitle = `${sc.titulo} ${elegido.cand.num}`.slice(0, 80);
+          if (sc.poster) room.videoImg = sc.poster.slice(0, 400);
+          room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
+          sc.idx = elegido.idx;
+          room.position = 0;
+          room.isPlaying = true;
+          room.updatedAt = Date.now();
+          sysMsg(room, `${room.users.get(userId).name} puso: ${room.videoTitle}${notaSalto}`);
+          broadcast(room, 'state', stateOf(room));
+          return json(res, 200, { ok: true, nativo: true });
+        }
         const m = mirrors.get(room.code);
         if (!m || !m.serie) return json(res, 404, { ok: false, error: 'No hay serie en el espejo' });
         let idx = m.serie.eps.findIndex((e) => e.url === (m.url || ''));
@@ -1322,6 +1437,7 @@ async function handleAction(req, res, body) {
         room.videoUrl = '';
         room.videoTitle = '';
         room.native = null; /* v92 */
+        room.serieCtx = null; /* v118 */
         room.videoImg = ''; /* v92 */
         room.position = 0;
         room.isPlaying = false;
@@ -2719,7 +2835,7 @@ async function extraerRpmvid(pageUrl) {
         }
       }
     }
-    if (!master) throw new Error('Ese capítulo ya no está disponible en Lacartoons');
+    if (!master) throw new Error('El player de Lacartoons no respondió (va lento) — reintenta');
     return master;
   } finally { try { await browser.close(); } catch {} }
 }

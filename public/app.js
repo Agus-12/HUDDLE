@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v117';
+const APP_VERSION = 'v118';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -322,6 +322,7 @@ function applyState(st) {
    * por el reloj del servidor; sin nativo, se apaga */
   if (st.videoUrl && st.native) activarNativo(st);
   else if (S.nativo) desactivarNativo();
+  S.serieSala = (st.native && st.serie) || null; /* v118: serie para siguiente/anterior en nativo */
   updateControlUi();
   updateBadge();
 }
@@ -331,6 +332,7 @@ function applyState(st) {
  * mp4upload) y todos la reproducimos en nuestro navegador, sincronizados
  * por el reloj de la sala (position + updatedAt + serverNow). */
 S.nativo = null; /* { url, m3u8, mp4, proxy, subs, isPlaying, position, updatedAt, hls } */
+S.serieSala = null; /* v118: { titulo, num, total, hayPrev, hayNext } — serie que se ve en nativo */
 function posEsperada() {
   if (!S.nativo) return 0;
   return S.nativo.isPlaying
@@ -474,6 +476,7 @@ function desmontarNativo() {
 }
 function desactivarNativo() {
   desmontarNativo();
+  S.serieSala = null; /* v118 */
   $('#roomVideo').classList.add('hidden');
   $('#mirrorImg').classList.remove('hidden');
   $('#mirrorLayer').classList.add('hidden');
@@ -1534,8 +1537,10 @@ function renderPageDrop() {
 function updateEpNav() {
   const nav = $('#epNav');
   if (!nav) return;
-  const sc = S.mirror && S.mirror.serie;
-  const puede = !!(sc && S.mirror.active && S.canControl);
+  /* v118: también en modo NATIVO (video directo como en Solo) — la
+   * serie la reporta el estado de la sala; en espejo, como siempre */
+  const sc = (S.nativo && S.serieSala) || (S.mirror && S.mirror.active && S.mirror.serie);
+  const puede = !!(sc && S.canControl);
   nav.classList.toggle('hidden', !puede);
   if (!puede) return;
   $('#epPrevBtn').classList.toggle('hidden', !sc.hayPrev);
@@ -1545,8 +1550,8 @@ function updateEpNav() {
 (function montarEpNav() {
   const prev = $('#epPrevBtn'), next = $('#epNextBtn'), buscar = $('#epSearchBtn');
   if (!prev || !next || !buscar) return;
-  prev.addEventListener('click', () => { toast('Abriendo el episodio anterior…'); sendAction({ type: 'mirror', op: 'epPrev' }); });
-  next.addEventListener('click', () => { toast('Abriendo el episodio siguiente…'); sendAction({ type: 'mirror', op: 'epNext' }); });
+  prev.addEventListener('click', () => { toast('Abriendo el episodio anterior…'); sendAction({ type: 'mirror', op: 'epPrev' }).then((r) => { if (r && r.ok === false) toast(r.error || 'No se pudo'); }); });
+  next.addEventListener('click', () => { toast('Abriendo el episodio siguiente…'); sendAction({ type: 'mirror', op: 'epNext' }).then((r) => { if (r && r.ok === false) toast(r.error || 'No se pudo'); }); });
   buscar.addEventListener('click', () => { try { $('#pagePickBtn').click(); } catch {} });
 })();
 
