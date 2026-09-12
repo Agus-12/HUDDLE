@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v134'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v135'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -833,6 +833,20 @@ async function detectarIntroSerie(serieKey, urls) {
       }
     } finally { try { fs.unlinkSync(f0); } catch {} try { fs.unlinkSync(f1); } catch {} }
   } catch {} finally { INTRO_JOBS.delete(serieKey); }
+}
+/* v135: cabeza de ventaja — al abrir el SELECTOR de episodios de una serie
+ * sin intro conocida ya se lanza la detección (mientras eliges episodio, el
+ * server ya está comparando el audio de los primeros) */
+function precargarIntroDeSerie(eps) {
+  try {
+    const urls = (eps || []).map((e) => e && e.url).filter(Boolean);
+    if (urls.length < 2) return;
+    const ks = introKeysDe(urls[0]);
+    if (!ks.serie || (INTROS[ks.serie] && INTROS[ks.serie].by === 'auto')) return;
+    if (!fpcalcOk() || INTRO_JOBS.has(ks.serie)) return;
+    if (Date.now() - (INTRO_INTENTOS.get(ks.serie) || 0) < 6 * 3600 * 1000) return;
+    detectarIntroSerie(ks.serie, urls.slice(0, 3));
+  } catch {}
 }
 
 function mirrorState(room) {
@@ -4149,6 +4163,7 @@ const server = http.createServer(async (req, res) => {
       if (!/^[a-z0-9-]{2,90}$/.test(slug) && !/^[0-9]{1,3}$/.test(slug)) return json(res, 400, { ok: false, error: 'Caricatura inválida' }); /* v119: ids de lacartoons de 1 dígito */
       const d = await datosCaricatura(slug);
       if (!d) return json(res, 502, { ok: false, error: 'No pude leer esa caricatura' });
+      precargarIntroDeSerie(d.episodios); /* v135 */
       return json(res, 200, d);
     }
     if (url.pathname.startsWith('/api/serie/')) {
@@ -4157,6 +4172,7 @@ const server = http.createServer(async (req, res) => {
       if (!/^[a-z0-9-]{2,90}$/.test(slug)) return json(res, 400, { ok: false, error: 'Serie inválida' });
       const dS = await datosSerieCuevana(slug); /* v74: compartida con los botones de episodio */
       if (!dS) return json(res, 502, { ok: false, error: 'No pude leer la serie' });
+      precargarIntroDeSerie(dS.episodios); /* v135 */
       return json(res, 200, dS);
     }
     if (url.pathname.startsWith('/api/anime/')) {
@@ -4166,6 +4182,7 @@ const server = http.createServer(async (req, res) => {
       if ((url.searchParams.get('site') || '').toLowerCase() === 'latanime') {
         const dL = await datosAnimeLatanime(slug); /* v74: compartida con los botones de episodio */
         if (!dL) return json(res, 502, { ok: false, error: 'No pude leer el anime' });
+        precargarIntroDeSerie(dL.episodios); /* v135 */
         return json(res, 200, dL);
       }
       const c = serieCache.get('anime:' + slug);

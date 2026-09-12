@@ -568,6 +568,15 @@ function evaluaIntro() {
   if (!b) return;
   let mostrar = false;
   const enSerie = !!(S.serieSala || (S.mirror.active && S.mirror.serie) || esEpisodioSolo()); /* v130: también Solo */
+  /* v135: episodio sonando SIN datos de intro → re-pregunta cada 40s — la
+   * detección por audio tarda ~1-3 min y así el botón aparece en este mismo
+   * episodio en cuanto el server la encuentra (no hay que cambiar de ep) */
+  if (enSerie && !S.introData && S.introUrl && Date.now() - (S.introChequeoEn || 0) > 40000) {
+    S.introChequeoEn = Date.now();
+    fetch('/api/intro?url=' + encodeURIComponent(S.introUrl)).then((r) => r.json()).then((d) => {
+      if (d && d.intro && S.introUrl) { S.introData = d.intro; S.introVistoEn = null; evaluaIntro(); }
+    }).catch(() => {});
+  }
   const w = ventanaIntro();
   /* v133: SOLO con datos reales (detección automática o intro aprendida) —
    * sin datos el botón NO sale: hay series cuyo episodio no trae intro al
