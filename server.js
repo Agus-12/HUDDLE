@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v126'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v127'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -456,6 +456,31 @@ async function datosAnimeLatanime(slug) {
 
 /* v74: si la URL es un episodio de serie, saca la lista completa de
  * episodios para saber cuál sigue y cuál va antes */
+/* v127: si la lista termina justo al final de una temporada y NO hay
+ * ningún episodio de la siguiente, trae la página de la temporada que
+ * sigue (MisCaricaturas publica cada temporada como un post aparte) y
+ * agrega sus episodios al final — así «Siguiente» RUEDA a la temporada
+ * nueva empezando en el episodio 1, en Solo y en Juntos. */
+async function extenderSerieCtx(sc) {
+  try {
+    if (!sc || !sc.eps || sc.eps.length < 2 || !sc.slug) return sc;
+    const tU = +((sc.eps[sc.eps.length - 1]).temporada || 0);
+    if (!tU) return sc; /* sin concepto de temporada (animes) */
+    if (sc.eps.some((e) => +e.temporada === tU + 1)) return sc; /* ya está */
+    if (sc.tipo === 'caricaturas' && !sc.esLct) {
+      const base = String(sc.slug).replace(/-(capitulos-completos[a-z]*|capitulos-y-canciones|completos|ver|latino|online)$/, '');
+      const rt = await fetchSeguro(CARI_BASE + base + '-temporada-' + (tU + 1) + '/', 10000).catch(() => null);
+      if (!rt || !rt.ok) return sc;
+      const extra = await cariEpsDeHtml(await rt.text());
+      if (!extra.length) return sc;
+      for (const e of extra) sc.eps.push(e);
+      sc.eps.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep || String(a.parte).localeCompare(String(b.parte)));
+      console.log('[serie] temporada ' + (tU + 1) + ' agregada (' + extra.length + ' eps) — el salto rueda a la nueva temporada');
+    }
+    return sc;
+  } catch { return sc; }
+}
+
 async function serieCtxFromUrl(u) {
   try {
     const url = new URL(u);
@@ -487,10 +512,18 @@ async function serieCtxFromUrl(u) {
       if (serie) {
         const d = await datosCaricatura(serie);
         if (d && d.episodios && d.episodios.length) {
-          const idx = d.episodios.findIndex((e) => cariSlugDe(e.url) === slugEp);
+          let idx = d.episodios.findIndex((e) => cariSlugDe(e.url) === slugEp);
+          /* v127: si el episodio no está por URL (la lista cambió, parte con
+           * sufijo distinto…), se busca por NÚMEROS 0Sx0Ep+parte */
+          if (idx < 0 && mE) {
+            const tN = parseInt(mE[2], 10), eN = parseInt(mE[3], 10), pa = mE[4] || '';
+            idx = d.episodios.findIndex((e) => e.temporada === tN && e.ep === eN && String(e.parte || '') === pa);
+          }
           if (idx >= 0) {
-            return { tipo: 'caricaturas', titulo: d.titulo, poster: d.poster, cover: d.cover || '', idx, /* v120: cover curada */
-              eps: d.episodios.map((e) => ({ url: e.url, num: `${e.temporada}x${e.ep || '·'}${e.parte || ''}` })) };
+            const sc = { tipo: 'caricaturas', slug: serie, titulo: d.titulo, poster: d.poster, cover: d.cover || '', idx,
+              eps: d.episodios.map((e) => ({ url: e.url, num: `${e.temporada}x${e.ep || '·'}${e.parte || ''}`, temporada: e.temporada, ep: e.ep, parte: e.parte || '' })) };
+            await extenderSerieCtx(sc); /* v127: rueda a la temporada siguiente */
+            return sc;
           }
         }
       }
@@ -501,12 +534,19 @@ async function serieCtxFromUrl(u) {
       const capId = +((/\/serie\/capitulo\/(\d+)/i.exec(url.pathname) || [])[1] || 0);
       const slug = capId ? lctSerieDeCap(capId) : '';
       if (slug) {
-        const d = await datosCaricatura(slug);
+        let d = await datosCaricatura(slug);
+        /* v127: si la lista no llegó (falló la carga a la primera), se pide
+         * DIRECTO a lacartoons saltando la caché — de esto dependen los
+         * botones de siguiente/anterior */
+        if (!d || !d.episodios || !d.episodios.length) {
+          const lct = [...LCT_SERIES.values()].find((x) => x.slug === slug);
+          if (lct) d = await refrescarDatosLacartoons(lct).catch(() => null);
+        }
         if (d && d.episodios && d.episodios.length) {
           const idx = d.episodios.findIndex((e) => lctCapIdDe(e.url) === capId);
           if (idx >= 0) {
-            return { tipo: 'caricaturas', titulo: d.titulo, poster: d.poster, cover: d.cover || '', idx, /* v120: cover curada */
-              eps: d.episodios.map((e) => ({ url: e.url, num: `${e.temporada}x${e.ep || '·'}${e.parte || ''}` })) };
+            return { tipo: 'caricaturas', slug, esLct: true, titulo: d.titulo, poster: d.poster, cover: d.cover || '', idx,
+              eps: d.episodios.map((e) => ({ url: e.url, num: `${e.temporada}x${e.ep || '·'}${e.parte || ''}`, temporada: e.temporada, ep: e.ep, parte: e.parte || '' })) };
           }
         }
       }
@@ -733,8 +773,9 @@ async function startMirror(room, rawUrl, userId) {
               cant++;
               if (v.readyState >= 2 && v.duration > 1) listo = true;
             }
-            /* v61: en cine NO damos play — queda en pausa esperando el botón */
-            if (!cine && v.readyState >= 2) { try { if (v.paused) v.play().catch(() => {}); } catch {} }
+            /* v127: SIEMPRE en pausa — el servidor no reproduce nada solo:
+             * el play lo da el botón de la sala y arranca para todos a la
+             * vez. Antes los episodios (no-cine) arrancaban solos aquí. */
             if (!v.paused && v.currentTime > 0) ok = true;
           });
           return { ok, cant, listo };
@@ -854,18 +895,35 @@ async function startMirror(room, rawUrl, userId) {
         }
       } catch {}
     }
-    if (esPagCine() && videoListo && !m.ready) {
-      /* v61: la peli queda LISTA EN PAUSA — el botón de play aparece en la sala
-       * y cuando alguien le pica, empieza para todos al mismo tiempo */
+    if (videoListo && !m.ready) {
+      /* v61→v127: la peli/episodio queda LISTO EN PAUSA en cualquier página
+       * (no solo cine) — el botón «Toca para empezar» aparece en la sala y
+       * cuando alguien le pica, empieza para todos al mismo tiempo */
       for (const fr of m.page.frames()) {
         await fr.evaluate(() => document.querySelectorAll('video').forEach((v) => { try { v.pause(); } catch {} })).catch(() => {});
       }
       m.ready = true;
       m.playing = false;
       console.log(`[espejo] lista en pausa en sala ${room.code} (${(m.url || '').slice(0, 60)})`);
-      pantallaCompleta().catch(() => {});
+      if (esPagCine()) pantallaCompleta().catch(() => {});
       broadcast(room, 'mirror-state', mirrorState(room));
       return; /* listo: no seguir reintentando */
+    }
+    /* v127: episodio cuyo player sigue dormido (ni siquiera cargó el video)
+     * — un toque al reproductor para que aparezca; una sola vez (intento 6) */
+    if (!esPagCine() && !videoListo && n === 6) {
+      const pt = await m.page.evaluate(() => {
+        try {
+          const vs = [...document.querySelectorAll('video')].sort((a, b) => (b.videoWidth * b.videoHeight) - (a.videoWidth * a.videoHeight));
+          if (vs.length) { vs[0].scrollIntoView({ block: 'center' }); try { vs[0].click(); } catch {} return null; }
+          const f = [...document.querySelectorAll('iframe')].find((x) => { const b = x.getBoundingClientRect(); return b.width > 250 && b.height > 140; });
+          if (!f) return null;
+          f.scrollIntoView({ block: 'center' });
+          const b = f.getBoundingClientRect();
+          return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+        } catch { return null; }
+      }).catch(() => null);
+      if (pt) await m.page.mouse.click(pt.x, pt.y).catch(() => {});
     }
     if (sonando && !avisoPlay) {
       avisoPlay = true;
@@ -1186,7 +1244,7 @@ async function handleAction(req, res, body) {
             room.videoImg = String(action.img || '').slice(0, 400);
             room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
             room.position = 0;
-            room.isPlaying = true; /* arranca sonando; el que no pueda, ve el botón de play */
+            room.isPlaying = false; /* v127: SIEMPRE pausado — «Toca para empezar» lo arranca para todos a la vez */
             room.updatedAt = Date.now();
             /* v118: si es un episodio de serie, la cadena completa
              * (siguiente/anterior) se arma por detrás — llega con el
@@ -1287,20 +1345,36 @@ async function handleAction(req, res, body) {
           room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
           sc.idx = elegido.idx;
           room.position = 0;
-          room.isPlaying = true;
+          room.isPlaying = false; /* v127: el episodio entra PAUSADO */
           room.updatedAt = Date.now();
           sysMsg(room, `${room.users.get(userId).name} puso: ${room.videoTitle}${notaSalto}`);
           broadcast(room, 'state', stateOf(room));
           return json(res, 200, { ok: true, nativo: true });
         }
-        const m = mirrors.get(room.code);
+        let m = mirrors.get(room.code);
+        /* v127: auto-reparación — si el contexto de serie no llegó al abrir
+         * (la carga de episodios falló a la primera), se reconstruye AHORA
+         * con la URL actual; antes los botones morían para siempre y por eso
+         * varias caricaturas/cartoons no tenían siguiente/anterior */
+        if (m && !m.serie) {
+          const scFix = await serieCtxFromUrl(m.url || '').catch(() => null);
+          if (scFix) { m.serie = scFix; broadcast(room, 'mirror-state', mirrorState(room)); }
+        }
         if (!m || !m.serie) return json(res, 404, { ok: false, error: 'No hay serie en el espejo' });
         let idx = m.serie.eps.findIndex((e) => e.url === (m.url || ''));
         if (idx < 0) idx = m.serie.idx;
         const target = m.serie.eps[idx + (op === 'epNext' ? 1 : -1)];
         if (!target) return json(res, 400, { ok: false, error: op === 'epNext' ? 'Ya estás en el último episodio' : 'Ya estás en el primer episodio' });
+        /* v127: la sala SABE qué episodio toca ahora (título/carátula para
+         * todos, «Continuar viendo» correcto) — antes el salto no tocaba el
+         * estado y los invitados se quedaban con el episodio viejo */
+        room.videoUrl = target.url;
+        room.videoTitle = `${m.serie.titulo} ${target.num}`.slice(0, 80);
+        if (m.serie.poster) room.videoImg = m.serie.poster.slice(0, 400);
         await stopMirror(room);
         await startMirror(room, target.url, userId);
+        sysMsg(room, `${room.users.get(userId).name} puso: ${room.videoTitle}`);
+        broadcast(room, 'state', stateOf(room));
         return json(res, 200, { ok: true });
       }
 

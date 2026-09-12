@@ -338,6 +338,17 @@ function applyState(st) {
   if (st.videoUrl && st.native) activarNativo(st);
   else if (S.nativo) desactivarNativo();
   S.serieSala = (st.native && st.serie) || null; /* v118: serie para siguiente/anterior en nativo */
+  S.salaTitulo = String(st.videoTitle || ''); /* v127: info para la espera de TODOS (invitados incluidos) */
+  S.salaImg = String(st.videoImg || '');
+  /* v127: en nativo, mientras el video no dé video la sala ve la espera;
+   * cuando esté lista y pausada, «Toca para empezar» */
+  if (S.nativo && !S.nativoListo && !S.pendingStart) {
+    if (!S.mirrorInfo) S.mirrorInfo = { title: S.salaTitulo, img: S.salaImg, url: st.videoUrl, sub: 'Preparando la sala…' };
+    mostrarPeliLoading();
+  } else if (S.nativo && S.nativoListo) {
+    ocultarPeliLoading();
+    if (st.isPlaying) ocultarPlayBtn(); else mostrarPlayBtn();
+  }
   updateControlUi();
   updateBadge();
 }
@@ -348,6 +359,8 @@ function applyState(st) {
  * por el reloj de la sala (position + updatedAt + serverNow). */
 S.nativo = null; /* { url, m3u8, mp4, proxy, subs, isPlaying, position, updatedAt, hls } */
 S.serieSala = null; /* v118: { titulo, num, total, hayPrev, hayNext } — serie que se ve en nativo */
+S.nativoListo = false; /* v127: ¿el video nativo ya dio video? */
+S.salaTitulo = ''; S.salaImg = ''; /* v127: qué se ve en la sala (para la espera de los invitados) */
 function posEsperada() {
   if (!S.nativo) return 0;
   return S.nativo.isPlaying
@@ -376,6 +389,10 @@ function activarNativo(st) {
     document.body.classList.add('mirroring');
     document.body.classList.add('cine-listo');
     ocultarPlayBtn();
+    /* v127: la espera de la sala vive hasta que el video dé video */
+    if (!S.mirrorInfo) S.mirrorInfo = { title: String(st.videoTitle || ''), img: String(st.videoImg || ''), url: st.videoUrl, sub: 'Preparando la sala…' };
+    S.nativoListo = false;
+    mostrarPeliLoading();
     montarNativo();
   } else {
     Object.assign(S.nativo, { isPlaying: !!st.isPlaying, position: +st.position || 0, updatedAt: +st.updatedAt || Date.now() });
@@ -483,7 +500,17 @@ function sincronizarNativo() {
     if (Math.abs(v.currentTime - esp) > 1) { try { v.currentTime = esp; } catch {} }
   }
 }
+/* v127: el video nativo dio video → fuera la espera; si va pausado,
+ * aparece «Toca para empezar» */
+function nativoListo() {
+  S.nativoListo = true;
+  ocultarPeliLoading();
+  if (S.nativo && !S.nativo.isPlaying) mostrarPlayBtn();
+}
+$('#roomVideo').addEventListener('canplay', () => { if (S.nativo) nativoListo(); });
+$('#roomVideo').addEventListener('loadeddata', () => { if (S.nativo) nativoListo(); });
 function desmontarNativo() {
+  S.nativoListo = false; /* v127 */
   const v = $('#roomVideo');
   if (S.nativo && S.nativo.hls) { try { S.nativo.hls.destroy(); } catch {} }
   if (v) { try { v.pause(); v.removeAttribute('src'); v.load(); } catch {} }
@@ -533,8 +560,15 @@ function applyMirrorState(ms) {
   else if (ms.active && ms.ready) { ocultarPeliLoading(); mostrarPlayBtn(); }
   /* v74: mientras se abre un episodio, TODA la sala ve la pantalla de
    * espera con la carátula de la serie y el episodio que se prepara */
-  else if (ms.active && !ms.ready && ms.serie && !S.pendingStart) {
-    S.mirrorInfo = { title: ms.serie.titulo, img: ((ms.serie.cover || ms.serie.poster) ? proxyAnimeImg(ms.serie.cover || ms.serie.poster, 400) : ''), url: ms.url, sub: 'Abriendo en el espejo…', epNum: ms.serie.num }; /* v120: cover de IMDb primero */
+  else if (ms.active && !ms.ready && !S.pendingStart) {
+    /* v127: la espera la ve TODA la sala mientras el video no esté listo
+     * (antes solo si había contexto de serie — por eso al saltar episodio
+     * en caricaturas los invitados se quedaban mirando el vacío) */
+    if (!S.mirrorInfo) {
+      S.mirrorInfo = ms.serie
+        ? { title: ms.serie.titulo, img: ((ms.serie.cover || ms.serie.poster) ? proxyAnimeImg(ms.serie.cover || ms.serie.poster, 400) : ''), url: ms.url, sub: 'Abriendo en el espejo…', epNum: ms.serie.num } /* v120: cover de IMDb primero */
+        : { title: S.salaTitulo || '', img: S.salaImg || '', url: ms.url, sub: 'Preparando la sala…' };
+    }
     mostrarPeliLoading();
   }
   updateEpNav();
@@ -1136,7 +1170,7 @@ function ocultarPeliLoadingSuave() {
   if (falta <= 0) return ocultarPeliLoading();
   setTimeout(() => ocultarPeliLoading(), falta);
 }
-$('#peliLoading').addEventListener('click', () => ocultarPeliLoading());
+$('#peliLoading').addEventListener('click', () => { /* v127: mientras carga, la pantalla NO se quita — solo cuando hay video listo */ if (S.mirror.ready || S.nativoListo) ocultarPeliLoading(); });
 /* v61: selector de temporadas y episodios para series */
 let spDatos = null; /* lo que devolvió /api/serie */
 /* v62→v67: imágenes de AnimeFLV y Latanime pasan por NUESTRO proxy —
@@ -1567,7 +1601,7 @@ function updateEpNav() {
   if (!prev || !next || !buscar) return;
   prev.addEventListener('click', () => { toast('Abriendo el episodio anterior…'); sendAction({ type: 'mirror', op: 'epPrev' }).then((r) => { if (r && r.ok === false) toast(r.error || 'No se pudo'); }); });
   next.addEventListener('click', () => { toast('Abriendo el episodio siguiente…'); sendAction({ type: 'mirror', op: 'epNext' }).then((r) => { if (r && r.ok === false) toast(r.error || 'No se pudo'); }); });
-  buscar.addEventListener('click', () => { try { $('#pagePickBtn').click(); } catch {} });
+  buscar.addEventListener('click', () => abrirMenuBuscarSala()); /* v127: menú de búsqueda propio */
 })();
 
 /* v43: cargar el directorio real del servidor (crece al pegar URLs) */
@@ -3484,7 +3518,8 @@ $('#btnVolver').addEventListener('click', () => {
 
 /* v45: buscar otra página SIN salir de la sala (mientras se espeja) */
 function cerrarBuscarSala() {
-  $('#msBar').classList.add('hidden');
+  const menu = $('#msMenu');
+  if (menu) menu.classList.add('hidden'); /* v127: cerrar el menú completo */
   $('#msResults').classList.add('hidden');
 }
 async function buscarEnSala() {
@@ -3512,13 +3547,19 @@ async function buscarEnSala() {
     box.innerHTML = '<div class="sr-info">Sin conexión con el servidor</div>';
   }
 }
-$('#btnMSearch').addEventListener('click', () => {
-  const bar = $('#msBar');
-  if (bar.classList.contains('hidden')) {
-    bar.classList.remove('hidden');
-    $('#msInput').focus();
-  } else cerrarBuscarSala();
-});
+/* v127: el buscador vive en un MENÚ modal — se abre limpio, buscas,
+ * eliges y sigues en la sala (series → temporadas/episodios de siempre) */
+function abrirMenuBuscarSala() {
+  const menu = $('#msMenu');
+  if (!menu) return;
+  menu.classList.remove('hidden');
+  $('#msInput').value = '';
+  $('#msResults').classList.add('hidden');
+  $('#msResults').innerHTML = '';
+  setTimeout(() => $('#msInput').focus(), 50);
+}
+$('#btnMSearch').addEventListener('click', abrirMenuBuscarSala);
+$('#msBack').addEventListener('click', cerrarBuscarSala);
 $('#msGo').addEventListener('click', buscarEnSala);
 $('#msClose').addEventListener('click', cerrarBuscarSala);
 $('#msInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); buscarEnSala(); } });

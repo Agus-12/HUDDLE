@@ -1680,3 +1680,19 @@ body.movil-horizontal #homeFull {
   overscroll-behavior: contain; /* el jalón fuerte no se pasa a la página de atrás */
   padding-bottom: 24px;
 }
+
+/* ============ v127: menú de búsqueda dentro de la sala ============ */
+.ms-menu { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: flex-start; justify-content: center; padding: 7vh 14px 14px; }
+.ms-menu.hidden { display: none; }
+.ms-menu-back { position: absolute; inset: 0; background: rgba(5, 7, 15, 0.84); }
+.ms-menu-box {
+  position: relative; width: min(94vw, 560px); max-height: 84vh;
+  overflow: hidden auto; -webkit-overflow-scrolling: touch;
+  background: var(--panel);
+  border: 1px solid var(--line); border-radius: 16px; padding: 14px;
+}
+.ms-menu-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.ms-menu-t { font-weight: 800; font-size: 15px; }
+.ms-menu-busca { display: flex; gap: 8px; margin-bottom: 10px; }
+.ms-menu-busca .input { flex: 1; min-width: 0; }
+.ms-results { max-height: 62vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
