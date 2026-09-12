@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v121'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v122'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1487,6 +1487,23 @@ function serveStatic(req, res, urlPath) {
     const noCache = /\.(html|js|css)$/i.test(filePath);
     const extra = noCache ? { 'Cache-Control': 'no-cache' } : {};
     const range = req.headers.range;
+
+    /* v122: index.html se sirve con la versión REAL inyectada — los ?v= de
+     * app.js/style.css se rellenan con UI_VERSION al vuelo. Subir la versión
+     * en el server basta: el cliente descarga el JS nuevo (URL distinta) y su
+     * APP_VERSION (leída de su propio tag) coincide — nadie se queda "viejo"
+     * de forma permanente. Antes el ?v= y APP_VERSION iban A MANO y se
+     * descuadraron (el cliente vivía jurando que era v119). */
+    if (/index\.html$/.test(filePath)) {
+      fs.readFile(filePath, 'utf8', (e2, html) => {
+        if (e2) { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('404'); return; }
+        html = html.replace(/((?:app\.js|style\.css)\?v=)[^"\s]*/g, '$1' + UI_VERSION);
+        const buf = Buffer.from(html, 'utf8');
+        res.writeHead(200, { 'Content-Type': type, 'Content-Length': buf.length, 'Cache-Control': 'no-cache', 'Accept-Ranges': 'bytes' });
+        res.end(buf);
+      });
+      return;
+    }
 
     if (range && st.size) {
       const m = /bytes=(\d*)-(\d*)/.exec(range);
@@ -4099,7 +4116,7 @@ const server = http.createServer(async (req, res) => {
         });
       return json(res, 200, { ok: true, rooms: list, srvVersion: UI_VERSION });
     }
-    if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size });
+    if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION }); /* v122 */
     return serveStatic(req, res, url.pathname);
   } catch (e) {
     console.error(e);

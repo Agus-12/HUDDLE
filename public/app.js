@@ -3,7 +3,18 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v119';
+/* v122: la versión la pone el SERVER — llega en el ?v= del tag <script>
+ * (index.html se lo inyecta al servir la página) y ya no se edita a mano:
+ * era la razón por la que la app se quedaba "vieja" para siempre (el JS
+ * nuevo seguía jurando que era v119 y pedía recargar en bucle). */
+const APP_VERSION = (() => {
+  try {
+    const s = document.querySelector('script[src*="/app.js"]');
+    const m = /v=([^&"]+)/.exec((s && s.src) || '');
+    if (m && m[1]) return m[1];
+  } catch {}
+  return 'v?'; /* sin ?v= no hay versión conocida — el chequeo de abajo actualizará */
+})();
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -94,12 +105,16 @@ function showScreen(id) {
 function maybeReload(srvVersion) {
   const key = 'rr-reloaded-' + srvVersion;
   if (sessionStorage.getItem(key)) {
-    toast('Hay una versión nueva (' + srvVersion + ') — recarga la página (F5)', 9000);
+    toast('Hay una versión nueva (' + srvVersion + ') — cierra y vuelve a abrir la app', 9000);
     return;
   }
   sessionStorage.setItem(key, '1');
-  toast('Nueva versión de la interfaz (' + srvVersion + ') — recargando…', 3000);
-  setTimeout(() => location.reload(), 2500);
+  toast('Actualizando la app a ' + srvVersion + '…', 1800);
+  /* v122: location.replace con ?rv= — URL distinta, así la app instalada
+   * (PWA) no puede re-servir el HTML de su caché (el reload seco a veces
+   * traía la página vieja y "nunca actualizaba"). Sin botón de recargar:
+   * se actualiza sola en cada actualización. */
+  setTimeout(() => location.replace('/?rv=' + encodeURIComponent(srvVersion)), 1200);
 }
 
 /* ======================= conexión / protocolo ======================= */
@@ -2086,6 +2101,11 @@ function initLanding() {
     av.textContent = (S.profile.name[0] || '?').toUpperCase();
     av.style.setProperty('--h', hashHue(S.profile.name));
     pollRooms();
+    /* v122: chequeo de versión al abrir — antes solo se chequeaba al entrar
+     * a una sala y quien no entraba a ninguna vivía con la app vieja */
+    fetch('/api/health').then((r) => r.json()).then((d) => {
+      if (d && d.version && d.version !== APP_VERSION) maybeReload(d.version);
+    }).catch(() => {});
     cargarPopulares(); /* v55: fila de populares del día */
     cargarContinuar(); /* v78: seguir viendo donde te quedaste */
     if (hM) {
@@ -2580,6 +2600,8 @@ async function buscarGlobal(q) {
 }
 function elegirResultadoBusqueda(res) {
   cerrarBuscador(); /* al elegir, esto ya no vive arriba del feed */
+  $('#homeSearch').value = ''; /* v122: elegiste algo — no queda texto colgado */
+  $('#spInput').value = '';
   if (elegirTitulo(res)) return; /* v61: series → temporadas y episodios */
   /* v91: en la pestaña Solo, lo que buscas se reproduce individual —
    * antes la búsqueda SIEMPRE armaba una sala (pantalla de "Cargando

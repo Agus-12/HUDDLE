@@ -1631,14 +1631,19 @@ body.movil-horizontal #homeFull {
   position: fixed; inset: 0; z-index: 90;
   background: var(--bg);
   overflow-y: auto; -webkit-overflow-scrolling: touch;
-  padding: 12px 14px 48px;
+  /* v122: respeta el notch/borde del móvil (viewport-fit=cover) — la barra
+   * del buscador ya no queda pegada/arriba del todo en la app instalada */
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px calc(env(safe-area-inset-bottom, 0px) + 48px);
 }
 .search-page.hidden { display: none; }
 .sp-top {
   position: sticky; top: 0; z-index: 2;
   display: flex; align-items: center; gap: 8px;
   background: var(--bg);
-  margin: -12px -14px 12px; padding: 12px 14px 10px;
+  /* v122: el safe-area va DENTRO de la barra (fondo opaco hasta el notch)
+   * y su contenido arranca debajo — nada de controles fuera de alcance */
+  margin: calc(-1 * (env(safe-area-inset-top, 0px) + 12px)) -14px 12px;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) 14px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 .sp-volver { flex: none; }
