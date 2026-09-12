@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v118'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v119'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -2148,7 +2148,7 @@ async function resolverPelisxd(pageUrl) {
 const CARI_BASE = 'https://miscaricaturas.com/';
 const cariMeta = new Map();   /* slug → {at, titulo, poster} — 6 h */
 const cariDatos = new Map();  /* slug → {at, d} — 30 min */
-const cariFeedCache = { at: 0, items: [] }; /* 1 h */
+const cariFeedCache = { at: 0, items: [], toons: [] }; /* 1 h — v119: items=MisCaricaturas, toons=Lacartoons (Cartoons) */
 /* v112: LACARTOONS (lacartoons.com) — fuente nueva de series clásicas.
  * Aporta lo que MisCaricaturas no tiene: las temporadas 1-5 de Billy y
  * Mandy en LATINO (allí solo la T6 está doblada) e iCarly y Drake & Josh
@@ -2197,6 +2197,82 @@ const LCT_SERIES = new Map([
   ['10', { slug: 'generador-rex', lctId: 10, titulo: 'Generador Rex' }],
   ['21', { slug: 'los-picapiedras', lctId: 21, titulo: 'Los Picapiedras' }],
   ['22', { slug: 'los-supersonicos', lctId: 22, titulo: 'Los Supersónicos' }],
+
+  /* v119: GRAN LOTE de cartoons clásicos verificados HOY (2026-09-12).
+   * Lacartoons usa TRES players: cubeembed.rpmvid (HLS, el de siempre),
+   * ok.ru (MP4 directo, nuevo resolver) y cubeembed.com (dominio MUERTO
+   * — esas series no entran). Verificación: 4 caps de muestra por serie;
+   * el barrido de fondo limpia los caps muertos que queden.
+   * Quedaron FUERA por player roto: Aladdin (cubeembed.com), Pato
+   * Aventuras/CatDog/Ren y Stimpy (sendvid caído), Thornberrys/Justicia
+   * Joven (dhtpre sin extractor), Cachorro Scooby, Shaggy y Scooby,
+   * Titán Sim-Biónico y Ben 10 Supremacia (sin player). */
+  /* — player ok.ru, MP4 directo — */
+  ['95', { slug: 'el-oso-yogui', lctId: 95, titulo: 'El Oso Yogui' }],
+  ['123', { slug: 'don-gato', lctId: 123, titulo: 'Don Gato y Su Pandilla' }],
+  ['105', { slug: 'la-pantera-rosa', lctId: 105, titulo: 'La Pantera Rosa' }],
+  ['122', { slug: 'tiro-loco-mcgraw', lctId: 122, titulo: 'Tiro Loco McGraw' }],
+  ['101', { slug: 'huckleberry-hound', lctId: 101, titulo: 'Huckleberry Hound' }],
+  ['92', { slug: 'el-inspector-ardilla', lctId: 92, titulo: 'El Inspector Ardilla' }],
+  ['108', { slug: 'los-autos-locos', lctId: 108, titulo: 'Los Autos Locos' }],
+  ['104', { slug: 'la-hormiga-atomica', lctId: 104, titulo: 'La Hormiga Atómica' }],
+  ['93', { slug: 'el-lagarto-juancho', lctId: 93, titulo: 'El Lagarto Juancho' }],
+  ['341', { slug: 'swat-kats', lctId: 341, titulo: 'Swat Kats' }],
+  ['176', { slug: 'jonny-quest', lctId: 176, titulo: 'Jonny Quest' }],
+  ['63', { slug: 'las-tortugas-ninjas', lctId: 63, titulo: 'Las Tortugas Ninjas' }],
+  ['130', { slug: 'superman-serie-animada', lctId: 130, titulo: 'Superman La Serie Animada' }],
+  ['298', { slug: 'reboot', lctId: 298, titulo: 'Reboot' }],
+  ['134', { slug: 'silvestre-y-piolin', lctId: 134, titulo: 'Las Aventuras de Silvestre y Piolín' }],
+  ['314', { slug: 'el-pato-darkwing', lctId: 314, titulo: 'El Pato Darkwing' }],
+  ['316', { slug: 'chip-y-dale', lctId: 316, titulo: 'Chip & Dale: Guardianes Rescatadores' }],
+  ['291', { slug: 'timon-y-pumba', lctId: 291, titulo: 'Timón y Pumba' }],
+  ['137', { slug: 'la-sirenita', lctId: 137, titulo: 'La Sirenita' }],
+  ['198', { slug: 'invasor-zim', lctId: 198, titulo: 'Invasor Zim' }],
+  ['226', { slug: 'megas-xlr', lctId: 226, titulo: 'Megas XLR' }],
+  ['283', { slug: 'mucha-lucha', lctId: 283, titulo: 'Mucha Lucha' }],
+  ['284', { slug: 'daniel-el-travieso', lctId: 284, titulo: 'Daniel El Travieso' }],
+  ['35', { slug: 'tom-y-jerry', lctId: 35, titulo: 'Tom y Jerry' }],
+  ['18', { slug: 'looney-tunes', lctId: 18, titulo: 'Looney Tunes' }],
+  ['44', { slug: 'droopy', lctId: 44, titulo: 'Droopy' }],
+  ['411', { slug: 'drama-total', lctId: 411, titulo: 'Drama Total' }],
+  ['353', { slug: 'pucca', lctId: 353, titulo: 'Pucca' }],
+  /* — player rpmvid (HLS, como las 16 de siempre) — */
+  ['180', { slug: 'thundercats', lctId: 180, titulo: 'Thundercats' }],
+  ['62', { slug: 'he-man', lctId: 62, titulo: 'He-Man y los Amos del Universo' }],
+  ['129', { slug: 'pinky-y-cerebro', lctId: 129, titulo: 'Pinky y Cerebro' }],
+  ['124', { slug: 'batman-del-futuro', lctId: 124, titulo: 'Batman Del Futuro' }],
+  ['318', { slug: 'kim-possible', lctId: 318, titulo: 'Kim Possible' }],
+  ['156', { slug: 'la-vida-moderna-de-rocko', lctId: 156, titulo: 'La Vida Moderna de Rocko' }],
+  ['368', { slug: 'rugrats', lctId: 368, titulo: 'Los Rugrats: Aventuras en Pañales' }],
+  ['161', { slug: 'rocket-power', lctId: 161, titulo: 'Rocket Power' }],
+  ['205', { slug: 'los-castores-cascarrabias', lctId: 205, titulo: 'Los Castores Cascarrabias' }],
+  ['376', { slug: 'un-show-mas', lctId: 376, titulo: 'Un Show Más' }],
+  ['125', { slug: 'batman-serie-animada', lctId: 125, titulo: 'Batman La Serie Animada' }],
+  ['131', { slug: 'tiny-toons', lctId: 131, titulo: 'Tiny Toons' }],
+  ['46', { slug: 'liga-de-la-justicia', lctId: 46, titulo: 'Liga de la Justicia' }],
+  /* — las que en v115 se creían muertas: en realidad estaban en ok.ru — */
+  ['173', { slug: 'x-men-serie-animada', lctId: 173, titulo: 'X-Men Serie Animada' }],
+  ['79', { slug: 'spiderman-serie-animada', lctId: 79, titulo: 'Spider-Man: La Serie Animada' }],
+  ['33', { slug: 'spiderman-nueva-serie', lctId: 33, titulo: 'Spiderman La Nueva Serie Animada' }],
+  ['7', { slug: 'static-shock', lctId: 7, titulo: 'Static Shock' }],
+  ['4', { slug: 'code-lyoko', lctId: 4, titulo: 'Code Lyoko' }],
+  ['30', { slug: 'scooby-misterios-sa', lctId: 30, titulo: 'Scooby Doo Misterios S.A' }],
+  ['119', { slug: 'scooby-donde-estas', lctId: 119, titulo: 'Scooby-Doo ¿Dónde Estás?' }],
+  ['257', { slug: 'el-show-de-scooby-doo', lctId: 257, titulo: 'El Show de Scooby-Doo' }],
+  ['290', { slug: 'nuevas-peliculas-scooby', lctId: 290, titulo: 'Las Nuevas Películas de Scooby Doo' }],
+  ['359', { slug: 'que-hay-de-nuevo-scooby', lctId: 359, titulo: '¿Qué Hay de Nuevo, Scooby-Doo?' }],
+  ['24', { slug: 'hombres-de-negro', lctId: 24, titulo: 'Hombres de Negro' }],
+  ['402', { slug: 'los-cazafantasmas', lctId: 402, titulo: 'Los Cazafantasmas' }],
+  ['377', { slug: 'las-chicas-z', lctId: 377, titulo: 'Las Chicas Superpoderosas Z' }],
+  ['6', { slug: 'duck-dodgers', lctId: 6, titulo: 'Duck Dodgers' }],
+  ['8', { slug: 'garfield', lctId: 8, titulo: 'Garfield' }],
+  ['25', { slug: 'meteoro', lctId: 25, titulo: 'Meteoro' }],
+  ['3', { slug: 'capitan-planeta', lctId: 3, titulo: 'El Capitán Planeta' }],
+  ['356', { slug: 'super-mario', lctId: 356, titulo: 'Super Mario' }],
+  ['23', { slug: 'godzilla', lctId: 23, titulo: 'Godzilla La Serie Animada' }],
+  ['13', { slug: 'las-aventuras-de-tintin', lctId: 13, titulo: 'Las Aventuras de TinTin' }],
+  ['36', { slug: 'wolverine', lctId: 36, titulo: 'Wolverine y los X-Men' }],
+  ['281', { slug: 'ben-10-fuerza-alienigena', lctId: 281, titulo: 'Ben 10: Fuerza Alienígena' }],
 ]);
 /* v113: series de MisCaricaturas cuyas temporadas en inglés se
  * reemplazan por las de lacartoons (latino, auditadas). «tomar» = qué
@@ -2230,7 +2306,7 @@ try {
   const ch = cacheLeer('cariHome');
   if (ch && ch.at) { cariHome.at = ch.at; for (const [k, v] of (ch.items || [])) cariHome.items.set(k, v); }
   const cf = cacheLeer('cariFeed');
-  if (cf && cf.at && Array.isArray(cf.items) && cf.items.length) { cariFeedCache.at = cf.at; cariFeedCache.items = cf.items; }
+  if (cf && cf.at) { cariFeedCache.at = cf.at; cariFeedCache.items = Array.isArray(cf.items) ? cf.items : []; cariFeedCache.toons = Array.isArray(cf.toons) ? cf.toons : []; }
   const nCari = cariDatos.size, nSerie = serieCache.size;
   if (nCari || nSerie) console.log('[cache] del disco: ' + nCari + ' caricaturas, ' + nSerie + ' series/animes, ' + cariMeta.size + ' metas' + (cariFeedCache.items.length ? ', feed listo' : ''));
 } catch {}
@@ -2372,7 +2448,7 @@ async function lctBarrerVivos(lctId, eps) {
     try {
       const r = await fetchSeguro(e.url, 12000);
       const html = r && r.ok ? await r.text() : '';
-      if (!html || /cubeembed\.rpmvid\.com\/#[a-z0-9]+/i.test(html)) vivos.push(e);
+      if (!html || /cubeembed\.rpmvid\.com\/#[a-z0-9]+|ok\.ru\/videoembed\/\d+/i.test(html)) vivos.push(e); /* v119: ok.ru también cuenta como vivo */
     } catch { vivos.push(e); } /* si no se pudo checar, no se tira */
   };
   for (const e of porChecar) {
@@ -2555,8 +2631,9 @@ const CARI_ORDEN = [
   'megas-xlr-capitulos-completos', 'monstruos-de-verdad-latino', 'soy-la-comadreja-latino',
 ];
 async function caricaturasDestacadas() {
-  if (Date.now() - cariFeedCache.at < 60 * 60 * 1000 && cariFeedCache.items.length) return cariFeedCache.items;
-  if (cariFeedCache.items.length) { refrescarCariFeed().catch(() => {}); return cariFeedCache.items; } /* v111: vencido → se sirve y se refresca por detrás */
+  const listo = () => ({ caricaturas: cariFeedCache.items, cartoons: cariFeedCache.toons });
+  if (Date.now() - cariFeedCache.at < 60 * 60 * 1000 && (cariFeedCache.items.length || cariFeedCache.toons.length)) return listo();
+  if (cariFeedCache.items.length || cariFeedCache.toons.length) { refrescarCariFeed().catch(() => {}); return listo(); } /* v111: vencido → se sirve y se refresca por detrás */
   return await refrescarCariFeed();
 }
 async function refrescarCariFeed() {
@@ -2577,21 +2654,32 @@ async function refrescarCariFeed() {
       url: CARI_BASE + slug + '/', img, site: 'Caricaturas',
     };
   }))).filter((x) => x.title && x.img);
-  /* v112→v117: iCarly, Drake & Josh y las demás de LACARTOONS entran al
-   * mismo carril — en PARALELO (16 fetches a la vez, no uno por uno:
-   * el arranque en frío baja de ~70 s a unos segundos) */
-  const lctItems = await Promise.all([...LCT_SERIES.values()].map(async (lct) => {
-    try {
-      const d = await datosCaricatura(String(lct.lctId));
-      if (d && d.poster && d.episodios && d.episodios.length) {
-        return { title: d.titulo, url: LCT_BASE + 'serie/' + lct.lctId, img: d.poster, site: 'Caricaturas' };
-      }
-    } catch {}
-    return null;
-  }));
-  for (const it of lctItems) if (it) items.push(it);
-  if (items.length) { cariFeedCache.at = Date.now(); cariFeedCache.items = items; cacheGuardar('cariFeed', () => ({ at: cariFeedCache.at, items: cariFeedCache.items })); } /* v111: a disco */
-  return items;
+  /* v119: apartado propio — las de LACARTOONS ya no se mezclan con las
+   * de MisCaricaturas: van a "Cartoons". Son ~79 series, así que se bajan
+   * en bloques de 16 en vez de todas a la vez (que no nos racione el
+   * sitio por ráfaga); el arranque en frío tarda unos segundos más pero
+   * queda en cache 1 h y después se sirve al instante. */
+  const lctLista = [...LCT_SERIES.values()];
+  const toons = [];
+  for (let i = 0; i < lctLista.length; i += 16) {
+    const parte = await Promise.all(lctLista.slice(i, i + 16).map(async (lct) => {
+      try {
+        const d = await datosCaricatura(String(lct.lctId));
+        if (d && d.poster && d.episodios && d.episodios.length) {
+          return { title: d.titulo, url: LCT_BASE + 'serie/' + lct.lctId, img: d.poster, site: 'Cartoons' };
+        }
+      } catch {}
+      return null;
+    }));
+    for (const it of parte) if (it) toons.push(it);
+  }
+  if (items.length || toons.length) {
+    cariFeedCache.at = Date.now();
+    cariFeedCache.items = items;
+    cariFeedCache.toons = toons;
+    cacheGuardar('cariFeed', () => ({ at: cariFeedCache.at, items: cariFeedCache.items, toons: cariFeedCache.toons }));
+  } /* v111: a disco */
+  return { caricaturas: items, cartoons: toons };
 }
 
 /* episodios de una caricatura — la tabla de la página de la serie.
@@ -2641,9 +2729,9 @@ async function refrescarDatosLacartoons(lct) {
 }
 async function datosCaricatura(slug) {
   try {
-    if (!/^[a-z0-9-]{2,90}$/.test(slug)) return null;
     const lct = LCT_SERIES.get(slug); /* v112: '/api/caricaturas/150' → iCarly de lacartoons */
-    if (lct) return await datosLacartoons(lct);
+    if (lct) return await datosLacartoons(lct); /* v119: primero — hay ids de UN dígito (3,4,6,7,8) */
+    if (!/^[a-z0-9-]{2,90}$/.test(slug)) return null;
     const c = cariDatos.get(slug);
     if (c && Date.now() - c.at < 30 * 60 * 1000) return c.d;
     if (c) { refrescarDatosCaricatura(slug).catch(() => {}); return c.d; } /* v111: vencido → se sirve y se refresca por detrás */
@@ -2839,6 +2927,31 @@ async function extraerRpmvid(pageUrl) {
     return master;
   } finally { try { await browser.close(); } catch {} }
 }
+
+/* v119: capítulos de lacartoons con player de OK.RU — el embed trae las
+ * URLs del video directo (MP4, 4-6 calidades) dentro de data-options, sin
+ * navegador. El token de okcdn va amarrado a la IP que pidió el embed
+ * (el servidor) → el resultado SIEMPRE se sirve por el proxy nuestro. */
+async function resolverOkRu(embedId) {
+  const r = await fetchSeguro('https://ok.ru/videoembed/' + embedId, 12000).catch(() => null);
+  const html = r && r.ok ? await r.text().catch(() => '') : '';
+  const m = /data-options="([^"]+)"/.exec(html || '');
+  let md = null;
+  try {
+    const opts = JSON.parse(m[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&'));
+    md = (opts.flashvars && opts.flashvars.metadata) || null;
+  } catch {}
+  const vids = (md && md.videos) || [];
+  if (!vids.length) throw new Error('Ese capítulo ya no está disponible en Lacartoons — prueba otro');
+  let mejor = null;
+  for (const n of ['full', 'hd', 'sd', 'low', 'lowest', 'mobile']) {
+    const v = vids.find((x) => x.name === n && x.url && /^https:/.test(x.url));
+    if (v) { mejor = v; break; }
+  }
+  if (!mejor) throw new Error('Ese capítulo ya no está disponible en Lacartoons — prueba otro');
+  return { m3u8: mejor.url, mp4: true, proxy: true, subs: [] };
+}
+
 async function resolverLacartoons(epUrl) {
   const m = /lacartoons\.com\/serie\/capitulo\/(\d+)\?t=\d+/i.exec(epUrl || '');
   if (!m) throw new Error('Capítulo de Lacartoons no válido');
@@ -2854,8 +2967,14 @@ async function resolverLacartoons(epUrl) {
   {
     const rPre = await fetchSeguro(epUrl, 10000).catch(() => null);
     const html = rPre && rPre.ok ? await rPre.text().catch(() => '') : '';
-    if (html && !/cubeembed\.rpmvid\.com\/#[a-z0-9]+/i.test(html)) {
-      throw new Error('Ese capítulo ya no está disponible en Lacartoons — prueba otro');
+    if (html) {
+      /* v119: ¿player de ok.ru? → MP4 directo, sin navegador */
+      const mOk = /ok\.ru\/videoembed\/(\d+)/i.exec(html);
+      if (mOk) return resolverOkRu(mOk[1]);
+      /* cubeembed.com (sin .rpmvid) es un dominio muerto → capítulo caído */
+      if (!/cubeembed\.rpmvid\.com\/#[a-z0-9]+/i.test(html)) {
+        throw new Error('Ese capítulo ya no está disponible en Lacartoons — prueba otro');
+      }
     }
   }
   /* el navegador clica el player y suelta el master. Hay DOS formatos:
@@ -3307,6 +3426,7 @@ function esProxeable(u) {
     const h = new URL(u).hostname;
     return /(^|\.)goodstream\.one$/i.test(h) || /(^|\.)mp4upload\.com$/i.test(h) || /(^|\.)vimeos\.(net|zip)$/i.test(h)
       || /(^|\.)rpmvid\.com$/i.test(h) || /(^|\.)tiktokcdn\.com$/i.test(h) /* v112: lacartoons (cubeembed) y sus segmentos camuflados */
+      || /(^|\.)okcdn\.ru$/i.test(h) /* v119: videos MP4 de ok.ru (Lacartoons) */
       || hlsReferers.has(h); /* v93: hosts que ya resolvimos (con su Referer) */
   } catch { return false; }
 }
@@ -3486,7 +3606,7 @@ const server = http.createServer(async (req, res) => {
       /* v55: populares del día + v57: series recién agregadas
        * v101: + 6 filas de género que rotan cada día
        * v102: + caricaturas (debajo de los animes) */
-      const [day, series, animes, generos, caricaturas] = await Promise.all([
+      const [day, series, animes, generos, cari] = await Promise.all([
         popularesDeHoy().catch(() => []),
         seriesRecientes().catch(() => []),
         animesDelMomento().catch(() => []), /* v67: animes del momento (Latanime) */
@@ -3495,18 +3615,19 @@ const server = http.createServer(async (req, res) => {
             .then((items) => ({ slug, nombre, items }))
             .catch(() => ({ slug, nombre, items: [] }))
         )),
-        caricaturasDestacadas().catch(() => []),
+        caricaturasDestacadas().catch(() => ({ caricaturas: [], cartoons: [] })),
       ]);
       return json(res, 200, {
         ok: true, results: day, series, animes,
-        caricaturas,
+        caricaturas: cari.caricaturas || [],
+        cartoons: cari.cartoons || [], /* v119: apartado propio de Lacartoons */
         generos: (generos || []).filter((g) => g.items && g.items.length),
       });
     }
     if (url.pathname.startsWith('/api/caricaturas/')) {
       /* v102: episodios de una caricatura (para el selector) */
       const slug = decodeURIComponent(url.pathname.split('/')[3] || '').toLowerCase();
-      if (!/^[a-z0-9-]{2,90}$/.test(slug)) return json(res, 400, { ok: false, error: 'Caricatura inválida' });
+      if (!/^[a-z0-9-]{2,90}$/.test(slug) && !/^[0-9]{1,3}$/.test(slug)) return json(res, 400, { ok: false, error: 'Caricatura inválida' }); /* v119: ids de lacartoons de 1 dígito */
       const d = await datosCaricatura(slug);
       if (!d) return json(res, 502, { ok: false, error: 'No pude leer esa caricatura' });
       return json(res, 200, d);

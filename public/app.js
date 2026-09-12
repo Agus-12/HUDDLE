@@ -3,7 +3,7 @@
 
 const $ = (s) => document.querySelector(s);
 
-const APP_VERSION = 'v118';
+const APP_VERSION = 'v119';
 
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
@@ -3378,6 +3378,15 @@ async function cargarPopulares() {
     if (wrapC && filaC && d.caricaturas && d.caricaturas.length) {
       d.caricaturas.slice(0, 18).forEach((res) => filaC.appendChild(crearTarjetaResultado(res, alTocar(res)))); /* v107 */
       wrapC.classList.remove('hidden');
+    }
+    /* v119: apartado propio — los cartoons clásicos de Lacartoons
+     * (Yogui, Tom y Jerry, Batman, Rugrats, X-Men…), separados de las
+     * caricaturas de MisCaricaturas */
+    const wrapT = document.querySelector('#toonBox');
+    const filaT = document.querySelector('#toonRow');
+    if (wrapT && filaT && d.cartoons && d.cartoons.length) {
+      d.cartoons.slice(0, 80).forEach((res) => filaT.appendChild(crearTarjetaResultado(res, alTocar(res))));
+      wrapT.classList.remove('hidden');
     }
     /* v101: filas de GÉNERO — seis secciones que rotan cada día; cada una
      * con su ícono y color, y las mismas tarjetas que todo el feed */
