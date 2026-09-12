@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v136'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v137'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -789,13 +789,17 @@ async function descargarInicioEp(m3u8) {
   return null;
 }
 const INTRO_JOBS = new Set(), INTRO_INTENTOS = new Map();
+/* v137: penalización por resultado — fallo de infra (navegador ocupado, red)
+ * retrasa el reintento solo 15 min; «no hay intro común» sí espera 6h */
+function penalizarIntro(serieKey, ms) {
+  INTRO_INTENTOS.set(serieKey, Date.now() + 6 * 3600 * 1000 - ms);
+}
 async function detectarIntroSerie(serieKey, urls) {
   /* v134: correr también cuando lo guardado es aprendido-a-mano (pudo salir de
    * un clic equivocado) — la huella de audio es la prueba fuerte; lo único que
    * NO se re-analiza es lo que ya vino de la huella misma */
   if (!fpcalcOk() || !serieKey || (INTROS[serieKey] && INTROS[serieKey].by === 'auto') || INTRO_JOBS.has(serieKey)) return;
   if (Date.now() - (INTRO_INTENTOS.get(serieKey) || 0) < 6 * 3600 * 1000) return;
-  INTRO_INTENTOS.set(serieKey, Date.now());
   INTRO_JOBS.add(serieKey);
   console.log('[intro] detectando intro de ' + serieKey + ' (comparando el audio de 2 episodios)…');
   try {
@@ -804,13 +808,13 @@ async function detectarIntroSerie(serieKey, urls) {
       try {
         const r = await resolverNativo(u);
         if (r && r.m3u8) listos.push(r.m3u8.startsWith('/') ? 'http://127.0.0.1:' + PORT + r.m3u8 : r.m3u8); /* el proxy propio (/api/xd) sirve el playlist con los headers correctos */
-      } catch {}
+      } catch (e) { console.log('[intro] un episodio no se dejó resolver: ' + String(e && e.message || e).slice(0, 90)); }
       if (listos.length >= 2) break;
     }
-    if (listos.length < 2) return console.log('[intro] no pude resolver 2 episodios de ' + serieKey);
+    if (listos.length < 2) { penalizarIntro(serieKey, 15 * 60 * 1000); return console.log('[intro] no pude resolver 2 episodios de ' + serieKey + ' — reintento en 15 min'); }
     const f0 = await descargarInicioEp(listos[0]);
     const f1 = f0 && await descargarInicioEp(listos[1]);
-    if (!f0 || !f1) return console.log('[intro] descargas incompletas para ' + serieKey);
+    if (!f0 || !f1) { penalizarIntro(serieKey, 15 * 60 * 1000); return console.log('[intro] descargas incompletas para ' + serieKey + ' — reintento en 15 min'); }
     try {
       const [ha, hb] = await Promise.all([fpcalcArchivo(f0), fpcalcArchivo(f1)]);
       if (ha && hb && ha.length > 130 && hb.length > 130) {
@@ -823,11 +827,13 @@ async function detectarIntroSerie(serieKey, urls) {
             console.log(`[intro] ${serieKey}: la huella CONFIRMA la intro aprendida a mano (${iniSeg}→${finSeg}s) — se respeta lo aprendido`);
           } else {
             INTROS[serieKey] = { start: iniSeg, end: finSeg, by: 'auto', at: Date.now() };
+            penalizarIntro(serieKey, 6 * 3600 * 1000);
             guardarIntros();
             if (anterior && anterior.by === 'manual') console.log(`[intro] ✅ ${serieKey}: la huella CORRIGE la aprendida a mano (estaba ${anterior.start}→${anterior.end}s, verdad del audio: ${iniSeg}→${finSeg}s)`);
             else console.log(`[intro] ✅ ${serieKey}: intro detectada ${iniSeg}s→${finSeg}s`);
           }
         } else {
+          penalizarIntro(serieKey, 6 * 3600 * 1000); /* conclusión real: sin intro común — 6h */
           console.log(`[intro] ${serieKey}: los episodios no comparten intro al inicio — no se guarda nada`);
         }
       }
@@ -4425,7 +4431,7 @@ const server = http.createServer(async (req, res) => {
           if (sc && sc.eps && sc.eps.length > 1) detectarIntroSerie(ks.serie, sc.eps.slice(0, 3).map((e) => e.url));
         }).catch(() => {});
       }
-      return json(res, 200, { ok: true, intro: it && +it.end > +it.start ? { start: +it.start, end: +it.end } : null });
+      return json(res, 200, { ok: true, intro: it && +it.end > +it.start ? { start: +it.start, end: +it.end } : null, detectando: !!(ks.serie && INTRO_JOBS.has(ks.serie)) });
     }
     if (url.pathname === '/api/intro' && req.method === 'DELETE') {
       /* v134: «esta intro salta mal» — se olvida la serie y queda lista para

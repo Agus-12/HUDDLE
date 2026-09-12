@@ -534,6 +534,7 @@ async function cargarIntro(url) {
   S.introUrl = url;
   S.introData = null;
   S.introVistoEn = null; /* v132: ¿en qué segundo apareció el botón? (para aprender el inicio real) */
+  S.introAvisoEn = null; /* v137: aviso «Buscando la intro…» una vez por episodio */
   try {
     const r = await fetch('/api/intro?url=' + encodeURIComponent(url));
     const d = await r.json();
@@ -575,6 +576,7 @@ function evaluaIntro() {
     S.introChequeoEn = Date.now();
     fetch('/api/intro?url=' + encodeURIComponent(S.introUrl)).then((r) => r.json()).then((d) => {
       if (d && d.intro && S.introUrl) { S.introData = d.intro; S.introVistoEn = null; evaluaIntro(); }
+      else if (d && d.detectando && !S.introAvisoEn) { S.introAvisoEn = Date.now(); toast('Buscando la intro de esta serie…'); }
     }).catch(() => {});
   }
   const w = ventanaIntro();
