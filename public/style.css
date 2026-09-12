@@ -1699,7 +1699,7 @@ body.movil-horizontal #homeFull {
 
 /* ============ v128: botón Saltar intro ============ */
 .skip-intro {
-  position: fixed; right: 16px; bottom: 96px; z-index: 55;
+  position: fixed; right: 16px; bottom: 96px; z-index: 95; /* v130: encima del player de Solo (z 90) y del video de sala */
   display: flex; align-items: center; gap: 7px;
   background: rgba(10, 7, 19, 0.92);
   border: 1px solid var(--line); color: var(--txt);

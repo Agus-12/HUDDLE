@@ -314,12 +314,6 @@
               </div>
               <div class="play-txt">Toca para empezar</div>
             </div>
-            <!-- v128: saltar la intro — aparece durante la intro del episodio
-                 (8s→90s o los tiempos aprendidos) y salta para toda la sala -->
-            <button id="skipIntro" class="skip-intro hidden" type="button">
-              Saltar intro
-              <svg class="icon icon-16" viewBox="0 0 24 24" fill="currentColor"><path d="M4 5v14l8-7zM14 5v14l8-7z"/></svg>
-            </button>
             <!-- v62: capa de controles ABAJO — se esconde, un toque la saca 5s -->
             <div id="ctrlLayer" class="ctrl-layer">
               <!-- v61: barrita de la película — tiempo, duración y arrastrar -->
@@ -473,6 +467,13 @@
 
   <!-- v60: pantalla completa de espera — la sala carga por detrás y cuando
        la peli está lista te mete (también al elegir desde el menú) -->
+  <!-- v130: saltar la intro — VIVE FUERA de las pantallas (sala y Solo):
+       aparece durante la intro del episodio; en sala salta para todos,
+       en Solo salta el video local -->
+  <button id="skipIntro" class="skip-intro hidden" type="button">
+    Saltar intro
+    <svg class="icon icon-16" viewBox="0 0 24 24" fill="currentColor"><path d="M4 5v14l8-7zM14 5v14l8-7z"/></svg>
+  </button>
   <div id="peliLoading" class="peli-loading hidden">
     <img id="peliPoster" class="peli-poster hidden" alt="">
     <div class="peli-nombre" id="peliNombre"></div>

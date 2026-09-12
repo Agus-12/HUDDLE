@@ -534,8 +534,21 @@ async function cargarIntro(url) {
     if (d && d.intro && S.introKey === introKeyDe(url)) S.introData = d.intro;
   } catch {}
 }
+/* v130: ¿lo que se ve en SOLO es un EPISODIO? — por la cadena de eps del
+ * picker o por la URL (animes, caricaturas, cartoons, cuevana); las PELIS
+ * nunca muestran el botón */
+function esEpisodioSolo() {
+  if (!SOLO || SOLO.cerrado) return false;
+  if (SOLO.info && SOLO.info.eps && SOLO.info.eps.length > 1) return true;
+  return /latanime\.org\/ver\/|miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}([ab])?(?:-|$)|lacartoons\.com\/serie\/capitulo\/|animeflv\.[a-z.]+\/ver\/|\/episode\//i.test(SOLO.url || '');
+}
 function ventanaIntro() {
-  /* {t, dur} del video activo — nativo en vivo, espejo por mirror-state */
+  /* {t, dur} del video activo — SOLO en vivo, nativo de sala, espejo */
+  if (SOLO && !SOLO.cerrado) { /* v130: modo Solo */
+    const sv = $('#soloVideo');
+    if (sv && isFinite(sv.duration) && sv.duration > 1) return { t: sv.currentTime, dur: sv.duration };
+    return null;
+  }
   if (S.nativo && S.nativoListo) {
     const v = $('#roomVideo');
     if (v && isFinite(v.duration) && v.duration > 1) return { t: v.currentTime, dur: v.duration };
@@ -548,12 +561,15 @@ function evaluaIntro() {
   const b = $('#skipIntro');
   if (!b) return;
   let mostrar = false;
-  const enSerie = !!(S.serieSala || (S.mirror.active && S.mirror.serie));
+  const enSerie = !!(S.serieSala || (S.mirror.active && S.mirror.serie) || esEpisodioSolo()); /* v130: también Solo */
   const w = ventanaIntro();
   if (enSerie && w && w.dur >= INTRO_DUR_MIN) {
     const ini = (S.introData && +S.introData.start) || INTRO_INICIO;
     const fin = (S.introData && +S.introData.end) || Math.min(INTRO_FIN, Math.floor(w.dur * 0.12));
-    const vaSonando = S.nativo ? ($('#roomVideo') && !$('#roomVideo').paused) : S.mirror.playing;
+    let vaSonando = false;
+    if (SOLO && !SOLO.cerrado) { const sv = $('#soloVideo'); vaSonando = !!(sv && !sv.paused); } /* v130 */
+    else if (S.nativo) vaSonando = ($('#roomVideo') && !$('#roomVideo').paused);
+    else vaSonando = S.mirror.playing;
     if (w.t >= ini && w.t < fin && vaSonando) mostrar = true;
     S.introFin = fin; S.introT = w.t;
   }
@@ -562,8 +578,12 @@ function evaluaIntro() {
 $('#skipIntro').addEventListener('click', () => {
   const fin = S.introFin;
   if (!fin) return;
-  if (S.nativo) sendAction({ type: 'seek', position: fin }).catch(() => {});
-  else {
+  if (SOLO && !SOLO.cerrado) { /* v130: en Solo el salto es LOCAL */
+    const sv = $('#soloVideo');
+    try { sv.currentTime = fin; } catch {}
+  } else if (S.nativo) {
+    sendAction({ type: 'seek', position: fin }).catch(() => {});
+  } else {
     sendAction({ type: 'mirror', op: 'seekTo', time: fin }).then((r) => {
       if (r && r.ok === false) toast(r.error || 'Solo el anfitrión puede saltar la intro');
     }).catch(() => {});
@@ -576,6 +596,7 @@ $('#skipIntro').addEventListener('click', () => {
   $('#skipIntro').classList.add('hidden');
 });
 $('#roomVideo').addEventListener('timeupdate', () => { if (S.nativo) evaluaIntro(); });
+$('#soloVideo').addEventListener('timeupdate', () => { if (SOLO) evaluaIntro(); }); /* v130 */
 function desmontarNativo() {
   S.nativoListo = false; /* v127 */
   const v = $('#roomVideo');
@@ -598,11 +619,11 @@ function desactivarNativo() {
 }
 /* reloj propio: barrita al día + resincronización suave cada 3s */
 setInterval(() => {
+  evaluaIntro(); /* v130: también en Solo — el early-return de abajo no lo esconda */
   if (!S.nativo) return;
   const v = $('#roomVideo');
   if (v && isFinite(v.duration) && v.duration > 0) { S.mirrorTime = { t: v.currentTime, d: v.duration }; pintarSeekBar(); }
   sincronizarNativo();
-  evaluaIntro(); /* v128 */
 }, 3000);
 $('#roomVideo').addEventListener('click', tocarPantallaCine);
 
@@ -2979,6 +3000,7 @@ async function abrirSolo(pageUrl, info, opts) {
     prevUrl: (opts && opts.prevUrl) || (info && info.prevUrl) || '', /* v86: de dónde venimos (avance de episodio) */
   };
   $('#soloRate').textContent = (rateInicial === 1 ? '1' : String(rateInicial)) + 'x'; /* v84 */
+  cargarIntro(pageUrl); /* v130: tiempos de intro de este episodio */
   $('#soloNext').classList.toggle('hidden', !(info && info.eps && info.eps.length > 1)); /* v84 */
   if (SOLO.startAt > 10) toast('Reanudando en ' + fmtTiempo(SOLO.startAt)); /* v82 */
   pararCuentaSiguiente(); /* v84 */
@@ -3233,6 +3255,7 @@ function cerrarSolo() {
   if (document.fullscreenElement) { try { document.exitFullscreen(); } catch {} }
   $('#soloPlayer').classList.add('hidden');
   SOLO = null;
+  evaluaIntro(); /* v130: fuera el botón */
   cargarContinuar(); /* refresca la fila de "Continuar viendo" */
 }
 $('#soloBack').addEventListener('click', cerrarSolo);
