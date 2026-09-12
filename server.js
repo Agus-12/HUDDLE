@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v130'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v131'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1658,7 +1658,9 @@ function serveStatic(req, res, urlPath) {
     const type = MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
     // los archivos de la app no se cachean (para que los cambios lleguen siempre)
     const noCache = /\.(html|js|css)$/i.test(filePath);
-    const extra = noCache ? { 'Cache-Control': 'no-cache' } : {};
+    /* v131: no-store — la caché del WebView de la PWA ignoraba no-cache y
+     * seguía sirviendo JS viejo; no-store prohibe guardarlo siquiera */
+    const extra = noCache ? { 'Cache-Control': 'no-store, must-revalidate' } : {};
     const range = req.headers.range;
 
     /* v122: index.html se sirve con la versión REAL inyectada — los ?v= de
@@ -1672,7 +1674,7 @@ function serveStatic(req, res, urlPath) {
         if (e2) { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('404'); return; }
         html = html.replace(/((?:app\.js|style\.css)\?v=)[^"\s]*/g, '$1' + UI_VERSION);
         const buf = Buffer.from(html, 'utf8');
-        res.writeHead(200, { 'Content-Type': type, 'Content-Length': buf.length, 'Cache-Control': 'no-cache', 'Accept-Ranges': 'bytes' });
+        res.writeHead(200, { 'Content-Type': type, 'Content-Length': buf.length, 'Cache-Control': 'no-store, must-revalidate', 'Accept-Ranges': 'bytes' });
         res.end(buf);
       });
       return;

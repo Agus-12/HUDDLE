@@ -16,6 +16,11 @@ const APP_VERSION = (() => {
   return 'v?'; /* sin ?v= no hay versión conocida — el chequeo de abajo actualizará */
 })();
 
+/* v131: etiqueta de versión visible — para saber de un vistazo qué
+ * versión corre la app (y saber si el auto-update llegó) */
+function pintarVersion() {
+  try { document.querySelectorAll('.ver-tag').forEach((el) => { el.textContent = APP_VERSION; }); } catch {}
+}
 /* Íconos SVG reutilizables (sin emojis) */
 const ICONS = {
   play: '<svg class="icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg>',
@@ -103,18 +108,18 @@ function showScreen(id) {
 /* Si el servidor sirve otra versión de la interfaz, la página se actualiza
  * sola (una vez por pestaña, para no entrar en bucle). */
 function maybeReload(srvVersion) {
-  const key = 'rr-reloaded-' + srvVersion;
+  /* v131: la llave de "ya recargué" va POR PAR (versiónDelCliente→versiónDelServer).
+   * Antes era solo por server y vivía en sessionStorage que en la PWA dura DÍAS:
+   * si la sesión gastó su recarga con el JS viejo, la app se quedaba vieja
+   * para siempre mostrando solo el toast (el "botón viejo" que veías). */
+  const key = 'rr-reloaded-' + APP_VERSION + '->' + srvVersion;
   if (sessionStorage.getItem(key)) {
-    toast('Hay una versión nueva (' + srvVersion + ') — cierra y vuelve a abrir la app', 9000);
+    toast('Versión nueva (' + srvVersion + ') pendiente — cierra la app del todo y reábrela', 9000);
     return;
   }
   sessionStorage.setItem(key, '1');
   toast('Actualizando la app a ' + srvVersion + '…', 1800);
-  /* v122: location.replace con ?rv= — URL distinta, así la app instalada
-   * (PWA) no puede re-servir el HTML de su caché (el reload seco a veces
-   * traía la página vieja y "nunca actualizaba"). Sin botón de recargar:
-   * se actualiza sola en cada actualización. */
-  setTimeout(() => location.replace('/?rv=' + encodeURIComponent(srvVersion)), 1200);
+  setTimeout(() => location.replace('/?rv=' + encodeURIComponent(srvVersion) + '&t=' + Date.now()), 1200);
 }
 
 /* ======================= conexión / protocolo ======================= */
@@ -210,6 +215,7 @@ S.mirrorTime = null; /* v61: posición de la peli para la barrita */
     } catch {}
   });
   es.addEventListener('mirror-frame', (e) => {
+    if (S.nativo) return; /* v131: sala nativa — los frames del espejo viejo no tocan nada (hueco restante de la tarjetita) */
     const f = JSON.parse(e.data);
     S.mirror.w = f.w; S.mirror.h = f.h;
     S.mirror.gotFrame = true;
@@ -2232,11 +2238,14 @@ function initLanding() {
     av.textContent = (S.profile.name[0] || '?').toUpperCase();
     av.style.setProperty('--h', hashHue(S.profile.name));
     pollRooms();
-    /* v122: chequeo de versión al abrir — antes solo se chequeaba al entrar
-     * a una sala y quien no entraba a ninguna vivía con la app vieja */
-    fetch('/api/health').then((r) => r.json()).then((d) => {
-      if (d && d.version && d.version !== APP_VERSION) maybeReload(d.version);
+    /* v122: chequeo de versión al abrir — v131: también cada 60s mientras
+     * estás en el inicio (si actualizas el server con la app abierta, se
+     * refresca sola sin que tengas que entrar a una sala) */
+    const chequeoVer = () => fetch('/api/health').then((r) => r.json()).then((d) => {
+      if (d && d.version && d.version !== APP_VERSION && !S.room) maybeReload(d.version);
     }).catch(() => {});
+    chequeoVer();
+    if (!S.verPoll) S.verPoll = setInterval(chequeoVer, 60000);
     cargarPopulares(); /* v55: fila de populares del día */
     cargarContinuar(); /* v78: seguir viendo donde te quedaste */
     if (hM) {
@@ -2947,6 +2956,7 @@ $('#tabSolo').addEventListener('click', () => setTab('solo', true));
  * toggle viejo (huddle_modo_solo) sigue funcionando en dispositivos viejos */
 S.modoSolo = S.tab === 'solo';
 pintarTabs();
+pintarVersion(); /* v131 */
 
 let SOLO = null; /* { url, info, res, hls, viaProxy, startAt, seekHecho, timer, subsOn, cerrado } */
 function cargarHlsJs(cb) {

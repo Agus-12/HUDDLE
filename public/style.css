@@ -1709,3 +1709,6 @@ body.movil-horizontal #homeFull {
 }
 .skip-intro:active { opacity: 0.85; }
 .skip-intro.hidden { display: none; }
+
+/* v131: etiqueta de versión — discreta, para verificar el auto-update */
+.ver-tag { font-size: 10px; color: var(--dim); opacity: 0.75; vertical-align: middle; margin-left: 4px; }
