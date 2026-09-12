@@ -1636,22 +1636,23 @@ body.movil-horizontal #homeFull {
   padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px calc(env(safe-area-inset-bottom, 0px) + 48px);
 }
 .search-page.hidden { display: none; }
-.sp-top {
-  /* v124: z-index 5 — el badge de las tarjetas trae z-index 2 y con empate
-   * (2=2) las películas se pintaban ENCIMA de la barra al hacer scroll */
+/* v125: UN solo header sticky para la barra Y el chip — antes los
+ * resultados se colaban alrededor (la barra tapaba el chip y las tarjetas
+ * asomaban por encima al dar scroll). Ahora todo eso queda dentro de una
+ * caja opaca por encima del contenido: el chip SIEMPRE visible y las
+ * tarjetas pasan por debajo. */
+.sp-top-wrap {
   position: sticky; top: 0; z-index: 5;
-  display: flex; align-items: center; gap: 8px;
   background: var(--bg);
-  /* v122: el safe-area va DENTRO de la barra (fondo opaco hasta el notch)
-   * y su contenido arranca debajo — nada de controles fuera de alcance */
   margin: calc(-1 * (env(safe-area-inset-top, 0px) + 12px)) -14px 12px;
-  padding: calc(env(safe-area-inset-top, 0px) + 14px) 14px 10px;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 14px 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
+.sp-top { display: flex; align-items: center; gap: 8px; }
 .sp-volver { flex: none; }
 .sp-caja { display: flex; gap: 8px; flex: 1; min-width: 0; }
 .sp-caja .input { flex: 1; min-width: 0; }
-.sp-sug { margin: 2px 0 12px; }
+.sp-sug { margin: 10px 2px 2px; }
 .sp-sug.hidden { display: none; }
 .sp-sug-btn {
   display: inline-flex; align-items: center; gap: 6px;

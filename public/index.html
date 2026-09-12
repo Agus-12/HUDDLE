@@ -183,17 +183,22 @@
              volver al feed. Cada pestaña (Salas/Juntos/Solo) tiene su
              búsqueda: al cambiar de pestaña esta página se cierra y limpia. -->
         <div id="searchPage" class="search-page hidden">
-          <div class="sp-top">
-            <button id="spBack" class="btn small sp-volver" type="button">
-              <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
-              <span>Feed</span>
-            </button>
-            <div class="sp-caja">
-              <input id="spInput" class="input" placeholder="Busca en todas las fuentes…" autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off">
-              <button id="spGo" class="btn primary" type="button">Buscar</button>
+          <!-- v125: barra + chip «¿Quisiste decir…?» viven en UN solo header
+               sticky y opaco — los resultados pasan POR DEBAJO y el chip
+               nunca lo tapan las tarjetas -->
+          <div class="sp-top-wrap">
+            <div class="sp-top">
+              <button id="spBack" class="btn small sp-volver" type="button">
+                <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+                <span>Feed</span>
+              </button>
+              <div class="sp-caja">
+                <input id="spInput" class="input" placeholder="Busca en todas las fuentes…" autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off">
+                <button id="spGo" class="btn primary" type="button">Buscar</button>
+              </div>
             </div>
+            <div id="spSugiere" class="sp-sug hidden"></div>
           </div>
-          <div id="spSugiere" class="sp-sug hidden"></div>
           <div id="spResults" class="sr sp-results"></div>
         </div>
 

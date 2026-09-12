@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v124'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v125'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -2529,7 +2529,13 @@ const CARI_PORTADAS = new Map();
 try {
   for (const f of fs.readdirSync(path.join(__dirname, 'public', 'covers'))) {
     const m = /^([a-z0-9-]{2,90})\.(jpe?g|png|webp)$/i.exec(f);
-    if (m) CARI_PORTADAS.set(m[1], '/covers/' + f + '?v=' + UI_VERSION); /* v108: ?v= para que el navegador no sirva una portada vieja de su caché al reemplazar el archivo */
+    if (!m) continue;
+    /* v125: ?v=VERSION.mtime — al REEMPLAZAR un archivo la URL cambia sola
+     * al reiniciar (antes solo cambiaba si subía UI_VERSION y por eso una
+     * cover vieja seguía saliendo del caché del navegador, como pasó con
+     * Daria: la cambié dentro de v123 y el ?v= no se movió) */
+    const mt = fs.statSync(path.join(__dirname, 'public', 'covers', f)).mtimeMs.toString(36);
+    CARI_PORTADAS.set(m[1], '/covers/' + f + '?v=' + UI_VERSION + '.' + mt);
   }
 } catch {}
 
@@ -3091,17 +3097,21 @@ function similitud(q, t) {
 let catalogoCache = { at: 0, items: [] }; /* 1 h */
 async function catalogoLocal() {
   if (Date.now() - catalogoCache.at < 3600 * 1000 && catalogoCache.items.length) return catalogoCache.items;
+  /* v125: la cover se toma PRIMERO de CARI_PORTADAS (mapa en memoria leído
+   * del disco al arrancar) — antes el catálogo en frío salía SIN covers (el
+   * mapa cariMeta tarda en llenarse) y las tarjetas mostraban la foto del
+   * sitio o la carita de Huddle (pasó con Chicas Superpoderosas Z) */
   const items = [];
   for (const lct of LCT_SERIES.values()) {
     const meta = cariMeta.get(lct.slug);
-    items.push({ title: lct.titulo, url: LCT_BASE + 'serie/' + lct.lctId, img: (meta && (meta.cover || meta.poster)) || '', site: 'Cartoons' });
+    items.push({ title: lct.titulo, url: LCT_BASE + 'serie/' + lct.lctId, img: CARI_PORTADAS.get(lct.slug) || (meta && (meta.cover || meta.poster)) || '', site: 'Cartoons' });
   }
   try {
     const home = await cariHomeImgs();
     for (const [slug, h] of home) {
       if (!cariEsSerie(slug)) continue;
       const meta = cariMeta.get(slug);
-      items.push({ title: (meta && meta.titulo) || cariLimpia(h.alt || cariBonito(slug)), url: CARI_BASE + slug + '/', img: (meta && (meta.cover || meta.poster)) || h.img || '', site: 'Caricaturas' });
+      items.push({ title: (meta && meta.titulo) || cariLimpia(h.alt || cariBonito(slug)), url: CARI_BASE + slug + '/', img: CARI_PORTADAS.get(slug) || (meta && (meta.cover || meta.poster)) || h.img || '', site: 'Caricaturas' });
     }
   } catch {}
   for (const [fn, site] of [[popularesDeHoy, 'Cuevana'], [seriesRecientes, 'Cuevana'], [animesDelMomento, 'Latanime']]) {
