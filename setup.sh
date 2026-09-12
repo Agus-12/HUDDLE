@@ -8,7 +8,8 @@ sudo apt-get update -qq || true
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
   libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxdamage1 \
   libxkbcommon0 libasound2t64 libatspi2.0-0 \
-  pulseaudio pulseaudio-utils xvfb strace
+  pulseaudio pulseaudio-utils xvfb strace \
+  libchromaprint-tools ffmpeg
 
 echo "🎧 Iniciando PulseAudio con sink virtual…"
 pkill -9 pulseaudio 2>/dev/null || true

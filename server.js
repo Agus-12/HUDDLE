@@ -18,10 +18,11 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, execFile, execFileSync } = require('child_process');
+const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v132'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v133'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -656,6 +657,172 @@ function guardarIntros() {
     fs.writeFileSync(tmp, JSON.stringify(INTROS));
     fs.renameSync(tmp, INTROS_FILE);
   } catch {}
+}
+
+/* ═══════ v133: DETECCIÓN REAL DE INTROS (huella de audio) ═══════
+ * Compara el AUDIO de dos episodios de la misma serie con chromaprint:
+ * el pedazo que suena IGUAL en ambos ES la intro (esté donde esté —
+ * si la serie no trae intro al inicio, NO se encuentra pedazo común y
+ * no se guarda nada → el botón no aparece y nadie salta contenido).
+ * Requiere fpcalc (libchromaprint-tools — setup.sh lo instala); sin él
+ * quedan las intros aprendidas a mano y el botón no sale a ciegas. */
+let FPCALC_OK = null;
+function fpcalcOk() {
+  if (FPCALC_OK !== null) return FPCALC_OK;
+  try { FPCALC_OK = !!execFileSync('which', ['fpcalc'], { timeout: 4000 }).toString().trim(); }
+  catch { FPCALC_OK = false; }
+  if (!FPCALC_OK) console.log('[intro] sin fpcalc — detección automática apagada (instala libchromaprint-tools)');
+  return FPCALC_OK;
+}
+function popcount32(x) {
+  x = x >>> 0;
+  x = x - ((x >> 1) & 0x55555555);
+  x = (x & 0x33333333) + ((x >> 2) & 0x33333333);
+  x = (x + (x >> 4)) & 0x0f0f0f0f;
+  return (x * 0x01010101) >> 24 & 0xff;
+}
+const INTRO_WPS = 1000 / 370; /* chromaprint: 1 palabra ≈ 0.37 s de audio */
+/* región de B que coincide con algo de A (mismo audio, distinta posición) */
+function compararHuellas(A, B) {
+  const SEMILLA = 16, PUENTE = 4, MAXERR = 10, SIM = 0.15;
+  const sim = (i, j) => {
+    let e = 0;
+    for (let k = 0; k < SEMILLA; k++) e += popcount32((A[i + k] | 0) ^ (B[j + k] | 0));
+    return e / (SEMILLA * 32);
+  };
+  let mejor = null;
+  for (let j = 0; j + SEMILLA < B.length; j += 2) {
+    for (let i = 0; i + SEMILLA < A.length; i += 2) {
+      if (sim(i, j) > SIM) continue;
+      let a1 = i + SEMILLA, b1 = j + SEMILLA, fallos = 0;
+      while (a1 < A.length && b1 < B.length) {
+        if (popcount32((A[a1] | 0) ^ (B[b1] | 0)) <= MAXERR) { a1++; b1++; fallos = 0; }
+        else if (++fallos > PUENTE) break;
+      }
+      let a0 = i + 1, b0 = j + 1; fallos = 0;
+      while (a0 > 0 && b0 > 0) {
+        if (popcount32((A[a0 - 1] | 0) ^ (B[b0 - 1] | 0)) <= MAXERR) { a0--; b0--; fallos = 0; }
+        else if (++fallos > PUENTE) break;
+      }
+      const dur = (b1 - b0) / INTRO_WPS;
+      if (!mejor || dur > mejor.dur) mejor = { a0, b0, a1, b1, dur };
+    }
+  }
+  /* recorte de bordes: fuera ventanas que solo coinciden a medias (el error
+   * sube en cuanto la ventana toca audio que NO es la intro en ambos lados) */
+  if (mejor) {
+    const off = mejor.a0 - mejor.b0;
+    const dentro = (b) => {
+      const a = b + off;
+      if (a < 0 || a + SEMILLA > A.length || b + SEMILLA > B.length) return false;
+      return sim(a, b) <= SIM + 0.03;
+    };
+    while (mejor.b1 - mejor.b0 > SEMILLA + 8 && !dentro(mejor.b0)) mejor.b0++;
+    while (mejor.b1 - mejor.b0 > SEMILLA + 8 && !dentro(mejor.b1 - SEMILLA)) mejor.b1--;
+    mejor.ini = mejor.b0 / INTRO_WPS;
+    mejor.fin = mejor.b1 / INTRO_WPS;
+  }
+  return mejor;
+}
+function fpcalcArchivo(archivo, segs) {
+  return new Promise((resolve) => {
+    execFile('fpcalc', ['-raw', '-length', String(segs || 280), '-json', archivo], { timeout: 50000, maxBuffer: 8e6 }, (err, so) => {
+      if (err) return resolve(null);
+      try {
+        const buf = Buffer.from(String(so).match(/"fingerprint"\s*:\s*"([^"]+)"/)[1], 'base64');
+        resolve(new Int32Array(buf.buffer, buf.byteOffset, Math.floor(buf.length / 4)));
+      } catch { resolve(null); }
+    });
+  });
+}
+/* baja los PRIMEROS ~4 min de un stream HLS o mp4 a un archivo temporal */
+async function descargarInicioEp(m3u8) {
+  const archivo = path.join(os.tmpdir(), 'intro-' + crypto.randomBytes(5).toString('hex') + '.ts');
+  let ref = '';
+  try { ref = hlsReferers.get(new URL(m3u8).hostname) || ''; } catch {}
+  const pedir = async (u, ms, range) => {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), ms);
+    try {
+      const r = await fetch(u, { headers: { 'User-Agent': MIRROR_UA, ...(ref ? { Referer: ref } : {}), ...(range ? { Range: range } : {}) }, signal: ctl.signal, redirect: 'follow' });
+      return r.ok ? r : null;
+    } catch { return null; } finally { clearTimeout(t); }
+  };
+  let pl = m3u8;
+  for (let saltos = 0; saltos < 2; saltos++) {
+    const r = await pedir(pl, 15000);
+    if (!r) return null;
+    const txt = await r.text();
+    if (/#EXT-X-STREAM-INF/i.test(txt)) {
+      const vars = [...txt.matchAll(/#EXT-X-STREAM-INF[^\n]*BANDWIDTH=(\d+)[^\n]*\n([^\n#]+)/gi)].map((m) => ({ bw: +m[1], u: (() => { try { return new URL(m[2].trim(), pl).href; } catch { return null; } })() })).filter((v) => v.u);
+      if (!vars.length) return null;
+      vars.sort((a, b) => a.bw - b.bw);
+      pl = vars[0].u; /* la más baja: para el audio basta */
+      continue;
+    }
+    if (!/#EXTM3U/i.test(txt)) {
+      /* mp4/webm directo — solo el primer cacho */
+      const r2 = await pedir(pl, 60000, 'bytes=0-36700160');
+      if (!r2) return null;
+      const ab = await r2.arrayBuffer();
+      if (!ab || ab.byteLength < 3e5) return null;
+      fs.writeFileSync(archivo, Buffer.from(ab));
+      return archivo;
+    }
+    const segs = txt.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).map((s) => { try { return new URL(s, pl).href; } catch { return null; } }).filter(Boolean).slice(0, 70);
+    if (!segs.length) return null;
+    const out = fs.createWriteStream(archivo);
+    let bytes = 0;
+    for (const s of segs) {
+      const r2 = await pedir(s, 20000);
+      if (!r2) break;
+      const ab = await r2.arrayBuffer();
+      if (!ab || !ab.byteLength) break;
+      bytes += ab.byteLength;
+      out.write(Buffer.from(ab));
+      if (bytes > 45e6) break;
+    }
+    await new Promise((r3) => out.end(r3));
+    if (bytes < 3e5) { try { fs.unlinkSync(archivo); } catch {} return null; }
+    return archivo;
+  }
+  return null;
+}
+const INTRO_JOBS = new Set(), INTRO_INTENTOS = new Map();
+async function detectarIntroSerie(serieKey, urls) {
+  if (!fpcalcOk() || !serieKey || INTROS[serieKey] || INTRO_JOBS.has(serieKey)) return;
+  if (Date.now() - (INTRO_INTENTOS.get(serieKey) || 0) < 6 * 3600 * 1000) return;
+  INTRO_INTENTOS.set(serieKey, Date.now());
+  INTRO_JOBS.add(serieKey);
+  console.log('[intro] detectando intro de ' + serieKey + ' (comparando el audio de 2 episodios)…');
+  try {
+    const listos = [];
+    for (const u of urls.slice(0, 3)) {
+      try {
+        const r = await resolverNativo(u);
+        if (r && r.m3u8) listos.push(r.m3u8.startsWith('/') ? 'http://127.0.0.1:' + PORT + r.m3u8 : r.m3u8); /* el proxy propio (/api/xd) sirve el playlist con los headers correctos */
+      } catch {}
+      if (listos.length >= 2) break;
+    }
+    if (listos.length < 2) return console.log('[intro] no pude resolver 2 episodios de ' + serieKey);
+    const f0 = await descargarInicioEp(listos[0]);
+    const f1 = f0 && await descargarInicioEp(listos[1]);
+    if (!f0 || !f1) return console.log('[intro] descargas incompletas para ' + serieKey);
+    try {
+      const [ha, hb] = await Promise.all([fpcalcArchivo(f0), fpcalcArchivo(f1)]);
+      if (ha && hb && ha.length > 130 && hb.length > 130) {
+        const hit = compararHuellas(ha, hb);
+        if (hit && hit.dur >= 45 && hit.fin <= 420 && hit.ini <= 240) {
+          const finSeg = Math.max(Math.round(hit.fin) - 2, Math.round(hit.ini) + 30); /* 2s antes: jamás comerse contenido */
+          INTROS[serieKey] = { start: Math.round(hit.ini), end: finSeg, by: 'auto', at: Date.now() };
+          guardarIntros();
+          console.log(`[intro] ✅ ${serieKey}: intro detectada ${Math.round(hit.ini)}s→${Math.round(hit.fin)}s`);
+        } else {
+          console.log(`[intro] ${serieKey}: los episodios no comparten intro al inicio — no se guarda nada`);
+        }
+      }
+    } finally { try { fs.unlinkSync(f0); } catch {} try { fs.unlinkSync(f1); } catch {} }
+  } catch {} finally { INTRO_JOBS.delete(serieKey); }
 }
 
 function mirrorState(room) {
@@ -4222,6 +4389,13 @@ const server = http.createServer(async (req, res) => {
        * en todos los episodios: saltar uno la aprende para toda) */
       const ks = introKeysDe(String(url.searchParams.get('url') || ''));
       const it = (ks.exacto && INTROS[ks.exacto]) || (ks.serie && INTROS[ks.serie]) || null;
+      /* v133: sin datos para esta serie → detección por audio en segundo plano */
+      const hace = INTRO_INTENTOS.get(ks.serie) || 0;
+      if (!it && ks.serie && fpcalcOk() && !INTRO_JOBS.has(ks.serie) && Date.now() - hace >= 6 * 3600 * 1000) {
+        serieCtxFromUrl(String(url.searchParams.get('url') || '')).then((sc) => {
+          if (sc && sc.eps && sc.eps.length > 1) detectarIntroSerie(ks.serie, sc.eps.slice(0, 3).map((e) => e.url));
+        }).catch(() => {});
+      }
       return json(res, 200, { ok: true, intro: it && +it.end > +it.start ? { start: +it.start, end: +it.end } : null });
     }
     if (url.pathname === '/api/intro' && req.method === 'POST') {

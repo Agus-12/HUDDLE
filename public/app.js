@@ -569,9 +569,12 @@ function evaluaIntro() {
   let mostrar = false;
   const enSerie = !!(S.serieSala || (S.mirror.active && S.mirror.serie) || esEpisodioSolo()); /* v130: también Solo */
   const w = ventanaIntro();
-  if (enSerie && w && w.dur >= INTRO_DUR_MIN) {
-    const ini = (S.introData && +S.introData.start) || INTRO_INICIO;
-    const fin = (S.introData && +S.introData.end) || Math.min(INTRO_FIN, Math.floor(w.dur * 0.12));
+  /* v133: SOLO con datos reales (detección automática o intro aprendida) —
+   * sin datos el botón NO sale: hay series cuyo episodio no trae intro al
+   * inicio (cold-open de Los Simpson) y saltar a ciegas se comería escena */
+  if (enSerie && S.introData && w && w.dur >= INTRO_DUR_MIN) {
+    const ini = +S.introData.start || INTRO_INICIO;
+    const fin = +S.introData.end || (ini + 75);
     let vaSonando = false;
     if (SOLO && !SOLO.cerrado) { const sv = $('#soloVideo'); vaSonando = !!(sv && !sv.paused); } /* v130 */
     else if (S.nativo) vaSonando = ($('#roomVideo') && !$('#roomVideo').paused);
