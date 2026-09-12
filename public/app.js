@@ -2565,11 +2565,14 @@ function abrirBuscador(q) {
 }
 function cerrarBuscador() {
   const pg = $('#searchPage');
-  if (pg.classList.contains('hidden')) return;
   pg.classList.add('hidden');
   $('#spResults').innerHTML = '';
   $('#spSugiere').classList.add('hidden');
   $('#spSugiere').innerHTML = '';
+  /* v124: volver al feed sin elegir → la barrita del inicio queda LIMPIA
+   * (antes te regresabas y seguía lo que habías escrito) */
+  $('#spInput').value = '';
+  $('#homeSearch').value = '';
 }
 async function buscarGlobal(q) {
   const box = $('#spResults');

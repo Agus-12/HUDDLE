@@ -1637,7 +1637,9 @@ body.movil-horizontal #homeFull {
 }
 .search-page.hidden { display: none; }
 .sp-top {
-  position: sticky; top: 0; z-index: 2;
+  /* v124: z-index 5 — el badge de las tarjetas trae z-index 2 y con empate
+   * (2=2) las películas se pintaban ENCIMA de la barra al hacer scroll */
+  position: sticky; top: 0; z-index: 5;
   display: flex; align-items: center; gap: 8px;
   background: var(--bg);
   /* v122: el safe-area va DENTRO de la barra (fondo opaco hasta el notch)
@@ -1662,5 +1664,9 @@ body.movil-horizontal #homeFull {
 .sp-sug-btn b { color: #c4a9ff; }
 /* resultados en rejilla (una sola lista global, nada de filas por sitio) */
 .sr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(106px, 1fr)); gap: 14px 10px; padding: 2px 2px 8px; }
-.sr-grid .sr-card { width: auto; }
+/* v124: la imagen iba a width FIJO (118/108px) y en la rejilla se SALÍA de
+ * su columna — las tarjetas se montaban unas sobre otras y atravesaban el
+ * badge del logo. Ahora la carátula llena su columna (100%) sin desbordar. */
+.sr-grid .sr-card { width: 100%; min-width: 0; }
+.sr-grid .sr-cover { width: 100%; height: auto; aspect-ratio: 2 / 3; }
 .sp-results { padding-bottom: 24px; }
