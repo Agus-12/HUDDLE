@@ -361,6 +361,8 @@ S.nativo = null; /* { url, m3u8, mp4, proxy, subs, isPlaying, position, updatedA
 S.serieSala = null; /* v118: { titulo, num, total, hayPrev, hayNext } — serie que se ve en nativo */
 S.nativoListo = false; /* v127: ¿el video nativo ya dio video? */
 S.salaTitulo = ''; S.salaImg = ''; /* v127: qué se ve en la sala (para la espera de los invitados) */
+S.mirrorT = 0; S.mirrorDur = 0; /* v128: tiempo del video espejado */
+S.introUrl = ''; S.introKey = ''; S.introData = null; S.introFin = 0; S.introT = 0; /* v128 */
 function posEsperada() {
   if (!S.nativo) return 0;
   return S.nativo.isPlaying
@@ -506,9 +508,74 @@ function nativoListo() {
   S.nativoListo = true;
   ocultarPeliLoading();
   if (S.nativo && !S.nativo.isPlaying) mostrarPlayBtn();
+  /* v128: reportar la duración (el server detecta el fin y salta solo) */
+  const v = $('#roomVideo');
+  if (v && isFinite(v.duration) && v.duration > 1) sendAction({ type: 'videoMeta', duration: v.duration }).catch(() => {});
+  if (S.nativo && S.nativo.url !== S.introUrl) cargarIntro(S.nativo.url); /* v128 */
 }
 $('#roomVideo').addEventListener('canplay', () => { if (S.nativo) nativoListo(); });
 $('#roomVideo').addEventListener('loadeddata', () => { if (S.nativo) nativoListo(); });
+/* ================= v128: SALTAR INTRO =================
+ * El botón aparece cuando va DENTRO de la intro (8s→90s, o los tiempos
+ * aprendidos del episodio) y solo en EPISODIOS con duración de verdad
+ * (pelis nunca). Al picarle salta al final de la intro para toda la sala
+ * y guarda los tiempos aprendidos en el server. */
+const INTRO_INICIO = 8, INTRO_FIN = 90, INTRO_DUR_MIN = 480; /* solo episodios de 8+ min */
+function introKeyDe(url) {
+  try { const u = new URL(url); return u.hostname.replace(/^www\./, '') + u.pathname.replace(/\/$/, ''); } catch { return String(url || '').slice(0, 140); }
+}
+async function cargarIntro(url) {
+  S.introUrl = url;
+  S.introKey = introKeyDe(url);
+  S.introData = null;
+  try {
+    const r = await fetch('/api/intro?key=' + encodeURIComponent(S.introKey));
+    const d = await r.json();
+    if (d && d.intro && S.introKey === introKeyDe(url)) S.introData = d.intro;
+  } catch {}
+}
+function ventanaIntro() {
+  /* {t, dur} del video activo — nativo en vivo, espejo por mirror-state */
+  if (S.nativo && S.nativoListo) {
+    const v = $('#roomVideo');
+    if (v && isFinite(v.duration) && v.duration > 1) return { t: v.currentTime, dur: v.duration };
+    return null;
+  }
+  if (S.mirror.active && S.mirror.serie && S.mirror.ready) return { t: S.mirrorT || 0, dur: S.mirrorDur || 0 };
+  return null;
+}
+function evaluaIntro() {
+  const b = $('#skipIntro');
+  if (!b) return;
+  let mostrar = false;
+  const enSerie = !!(S.serieSala || (S.mirror.active && S.mirror.serie));
+  const w = ventanaIntro();
+  if (enSerie && w && w.dur >= INTRO_DUR_MIN) {
+    const ini = (S.introData && +S.introData.start) || INTRO_INICIO;
+    const fin = (S.introData && +S.introData.end) || Math.min(INTRO_FIN, Math.floor(w.dur * 0.12));
+    const vaSonando = S.nativo ? ($('#roomVideo') && !$('#roomVideo').paused) : S.mirror.playing;
+    if (w.t >= ini && w.t < fin && vaSonando) mostrar = true;
+    S.introFin = fin; S.introT = w.t;
+  }
+  b.classList.toggle('hidden', !mostrar);
+}
+$('#skipIntro').addEventListener('click', () => {
+  const fin = S.introFin;
+  if (!fin) return;
+  if (S.nativo) sendAction({ type: 'seek', position: fin }).catch(() => {});
+  else {
+    sendAction({ type: 'mirror', op: 'seekTo', time: fin }).then((r) => {
+      if (r && r.ok === false) toast(r.error || 'Solo el anfitrión puede saltar la intro');
+    }).catch(() => {});
+  }
+  /* v128: los tiempos que funcionaron quedan aprendidos en el server */
+  if (S.introKey) {
+    fetch('/api/intro', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: S.introKey, start: Math.floor(S.introT || INTRO_INICIO), end: Math.round(fin), name: (S.profile && S.profile.name) || '' }) }).catch(() => {});
+  }
+  $('#skipIntro').classList.add('hidden');
+});
+$('#roomVideo').addEventListener('timeupdate', () => { if (S.nativo) evaluaIntro(); });
 function desmontarNativo() {
   S.nativoListo = false; /* v127 */
   const v = $('#roomVideo');
@@ -535,6 +602,7 @@ setInterval(() => {
   const v = $('#roomVideo');
   if (v && isFinite(v.duration) && v.duration > 0) { S.mirrorTime = { t: v.currentTime, d: v.duration }; pintarSeekBar(); }
   sincronizarNativo();
+  evaluaIntro(); /* v128 */
 }, 3000);
 $('#roomVideo').addEventListener('click', tocarPantallaCine);
 
@@ -551,6 +619,8 @@ function applyMirrorState(ms) {
   S.mirror.ready = !!(ms.active && ms.ready);
   S.mirror.playing = !!ms.playing;
   S.mirror.serie = ms.serie || null; /* v74: episodio de serie actual */
+  S.mirrorT = +ms.t || 0; S.mirrorDur = +ms.dur || 0; /* v128: tiempo del video espejado (Saltar intro) */
+  if (ms.url && ms.url !== S.introUrl) cargarIntro(ms.url); /* v128 */
   /* v62: en modo cine los controles viven escondidos abajo */
   document.body.classList.toggle('cine-listo', S.mirror.ready);
   if (ms.playing || !ms.active) ocultarCtrls();
@@ -572,6 +642,7 @@ function applyMirrorState(ms) {
     mostrarPeliLoading();
   }
   updateEpNav();
+  evaluaIntro(); /* v128: botón de Saltar intro según el tiempo del video */
   /* v61: ojo — si la sala aún va a arrancar el espejo (pendingStart),
    * NO quitamos la pantalla de espera (era el destello de la sala) */
   if (!ms.active && !S.pendingStart) { ocultarPeliLoading(); ocultarPlayBtn(); S.mirrorInfo = null; }

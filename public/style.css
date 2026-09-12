@@ -1696,3 +1696,16 @@ body.movil-horizontal #homeFull {
 .ms-menu-busca { display: flex; gap: 8px; margin-bottom: 10px; }
 .ms-menu-busca .input { flex: 1; min-width: 0; }
 .ms-results { max-height: 62vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* ============ v128: botón Saltar intro ============ */
+.skip-intro {
+  position: fixed; right: 16px; bottom: 96px; z-index: 55;
+  display: flex; align-items: center; gap: 7px;
+  background: rgba(10, 7, 19, 0.92);
+  border: 1px solid var(--line); color: var(--txt);
+  font-family: inherit; font-weight: 800; font-size: 13.5px;
+  padding: 10px 16px; border-radius: 999px; cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5);
+}
+.skip-intro:active { opacity: 0.85; }
+.skip-intro.hidden { display: none; }

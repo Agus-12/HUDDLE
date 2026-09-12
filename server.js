@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v127'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v128'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -555,11 +555,86 @@ async function serieCtxFromUrl(u) {
   } catch { return null; }
 }
 
+/* v128: SALTO AUTOMÁTICO al terminar un episodio (nativo) — busca el
+ * siguiente vivo (brincando hasta 3 caídos), lo deja PAUSADO con «Toca
+ * para empezar» y lo anuncia en el chat. Lo dispara el «ended» del video
+ * o el latido del servidor (por tiempo, aunque nadie reporte el final). */
+const EP_MUERTO_RE = /ya no está disponible|ya no existe en la fuente|solo está en MEGA|no está en español|solo existe en inglés|no respondió|no entregó el video/i;
+async function autoSiguienteNativo(room) {
+  const sc = room.serieCtx;
+  if (!sc || !room.native || !sc.eps || !sc.eps.length) return false;
+  const actual = sc.eps.findIndex((e) => e.url === room.videoUrl);
+  const desde = actual >= 0 ? actual : sc.idx;
+  if (desde + 1 >= sc.eps.length) return false;
+  let elegido = null;
+  const saltados = [];
+  for (let paso = 1; paso <= 3 && desde + paso < sc.eps.length; paso++) {
+    const cand = sc.eps[desde + paso];
+    let errN = '';
+    const nat = await resolverNativo(cand.url).catch((e) => { errN = String(e.message || e).slice(0, 140); return null; });
+    if (nat) { elegido = { cand, idx: desde + paso, nat }; break; }
+    if (!EP_MUERTO_RE.test(errN)) return false; /* error raro (red/navegador): no arriesgar el salto automático */
+    saltados.push(cand.num);
+  }
+  if (!elegido) return false;
+  room.videoUrl = elegido.cand.url;
+  room.videoTitle = `${sc.titulo} ${elegido.cand.num}`.slice(0, 80);
+  if (sc.poster) room.videoImg = sc.poster.slice(0, 400);
+  room.native = { m3u8: elegido.nat.m3u8, mp4: !!elegido.nat.mp4, proxy: !!elegido.nat.proxy, subs: elegido.nat.subs || [] };
+  sc.idx = elegido.idx;
+  room.position = 0;
+  room.videoDuration = 0;
+  room.isPlaying = false; /* v127: pausado — «Toca para empezar» lo arranca para todos */
+  room.updatedAt = Date.now();
+  sysMsg(room, `Siguiente episodio automático: ${room.videoTitle}${saltados.length ? ' (sin ' + saltados.join(', ') + ')' : ''}`);
+  broadcast(room, 'state', stateOf(room));
+  return true;
+}
+/* v128: salto automático en el ESPEJO — el video terminó en el Chrome
+ * remoto (detectado por CDP en el latido) → el siguiente, con la misma
+ * auto-reparación del contexto que los botones */
+async function avanzarAutoEspejo(room) {
+  let m = mirrors.get(room.code);
+  if (m && !m.serie) {
+    const scFix = await serieCtxFromUrl(m.url || '').catch(() => null);
+    if (scFix) { m.serie = scFix; broadcast(room, 'mirror-state', mirrorState(room)); }
+  }
+  if (!m || !m.serie) return false;
+  let idx = m.serie.eps.findIndex((e) => e.url === (m.url || ''));
+  if (idx < 0) idx = m.serie.idx;
+  const target = m.serie.eps[idx + 1];
+  if (!target) return false;
+  room.videoUrl = target.url;
+  room.videoTitle = `${m.serie.titulo} ${target.num}`.slice(0, 80);
+  if (m.serie.poster) room.videoImg = m.serie.poster.slice(0, 400);
+  await stopMirror(room);
+  await startMirror(room, target.url, room.hostId);
+  sysMsg(room, `Siguiente episodio automático: ${room.videoTitle}`);
+  broadcast(room, 'state', stateOf(room));
+  return true;
+}
+/* v128: INTROS APRENDIDAS — «Saltar intro» usa una ventana fija (8s→90s),
+ * pero si un episodio tiene tiempos guardados (de saltos reales o curados
+ * a mano en data/intros.json) se usan esos exactos. */
+const INTROS_FILE = path.join(DATA_DIR, 'intros.json');
+let INTROS = {};
+try { INTROS = JSON.parse(fs.readFileSync(INTROS_FILE, 'utf8')) || {}; } catch {}
+function introKeyDe(url) {
+  try { const u = new URL(url); return u.hostname.replace(/^www\./, '') + u.pathname.replace(/\/$/, ''); } catch { return String(url || '').slice(0, 140); }
+}
+function guardarIntros() {
+  try {
+    const tmp = INTROS_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(INTROS));
+    fs.renameSync(tmp, INTROS_FILE);
+  } catch {}
+}
+
 function mirrorState(room) {
   const m = mirrors.get(room.code);
   const out = m
-    ? { active: true, url: m.url || '', audio: AUDIO_READY, playing: !!m.playing, ready: !!m.ready }
-    : { active: false, url: '', audio: false, playing: false, ready: false };
+    ? { active: true, url: m.url || '', audio: AUDIO_READY, playing: !!m.playing, ready: !!m.ready, t: Math.round((m.curTime || 0) * 10) / 10, dur: Math.round((m.curDur || 0) * 10) / 10 }
+    : { active: false, url: '', audio: false, playing: false, ready: false, t: 0, dur: 0 }; /* v128: tiempo/duración para Saltar intro */
   /* v74: si están viendo un episodio de serie, la sala sabe cuál es y si
    * hay siguiente/anterior — para los botoncitos de la esquina */
   if (m && m.serie) {
@@ -1198,11 +1273,22 @@ async function handleAction(req, res, body) {
     return json(res, 200, { ok: true });
   }
 
+  if (type === 'videoMeta') { /* v128: duración del video nativo (la reporta el cliente al cargar) — con ella el server detecta el final en el latido */
+    if (room.native) room.videoDuration = Math.max(0, Number(action.duration) || 0);
+    return json(res, 200, { ok: true });
+  }
   if (type === 'ended') { // el video terminó de reproducirse
     room.position = Math.max(0, Number(action.position) || 0);
     room.isPlaying = false;
     room.updatedAt = now;
     broadcast(room, 'state', stateOf(room));
+    /* v128: si era un EPISODIO, el siguiente entra SOLO (pausado, con
+     * «Toca para empezar») — el guardia evita el doble salto cuando varios
+     * clientes reportan el final casi al mismo tiempo */
+    if (room.native && room.serieCtx && room.autoNextKey !== room.videoUrl) {
+      room.autoNextKey = room.videoUrl;
+      autoSiguienteNativo(room).catch(() => {});
+    }
     return json(res, 200, { ok: true });
   }
 
@@ -1245,6 +1331,7 @@ async function handleAction(req, res, body) {
             room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
             room.position = 0;
             room.isPlaying = false; /* v127: SIEMPRE pausado — «Toca para empezar» lo arranca para todos a la vez */
+            room.videoDuration = 0; room.autoNextKey = null; /* v128 */
             room.updatedAt = Date.now();
             /* v118: si es un episodio de serie, la cadena completa
              * (siguiente/anterior) se arma por detrás — llega con el
@@ -1346,6 +1433,7 @@ async function handleAction(req, res, body) {
           sc.idx = elegido.idx;
           room.position = 0;
           room.isPlaying = false; /* v127: el episodio entra PAUSADO */
+          room.videoDuration = 0; room.autoNextKey = null; /* v128 */
           room.updatedAt = Date.now();
           sysMsg(room, `${room.users.get(userId).name} puso: ${room.videoTitle}${notaSalto}`);
           broadcast(room, 'state', stateOf(room));
@@ -4087,6 +4175,21 @@ const server = http.createServer(async (req, res) => {
       /* v81: proxy del stream (solo goodstream) cuando directo falla */
       return proxearHls(req, res, url.searchParams.get('u') || '');
     }
+    if (url.pathname === '/api/intro' && req.method === 'GET') {
+      /* v128: tiempos de intro conocidos de un episodio (key = host+ruta) */
+      const key = String(url.searchParams.get('key') || '').slice(0, 200);
+      const it = INTROS[key];
+      return json(res, 200, { ok: true, intro: it && +it.end > +it.start ? { start: +it.start, end: +it.end } : null });
+    }
+    if (url.pathname === '/api/intro' && req.method === 'POST') {
+      const b = await readBody(req);
+      const key = String(b.key || '').slice(0, 200);
+      const start = Math.max(0, +b.start || 0), end = Math.min(3600, +b.end || 0);
+      if (!key || end <= start || end - start > 600) return json(res, 400, { ok: false, error: 'Datos de intro no válidos' });
+      INTROS[key] = { start, end, by: String(b.name || '').slice(0, 24), at: Date.now() };
+      guardarIntros();
+      return json(res, 200, { ok: true });
+    }
     if (url.pathname === '/api/progress' && req.method === 'POST') {
       /* v81: guardar el minuto por el que va el usuario en modo individual */
       const body = await readBody(req);
@@ -4209,10 +4312,41 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-/* Sincronización periódica (corrección de desvío) + limpieza */
+/* Sincronización periódica (corrección de desvío) + limpieza + v128 */
 setInterval(() => {
   for (const room of rooms.values()) {
+    /* v128: NATIVO — episodio que TERMINA (por tiempo) → siguiente solo.
+     * fin = updatedAt + (duración − posición): corre aunque el cliente que
+     * reportó la duración ya se haya ido de la sala. */
+    if (room.native && room.serieCtx && room.isPlaying && room.videoDuration > 1) {
+      const finMs = room.updatedAt + Math.max(0, room.videoDuration - room.position) * 1000;
+      if (Date.now() >= finMs - 300 && room.autoNextKey !== room.videoUrl) {
+        room.autoNextKey = room.videoUrl;
+        autoSiguienteNativo(room).catch(() => {});
+        continue;
+      }
+    }
     if (room.clients.size && room.isPlaying) broadcast(room, 'state', stateOf(room));
+    /* v128: ESPEJO — leer el tiempo del video del Chrome remoto: alimenta
+     * «Saltar intro» (mirror-state fresco) y detecta el final */
+    const mi = mirrors.get(room.code);
+    if (mi && mi.serie && mi.page && !mi.page.isClosed()) {
+      mi.page.evaluate(() => {
+        let t = 0, dur = 0, fin = false;
+        document.querySelectorAll('video').forEach((v) => {
+          if (v.duration > 1) { if (v.currentTime > t) t = v.currentTime; if (v.duration > dur) dur = v.duration; if (v.ended) fin = true; }
+        });
+        return { t, dur, fin };
+      }).then((r) => {
+        if (!r || !mirrors.get(room.code)) return;
+        mi.curTime = r.t; mi.curDur = r.dur;
+        if (r.fin && mi.playing && mi.autoNextKey !== mi.url) {
+          mi.autoNextKey = mi.url;
+          return avanzarAutoEspejo(room);
+        }
+        if (mi.playing) broadcast(room, 'mirror-state', mirrorState(room)); /* tiempo fresco en los clientes */
+      }).catch(() => {});
+    }
   }
 }, 2500);
 
