@@ -849,8 +849,10 @@ select.input {
   padding: 6px; box-shadow: 0 14px 44px rgba(0, 0, 0, 0.55);
   display: flex; flex-direction: column; gap: 2px;
 }
-/* v136: abierta DESDE LA SALA flota como hoja inferior — el shell del video la recortaba */
-.page-drop.desde-sala { position: fixed; top: auto; left: 12px; right: 12px; bottom: 12px; z-index: 9500; }
+/* v136: abierta DESDE LA SALA flota como hoja inferior — el shell del video la recortaba.
+ * v139: con TECHO y scroll propio — antes crecía hacia arriba sin límite y la
+ * parte de arriba (buscar + resultados) quedaba fuera de la pantalla del móvil */
+.page-drop.desde-sala { position: fixed; top: auto; left: 12px; right: 12px; bottom: 12px; z-index: 9500; max-height: 74dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .page-opt {
   display: flex; align-items: center; gap: 10px;
   background: none; border: 0; color: var(--txt);

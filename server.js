@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v138'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v139'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -578,7 +578,7 @@ async function autoSiguienteNativo(room) {
     saltados.push(cand.num);
   }
   if (!elegido) return false;
-  room.videoUrl = elegido.cand.url;
+  room.videoUrl = elegido.cand.url; programarPrefetchEp(room);
   room.videoTitle = `${sc.titulo} ${elegido.cand.num}`.slice(0, 80);
   if (sc.poster) room.videoImg = sc.poster.slice(0, 400);
   room.native = { m3u8: elegido.nat.m3u8, mp4: !!elegido.nat.mp4, proxy: !!elegido.nat.proxy, subs: elegido.nat.subs || [] };
@@ -605,7 +605,7 @@ async function avanzarAutoEspejo(room) {
   if (idx < 0) idx = m.serie.idx;
   const target = m.serie.eps[idx + 1];
   if (!target) return false;
-  room.videoUrl = target.url;
+  room.videoUrl = target.url; programarPrefetchEp(room);
   room.videoTitle = `${m.serie.titulo} ${target.num}`.slice(0, 80);
   if (m.serie.poster) room.videoImg = m.serie.poster.slice(0, 400);
   await stopMirror(room);
@@ -849,6 +849,37 @@ async function detectarIntroSerie(serieKey, urls) {
       }
     } finally { try { fs.unlinkSync(f0); } catch {} try { fs.unlinkSync(f1); } catch {} }
   } catch {} finally { INTRO_JOBS.delete(serieKey); }
+}
+/* ═══════ v139: PRECALENTAMIENTO DEL SIGUIENTE EPISODIO ═══════
+ * En Juntos las caricaturas tardan porque resolver un episodio abre el
+ * navegador del server y le saca el stream (~5-20s). Mientras ven uno,
+ * el server ya resuelve EL QUE SIGUE en segundo plano: al picarle
+ * «siguiente» (o el auto-next) el stream ya está en caché (2h) y entra
+ * al instante. Llamar es barato: si ya está en caché, el resolver
+ * devuelve la caché sin abrir nada. */
+const PREFETCH_EP = new Map(); /* roomCode → videoUrl ya programado */
+function programarPrefetchEp(room) {
+  try {
+    const url = room && room.videoUrl;
+    if (!url || !room.code) return;
+    if (PREFETCH_EP.get(room.code) === url) return; /* este episodio ya está programado */
+    PREFETCH_EP.set(room.code, url);
+    setTimeout(() => {
+      (async () => {
+        try {
+          const viva = rooms.get(room.code);
+          if (!viva || viva.videoUrl !== url) return; /* cambiaron de video o la sala murió */
+          const sc = await serieCtxFromUrl(url).catch(() => null);
+          if (!sc || !sc.eps || !sc.eps.length) return; /* pelis o fuente sin lista: nada que precalentar */
+          const idx = sc.idx != null ? sc.idx : sc.eps.findIndex((e) => e.url === url);
+          const nxt = sc.eps[idx + 1];
+          if (!nxt || !nxt.url) return; /* era el último */
+          await resolverNativo(nxt.url);
+          console.log('[prefetch] siguiente episodio listo en caché para la sala ' + room.code);
+        } catch (e) { console.log('[prefetch] no se pudo precalentar: ' + String(e && e.message || e).slice(0, 80)); }
+      })();
+    }, 20000); /* 20s: que el video actual arranque tranquilo primero */
+  } catch {}
 }
 /* v135: cabeza de ventaja — al abrir el SELECTOR de episodios de una serie
  * sin intro conocida ya se lanza la detección (mientras eliges episodio, el
@@ -1560,7 +1591,7 @@ async function handleAction(req, res, body) {
           });
           if (nat) {
             if (mirrors.has(room.code)) stopMirror(room).catch(() => {});
-            room.videoUrl = urlNat;
+            room.videoUrl = urlNat; programarPrefetchEp(room);
             room.videoTitle = String(action.title || guessTitle(urlNat)).slice(0, 80);
             room.videoImg = String(action.img || '').slice(0, 400);
             room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
@@ -1672,7 +1703,7 @@ async function handleAction(req, res, body) {
             return json(res, 200, { ok: false, error: errN || 'No pude resolver el episodio siguiente — prueba del selector' });
           }
           const notaSalto = saltados.length ? ' (sin ' + saltados.join(', ') + ')' : '';
-          room.videoUrl = elegido.cand.url;
+          room.videoUrl = elegido.cand.url; programarPrefetchEp(room);
           room.videoTitle = `${sc.titulo} ${elegido.cand.num}`.slice(0, 80);
           if (sc.poster) room.videoImg = sc.poster.slice(0, 400);
           room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
@@ -1702,7 +1733,7 @@ async function handleAction(req, res, body) {
         /* v127: la sala SABE qué episodio toca ahora (título/carátula para
          * todos, «Continuar viendo» correcto) — antes el salto no tocaba el
          * estado y los invitados se quedaban con el episodio viejo */
-        room.videoUrl = target.url;
+        room.videoUrl = target.url; programarPrefetchEp(room);
         room.videoTitle = `${m.serie.titulo} ${target.num}`.slice(0, 80);
         if (m.serie.poster) room.videoImg = m.serie.poster.slice(0, 400);
         await stopMirror(room);
@@ -1858,7 +1889,7 @@ async function handleAction(req, res, body) {
         console.warn(`[acción] ❌ URL inválida: "${url}"`);
         return json(res, 400, { ok: false, error: 'URL inválida (debe ser http(s) o una ruta local)' });
       }
-      room.videoUrl = url;
+      room.videoUrl = url; programarPrefetchEp(room);
       room.videoTitle = title || guessTitle(url);
       room.position = 0;
       room.isPlaying = false;
