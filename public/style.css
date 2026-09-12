@@ -472,7 +472,7 @@ input[type="range"]:disabled { opacity: 0.35; cursor: not-allowed; }
 .toasts {
   position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
   display: flex; flex-direction: column; align-items: center; gap: 8px;
-  z-index: 100; pointer-events: none; width: min(92vw, 560px);
+  z-index: 9600; pointer-events: none; width: min(92vw, 560px); /* v136: sobre el menú de búsqueda */
 }
 .toast {
   background: rgba(24, 16, 40, 0.95);
@@ -849,6 +849,8 @@ select.input {
   padding: 6px; box-shadow: 0 14px 44px rgba(0, 0, 0, 0.55);
   display: flex; flex-direction: column; gap: 2px;
 }
+/* v136: abierta DESDE LA SALA flota como hoja inferior — el shell del video la recortaba */
+.page-drop.desde-sala { position: fixed; top: auto; left: 12px; right: 12px; bottom: 12px; z-index: 9500; }
 .page-opt {
   display: flex; align-items: center; gap: 10px;
   background: none; border: 0; color: var(--txt);

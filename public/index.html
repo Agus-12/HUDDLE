@@ -345,26 +345,6 @@
             <!-- v127: menú de búsqueda EN la sala — modal sobre la película:
                  buscas, eliges la serie (temporadas/episodios) o la peli, y
                  mientras llega el video toda la sala ve la pantalla de espera -->
-            <div id="msMenu" class="ms-menu hidden">
-              <div id="msBack" class="ms-menu-back"></div>
-              <div class="ms-menu-box">
-                <div class="ms-menu-head">
-                  <span class="ms-menu-t">Cambiar lo que están viendo</span>
-                  <button id="msClose" class="btn small ghost" type="button" title="Cerrar">
-                    <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-                  </button>
-                </div>
-                <div class="ms-menu-busca">
-                  <input id="msInput" class="input" placeholder="Busca película o serie…" autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off">
-                  <button id="msGo" class="btn small primary" type="button">Buscar</button>
-                </div>
-                <div id="msResults" class="ms-results hidden"></div>
-                <button id="msPaginas" class="btn small ghost ms-paginas" type="button">
-                  <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                  Elegir página web (YouTube, sitios…)
-                </button>
-              </div>
-            </div>
             <div class="mirror-hint">Navegador espejado — haz clic, arrastra o escribe sobre la página: todos ven lo mismo</div>
           </div>
 
@@ -475,6 +455,27 @@
   <!-- v130: saltar la intro — VIVE FUERA de las pantallas (sala y Solo):
        aparece durante la intro del episodio; en sala salta para todos,
        en Solo salta el video local -->
+            <div id="msMenu" class="ms-menu hidden">
+              <div id="msBack" class="ms-menu-back"></div>
+              <div class="ms-menu-box">
+                <div class="ms-menu-head">
+                  <span class="ms-menu-t">Cambiar lo que están viendo</span>
+                  <button id="msClose" class="btn small ghost" type="button" title="Cerrar">
+                    <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                  </button>
+                </div>
+                <div class="ms-menu-busca">
+                  <input id="msInput" class="input" placeholder="Busca película o serie…" autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off">
+                  <button id="msGo" class="btn small primary" type="button">Buscar</button>
+                </div>
+                <div id="msResults" class="ms-results hidden"></div>
+                <button id="msPaginas" class="btn small ghost ms-paginas" type="button">
+                  <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                  Elegir página web (YouTube, sitios…)
+                </button>
+              </div>
+            </div>
+
   <button id="skipIntro" class="skip-intro hidden" type="button">
     Saltar intro
     <svg class="icon icon-16" viewBox="0 0 24 24" fill="currentColor"><path d="M4 5v14l8-7zM14 5v14l8-7z"/></svg>

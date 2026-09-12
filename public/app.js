@@ -1742,8 +1742,14 @@ function updateEpNav() {
 (function montarEpNav() {
   const prev = $('#epPrevBtn'), next = $('#epNextBtn'), buscar = $('#epSearchBtn');
   if (!prev || !next || !buscar) return;
-  prev.addEventListener('click', () => { toast('Abriendo el episodio anterior…'); sendAction({ type: 'mirror', op: 'epPrev' }).then((r) => { if (r && r.ok === false) toast(r.error || 'No se pudo'); }); });
-  next.addEventListener('click', () => { toast('Abriendo el episodio siguiente…'); sendAction({ type: 'mirror', op: 'epNext' }).then((r) => { if (r && r.ok === false) toast(r.error || 'No se pudo'); }); });
+  /* v136: la tarjetita de espera sale AL INSTANTE (no «cuando quiere» cuando
+   * el server ya resolvió) y solo se va cuando hay video listo o si falló */
+  const tarjetitaEp = (mensaje) => {
+    if (S.mirrorInfo) { S.mirrorInfo.sub = mensaje; mostrarPeliLoading(); }
+  };
+  const alFallo = (r) => { ocultarPeliLoading(); toast((r && r.error) || 'No se pudo'); };
+  prev.addEventListener('click', () => { toast('Abriendo el episodio anterior…'); tarjetitaEp('Abriendo el episodio anterior…'); sendAction({ type: 'mirror', op: 'epPrev' }).then((r) => { if (r && r.ok === false) alFallo(r); }).catch(() => alFallo()); });
+  next.addEventListener('click', () => { toast('Abriendo el episodio siguiente…'); tarjetitaEp('Abriendo el episodio siguiente…'); sendAction({ type: 'mirror', op: 'epNext' }).then((r) => { if (r && r.ok === false) alFallo(r); }).catch(() => alFallo()); });
   buscar.addEventListener('click', () => abrirMenuBuscarSala()); /* v127: menú de búsqueda propio */
 })();
 
@@ -3713,6 +3719,7 @@ $('#msPaginas').addEventListener('click', () => {
   if (menu) menu.classList.add('hidden');
   const drop = $('#pageDrop');
   if (drop) {
+    drop.classList.add('desde-sala'); /* v136: fuera del shell que la recortaba — flota sobre todo */
     drop.classList.remove('hidden');
     setTimeout(() => { try { $('#pdSearch').focus(); } catch {} }, 60);
   }
@@ -3739,6 +3746,7 @@ async function buscarEnPicker() {
     }
     renderResultados(box, d.results, (res) => {
       $('#pageDrop').classList.add('hidden');
+      $('#pageDrop').classList.remove('desde-sala'); /* v136 */
       if (!S.canControl) { toast('Solo el anfitrión puede cambiar de página'); return; }
       toast(`Abriendo ${res.site}…`);
       $('#mirrorUrl').value = res.url;
