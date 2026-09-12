@@ -519,7 +519,7 @@ function applyMirrorState(ms) {
   /* v74: mientras se abre un episodio, TODA la sala ve la pantalla de
    * espera con la carátula de la serie y el episodio que se prepara */
   else if (ms.active && !ms.ready && ms.serie && !S.pendingStart) {
-    S.mirrorInfo = { title: ms.serie.titulo, img: (ms.serie.poster ? proxyAnimeImg(ms.serie.poster, 400) : ''), url: ms.url, sub: 'Abriendo en el espejo…', epNum: ms.serie.num };
+    S.mirrorInfo = { title: ms.serie.titulo, img: ((ms.serie.cover || ms.serie.poster) ? proxyAnimeImg(ms.serie.cover || ms.serie.poster, 400) : ''), url: ms.url, sub: 'Abriendo en el espejo…', epNum: ms.serie.num }; /* v120: cover de IMDb primero */
     mostrarPeliLoading();
   }
   updateEpNav();

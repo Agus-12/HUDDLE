@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v119'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v120'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -489,7 +489,7 @@ async function serieCtxFromUrl(u) {
         if (d && d.episodios && d.episodios.length) {
           const idx = d.episodios.findIndex((e) => cariSlugDe(e.url) === slugEp);
           if (idx >= 0) {
-            return { tipo: 'caricaturas', titulo: d.titulo, poster: d.poster, idx,
+            return { tipo: 'caricaturas', titulo: d.titulo, poster: d.poster, cover: d.cover || '', idx, /* v120: cover curada */
               eps: d.episodios.map((e) => ({ url: e.url, num: `${e.temporada}x${e.ep || '·'}${e.parte || ''}` })) };
           }
         }
@@ -505,7 +505,7 @@ async function serieCtxFromUrl(u) {
         if (d && d.episodios && d.episodios.length) {
           const idx = d.episodios.findIndex((e) => lctCapIdDe(e.url) === capId);
           if (idx >= 0) {
-            return { tipo: 'caricaturas', titulo: d.titulo, poster: d.poster, idx,
+            return { tipo: 'caricaturas', titulo: d.titulo, poster: d.poster, cover: d.cover || '', idx, /* v120: cover curada */
               eps: d.episodios.map((e) => ({ url: e.url, num: `${e.temporada}x${e.ep || '·'}${e.parte || ''}` })) };
           }
         }
@@ -525,7 +525,7 @@ function mirrorState(room) {
   if (m && m.serie) {
     const sc = m.serie;
     out.serie = {
-      titulo: sc.titulo, poster: sc.poster, total: sc.eps.length,
+      titulo: sc.titulo, poster: sc.poster, cover: sc.cover || '', total: sc.eps.length, /* v120: cover curada de IMDb */
       num: sc.eps[sc.idx] ? sc.eps[sc.idx].num : '',
       hayPrev: sc.idx > 0, hayNext: sc.idx >= 0 && sc.idx < sc.eps.length - 1,
     };
@@ -2666,7 +2666,7 @@ async function refrescarCariFeed() {
       try {
         const d = await datosCaricatura(String(lct.lctId));
         if (d && d.poster && d.episodios && d.episodios.length) {
-          return { title: d.titulo, url: LCT_BASE + 'serie/' + lct.lctId, img: d.poster, site: 'Cartoons' };
+          return { title: d.titulo, url: LCT_BASE + 'serie/' + lct.lctId, img: d.cover || d.poster, site: 'Cartoons' }; /* v120: portada de IMDb primero */
         }
       } catch {}
       return null;
@@ -2719,10 +2719,11 @@ async function refrescarDatosLacartoons(lct) {
     const lista = await lctEpisodios(lct.lctId);
     const eps = (lista && lista.eps) || lctEpsDeHtml(html);
     if (!eps.length) return null;
-    const out = { ok: true, slug: lct.slug, titulo: lct.titulo, poster, cover: '', episodios: eps };
+    const cover = CARI_PORTADAS.get(lct.slug) || ''; /* v120: portada curada de IMDb (public/covers/{slug}.jpg) — el póster del sitio a veces es una foto del cast, no la carátula */
+    const out = { ok: true, slug: lct.slug, titulo: lct.titulo, poster, cover, episodios: eps };
     cariDatos.set(lct.slug, { at: Date.now(), d: out });
     cacheGuardar('cariDatos', () => [...cariDatos.entries()]);
-    if (poster) cariMeta.set(lct.slug, { at: Date.now(), titulo: out.titulo, poster, cover: '' });
+    if (poster || cover) cariMeta.set(lct.slug, { at: Date.now(), titulo: out.titulo, poster, cover });
     cacheGuardar('cariMeta', () => [...cariMeta.entries()]);
     return out;
   } catch { return null; }
