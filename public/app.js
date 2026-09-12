@@ -614,6 +614,11 @@ function updateBadge() {}
 
 function applyMirrorState(ms) {
   if (!ms) return;
+  /* v129: LA SALA VA NATIVA → los eventos de espejo no tocan nada. Era el
+   * bug de «la tarjetita se quita»: al pasar a nativo el stopMirror
+   * broadcasteaba mirror-state inactivo y esto ocultaba la pantalla de
+   * espera (¡con el video aún sin cargar!) y borraba la info */
+  if (S.nativo) return;
   S.mirror.active = !!ms.active;
   S.mirror.url = ms.url || '';
   S.mirror.ready = !!(ms.active && ms.ready);
@@ -1510,7 +1515,7 @@ function arrancarTimerPeli() {
       ocultarPeliLoading();
       toast('Ya estás en la sala — la película sigue preparándose');
     }
-  }, 100000);
+  }, 240000); /* v129: 4 min — las caricaturas resuelven lento (scrapes) y a los 100s se iba la tarjeta */
 }
 
 function startMirrorFromPicker() {

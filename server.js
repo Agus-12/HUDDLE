@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v128'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v129'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1393,6 +1393,17 @@ async function handleAction(req, res, body) {
          * episodio se resuelve como al abrirlo (video directo, como
          * Solo). Si el siguiente está caído, se salta hasta 3 y se
          * avanza al primero que SÍ dé video. */
+        /* v129: si la sala es NATIVA pero el contexto de serie no llegó al
+         * abrir (su carga tarda o falló UNA vez), se reconstruye AHORA —
+         * sin esto los botones morían para siempre en caricaturas/cartoons
+         * (en animes la carga es rápida y por eso ahí sí funcionaba) */
+        if (room.native && !room.serieCtx && room.videoUrl) {
+          const scFix = await serieCtxFromUrl(room.videoUrl).catch(() => null);
+          if (scFix) {
+            room.serieCtx = scFix;
+            broadcast(room, 'state', stateOf(room));
+          }
+        }
         if (room.native && room.serieCtx) {
           const sc = room.serieCtx;
           const dir = op === 'epNext' ? 1 : -1;
@@ -1439,11 +1450,11 @@ async function handleAction(req, res, body) {
           broadcast(room, 'state', stateOf(room));
           return json(res, 200, { ok: true, nativo: true });
         }
+        if (room.native) return json(res, 200, { ok: false, error: 'La sala va en modo video directo — reintenta' }); /* v129: el espejo no roba el salto */
         let m = mirrors.get(room.code);
-        /* v127: auto-reparación — si el contexto de serie no llegó al abrir
-         * (la carga de episodios falló a la primera), se reconstruye AHORA
-         * con la URL actual; antes los botones morían para siempre y por eso
-         * varias caricaturas/cartoons no tenían siguiente/anterior */
+        /* v127: auto-reparación del ESPEJO — si el contexto de serie no llegó
+         * al abrir (la carga de episodios falló a la primera), se reconstruye
+         * AHORA con la URL actual; antes los botones morían para siempre */
         if (m && !m.serie) {
           const scFix = await serieCtxFromUrl(m.url || '').catch(() => null);
           if (scFix) { m.serie = scFix; broadcast(room, 'mirror-state', mirrorState(room)); }
