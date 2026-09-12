@@ -368,7 +368,7 @@ S.serieSala = null; /* v118: { titulo, num, total, hayPrev, hayNext } — serie 
 S.nativoListo = false; /* v127: ¿el video nativo ya dio video? */
 S.salaTitulo = ''; S.salaImg = ''; /* v127: qué se ve en la sala (para la espera de los invitados) */
 S.mirrorT = 0; S.mirrorDur = 0; /* v128: tiempo del video espejado */
-S.introUrl = ''; S.introKey = ''; S.introData = null; S.introFin = 0; S.introT = 0; /* v128 */
+S.introUrl = ''; S.introData = null; S.introFin = 0; S.introT = 0; S.introVistoEn = null; /* v128/v132 */
 function posEsperada() {
   if (!S.nativo) return 0;
   return S.nativo.isPlaying
@@ -532,12 +532,12 @@ function introKeyDe(url) {
 }
 async function cargarIntro(url) {
   S.introUrl = url;
-  S.introKey = introKeyDe(url);
   S.introData = null;
+  S.introVistoEn = null; /* v132: ¿en qué segundo apareció el botón? (para aprender el inicio real) */
   try {
-    const r = await fetch('/api/intro?key=' + encodeURIComponent(S.introKey));
+    const r = await fetch('/api/intro?url=' + encodeURIComponent(url));
     const d = await r.json();
-    if (d && d.intro && S.introKey === introKeyDe(url)) S.introData = d.intro;
+    if (d && d.intro && S.introUrl === url) S.introData = d.intro;
   } catch {}
 }
 /* v130: ¿lo que se ve en SOLO es un EPISODIO? — por la cadena de eps del
@@ -577,6 +577,7 @@ function evaluaIntro() {
     else if (S.nativo) vaSonando = ($('#roomVideo') && !$('#roomVideo').paused);
     else vaSonando = S.mirror.playing;
     if (w.t >= ini && w.t < fin && vaSonando) mostrar = true;
+    if (mostrar && S.introVistoEn == null) S.introVistoEn = w.t; /* v132: inicio real de la intro */
     S.introFin = fin; S.introT = w.t;
   }
   b.classList.toggle('hidden', !mostrar);
@@ -594,10 +595,11 @@ $('#skipIntro').addEventListener('click', () => {
       if (r && r.ok === false) toast(r.error || 'Solo el anfitrión puede saltar la intro');
     }).catch(() => {});
   }
-  /* v128: los tiempos que funcionaron quedan aprendidos en el server */
-  if (S.introKey) {
+  /* v128→v132: se aprende a NIVEL DE SERIE (el server deduce la serie de la
+   * URL) — el inicio real es cuando el botón apareció, no cuando le picaste */
+  if (S.introUrl) {
     fetch('/api/intro', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: S.introKey, start: Math.floor(S.introT || INTRO_INICIO), end: Math.round(fin), name: (S.profile && S.profile.name) || '' }) }).catch(() => {});
+      body: JSON.stringify({ url: S.introUrl, start: Math.floor(S.introVistoEn != null ? S.introVistoEn : INTRO_INICIO), end: Math.round(fin), name: (S.profile && S.profile.name) || '' }) }).catch(() => {});
   }
   $('#skipIntro').classList.add('hidden');
 });
@@ -677,7 +679,11 @@ function applyMirrorState(ms) {
   evaluaIntro(); /* v128: botón de Saltar intro según el tiempo del video */
   /* v61: ojo — si la sala aún va a arrancar el espejo (pendingStart),
    * NO quitamos la pantalla de espera (era el destello de la sala) */
-  if (!ms.active && !S.pendingStart) { ocultarPeliLoading(); ocultarPlayBtn(); S.mirrorInfo = null; }
+  /* v132: si la tarjeta está fresca (<25s), este mirror-state inactivo es la
+   * TRANSICIÓN a nativo (el server apaga el espejo viejo ANTES de anunciar
+   * el video) — ocultarla aquí era la «doble tarjeta»: se iba, entrabas a
+   * ciegas y luego la tarjeta renacía. El estado de la sala manda. */
+  if (!ms.active && !S.pendingStart && Date.now() - (S.envioEn || 0) > 25000) { ocultarPeliLoading(); ocultarPlayBtn(); S.mirrorInfo = null; }
   document.body.classList.toggle('mirroring', !!ms.active);
   $('#mirrorLayer').classList.toggle('hidden', !S.mirror.active);
   $('#videoEmpty').classList.toggle('hidden', S.mirror.active);
@@ -1257,6 +1263,7 @@ function mostrarPeliLoading() {
     $('#peliSub').textContent = info.sub || 'Abriendo en el espejo…';
   }
   box.classList.remove('hidden');
+  S.envioEn = Date.now(); /* v132: nace la espera — mirror-state inactivo dentro de 25s es TRANSICIÓN a nativo, no aborto */
   arrancarTimerPeli();
 }
 function ocultarPeliLoading() {
@@ -1630,12 +1637,13 @@ function renderPageDrop() {
 
   renderPageDrop();
 
+  /* v132: «Buscar películas» abre el MENÚ de búsqueda (msMenu) — lo que
+   * siempre decía el botón. La lista de páginas/servidores vive dentro del
+   * menú («Elegir página web») y también sigue con su botón de la lupa
+   * chica de la barra de abajo. */
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
-    drop.classList.toggle('hidden');
-    /* v70: al abrirse, la caja de buscar queda lista para escribir
-     * (como en el inicio) — solo la ve quien la abrió, en su pantalla */
-    if (!drop.classList.contains('hidden')) setTimeout(() => { try { $('#pdSearch').focus(); } catch {} }, 60);
+    abrirMenuBuscarSala();
   });
   /* v48: Enter en la caja de búsqueda del desplegable */
   drop.addEventListener('keydown', (e) => {
@@ -3667,6 +3675,16 @@ function abrirMenuBuscarSala() {
   $('#msResults').innerHTML = '';
   setTimeout(() => $('#msInput').focus(), 50);
 }
+/* v132: la lista de páginas/servidores vive dentro del menú */
+$('#msPaginas').addEventListener('click', () => {
+  const menu = $('#msMenu');
+  if (menu) menu.classList.add('hidden');
+  const drop = $('#pageDrop');
+  if (drop) {
+    drop.classList.remove('hidden');
+    setTimeout(() => { try { $('#pdSearch').focus(); } catch {} }, 60);
+  }
+});
 $('#btnMSearch').addEventListener('click', abrirMenuBuscarSala);
 $('#msBack').addEventListener('click', cerrarBuscarSala);
 $('#msGo').addEventListener('click', buscarEnSala);

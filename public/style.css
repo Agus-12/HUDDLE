@@ -1712,3 +1712,5 @@ body.movil-horizontal #homeFull {
 
 /* v131: etiqueta de versión — discreta, para verificar el auto-update */
 .ver-tag { font-size: 10px; color: var(--dim); opacity: 0.75; vertical-align: middle; margin-left: 4px; }
+
+.ms-paginas { width: 100%; margin-top: 10px; justify-content: center; display: flex; gap: 6px; }

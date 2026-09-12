@@ -21,7 +21,7 @@ const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v131'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v132'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -621,6 +621,34 @@ let INTROS = {};
 try { INTROS = JSON.parse(fs.readFileSync(INTROS_FILE, 'utf8')) || {}; } catch {}
 function introKeyDe(url) {
   try { const u = new URL(url); return u.hostname.replace(/^www\./, '') + u.pathname.replace(/\/$/, ''); } catch { return String(url || '').slice(0, 140); }
+}
+/* v132: clave a NIVEL DE SERIE — la intro es la misma en todos los
+ * episodios de una temporada, así que lo aprendido en uno sirve para
+ * todos (MisCaricaturas, Lacartoons, animes, Cuevana) */
+function introKeysDe(url) {
+  const exacto = introKeyDe(url);
+  let serie = null;
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    if (/miscaricaturas\.com$/.test(host)) {
+      const base = cariSlugDe(url).replace(/-\d{2}x\d{2}[ab]?(-.*)?$/, '');
+      if (base) serie = 'mm:' + base;
+    } else if (/lacartoons\.com$/.test(host)) {
+      const capId = +((/\/serie\/capitulo\/(\d+)/.exec(new URL(url).pathname) || [])[1] || 0);
+      const slug = capId ? lctSerieDeCap(capId) : '';
+      if (slug) serie = 'lct:' + slug;
+    } else if (/latanime\.org$/.test(host)) {
+      const m = /\/ver\/([a-z0-9-]+)-episodio-\d+/.exec(new URL(url).pathname);
+      if (m) serie = 'la:' + m[1];
+    } else if (/animeflv\./.test(host)) {
+      const m = /\/ver\/([a-z0-9-]+)-episodio-\d+/.exec(new URL(url).pathname);
+      if (m) serie = 'af:' + m[1];
+    } else if (/(cine-calidad\.mx|cuevana\.)/.test(host)) {
+      const m = /\/episode\/([a-z0-9-]+)-\d+x\d+/.exec(new URL(url).pathname);
+      if (m) serie = 'cv:' + m[1];
+    }
+  } catch {}
+  return { exacto, serie };
 }
 function guardarIntros() {
   try {
@@ -4189,14 +4217,17 @@ const server = http.createServer(async (req, res) => {
       return proxearHls(req, res, url.searchParams.get('u') || '');
     }
     if (url.pathname === '/api/intro' && req.method === 'GET') {
-      /* v128: tiempos de intro conocidos de un episodio (key = host+ruta) */
-      const key = String(url.searchParams.get('key') || '').slice(0, 200);
-      const it = INTROS[key];
+      /* v128→v132: por URL del episodio — se buscan los tiempos EXACTOS del
+       * episodio y, si no hay, los de su SERIE (la intro suele ser la misma
+       * en todos los episodios: saltar uno la aprende para toda) */
+      const ks = introKeysDe(String(url.searchParams.get('url') || ''));
+      const it = (ks.exacto && INTROS[ks.exacto]) || (ks.serie && INTROS[ks.serie]) || null;
       return json(res, 200, { ok: true, intro: it && +it.end > +it.start ? { start: +it.start, end: +it.end } : null });
     }
     if (url.pathname === '/api/intro' && req.method === 'POST') {
       const b = await readBody(req);
-      const key = String(b.key || '').slice(0, 200);
+      const ks = introKeysDe(String(b.url || ''));
+      const key = ks.serie || ks.exacto; /* v132: se guarda a NIVEL DE SERIE */
       const start = Math.max(0, +b.start || 0), end = Math.min(3600, +b.end || 0);
       if (!key || end <= start || end - start > 600) return json(res, 400, { ok: false, error: 'Datos de intro no válidos' });
       INTROS[key] = { start, end, by: String(b.name || '').slice(0, 24), at: Date.now() };
