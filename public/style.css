@@ -1697,7 +1697,27 @@ body.movil-horizontal #homeFull {
 .ms-menu-t { font-weight: 800; font-size: 15px; }
 .ms-menu-busca { display: flex; gap: 8px; margin-bottom: 10px; }
 .ms-menu-busca .input { flex: 1; min-width: 0; }
-.ms-results { max-height: 62vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.ms-results { max-height: 50vh; overflow-y: auto; -webkit-overflow-scrolling: touch; } /* v138: 50vh — con el teclado abierto los resultados siguen a la vista */
+/* v138: con el celular HORIZONTAL la sala entera se rota (v77) — el menú y la
+ * hoja de servidores (a nivel página desde v136) se rotan con ella, como la
+ * pantalla de espera y el selector (v79) */
+body.sala-girada #msMenu {
+  inset: auto;
+  top: 50%; left: 50%;
+  width: 100dvh; height: 100dvw;
+  transform: translate(-50%, -50%) rotate(var(--giro-sala));
+  padding: 5dvw 14px 14px;
+}
+body.sala-girada .ms-menu-box { max-height: 80dvw; }
+body.sala-girada .ms-results { max-height: none; }
+body.sala-girada #pageDrop.desde-sala {
+  inset: auto;
+  top: 50%; left: 50%;
+  width: 100dvh; height: auto; max-height: 82dvw;
+  transform: translate(-50%, -50%) rotate(var(--giro-sala));
+  overflow-y: auto;
+}
+body.sala-girada .pd-results { max-height: 50dvw; }
 
 /* ============ v128: botón Saltar intro ============ */
 .skip-intro {

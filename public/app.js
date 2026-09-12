@@ -3683,10 +3683,15 @@ async function buscarEnSala() {
   const q = $('#msInput').value.trim();
   const box = $('#msResults');
   if (!q) { cerrarBuscarSala(); return; }
+  /* v138: el teclado del celular EMPUJA el menú fuera de la pantalla (el
+   * WebView desplaza la página para «ver» el input y no la regresa) — se
+   * cierra el teclado al buscar y se regresa la vista al pintar resultados */
+  try { $('#msInput').blur(); } catch {}
   box.classList.remove('hidden');
   box.innerHTML = '<div class="sr-info"><div class="spinner"></div> Buscando…</div>';
   try {
     const d = await buscarEnServer(q);
+    try { window.scrollTo(0, 0); } catch {}
     if (!d.ok || !d.results || !d.results.length) {
       box.innerHTML = `<div class="sr-info">${(d && d.error) || 'No encontré nada — prueba con otras palabras'}</div>`;
       return;
@@ -3739,9 +3744,11 @@ async function buscarEnPicker() {
   if (!inp || !box) return;
   const q = inp.value.trim();
   if (!q) { box.innerHTML = ''; return; }
+  try { inp.blur(); } catch {} /* v138: cerrar teclado — mismo mal del menú */
   box.innerHTML = '<div class="sr-info"><div class="spinner"></div> Buscando…</div>';
   try {
     const d = await buscarEnServer(q);
+    try { window.scrollTo(0, 0); } catch {} /* v138 */
     if (!d.ok || !d.results || !d.results.length) {
       box.innerHTML = `<div class="sr-info">${(d && d.error) || 'No encontré nada — prueba con otras palabras'}</div>`;
       return;

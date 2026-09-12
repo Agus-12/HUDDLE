@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v137'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v138'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -620,6 +620,16 @@ async function avanzarAutoEspejo(room) {
 const INTROS_FILE = path.join(DATA_DIR, 'intros.json');
 let INTROS = {};
 try { INTROS = JSON.parse(fs.readFileSync(INTROS_FILE, 'utf8')) || {}; } catch {}
+/* v138: los aprendizajes del sistema VIEJO (ventana fija 8→90) tenían fin
+ * exactamente en 90 — salían «de más». Se eliminan al arrancar para que la
+ * detección por audio aprenda esas series desde cero y bien. */
+(function limpiarIntrosViejas() {
+  let n = 0;
+  for (const [k, v] of Object.entries(INTROS)) {
+    if (v && v.by !== 'auto' && !/^(mm|lct|la|af|cv):/.test(k) && +v.end === 90 && +v.start <= 25) { delete INTROS[k]; n++; }
+  }
+  if (n) { try { guardarIntros(); } catch {} console.log('[intro] migración: ' + n + ' aprendizaje' + (n === 1 ? '' : 's') + ' de la ventana vieja eliminado' + (n === 1 ? '' : 's') + ' (salían de más)'); }
+})();
 function introKeyDe(url) {
   try { const u = new URL(url); return u.hostname.replace(/^www\./, '') + u.pathname.replace(/\/$/, ''); } catch { return String(url || '').slice(0, 140); }
 }
