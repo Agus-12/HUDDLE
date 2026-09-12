@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v133'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v134'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -790,7 +790,10 @@ async function descargarInicioEp(m3u8) {
 }
 const INTRO_JOBS = new Set(), INTRO_INTENTOS = new Map();
 async function detectarIntroSerie(serieKey, urls) {
-  if (!fpcalcOk() || !serieKey || INTROS[serieKey] || INTRO_JOBS.has(serieKey)) return;
+  /* v134: correr también cuando lo guardado es aprendido-a-mano (pudo salir de
+   * un clic equivocado) — la huella de audio es la prueba fuerte; lo único que
+   * NO se re-analiza es lo que ya vino de la huella misma */
+  if (!fpcalcOk() || !serieKey || (INTROS[serieKey] && INTROS[serieKey].by === 'auto') || INTRO_JOBS.has(serieKey)) return;
   if (Date.now() - (INTRO_INTENTOS.get(serieKey) || 0) < 6 * 3600 * 1000) return;
   INTRO_INTENTOS.set(serieKey, Date.now());
   INTRO_JOBS.add(serieKey);
@@ -814,9 +817,16 @@ async function detectarIntroSerie(serieKey, urls) {
         const hit = compararHuellas(ha, hb);
         if (hit && hit.dur >= 45 && hit.fin <= 420 && hit.ini <= 240) {
           const finSeg = Math.max(Math.round(hit.fin) - 2, Math.round(hit.ini) + 30); /* 2s antes: jamás comerse contenido */
-          INTROS[serieKey] = { start: Math.round(hit.ini), end: finSeg, by: 'auto', at: Date.now() };
-          guardarIntros();
-          console.log(`[intro] ✅ ${serieKey}: intro detectada ${Math.round(hit.ini)}s→${Math.round(hit.fin)}s`);
+          const iniSeg = Math.round(hit.ini);
+          const anterior = INTROS[serieKey];
+          if (anterior && anterior.by === 'manual' && Math.abs(anterior.start - iniSeg) <= 20 && Math.abs(anterior.end - finSeg) <= 20) {
+            console.log(`[intro] ${serieKey}: la huella CONFIRMA la intro aprendida a mano (${iniSeg}→${finSeg}s) — se respeta lo aprendido`);
+          } else {
+            INTROS[serieKey] = { start: iniSeg, end: finSeg, by: 'auto', at: Date.now() };
+            guardarIntros();
+            if (anterior && anterior.by === 'manual') console.log(`[intro] ✅ ${serieKey}: la huella CORRIGE la aprendida a mano (estaba ${anterior.start}→${anterior.end}s, verdad del audio: ${iniSeg}→${finSeg}s)`);
+            else console.log(`[intro] ✅ ${serieKey}: intro detectada ${iniSeg}s→${finSeg}s`);
+          }
         } else {
           console.log(`[intro] ${serieKey}: los episodios no comparten intro al inicio — no se guarda nada`);
         }
@@ -4388,15 +4398,28 @@ const server = http.createServer(async (req, res) => {
        * episodio y, si no hay, los de su SERIE (la intro suele ser la misma
        * en todos los episodios: saltar uno la aprende para toda) */
       const ks = introKeysDe(String(url.searchParams.get('url') || ''));
-      const it = (ks.exacto && INTROS[ks.exacto]) || (ks.serie && INTROS[ks.serie]) || null;
-      /* v133: sin datos para esta serie → detección por audio en segundo plano */
+      const datos = (ks.exacto && INTROS[ks.exacto]) || (ks.serie && INTROS[ks.serie]) || null;
+      const it = datos && +datos.end > +datos.start ? { start: +datos.start, end: +datos.end } : null;
+      /* v133: sin datos para esta serie → detección por audio en segundo plano.
+       * v134: también con datos MANUALES (un clic equivocado no se queda para siempre) */
       const hace = INTRO_INTENTOS.get(ks.serie) || 0;
-      if (!it && ks.serie && fpcalcOk() && !INTRO_JOBS.has(ks.serie) && Date.now() - hace >= 6 * 3600 * 1000) {
+      if (ks.serie && (!datos || datos.by !== 'auto') && fpcalcOk() && !INTRO_JOBS.has(ks.serie) && Date.now() - hace >= 6 * 3600 * 1000) {
         serieCtxFromUrl(String(url.searchParams.get('url') || '')).then((sc) => {
           if (sc && sc.eps && sc.eps.length > 1) detectarIntroSerie(ks.serie, sc.eps.slice(0, 3).map((e) => e.url));
         }).catch(() => {});
       }
       return json(res, 200, { ok: true, intro: it && +it.end > +it.start ? { start: +it.start, end: +it.end } : null });
+    }
+    if (url.pathname === '/api/intro' && req.method === 'DELETE') {
+      /* v134: «esta intro salta mal» — se olvida la serie y queda lista para
+       * re-aprender a mano o re-detectarse por audio de inmediato */
+      const ks = introKeysDe(String(url.searchParams.get('url') || ''));
+      let borrado = 0;
+      for (const k of [ks.exacto, ks.serie]) if (k && INTROS[k]) { delete INTROS[k]; borrado++; }
+      if (ks.serie) INTRO_INTENTOS.delete(ks.serie); /* sin puerta de 6h: que re-detecte ya */
+      if (borrado) guardarIntros();
+      console.log('[intro] olvidada ' + (ks.serie || ks.exacto) + ' (' + borrado + ' entrada' + (borrado === 1 ? '' : 's') + ')');
+      return json(res, 200, { ok: true, borrado });
     }
     if (url.pathname === '/api/intro' && req.method === 'POST') {
       const b = await readBody(req);

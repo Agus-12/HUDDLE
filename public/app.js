@@ -585,7 +585,27 @@ function evaluaIntro() {
   }
   b.classList.toggle('hidden', !mostrar);
 }
+/* v134: mantén presionado el botón (medio segundo) = «esta intro salta mal»
+ * → se olvida la intro aprendida de la serie y el audio la vuelve a detectar */
+let introPresT = null, introLargoHecho = false;
+$('#skipIntro').addEventListener('pointerdown', () => {
+  introLargoHecho = false;
+  clearTimeout(introPresT);
+  introPresT = setTimeout(async () => {
+    introLargoHecho = true;
+    if (!S.introUrl) return;
+    try {
+      const r = await fetch('/api/intro?url=' + encodeURIComponent(S.introUrl), { method: 'DELETE' });
+      const d = await r.json().catch(() => null);
+      S.introData = null; S.introVistoEn = null; S.introFin = 0; S.introT = 0;
+      $('#skipIntro').classList.add('hidden');
+      toast(d && d.borrado ? 'Intro olvidada — se volverá a detectar con el audio' : 'No había intro guardada de esta serie');
+    } catch { toast('No se pudo olvidar la intro'); }
+  }, 550);
+});
+['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => $('#skipIntro').addEventListener(ev, () => clearTimeout(introPresT)));
 $('#skipIntro').addEventListener('click', () => {
+  if (introLargoHecho) { introLargoHecho = false; return; } /* el long-press ya olvidó: este click no salta */
   const fin = S.introFin;
   if (!fin) return;
   if (SOLO && !SOLO.cerrado) { /* v130: en Solo el salto es LOCAL */
