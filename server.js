@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v175'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v176'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -418,33 +418,38 @@ async function daniEpToStream(urlEp) {
   const html1 = await r1.text();
   const post = (/data-post=['"](\d+)/.exec(html1) || [])[1];
   if (!post) throw new Error('el capítulo no trae player');
-  const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), 12000);
-  let embedUrl = '';
-  try {
-    const r2 = await fetch(DANI_BASE + '/wp-admin/admin-ajax.php', {
-      method: 'POST', signal: ctl.signal,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'User-Agent': MIRROR_UA,
-        'Referer': urlEp,
-        'Origin': DANI_BASE,
-      },
-      body: 'action=doo_player_ajax&post=' + encodeURIComponent(post) + '&nume=1&type=tv',
-    });
-    if (r2.ok) { const j2 = await r2.json().catch(() => null); if (j2 && j2.embed_url) embedUrl = j2.embed_url; }
-  } finally { clearTimeout(t); }
-  if (!embedUrl) throw new Error('el player no entregó el embed');
-  /* el front hglink (con guard JS) solo ROTA el dominio: hanerix sirve el
-   * player de verdad sin guard — si aún no viene desempacable, cambiamos host */
+  /* v176: cada capítulo trae hasta 4 players (nume=1..4) y NO todos
+   * sirven: el 1x2 de Titanes traía voe.sx (403 DDoS-Guard) en la opción 1
+   * mientras hglink (la que sabemos romper) era la 3 — se prueban TODAS
+   * hasta que una entregue player desempacable. El front hglink (con guard
+   * JS) solo ROTA el dominio: hanerix sirve el player de verdad sin guard */
   let html2 = '';
-  for (const intento of [embedUrl, embedUrl.replace(/^https:\/\/[^/]+/i, 'https://hanerix.com')]) {
-    const r3 = await fetchSeguro(intento, 12000).catch(() => null);
-    if (!r3 || !r3.ok) continue;
-    const b = await r3.text();
-    if (/\.m3u8|eval\(function\(p,a,c,k,e/.test(b)) { html2 = b; break; }
+  for (let nume = 1; nume <= 4 && !html2; nume++) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 12000);
+    let embedUrl = '';
+    try {
+      const r2 = await fetch(DANI_BASE + '/wp-admin/admin-ajax.php', {
+        method: 'POST', signal: ctl.signal,
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': MIRROR_UA,
+          'Referer': urlEp,
+          'Origin': DANI_BASE,
+        },
+        body: 'action=doo_player_ajax&post=' + encodeURIComponent(post) + '&nume=' + nume + '&type=tv',
+      });
+      if (r2.ok) { const j2 = await r2.json().catch(() => null); if (j2 && j2.embed_url) embedUrl = j2.embed_url; }
+    } finally { clearTimeout(t); }
+    if (!embedUrl) continue;
+    for (const intento of [embedUrl, embedUrl.replace(/^https:\/\/[^/]+/i, 'https://hanerix.com')]) {
+      const r3 = await fetchSeguro(intento, 12000).catch(() => null);
+      if (!r3 || !r3.ok) continue;
+      const b = await r3.text();
+      if (/\.m3u8|eval\(function\(p,a,c,k,e/.test(b)) { html2 = b; break; }
+    }
   }
-  if (!html2) throw new Error('el embed no entregó el player');
+  if (!html2) throw new Error('ninguna opción de player sirvió — reintenta');
   const des = daniDesempacar(html2);
   const m3u8 = (/https:[^"']+?\.m3u8[^"']*/.exec(des) || [])[0];
   if (!m3u8) throw new Error('el video no dio stream (quizá se cayó este cap)');
