@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v171'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v172'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -484,11 +484,139 @@ async function ponerRobinNativo(room, watchUrl, userId) {
   return true;
 }
 
+/* v172: DANIMADOS — Teen Titans Go COMPLETO (9 temporadas, 291 eps) en
+ * latino, WordPress+Dooplay sin Cloudflare y TODOS los caminos por HTTP:
+ * lista del HTML de la serie, player por admin-ajax (doo_player_ajax) y el
+ * embed (hglink→hanerix) trae el m3u8 dentro de un packer Dean-Edwards que
+ * se desempaca aquí mismo. CDN premilkyway = la familia que ya proxéamos. */
+const DANI_BASE = 'https://danimados.cc';
+const DANI_SERIE = '/series/teen-titans-go/';
+let daniFeed = { at: 0, eps: [] };
+const DANI_STREAMS = new Map(); /* url ep → { nat, at } */
+function daniDesempacar(html) {
+  /* Dean Edwards packer: eval(function(p,a,c,k,e,d){…}('payload',36,504,'a|b|c'.split('|'),0,{})) */
+  const m = /eval\(function\(p,a,c,k,e,[dr]\)\{.*?\}\('(.*?)',(\d+),(\d+),'(.*?)'\.split\('\|'\)/s.exec(html);
+  if (!m) return html;
+  const payload = m[1].replace(/\\'/g, "'").replace(/\\\\/g, '\\');
+  const radix = +m[2], count = +m[3], keys = m[4].split('|');
+  const e = (c2, r) => (c2 < r ? '' : e(parseInt(c2 / r), r)) + ((c2 = c2 % r) > 35 ? String.fromCharCode(c2 + 29) : c2.toString(36));
+  const dict = {};
+  for (let i = count - 1; i >= 0; i--) if (keys[i]) dict[e(i, radix)] = keys[i];
+  return payload.replace(/\b\w+\b/g, (w) => dict[w] || w);
+}
+async function daniLista() {
+  if (daniFeed.eps.length && Date.now() - daniFeed.at < 6 * 3600e3) return daniFeed.eps;
+  const r = await fetchSeguro(DANI_BASE + DANI_SERIE, 15000);
+  if (!r.ok) throw new Error('no pude leer danimados (' + r.status + ')');
+  const html = await r.text();
+  const eps = [];
+  const partes = html.split("<div class='se-c'>");
+  for (const p of partes.slice(1)) {
+    const mt = /class='se-t[^']*'>(\d+)<\/span>/.exec(p);
+    const temporada = mt ? +mt[1] : 1;
+    for (const it of p.split('<li').slice(1)) {
+      const u = /href='(https:\/\/danimados\.cc\/episodios\/[^']+)'/.exec(it);
+      if (!u) continue;
+      const num = /numerando'>(\d+)\s*-\s*(\d+)</.exec(it);
+      const slug = /([a-z0-9-]+)-(\d+)x(\d+)\/?/.exec(u[1]);
+      const t = /episodiotitle[^>]*>\s*<a[^>]*>([^<]+)</.exec(it);
+      const ep = num ? +num[2] : (slug ? +slug[3] : 0);
+      if (!ep) continue;
+      const tit = t ? htmlDecode(t[1]) : '';
+      eps.push({ temporada, ep, parte: '', url: u[1], titulo: (tit || ('Episodio ' + ep)).slice(0, 80), num: temporada + 'x' + ep });
+    }
+  }
+  eps.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep);
+  daniFeed = { at: Date.now(), eps };
+  console.log('[dani] lista: ' + eps.length + ' episodios en ' + (partes.length - 1) + ' temporadas (HTTP)');
+  return eps;
+}
+function htmlDecode(s) { return String(s || '').replace(/&#(\d+);/g, (m2, d2) => String.fromCharCode(+d2)).replace(/&amp;/g, '&').replace(/&#215;/g, '×').trim(); }
+async function daniEpToStream(urlEp) {
+  const c = DANI_STREAMS.get(urlEp);
+  if (c && Date.now() - c.at < 2 * 3600e3) return c.nat;
+  const r1 = await fetchSeguro(urlEp, 12000);
+  if (!r1.ok) throw new Error('el capítulo no abrió (' + r1.status + ')');
+  const html1 = await r1.text();
+  const post = (/data-post=['"](\d+)/.exec(html1) || [])[1];
+  if (!post) throw new Error('el capítulo no trae player');
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 12000);
+  let embedUrl = '';
+  try {
+    const r2 = await fetch(DANI_BASE + '/wp-admin/admin-ajax.php', {
+      method: 'POST', signal: ctl.signal,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': MIRROR_UA,
+        'Referer': urlEp,
+        'Origin': DANI_BASE,
+      },
+      body: 'action=doo_player_ajax&post=' + encodeURIComponent(post) + '&nume=1&type=tv',
+    });
+    if (r2.ok) { const j2 = await r2.json().catch(() => null); if (j2 && j2.embed_url) embedUrl = j2.embed_url; }
+  } finally { clearTimeout(t); }
+  if (!embedUrl) throw new Error('el player no entregó el embed');
+  /* el front hglink (con guard JS) solo ROTA el dominio: hanerix sirve el
+   * player de verdad sin guard — si aún no viene desempacable, cambiamos host */
+  let html2 = '';
+  for (const intento of [embedUrl, embedUrl.replace(/^https:\/\/[^/]+/i, 'https://hanerix.com')]) {
+    const r3 = await fetchSeguro(intento, 12000).catch(() => null);
+    if (!r3 || !r3.ok) continue;
+    const b = await r3.text();
+    if (/\.m3u8|eval\(function\(p,a,c,k,e/.test(b)) { html2 = b; break; }
+  }
+  if (!html2) throw new Error('el embed no entregó el player');
+  const des = daniDesempacar(html2);
+  const m3u8 = (/https:[^"']+?\.m3u8[^"']*/.exec(des) || [])[0];
+  if (!m3u8) throw new Error('el video no dio stream (quizá se cayó este cap)');
+  const ahora = Date.now();
+  const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
+  let hostCDN = '';
+  try { hostCDN = new URL(m3u8).hostname; } catch {}
+  if (hostCDN) { hlsReferers.set(hostCDN, ''); try { hlsUAs.set(hostCDN, MIRROR_UA); } catch {} }
+  /* el master se cachea con su CUERPO real (para /api/xd) */
+  const rM = await fetchSeguro(m3u8, 12000).catch(() => null);
+  const bodyM = rM && rM.ok ? await rM.text() : '';
+  if (!/#EXTM3U/.test(bodyM)) throw new Error('el master no respondió');
+  pelisxdStreams.set(tok, { body: bodyM, base: m3u8, ref: '', slug: 'dani', at: ahora });
+  const nat = { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
+  DANI_STREAMS.set(urlEp, { nat, at: ahora });
+  return nat;
+}
+async function resolverDani(url) { return daniEpToStream(url); }
+async function ponerDaniNativo(room, urlEp, userId) {
+  const nat = await daniEpToStream(urlEp);
+  if (mirrors.has(room.code)) await stopMirror(room);
+  let titulo = 'Los Jóvenes Titanes en Acción';
+  try {
+    const eps = await daniLista();
+    const i = eps.findIndex((e) => { try { return new URL(e.url).pathname === new URL(urlEp).pathname; } catch { return false; } });
+    if (i >= 0) titulo += ' · ' + eps[i].num + (eps[i].titulo && !/^Episodio/.test(eps[i].titulo) ? ' · ' + eps[i].titulo : '');
+  } catch {}
+  room.videoUrl = urlEp;
+  room.videoTitle = titulo.slice(0, 80);
+  room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
+  room.videoImg = CARI_PORTADAS.get('dani-titanes') || '';
+  room.position = 0;
+  room.isPlaying = false;
+  room.videoDuration = 0;
+  room.updatedAt = Date.now();
+  room.serieCtx = null;
+  serieCtxFromUrl(urlEp).then((sc) => {
+    if (sc && room.videoUrl === urlEp) { room.serieCtx = sc; broadcast(room, 'state', stateOf(room)); }
+  }).catch(() => {});
+  sysMsg(room, '🎬 ' + room.videoTitle);
+  broadcast(room, 'state', stateOf(room));
+  return true;
+}
+
 async function resolverNativoInterno(url) {
   if (/latanime\.org\/ver\//i.test(url)) return resolverAnime(url);
   if (/pelisxd\.com\/pelicula\//i.test(url)) return resolverPelisxd(url); /* v98 */
   if (/miscaricaturas\.com\//i.test(url)) return resolverCaricatura(url); /* v102 */
   if (/robingolatino\.blogspot\./i.test(url)) return resolverRobin(url); /* v170 */
+  if (/danimados\.cc\/episodios\//i.test(url)) return resolverDani(url); /* v172 */
   if (/youtube\.com\/(watch|shorts)|youtu\.be\//i.test(url)) return resolverYoutube(url); /* v164 */
   if (/lacartoons\.com\/serie\/capitulo\//i.test(url)) return resolverLacartoons(url); /* v116: sin esto, los capítulos de lacartoons en SALA caían al espejo de navegador (abría la página web en vez de reproducir nativo) */
   return resolverSolo(url);
@@ -804,7 +932,20 @@ async function serieCtxFromUrl(u) {
         }
       }
     }
-    /* v170: Los Jóvenes Titanes en Acción (robingolatino) — la cadena sale
+    /* v172: Teen Titans Go de DANIMADOS — 9 temporadas completas */
+    if (host.includes('danimados.cc')) {
+      const eps = await daniLista().catch(() => []);
+      if (eps.length) {
+        const pth = url.pathname.replace(/\/$/, '');
+        const idx = eps.findIndex((e) => { try { return new URL(e.url).pathname.replace(/\/$/, '') === pth; } catch { return false; } });
+        if (idx >= 0) {
+          const cov = CARI_PORTADAS.get('dani-titanes') || '';
+          return { tipo: 'dani', titulo: 'Los Jóvenes Titanes en Acción', poster: cov, cover: cov, idx,
+            eps: eps.map((e) => ({ url: e.url, num: e.num, temporada: e.temporada, ep: e.ep, parte: '' })) };
+        }
+      }
+    }
+        /* v170: Los Jóvenes Titanes en Acción (robingolatino) — la cadena sale
      * del feed del blog; la URL se compara por pathname (el dominio puede
      * llegar como .mx/.com y da lo mismo) */
     if (host.includes('robingolatino.blogspot')) {
@@ -1236,7 +1377,16 @@ function sincroSesion(clon) {
 
 async function startMirror(room, rawUrl, userId) {
   const url = normalizeWebUrl(rawUrl);
-  /* v170: los capítulos de robingolatino SIEMPRE nativo — si el player del
+  /* v172: danimados (Titanes completas) SIEMPRE nativo — error limpio */
+  if (/danimados\.cc\/episodios\//i.test(url)) {
+    try { if (await ponerDaniNativo(room, url, userId)) return; }
+    catch (e) {
+      console.log('[espejo] dani no pudo (' + String(e.message || e).slice(0, 70) + ')');
+      try { sysMsg(room, '⚠️ ' + String(e.message || e).slice(0, 120)); } catch {}
+      throw new Error(String(e.message || e).slice(0, 140));
+    }
+  }
+    /* v170: los capítulos de robingolatino SIEMPRE nativo — si el player del
    * post está muerto, error limpio (abrir la página en espejo no sirve: el
    * video de allí no existe desde hace años) */
   if (/robingolatino\.blogspot\./i.test(url)) {
@@ -1998,6 +2148,7 @@ async function handleAction(req, res, body) {
          * se puede, caemos al espejo de siempre. */
         let urlNat = String(action.url || '').trim();
         if (/robingolatino\.blogspot\./i.test(urlNat)) { try { urlNat = 'https://robingolatino.blogspot.com' + new URL(urlNat).pathname; } catch {} } /* v170 */
+        if (/danimados\.cc/i.test(urlNat)) { try { urlNat = 'https://danimados.cc' + new URL(urlNat).pathname; } catch {} } /* v172 */
         if (/^https?:\/\//i.test(urlNat)) {
           let errNat = '';
           const nat = await resolverNativo(urlNat).catch((e) => {
@@ -4848,7 +4999,13 @@ const server = http.createServer(async (req, res) => {
       /* v102: episodios de una caricatura (para el selector) */
       const slug = decodeURIComponent(url.pathname.split('/')[3] || '').toLowerCase();
       if (!/^[a-z0-9-]{2,90}$/.test(slug) && !/^[0-9]{1,3}$/.test(slug)) return json(res, 400, { ok: false, error: 'Caricatura inválida' }); /* v119: ids de lacartoons de 1 dígito */
-      if (slug === 'robin-titanes') { /* v170: serie del blog robingolatino */
+      if (slug === 'dani-titanes') { /* v172: Teen Titans Go de danimados (9 temporadas) */
+        const eps = await daniLista().catch(() => []);
+        if (!eps.length) return json(res, 502, { ok: false, error: 'No pude leer danimados — intenta luego' });
+        const cov = CARI_PORTADAS.get('dani-titanes') || '';
+        return json(res, 200, { ok: true, slug, titulo: 'Los Jóvenes Titanes en Acción', poster: cov, cover: cov, episodios: eps });
+      }
+            if (slug === 'robin-titanes') { /* v170: serie del blog robingolatino */
         const eps = await robinLista().catch(() => []);
         if (!eps.length) return json(res, 502, { ok: false, error: 'No pude leer el blog de los Titanes — intenta luego' });
         const cov = CARI_PORTADAS.get('robin-titanes') || '';
@@ -4945,7 +5102,10 @@ const server = http.createServer(async (req, res) => {
       const q = (url.searchParams.get('q') || '').trim().slice(0, 120);
       if (!q) return json(res, 400, { ok: false, error: 'Escribe qué quieren ver' });
       const r = await buscarEnSitios(q); /* v121: global + fuzzy + sugiere */
-      if (/titan(es)?\b/i.test(q)) r.resultados.unshift({ title: 'Los Jóvenes Titanes en Acción (Latino)', url: 'https://robingolatino.blogspot.com/serie/robin-titanes', img: '', site: 'Caricaturas', extra: 'la serie completa' }); /* v170 */
+      if (/titan(es)?\b/i.test(q)) {
+        r.resultados.unshift({ title: 'Los Jóvenes Titanes en Acción (Latino)', url: 'https://robingolatino.blogspot.com/serie/robin-titanes', img: '/covers/robin-titanes.jpg', site: 'Caricaturas', extra: '69 capítulos · respaldo' }); /* v170 */
+        r.resultados.unshift({ title: 'Los Jóvenes Titanes en Acción (Latino)', url: 'https://danimados.cc/serie/dani-titanes', img: '/covers/dani-titanes.jpg', site: 'Caricaturas', extra: '9 temporadas · 291 episodios' }); /* v172 */
+      }
       if (!r.resultados.length) return json(res, 200, { ok: true, results: [], sugiere: r.sugiere, error: 'No encontré nada — prueba con otras palabras' });
       return json(res, 200, { ok: true, results: r.resultados, sugiere: r.sugiere });
     }

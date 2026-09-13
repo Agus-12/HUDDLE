@@ -1514,7 +1514,8 @@ function abrirSeriePicker(res, enSala, esAnime) {
 function abrirCaricaturasPicker(res, enSala) {
   const slugM = /miscaricaturas\.com\/([a-z0-9-]+)/i.exec(res.url || '') /* v102 */
     || /lacartoons\.com\/serie\/(\d+)/i.exec(res.url || '') /* v112: el id numérico de la serie viaja como slug y el servidor lo mapea */
-    || /robingolatino\.blogspot\.[a-z.]+\/serie\/([a-z0-9-]+)/i.exec(res.url || ''); /* v170 */
+    || /robingolatino\.blogspot\.[a-z.]+\/serie\/([a-z0-9-]+)/i.exec(res.url || ''); /* v170 
+    || /danimados\.cc\/serie\/([a-z0-9-]+)/i.exec(res.url || ''); /* v172 */
   if (!slugM) { toast('No pude leer esa caricatura'); return; }
   const slug = slugM[1];
   const pk = $('#seriePicker');
