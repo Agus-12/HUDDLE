@@ -1686,6 +1686,17 @@ function renderPageDrop() {
   otra.dataset.name = 'otra';
   otra.innerHTML = '<svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg><span>Otra página (escribe la URL)…</span>';
   drop.appendChild(otra);
+  /* v143: regreso claro a la sala */
+  const volver = document.createElement('button');
+  volver.className = 'btn primary ms-volver';
+  volver.type = 'button';
+  volver.textContent = '⟵ Regresar a la sala';
+  volver.addEventListener('click', () => {
+    drop.classList.add('hidden');
+    drop.classList.remove('desde-sala');
+    abrazarVisible();
+  });
+  drop.appendChild(volver);
 }
 (function montarPaginas() {
   const btn = $('#pagePickBtn');
@@ -3786,6 +3797,7 @@ $('#btnMSearch').addEventListener('click', abrirMenuBuscarSala);
 $('#msBack').addEventListener('click', cerrarBuscarSala);
 $('#msGo').addEventListener('click', buscarEnSala);
 $('#msClose').addEventListener('click', cerrarBuscarSala);
+$('#msVolver').addEventListener('click', cerrarBuscarSala); /* v143: botón grande de regreso */
 $('#msInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); buscarEnSala(); } });
 
 /* v48: buscar desde el desplegable de páginas (en la sala) */

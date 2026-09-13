@@ -1686,16 +1686,21 @@ body.movil-horizontal #homeFull {
 }
 
 /* ============ v127: menú de búsqueda dentro de la sala ============ */
-.ms-menu { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: flex-start; justify-content: center; padding: min(7vh, 56px) 14px 14px; } /* v140: techo modesto */
+/* v143: HOJA INFERIOR — nace desde el borde de abajo (donde ni el teclado ni el scroll la pueden correr) */
+.ms-menu { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: flex-end; justify-content: center; padding: 0 8px; }
 .ms-menu.hidden { display: none; }
 .ms-menu-back { position: absolute; inset: 0; background: rgba(5, 7, 15, 0.84); }
 .ms-menu-box {
-  position: relative; width: min(94vw, 560px); max-height: 92%; /* v140: % del overlay — con el teclado abierto cabe en la zona visible */
+  position: relative; width: min(100vw, 560px); max-height: 88%; /* v143: de la zona visible (el overlay la abraza) */
   display: flex; flex-direction: column; /* v141: orden FÍSICO — el buscador jamás queda debajo de los resultados */
   overflow: hidden; /* v141: la caja YA NO scrollea — nada se puede «perder» por arriba; solo la lista de resultados scrollea */
   background: var(--panel);
-  border: 1px solid var(--line); border-radius: 16px; padding: 14px;
+  border: 1px solid var(--line); border-bottom: none; border-radius: 18px 18px 0 0; /* v143: pegada al borde de abajo */
+  padding: 14px 14px max(14px, env(safe-area-inset-bottom)); /* v143: respeta la barrita del iPhone */
+  animation: ms-sheet .18s ease-out; /* v143: entra deslizándose desde abajo */
 }
+@keyframes ms-sheet { from { transform: translateY(56px); opacity: .4; } to { transform: none; opacity: 1; } }
+.ms-volver { width: 100%; margin-top: 12px; flex: none; }
 .ms-menu-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; flex: none; }
 .ms-menu-t { font-weight: 800; font-size: 15px; }
 .ms-menu-busca { display: flex; gap: 8px; margin-bottom: 10px; flex: none; }
@@ -1711,7 +1716,7 @@ body.sala-girada #msMenu {
   top: 50%; left: 50%;
   width: 100dvh; height: 100dvw;
   transform: translate(-50%, -50%) rotate(var(--giro-sala));
-  padding: 5dvw 14px 14px;
+  padding: 0 14px;
 }
 body.sala-girada .ms-menu-box { max-height: 80dvw; }
 body.sala-girada .ms-results { max-height: none; }
