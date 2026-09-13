@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v146'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v147'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -213,6 +213,7 @@ function stateOf(room) {
     /* v92: sala nativa — el video directo (como el modo Solo) */
     native: room.native || null,
     videoImg: room.videoImg || '',
+    switching: !!room.switchingEp, /* v147: resolviendo el episodio anunciado */
     /* v118: si están viendo una SERIE en nativo, la sala sabe cuál cap
      * toca y si hay siguiente/anterior (para los botoncitos) — igual
      * que mirrorState hace para el espejo, pero sin la lista pesada */
@@ -1736,6 +1737,23 @@ async function handleAction(req, res, body) {
           if (desde + dir < 0 || desde + dir >= sc.eps.length) {
             return json(res, 400, { ok: false, error: op === 'epNext' ? 'Ya estás en el último episodio' : 'Ya estás en el primer episodio' });
           }
+          /* v147: ANUNCIO INMEDIATO — el título del episodio que va a cargar
+           * sale YA (chip + tarjeta de todos), no hasta que termine de
+           * resolverse; la tarjeta deja de verse «congelada» en el viejo */
+          const tituloPrev = room.videoTitle, imgPrev = room.videoImg;
+          const primeroEp = sc.eps[desde + dir];
+          if (primeroEp) {
+            room.videoTitle = tituloBonitoEp(sc.titulo, primeroEp.num);
+            if (sc.poster) room.videoImg = sc.poster.slice(0, 400);
+            room.switchingEp = Date.now();
+            broadcast(room, 'state', stateOf(room));
+          }
+          const fallarEp = (mensaje) => {
+            room.switchingEp = null;
+            room.videoTitle = tituloPrev; room.videoImg = imgPrev; /* el nuevo no llegó: se regresa el nombre */
+            broadcast(room, 'state', stateOf(room));
+            return json(res, 200, { ok: false, error: mensaje });
+          };
           /* v118: se SALTA el episodio si la fuente confirma que está
            * muerto/sin español, o si su player existe pero nunca suelta
            * video («muerto por dentro», como el 1x03 de Billy) — así el
@@ -1758,13 +1776,13 @@ async function handleAction(req, res, body) {
             }
             if (nat) { elegido = { cand, idx: desde + dir * paso }; break; }
             if (!MUERTO_RE.test(errN)) {
-              return json(res, 200, { ok: false, error: /reintenta/i.test(errN) ? errN : errN + ' — reintenta' });
+              return fallarEp(/reintenta/i.test(errN) ? errN : errN + ' — reintenta');
             }
             console.log('[sala] episodio caído (' + cand.num + '), sigo al próximo');
             saltados.push(cand.num);
           }
           if (!elegido) {
-            return json(res, 200, { ok: false, error: errN || 'No pude resolver el episodio siguiente — prueba del selector' });
+            return fallarEp(errN || 'No pude resolver el episodio siguiente — prueba del selector');
           }
           const notaSalto = saltados.length ? ' (sin ' + saltados.join(', ') + ')' : '';
           room.videoUrl = elegido.cand.url; programarPrefetchEp(room);
@@ -1775,6 +1793,7 @@ async function handleAction(req, res, body) {
           room.position = 0;
           room.isPlaying = false; /* v127: el episodio entra PAUSADO */
           room.videoDuration = 0; room.autoNextKey = null; /* v128 */
+          room.switchingEp = null; /* v147: llegó */
           room.updatedAt = Date.now();
           sysMsg(room, `${room.users.get(userId).name} puso: ${room.videoTitle}${notaSalto}`);
           broadcast(room, 'state', stateOf(room));
@@ -1806,8 +1825,11 @@ async function handleAction(req, res, body) {
         room.videoUrl = target.url; programarPrefetchEp(room);
         room.videoTitle = tituloBonitoEp(m.serie.titulo, target.num); /* v144 */
         if (m.serie.poster) room.videoImg = m.serie.poster.slice(0, 400);
+        room.switchingEp = Date.now(); /* v147: anuncio inmediato */
+        broadcast(room, 'state', stateOf(room));
         await stopMirror(room);
         await startMirror(room, target.url, userId);
+        room.switchingEp = null; /* v147: llegó */
         sysMsg(room, `${room.users.get(userId).name} puso: ${room.videoTitle}`);
         broadcast(room, 'state', stateOf(room));
         return json(res, 200, { ok: true });

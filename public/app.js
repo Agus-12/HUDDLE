@@ -347,11 +347,24 @@ function applyState(st) {
   S.salaTitulo = String(st.videoTitle || ''); /* v127: info para la espera de TODOS (invitados incluidos) */
   S.salaImg = String(st.videoImg || '');
   if (typeof pintarTituloSala === 'function') pintarTituloSala(); /* v141 */
+  /* v147: mientras el server resuelve el nuevo episodio (switching), la
+   * tarjeta VIVE: muestra ya el nombre nuevo y su spinner — no se queda
+   * congelada con el episodio viejo */
+  if (st.switching && S.nativo) {
+    const pn = $('#peliNombre'), pe = $('#peliEstado');
+    if (pn && S.salaTitulo) pn.textContent = S.salaTitulo;
+    if (pe) pe.textContent = 'Preparando el siguiente episodio…';
+    mostrarPeliLoading();
+  }
   /* v127: en nativo, mientras el video no dé video la sala ve la espera;
    * cuando esté lista y pausada, «Toca para empezar» */
   /* v146: esperando el nuevo episodio — cualquier estado que llegue hablando
    * del episodio VIEJO (pausas, latidos, reparaciones) NO toca la tarjeta:
    * nace al picarle «siguiente» y solo se va con el video NUEVO listo o error */
+  /* v147: si el estado trae OTRO video, la tarjeta pasa a anunciar el nuevo */
+  if (S.mirrorInfo && st.videoUrl && S.mirrorInfo.url && S.mirrorInfo.url !== st.videoUrl) {
+    S.mirrorInfo.title = S.salaTitulo; S.mirrorInfo.img = S.salaImg; S.mirrorInfo.url = st.videoUrl;
+  }
   const esperandoEp = !!(S.epEsperaUrl && Date.now() - (S.epEsperaEn || 0) < 45000 && (!st.videoUrl || st.videoUrl === S.epEsperaUrl));
   if (S.nativo && !S.nativoListo && !S.pendingStart) {
     if (!esperandoEp) {
