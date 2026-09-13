@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v162'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v163'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1098,8 +1098,19 @@ async function startMirror(room, rawUrl, userId) {
       m.url = f.url();
       /* v162: navegaron a un video de youtube dentro del espejo → se lo
        * cambia al player embebido (sin muro de login, autoplay) */
-      const emb = urlYoutubeEmbed(m.url);
-      if (emb) { m.page.goto(emb, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {}); return; }
+      const idNav = ((/[?&]v=([A-Za-z0-9_-]{6,16})/.exec(m.url) || [])[1]
+        || (/youtu\.be\/([A-Za-z0-9_-]{6,16})/.exec(m.url) || [])[1] || '');
+      /* v163: si acabamos de poner ESTE video en embed y aun así el usuario
+       * terminó en el watch, youtube botó el embed — no lo re-convirtamos
+       * (bucle infinito); deja el watch normal */
+      if (!(idNav && m.ultimoEmb && m.ultimoEmb.id === idNav && Date.now() - m.ultimoEmb.at < 60000)) {
+        const emb = urlYoutubeEmbed(m.url);
+        if (emb) {
+          m.ultimoEmb = { id: idNav, at: Date.now() };
+          m.page.goto(emb, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {});
+          return;
+        }
+      }
       broadcast(room, 'mirror-state', mirrorState(room));
     }
   });
@@ -1454,7 +1465,10 @@ function urlYoutubeEmbed(u) {
       if (m) id = m[1];
     }
     if (!id || /^watch$/.test(id)) return null;
-    return 'https://www.youtube.com/embed/' + id + '?autoplay=1&hl=es&cc_lang_pref=es&rel=0';
+    /* v163: el embed cargado como PÁGINA principal suelta «Error 153» —
+     * está diseñado para vivir dentro de un iframe. Lo servimos envuelto
+     * en una mini-página local de Huddle (ver /api/yt). */
+    return 'http://127.0.0.1:' + PORT + '/api/yt?v=' + encodeURIComponent(id);
   } catch { return null; }
 }
 
@@ -4746,6 +4760,21 @@ const server = http.createServer(async (req, res) => {
         console.warn('[solo] no pude resolver', target.slice(0, 70), '→', String(e.message || e).slice(0, 90));
         return json(res, 404, { ok: false, error: String(e.message || e).slice(0, 200) });
       }
+    }
+    if (url.pathname === '/api/yt') {
+      /* v163: envoltorio local para el player embebido de YouTube — el
+       * iframe vive dentro de esta página y el error 153 desaparece.
+       * Sin estado, sin cookie, solo el iframe con autoplay. */
+      const vid = String(url.searchParams.get('v') || '');
+      if (!/^[A-Za-z0-9_-]{6,16}$/.test(vid)) { res.writeHead(400, { 'Content-Type': 'text/plain' }); res.end('video inválido'); return; }
+      const html = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>YouTube</title>'
+        + '<style>html,body{margin:0;height:100%;background:#000;overflow:hidden}'
+        + 'iframe{position:fixed;inset:0;width:100%;height:100%;border:0}</style></head>'
+        + '<body><iframe src="https://www.youtube-nocookie.com/embed/' + vid + '?autoplay=1&hl=es&cc_lang_pref=es&rel=0&playsinline=1" '
+        + 'allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></body></html>';
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(html);
+      return;
     }
     if (url.pathname.startsWith('/api/xd/')) {
       /* v98: el playlist de una peli de PelisXD ya resuelto (cuerpo cacheado
