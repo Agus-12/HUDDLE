@@ -2894,6 +2894,35 @@ function cerrarBuscador() {
   $('#spInput').value = '';
   $('#homeSearch').value = '';
 }
+/* v160: SITIOS WEB EN EL BUSCADOR — si lo escrito es una URL o un sitio
+ * conocido, la PRIMERA tarjeta lo abre directo en la sala (espejo).
+ * Antes el buscador solo traía pelis/series con coincidencias raras
+ * («youtube» → «Youjo Senki») y no había forma de meter un sitio web. */
+const SITIOS_ALIAS = {
+  youtube: 'https://www.youtube.com', yt: 'https://www.youtube.com',
+  google: 'https://www.google.com', twitch: 'https://www.twitch.tv',
+  tiktok: 'https://www.tiktok.com', reddit: 'https://www.reddit.com',
+  facebook: 'https://www.facebook.com', instagram: 'https://www.instagram.com',
+  twitter: 'https://x.com', x: 'https://x.com', wikipedia: 'https://es.wikipedia.org',
+};
+const IMG_GLOBE = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240"><rect width="240" height="240" fill="#11263f"/><text x="50%" y="55%" font-size="110" text-anchor="middle" dominant-baseline="middle">\uD83C\uDF10</text></svg>');
+function sitioDeConsulta(q) {
+  const s = String(q || '').trim().toLowerCase();
+  if (!s || /\s/.test(s)) return null;
+  let u = '';
+  if (/^https?:\/\/[^\s]+$/i.test(s)) u = s;
+  else if (/^([a-z0-9-]+\.)+[a-z]{2,6}(\/[^\s]*)?$/i.test(s)) u = 'https://' + s;
+  else if (SITIOS_ALIAS[s]) u = SITIOS_ALIAS[s];
+  if (!u) return null;
+  let host = '';
+  try { host = new URL(u).hostname.replace(/^www\./, ''); } catch { return null; }
+  return { title: '\uD83C\uDF10 Abrir ' + host + ' en la sala', url: u, site: 'Web', extra: 'sitio web', img: IMG_GLOBE };
+}
+function anteponerSitio(q, d) {
+  const sit = sitioDeConsulta(q);
+  if (sit && d && d.results) d.results.unshift(sit);
+}
+
 async function buscarGlobal(q) {
   const box = $('#spResults');
   box.scrollTop = 0; /* v126: cada búsqueda nueva arranca desde arriba */
@@ -2901,6 +2930,7 @@ async function buscarGlobal(q) {
   box.innerHTML = '<div class="sr-info"><div class="spinner"></div> Buscando en todas las fuentes…</div>';
   try {
     const d = await buscarEnServer(q);
+    anteponerSitio(q, d); /* v160: sitios web */
     if (d && d.sugiere && d.sugiere.q) {
       const chip = $('#spSugiere');
       chip.innerHTML = '';
@@ -2930,7 +2960,9 @@ function elegirResultadoBusqueda(res) {
   /* v91: en la pestaña Solo, lo que buscas se reproduce individual —
    * antes la búsqueda SIEMPRE armaba una sala (pantalla de "Cargando
    * tu sala…" aunque estuvieras en Solo) */
-  if (S.modoSolo) { abrirSolo(res.url, { title: res.title || '', img: res.img || '' }); return; }
+  if (res.site === 'Web') { /* v160: un sitio web se ve por el espejo, en sala */
+    if (S.modoSolo) { toast('Los sitios web se ven en la sala — pestaña Juntos'); return; }
+  } else if (S.modoSolo) { abrirSolo(res.url, { title: res.title || '', img: res.img || '' }); return; }
   S.pendingStart = { url: res.url, name: res.title || res.site, img: res.img || '' };
   /* v60: pantalla completa de espera desde el toque */
   S.mirrorInfo = { title: res.title || '', img: res.img || '', url: res.url, sub: 'Cargando tu sala…' };
@@ -2960,6 +2992,7 @@ async function buscarSetup() {
   box.innerHTML = '<div class="sr-info"><div class="spinner"></div> Buscando…</div>';
   try {
     const d = await buscarEnServer(q);
+    anteponerSitio(q, d); /* v160: sitios web */
     if (!d.ok || !d.results || !d.results.length) {
       box.innerHTML = `<div class="sr-info">${(d && d.error) || 'No encontré nada — prueba con otras palabras'}</div>`;
       return;
@@ -3825,6 +3858,7 @@ async function buscarEnSala() {
   box.innerHTML = '<div class="sr-info"><div class="spinner"></div> Buscando…</div>';
   try {
     const d = await buscarEnServer(q);
+    anteponerSitio(q, d); /* v160: sitios web */
     try { window.scrollTo(0, 0); } catch {}
     if (!d.ok || !d.results || !d.results.length) {
       box.innerHTML = `<div class="sr-info">${(d && d.error) || 'No encontré nada — prueba con otras palabras'}</div>`;
@@ -3906,6 +3940,7 @@ async function buscarEnPicker() {
   box.innerHTML = '<div class="sr-info"><div class="spinner"></div> Buscando…</div>';
   try {
     const d = await buscarEnServer(q);
+    anteponerSitio(q, d); /* v160: sitios web */
     try { window.scrollTo(0, 0); } catch {} /* v138 */
     if (!d.ok || !d.results || !d.results.length) {
       box.innerHTML = `<div class="sr-info">${(d && d.error) || 'No encontré nada — prueba con otras palabras'}</div>`;
