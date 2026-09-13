@@ -1786,8 +1786,22 @@ function updateEpNav() {
     S.epEsperaEn = Date.now();
   };
   const alFallo = (r) => { ocultarPeliLoading(); toast((r && r.error) || 'No se pudo'); };
-  prev.addEventListener('click', () => { toast('Abriendo el episodio anterior…'); tarjetitaEp('Abriendo el episodio anterior…'); sendAction({ type: 'mirror', op: 'epPrev' }).then((r) => { if (r && r.ok === false) alFallo(r); }).catch(() => alFallo()); });
-  next.addEventListener('click', () => { toast('Abriendo el episodio siguiente…'); tarjetitaEp('Abriendo el episodio siguiente…'); sendAction({ type: 'mirror', op: 'epNext' }).then((r) => { if (r && r.ok === false) alFallo(r); }).catch(() => alFallo()); });
+  /* v144: UN cambio a la vez — los toques repetidos mientras el server
+   * resuelve no encolan basura (por eso «hacía lo que quería»); el server
+   * además YA reintenta por su cuenta los fallos transitorios */
+  let enVuelo = false;
+  const cambiarEp = (op, mensaje) => {
+    if (enVuelo) return;
+    enVuelo = true;
+    toast(mensaje);
+    tarjetitaEp(mensaje);
+    sendAction({ type: 'mirror', op })
+      .then((r) => { if (r && r.ok === false) alFallo(r); })
+      .catch(() => alFallo())
+      .finally(() => { enVuelo = false; });
+  };
+  prev.addEventListener('click', () => cambiarEp('epPrev', 'Abriendo el episodio anterior…'));
+  next.addEventListener('click', () => cambiarEp('epNext', 'Abriendo el episodio siguiente…'));
   buscar.addEventListener('click', () => abrirMenuBuscarSala()); /* v127: menú de búsqueda propio */
 })();
 

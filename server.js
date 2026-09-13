@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v143'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v144'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -227,7 +227,43 @@ function stateOf(room) {
 }
 /* v92: ¿esta URL se puede reproducir NATIVA (sin navegador remoto)?
  * El mismo resolver del modo Solo: goodstream/vimeos y animes mp4upload */
-async function resolverNativo(url) {
+/* v144: si el MISMO episodio ya se está resolviendo (el precalentado de
+ * v139, la detección de intro o tu toque a «siguiente»), todos esperan
+ * UNA sola resolución — antes corrían 2 navegadores a la vez, se
+ * estorbaban y el primer toque fallaba */
+const RESOLVIENDO = new Map(); /* url → promesa en vuelo */
+function resolverNativo(url) {
+  const k = String(url || '');
+  const enVuelo = RESOLVIENDO.get(k);
+  if (enVuelo) return enVuelo;
+  const p = resolverNativoInterno(url).finally(() => RESOLVIENDO.delete(k));
+  RESOLVIENDO.set(k, p);
+  return p;
+}
+/* v144: título legible de episodio: «Hora de aventura — T.1 EP.3» */
+function tituloBonitoEp(titulo, num) {
+  const t = String(titulo || '').trim().replace(/\s+/g, ' ');
+  const s = String(num || '');
+  let m = /(\d{1,2})x(\d{1,3})/.exec(s);
+  if (m) return `${t} — T.${+m[1]} EP.${+m[2]}`.slice(0, 90);
+  m = /episodio\s*(\d+)/i.exec(s);
+  if (m) return `${t} — EP.${+m[1]}`.slice(0, 90);
+  return `${t}${s ? ' — ' + s : ''}`.slice(0, 90);
+}
+/* v144: ¿qué episodio es esta URL? (de la ruta o del índice en la serie) */
+function epNumDeUrl(url, sc) {
+  const u = String(url || '');
+  let m = /-(\d{2})x(\d{2})([ab])?(?:-|$)/i.exec(u);
+  if (m) return +m[1] + 'x' + +m[2];
+  m = /-episodio-(\d+)/i.exec(u);
+  if (m) return '1x' + (+m[1]);
+  try {
+    const i = ((sc && sc.eps) || []).findIndex((e) => e.url === u);
+    if (i >= 0) return '1x' + (i + 1);
+  } catch {}
+  return '';
+}
+async function resolverNativoInterno(url) {
   if (/latanime\.org\/ver\//i.test(url)) return resolverAnime(url);
   if (/pelisxd\.com\/pelicula\//i.test(url)) return resolverPelisxd(url); /* v98 */
   if (/miscaricaturas\.com\//i.test(url)) return resolverCaricatura(url); /* v102 */
@@ -579,7 +615,7 @@ async function autoSiguienteNativo(room) {
   }
   if (!elegido) return false;
   room.videoUrl = elegido.cand.url; programarPrefetchEp(room);
-  room.videoTitle = `${sc.titulo} ${elegido.cand.num}`.slice(0, 80);
+  room.videoTitle = tituloBonitoEp(sc.titulo, elegido.cand.num); /* v144 */
   if (sc.poster) room.videoImg = sc.poster.slice(0, 400);
   room.native = { m3u8: elegido.nat.m3u8, mp4: !!elegido.nat.mp4, proxy: !!elegido.nat.proxy, subs: elegido.nat.subs || [] };
   sc.idx = elegido.idx;
@@ -606,7 +642,7 @@ async function avanzarAutoEspejo(room) {
   const target = m.serie.eps[idx + 1];
   if (!target) return false;
   room.videoUrl = target.url; programarPrefetchEp(room);
-  room.videoTitle = `${m.serie.titulo} ${target.num}`.slice(0, 80);
+  room.videoTitle = tituloBonitoEp(m.serie.titulo, target.num); /* v144 */
   if (m.serie.poster) room.videoImg = m.serie.poster.slice(0, 400);
   await stopMirror(room);
   await startMirror(room, target.url, room.hostId);
@@ -1606,6 +1642,12 @@ async function handleAction(req, res, body) {
             serieCtxFromUrl(urlNat).then((sc) => {
               if (sc && room.videoUrl === urlNat) {
                 room.serieCtx = sc;
+                /* v144: título con temporada/capítulo claros — lo que manda el
+                 * selector a veces es solo «1x2» o el nombre pelón */
+                if (!/EP\.\d+/.test(room.videoTitle)) {
+                  const n2 = epNumDeUrl(urlNat, sc);
+                  if (n2) room.videoTitle = tituloBonitoEp(sc.titulo, n2);
+                }
                 broadcast(room, 'state', stateOf(room));
               }
             }).catch(() => {});
@@ -1704,10 +1746,16 @@ async function handleAction(req, res, body) {
             const cand = sc.eps[desde + dir * paso];
             if (cand.url === room.videoUrl) continue; /* v141: jamás «cambiar» al mismo video */
             errN = '';
-            nat = await resolverNativo(cand.url).catch((e) => { errN = String(e.message || e).slice(0, 140); return null; });
+            nat = null;
+            /* v144: los fallos transitorios (navegador ocupado, red lenta) se
+             * REINTENTAN AQUÍ MISMO 2 veces más — antes el error viajaba al
+             * teléfono con «reintenta» y tocaba picarle varias veces */
+            for (let intento = 0; intento < 3 && !nat; intento++) {
+              nat = await resolverNativo(cand.url).catch((e) => { errN = String(e.message || e).slice(0, 140); return null; });
+              if (!nat && intento < 2 && !MUERTO_RE.test(errN)) await new Promise((r3) => setTimeout(r3, 700));
+            }
             if (nat) { elegido = { cand, idx: desde + dir * paso }; break; }
             if (!MUERTO_RE.test(errN)) {
-              /* error raro (navegador, red) — mejor reintentar que brincar */
               return json(res, 200, { ok: false, error: /reintenta/i.test(errN) ? errN : errN + ' — reintenta' });
             }
             console.log('[sala] episodio caído (' + cand.num + '), sigo al próximo');
@@ -1718,7 +1766,7 @@ async function handleAction(req, res, body) {
           }
           const notaSalto = saltados.length ? ' (sin ' + saltados.join(', ') + ')' : '';
           room.videoUrl = elegido.cand.url; programarPrefetchEp(room);
-          room.videoTitle = `${sc.titulo} ${elegido.cand.num}`.slice(0, 80);
+          room.videoTitle = tituloBonitoEp(sc.titulo, elegido.cand.num); /* v144 */
           if (sc.poster) room.videoImg = sc.poster.slice(0, 400);
           room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
           sc.idx = elegido.idx;
@@ -1754,7 +1802,7 @@ async function handleAction(req, res, body) {
          * todos, «Continuar viendo» correcto) — antes el salto no tocaba el
          * estado y los invitados se quedaban con el episodio viejo */
         room.videoUrl = target.url; programarPrefetchEp(room);
-        room.videoTitle = `${m.serie.titulo} ${target.num}`.slice(0, 80);
+        room.videoTitle = tituloBonitoEp(m.serie.titulo, target.num); /* v144 */
         if (m.serie.poster) room.videoImg = m.serie.poster.slice(0, 400);
         await stopMirror(room);
         await startMirror(room, target.url, userId);
