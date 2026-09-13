@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v199'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v200'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -376,6 +376,8 @@ const DANI_STREAMS = new Map(); /* url ep → { nat, at } */
  * para lo que danimados no tiene o donde la nuestra es mejor. */
 let DANI_CAT = new Map();
 const LA_TODOS = new Set(), LA_OCULTAS_SET = new Set(); /* v198 */
+const LA_MUERTAS_SET = new Set(); /* v200: auditadas con video caído */
+const GP_OCULTAS_SET = new Set(); /* v200: gopelis sin servidores vivos */
 try {
   for (const [sl, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'dani-catalogo.json'), 'utf8')))) DANI_CAT.set(sl, v);
   /* v198: auditoría LATANIME — 3,453 series; se OCULTAN las castellanas y los
@@ -385,7 +387,11 @@ try {
     for (const l of fs.readFileSync(path.join(__dirname, 'public', 'latanime-slugs.txt'), 'utf8').split('\n')) if (l.trim()) LA_TODOS.add(l.trim());
     for (const l of fs.readFileSync(path.join(__dirname, 'public', 'latanime-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) LA_OCULTAS_SET.add(l.trim());
   } catch {}
-  console.log('[latanime] ' + LA_TODOS.size + ' series (' + LA_OCULTAS_SET.size + ' castellano/duplicados fuera)');
+  try {
+    for (const l of fs.readFileSync(path.join(__dirname, 'public', 'latanime-muertas.txt'), 'utf8').split('\n')) if (l.trim()) LA_MUERTAS_SET.add(l.trim());
+    for (const l of fs.readFileSync(path.join(__dirname, 'public', 'gopelis-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) GP_OCULTAS_SET.add(l.trim());
+  } catch {}
+  console.log('[latanime] ' + LA_TODOS.size + ' series (' + LA_OCULTAS_SET.size + ' cast/dup, ' + LA_MUERTAS_SET.size + ' muertas) | [gopelis] ' + GP_OCULTAS_SET.size + ' ocultas');
 } catch {}
 /* v199: inventario de PELÍCULAS que ya tenemos (cine-calidad) — para no
  * duplicar las de GoPelis en el buscador */
@@ -499,7 +505,8 @@ const DANI_TITULO_FIX = new Map([['daria', 'Daria'], ['kenan-kel', 'Kenan y Kel'
 /* v198: ¿URL de latanime oculta (castellano o duplicado)? */
 function laOcultaUrl(u) {
   const m = /latanime\.org\/anime\/([a-z0-9-]+)/i.exec(u || '');
-  return !!(m && LA_OCULTAS_SET.has(m[1]));
+  if (!m) return false;
+  return LA_OCULTAS_SET.has(m[1]) || LA_MUERTAS_SET.has(m[1]); /* v200: también las de video caído */
 }
 /* v198: bases de latanime (para que AnimeFLV ceda los duplicados) */
 function laBaseNorm(slug) {
@@ -547,7 +554,7 @@ async function gpCatalogo() {
       }
     }
   }
-  const buenos = items.filter((x) => x.titulo);
+  const buenos = items.filter((x) => x.titulo && !GP_OCULTAS_SET.has(x.slug)); /* v200: sin las muertas */
   if (buenos.length) { gpCatCache.at = Date.now(); gpCatCache.items = buenos; }
   return buenos.length ? buenos : gpCatCache.items;
 }
@@ -658,8 +665,9 @@ async function gpCatalogoPelis() {
     }
     if (!nuevos) break; /* página sin contenido nuevo: fin del listado */
   }
-  if (items.length) { gpPelisCache.at = Date.now(); gpPelisCache.items = items; }
-  return items;
+  const visibles = items.filter((x) => !GP_OCULTAS_SET.has('p:' + x.slug)); /* v200: sin las muertas */
+  if (visibles.length) { gpPelisCache.at = Date.now(); gpPelisCache.items = visibles; }
+  return visibles;
 }
 
 /* v199: ficha de PELÍCULA → {ok, esPeli, titulo, poster, url(/ver/movie/<id>)} */
