@@ -231,10 +231,14 @@ S.mirrorTime = null; /* v61: posición de la peli para la barrita */
     S.mirror.gotFrame = true;
     $('#mirrorLoading').classList.add('hidden');
     drawMirrorFrame(f.d);
-    /* v60: en SERIES la página renderizada ya es útil (eliges episodio);
-     * v61: los EPISODIOS se preparan como pelis — se espera al botón de play */
+    /* v60/v61: en SERIES la página ya es útil; en PELIS/EPISODIOS se espera
+     * al play (el server les da clic y la espera vive hasta que suena).
+     * v161: en CUALQUIER OTRO sitio (youtube, google, lo que escribas en el
+     * buscador) la página viva ES el contenido — con el primer frame se quita
+     * la espera. Antes solo las /serie/ lo hacían y un sitio web se quedaba
+     * con la tarjetita «Entrando…» para siempre. */
     const pl = $('#peliLoading');
-    if (pl && !pl.classList.contains('hidden') && /\/serie\//.test(S.mirror.url || '') && !/\/episode\//.test(S.mirror.url || '')) ocultarPeliLoading();
+    if (pl && !pl.classList.contains('hidden') && !/pelicula\/|\/episode\/|\/ver\//i.test(S.mirror.url || '')) ocultarPeliLoading();
   });
   es.addEventListener('mirror-audio', (e) => {
     const d = JSON.parse(e.data);
