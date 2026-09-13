@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v200'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v201'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -6885,13 +6885,16 @@ async function resolverAnime(epUrl) {
   const links = [...html.matchAll(/<a\b[^>]*class="[^"]*play-video[^"]*"[^>]*data-player="([^"]+)"[^>]*>/gi)];
   const embeds = links.map((m) => { try { return Buffer.from(m[1], 'base64').toString('utf8'); } catch { return ''; } }).filter((u) => /^https?:\/\//i.test(u));
   const candidatos = [...new Set(embeds.filter((u) => /mp4upload\./i.test(u)))];
-  if (!candidatos.length) throw new Error('Este episodio no tiene servidor mp4upload — se ve en modo sala (👥 Juntos)');
-  const directo = await extraerMp4(candidatos, epUrl);
+  const directo = candidatos.length ? await extraerMp4(candidatos, epUrl) : null;
   if (directo) return directo;
   /* v93: mp4upload agotado (borrado, como le pasó a Evangelion) → que
-   * el navegador del servidor lo resuelva UNA vez y todos lo ven nativo */
+   * el navegador del servidor lo resuelva UNA vez y todos lo ven nativo.
+   * v201: TAMBIÉN cuando el episodio no trae mp4upload (sus players son
+   * otros y el navegador sabe sacarles el video) — así resucitan series
+   * que por HTTP puro parecían muertas */
   const nat = await resolverAnimePorNavegador(epUrl).catch(() => null);
   if (nat) return nat;
+  if (!candidatos.length) throw new Error('Este episodio no tiene servidores que Huddle pueda abrir — se ocultó del catálogo');
   throw new Error('Los servidores de este episodio están caídos en Latanime (probé todos, hasta con navegador). Prueba otra versión del anime o más tarde');
 }
 /* v97: episodio de AnimeFLV — la página trae el id en data-encrypt
