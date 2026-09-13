@@ -1513,7 +1513,8 @@ function abrirSeriePicker(res, enSala, esAnime) {
  * temporadas de verdad (Bob Esponja tiene 13) */
 function abrirCaricaturasPicker(res, enSala) {
   const slugM = /miscaricaturas\.com\/([a-z0-9-]+)/i.exec(res.url || '') /* v102 */
-    || /lacartoons\.com\/serie\/(\d+)/i.exec(res.url || ''); /* v112: el id numérico de la serie viaja como slug y el servidor lo mapea */
+    || /lacartoons\.com\/serie\/(\d+)/i.exec(res.url || '') /* v112: el id numérico de la serie viaja como slug y el servidor lo mapea */
+    || /robingolatino\.blogspot\.[a-z.]+\/serie\/([a-z0-9-]+)/i.exec(res.url || ''); /* v170 */
   if (!slugM) { toast('No pude leer esa caricatura'); return; }
   const slug = slugM[1];
   const pk = $('#seriePicker');
