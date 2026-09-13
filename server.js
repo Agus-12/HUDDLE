@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v167'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v168'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -330,6 +330,21 @@ async function resolverYoutube(u) {
   throw new Error('No pude sacar el video de YouTube (' + ultimoErr + ')');
 }
 /* mete un video de youtube como NATIVO (desde el espejo o al abrirlo) */
+/* v168: hand-off reutilizable con guarda anti-doble disparo */
+function cambiarYtNativo(room, url, userId) {
+  const id = idYoutubeDe(url);
+  if (!id) return false;
+  const m = mirrors.get(room.code);
+  if (m && m.poniendo === id) return true; /* ya en camino */
+  if (m) m.poniendo = id;
+  ponerYoutubeNativo(room, url, userId).catch((eH) => {
+    const mv = mirrors.get(room.code);
+    if (mv) mv.poniendo = null; /* falló → se puede reintentar */
+    try { sysMsg(room, '⚠️ No pude sacar el video de YouTube (' + String(eH && eH.message || eH).slice(0, 60) + '). Reintenta en un momento o entra a tu cuenta aquí mismo.'); } catch {}
+  });
+  return true;
+}
+
 async function ponerYoutubeNativo(room, watchUrl, userId) {
   const id = idYoutubeDe(watchUrl);
   const nat = await resolverYoutube(watchUrl);
@@ -1222,16 +1237,7 @@ async function startMirror(room, rawUrl, userId) {
       /* v164: navegaron a un video de youtube dentro del espejo → se cambia
        * el modo: el video va NATIVO (extraído por piped/invidious), no hay
        * muro de login posible, hay audio en cada teléfono y fullscreen */
-      const idNav = idYoutubeDe(m.url);
-      if (idNav && m.poniendo !== idNav) { /* v165: si falla, se puede reintentar al toque */
-        m.poniendo = idNav;
-        const watchUrl = m.url;
-        ponerYoutubeNativo(room, watchUrl, userId).catch((eH) => {
-          m.poniendo = null;
-          try { sysMsg(room, '⚠️ No pude sacar el video de YouTube (' + String(eH && eH.message || eH).slice(0, 60) + '). Reintenta en un momento o entra a tu cuenta aquí mismo.'); } catch {}
-        });
-        return;
-      }
+      if (idYoutubeDe(m.url)) { cambiarYtNativo(room, m.url, userId); return; }
       broadcast(room, 'mirror-state', mirrorState(room));
     }
   });
@@ -1494,6 +1500,17 @@ async function startMirror(room, rawUrl, userId) {
   m.stats = { bytes: 0, frames: 0, at: Date.now() };
   m.timer = setInterval(() => {
     const now = Date.now();
+    /* v168: youtube navega «por dentro» al picarle a un video del feed
+     * (pushState) — el evento de navegación no siempre avisa y el cambio
+     * a nativo no se disparaba: la sala se quedaba en el espejo con el
+     * muro de login. El timer compara la URL real en cada tick. */
+    try {
+      const uAhora = m.page.url();
+      if (uAhora && uAhora !== (m.urlUlt || '')) {
+        m.urlUlt = uAhora;
+        if (idYoutubeDe(uAhora)) { cambiarYtNativo(room, uAhora, m.ownerId); return; }
+      }
+    } catch {}
     /* v25: si la página murió, reabrir sola (sin esperar que un clic falle) */
     if (m.page.isClosed()) { recoverMirror(room.code, 'página cerrada (watchdog)').catch(() => {}); return; }
     if (m.dirty && m.frame) {
