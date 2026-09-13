@@ -1653,6 +1653,7 @@ $('#seriePicker').addEventListener('click', (e) => { if (e.target === e.currentT
 /* v61: ¿es una serie? → abrir el selector en vez del espejo directo */
 function elegirTitulo(res, enSala) {
   if (/lacartoons\.com\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v112: antes que el genérico /serie/ (sus urls también lo traen) */
+  if (/danimados\.cc\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v175: ANTES del genérico /serie/ — la tarjeta de danimados es dani-titanes bajo /serie/ y caía en el picker de Cuevana («cargando temporadas» → error) */
   if (/\/serie\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, false); return true; }
   if (/\/anime\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, true); return true; }
   if (/miscaricaturas\.com\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v102 */
