@@ -135,6 +135,7 @@
             <div class="sr-sec-titulo">
               <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: var(--cyan);"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/></svg>
               <span>Caricaturas</span>
+              <button id="btnDaniTodas" class="btn small ghost" type="button" style="margin-left:auto;padding:4px 10px;font-size:12px;">Ver todas · 820+ ✨</button>
             </div>
             <div id="cariRow" class="sr-fila"></div>
           </div>
@@ -444,6 +445,23 @@
       </div>
       <div id="spTemporadas" class="sp-temporadas"></div>
       <div id="spEpisodios" class="sp-episodios"></div>
+    </div>
+  </div>
+
+  <!-- v177: explorador de TODAS las series de danimados -->
+  <div id="daniEx" class="serie-picker hidden">
+    <div class="sp-cuerpo">
+      <div class="sp-head">
+        <div class="sp-info">
+          <div class="sp-title">Todas las series ✨</div>
+          <div class="sp-meta">Catálogo completo — <span id="daniExTotal">…</span></div>
+        </div>
+        <button id="daniExClose" class="btn small ghost" title="Cerrar">
+          <svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div id="daniExGrid"></div>
+      <button id="daniExMas" class="btn small ghost" type="button" style="margin:10px auto 0;display:block;">Cargar más</button>
     </div>
   </div>
 

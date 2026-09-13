@@ -1650,6 +1650,34 @@ function cerrarSeriePicker() { $('#seriePicker').classList.add('hidden'); }
 $('#spClose').addEventListener('click', cerrarSeriePicker);
 $('#seriePicker').addEventListener('click', (e) => { if (e.target === e.currentTarget) cerrarSeriePicker(); });
 
+/* v177: explorador de TODAS las series de danimados (823) — grilla paginada;
+ * tocar una tarjeta abre el MISMO picker de siempre (danimados → caricaturas) */
+let daniExPag = 0;
+const daniExItems = []; /* v177: acumulado — renderResultados limpia el box, «Cargar más» re-renderiza TODO lo visto */
+function abrirDaniEx() {
+  daniExPag = 0;
+  daniExItems.length = 0;
+  $('#daniExGrid').innerHTML = '<div class="sp-meta" style="grid-column:1/-1;text-align:center;padding:20px 0">Cargando series…</div>';
+  $('#daniExTotal').textContent = '…';
+  $('#daniEx').classList.remove('hidden');
+  cargarDaniExPag();
+}
+function cargarDaniExPag() {
+  daniExPag++;
+  fetch('/api/dani/catalogo?pag=' + daniExPag).then((r) => r.json()).then((d) => {
+    if (!d || !d.ok) { $('#daniExGrid').innerHTML = '<div class="sp-meta" style="grid-column:1/-1;text-align:center;padding:20px 0">Sin conexión — inténtalo de nuevo</div>'; return; }
+    if (daniExPag === 1) daniExItems.length = 0;
+    for (const it of d.items) daniExItems.push({ title: it.titulo, url: 'https://danimados.cc/serie/' + it.slug, img: it.poster, site: 'Caricaturas', extra: '' });
+    $('#daniExTotal').textContent = d.total + ' series';
+    renderResultados($('#daniExGrid'), daniExItems, elegirResultadoBusqueda, true);
+    $('#daniExMas').style.display = d.pag * d.por >= d.total ? 'none' : '';
+  }).catch(() => { $('#daniExGrid').innerHTML = '<div class="sp-meta" style="grid-column:1/-1;text-align:center;padding:20px 0">Sin conexión — inténtalo de nuevo</div>'; });
+}
+$('#btnDaniTodas').addEventListener('click', abrirDaniEx);
+$('#daniExMas').addEventListener('click', cargarDaniExPag);
+$('#daniExClose').addEventListener('click', () => $('#daniEx').classList.add('hidden'));
+$('#daniEx').addEventListener('click', (e) => { if (e.target === e.currentTarget) $('#daniEx').classList.add('hidden'); });
+
 /* v61: ¿es una serie? → abrir el selector en vez del espejo directo */
 function elegirTitulo(res, enSala) {
   if (/lacartoons\.com\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v112: antes que el genérico /serie/ (sus urls también lo traen) */

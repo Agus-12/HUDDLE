@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v176'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v177'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -369,8 +369,56 @@ async function ponerYoutubeNativo(room, watchUrl, userId) {
  * se desempaca aquí mismo. CDN premilkyway = la familia que ya proxéamos. */
 const DANI_BASE = 'https://danimados.cc';
 const DANI_SERIE = '/series/teen-titans-go/';
-let daniFeed = { at: 0, eps: [] };
 const DANI_STREAMS = new Map(); /* url ep → { nat, at } */
+/* v177: CATÁLOGO COMPLETO de danimados en Huddle — snapshot de 823 series
+ * (slug+título+póster) bajado de su API WordPress; reemplaza nuestras series
+ * rotas y añade las suyas. Nuestra fuente (miscaricaturas/lacartoons) queda
+ * para lo que danimados no tiene o donde la nuestra es mejor. */
+let DANI_CAT = new Map();
+try {
+  for (const [sl, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'dani-catalogo.json'), 'utf8')))) DANI_CAT.set(sl, v);
+} catch {}
+const DANI_CAT_ARR = [...DANI_CAT.entries()].sort((a, b) => String(a[1].t).localeCompare(String(b[1].t), 'es'));
+const DANI_FEEDS = new Map(); /* slug → { at, eps } */
+const DANI_POSTERS = new Map(); /* slug → { at, url } */
+/* v177: series nuestras ROTAS o incompletas que danimados tiene bien —
+ * el slug nuestro (filas/buscador) ahora SIRVE la versión de danimados */
+const DANI_REEMPLAZAS = new Map([
+  ['dani-titanes', 'teen-titans-go'],
+  ['bob-esponja-capitulos-completos', 'bob-esponja'],
+  ['hora-de-aventura-capitulos-completos', 'hora-de-aventuras'],
+  ['los-simpsons', 'los-simpson'],
+  ['south-park', 'south-park'],
+  ['rick-y-morty-capitulos-completos', 'rick-y-morty'],
+  ['samurai-jack-temporada-1', 'samurai-jack'],
+  ['31-minutos-capitulos-y-canciones', '31-minutos'],
+  ['ben-10-capitulos-completos', 'ben-10'],
+  ['jimmy-neutron-capitulos-completos', 'jimmy-neutron-el-nino-genio'],
+  ['danny-phantom-capitulos-completos', 'danny-phantom'],
+  ['invasor-zim-temporada-1', 'invasor-zim'],
+  ['phineas-y-ferb-capitulos-completos', 'phineas-y-ferb'],
+]);
+function daniSlugDeUrl(urlEp) { return (/\/episodios\/([a-z0-9-]+)-(\d+)x(\d+)\//.exec(String(urlEp || '')) || [])[1] || ''; }
+function daniTituloDe(slug) {
+  const v = DANI_CAT.get(slug);
+  return (v && v.t ? String(v.t).replace(/\xa0/g, ' ') : slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
+}
+function daniCoverDe(slug) { return CARI_PORTADAS.get(slug) || '/api/dani/poster/' + slug; }
+async function daniPosterUrl(slug) {
+  const c = DANI_POSTERS.get(slug);
+  if (c && Date.now() - c.at < 24 * 3600e3) return c.url;
+  let u = (DANI_CAT.get(slug) || {}).p || '';
+  if (!u) {
+    try {
+      const r = await fetchSeguro(DANI_BASE + '/series/' + slug + '/', 12000);
+      const html = r && r.ok ? await r.text() : '';
+      u = (/property=["']og:image["']\s+content=["']([^"']+)/.exec(html) || /content=["']([^"']+)["']\s+property=["']og:image["']/.exec(html) || [])[1] || '';
+      u = String(u).replace(/[\r\n\t]/g, '').trim(); /* v177: el HTML trae \r colado en el content y el redirect revienta */
+    } catch {}
+  }
+  DANI_POSTERS.set(slug, { at: Date.now(), url: u });
+  return u;
+}
 function daniDesempacar(html) {
   /* Dean Edwards packer: eval(function(p,a,c,k,e,d){…}('payload',36,504,'a|b|c'.split('|'),0,{})) */
   const m = /eval\(function\(p,a,c,k,e,[dr]\)\{.*?\}\('(.*?)',(\d+),(\d+),'(.*?)'\.split\('\|'\)/s.exec(html);
@@ -382,9 +430,11 @@ function daniDesempacar(html) {
   for (let i = count - 1; i >= 0; i--) if (keys[i]) dict[e(i, radix)] = keys[i];
   return payload.replace(/\b\w+\b/g, (w) => dict[w] || w);
 }
-async function daniLista() {
-  if (daniFeed.eps.length && Date.now() - daniFeed.at < 6 * 3600e3) return daniFeed.eps;
-  const r = await fetchSeguro(DANI_BASE + DANI_SERIE, 15000);
+async function daniLista(slug) {
+  slug = slug || 'teen-titans-go';
+  const feed = DANI_FEEDS.get(slug);
+  if (feed && feed.eps.length && Date.now() - feed.at < 6 * 3600e3) return feed.eps;
+  const r = await fetchSeguro(DANI_BASE + '/series/' + slug + '/', 15000);
   if (!r.ok) throw new Error('no pude leer danimados (' + r.status + ')');
   const html = await r.text();
   const eps = [];
@@ -396,17 +446,17 @@ async function daniLista() {
       const u = /href='(https:\/\/danimados\.cc\/episodios\/[^']+)'/.exec(it);
       if (!u) continue;
       const num = /numerando'>(\d+)\s*-\s*(\d+)</.exec(it);
-      const slug = /([a-z0-9-]+)-(\d+)x(\d+)\/?/.exec(u[1]);
+      const sl2 = /([a-z0-9-]+)-(\d+)x(\d+)\/?/.exec(u[1]);
       const t = /episodiotitle[^>]*>\s*<a[^>]*>([^<]+)</.exec(it);
-      const ep = num ? +num[2] : (slug ? +slug[3] : 0);
+      const ep = num ? +num[2] : (sl2 ? +sl2[3] : 0);
       if (!ep) continue;
       const tit = t ? htmlDecode(t[1]) : '';
       eps.push({ temporada, ep, parte: '', url: u[1], titulo: (tit || ('Episodio ' + ep)).slice(0, 80), num: temporada + 'x' + ep });
     }
   }
   eps.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep);
-  daniFeed = { at: Date.now(), eps };
-  console.log('[dani] lista: ' + eps.length + ' episodios en ' + (partes.length - 1) + ' temporadas (HTTP)');
+  DANI_FEEDS.set(slug, { at: Date.now(), eps });
+  console.log('[dani] ' + slug + ': ' + eps.length + ' episodios en ' + (partes.length - 1) + ' temporadas (HTTP)');
   return eps;
 }
 function htmlDecode(s) { return String(s || '').replace(/&#(\d+);/g, (m2, d2) => String.fromCharCode(+d2)).replace(/&amp;/g, '&').replace(/&#215;/g, '×').trim(); }
@@ -471,16 +521,17 @@ async function resolverDani(url) { return daniEpToStream(url); }
 async function ponerDaniNativo(room, urlEp, userId) {
   const nat = await daniEpToStream(urlEp);
   if (mirrors.has(room.code)) await stopMirror(room);
-  let titulo = 'Los Jóvenes Titanes en Acción';
+  const slugD = daniSlugDeUrl(urlEp) || 'teen-titans-go';
+  let titulo = daniTituloDe(slugD);
   try {
-    const eps = await daniLista();
+    const eps = await daniLista(slugD);
     const i = eps.findIndex((e) => { try { return new URL(e.url).pathname === new URL(urlEp).pathname; } catch { return false; } });
     if (i >= 0) titulo += ' · ' + eps[i].num + (eps[i].titulo && !/^Episodio/.test(eps[i].titulo) ? ' · ' + eps[i].titulo : '');
   } catch {}
   room.videoUrl = urlEp;
   room.videoTitle = titulo.slice(0, 80);
   room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
-  room.videoImg = CARI_PORTADAS.get('dani-titanes') || '';
+  room.videoImg = daniCoverDe(slugD);
   room.position = 0;
   room.isPlaying = false;
   room.videoDuration = 0;
@@ -816,13 +867,14 @@ async function serieCtxFromUrl(u) {
     }
     /* v172: Teen Titans Go de DANIMADOS — 9 temporadas completas */
     if (host.includes('danimados.cc')) {
-      const eps = await daniLista().catch(() => []);
+      const slugD = daniSlugDeUrl(url.pathname) || 'teen-titans-go';
+      const eps = await daniLista(slugD).catch(() => []);
       if (eps.length) {
         const pth = url.pathname.replace(/\/$/, '');
         const idx = eps.findIndex((e) => { try { return new URL(e.url).pathname.replace(/\/$/, '') === pth; } catch { return false; } });
         if (idx >= 0) {
-          const cov = CARI_PORTADAS.get('dani-titanes') || '';
-          return { tipo: 'dani', titulo: 'Los Jóvenes Titanes en Acción', poster: cov, cover: cov, idx,
+          const cov = daniCoverDe(slugD);
+          return { tipo: 'dani', titulo: daniTituloDe(slugD), poster: cov, cover: cov, idx,
             eps: eps.map((e) => ({ url: e.url, num: e.num, temporada: e.temporada, ep: e.ep, parte: '' })) };
         }
       }
@@ -4850,15 +4902,34 @@ const server = http.createServer(async (req, res) => {
         generos: (generos || []).filter((g) => g.items && g.items.length),
       });
     }
+    if (url.pathname.startsWith('/api/dani/poster/')) { /* v177: póster perezoso og:image */
+      const slug = decodeURIComponent(url.pathname.split('/')[4] || '');
+      if (!/^[a-z0-9-]{2,90}$/.test(slug) || !DANI_CAT.has(slug)) return json(res, 404, { ok: false });
+      const u = await daniPosterUrl(slug).catch(() => '');
+      if (!u) return json(res, 404, { ok: false });
+      res.writeHead(302, { Location: u });
+      return res.end();
+    }
+    if (url.pathname === '/api/dani/catalogo') { /* v177: explorador de las 823 */
+      const por = 60;
+      const pag = Math.max(1, +(url.searchParams.get('pag') || 1));
+      const ini = (pag - 1) * por;
+      const items = DANI_CAT_ARR.slice(ini, ini + por).map(([sl, v]) => ({ slug: sl, titulo: String(v.t).replace(/\xa0/g, ' '), poster: v.p || ('/api/dani/poster/' + sl) }));
+      return json(res, 200, { ok: true, total: DANI_CAT_ARR.length, pag, por, items });
+    }
     if (url.pathname.startsWith('/api/caricaturas/')) {
       /* v102: episodios de una caricatura (para el selector) */
       const slug = decodeURIComponent(url.pathname.split('/')[3] || '').toLowerCase();
       if (!/^[a-z0-9-]{2,90}$/.test(slug) && !/^[0-9]{1,3}$/.test(slug)) return json(res, 400, { ok: false, error: 'Caricatura inválida' }); /* v119: ids de lacartoons de 1 dígito */
-      if (slug === 'dani-titanes') { /* v172: Teen Titans Go de danimados (9 temporadas) */
-        const eps = await daniLista().catch(() => []);
+      /* v177: danimados primero — series nuestras ROTAS (reemplazos) y las
+     * que SOLO están en danimados. Lo demás sigue en nuestra fuente. */
+      const daniSlug = DANI_REEMPLAZAS.get(slug)
+        || (!CARI_ORDEN.includes(slug) && !LCT_SERIES.has(slug) && DANI_CAT.has(slug) ? slug : '');
+      if (daniSlug) {
+        const eps = await daniLista(daniSlug).catch(() => []);
         if (!eps.length) return json(res, 502, { ok: false, error: 'No pude leer danimados — intenta luego' });
-        const cov = CARI_PORTADAS.get('dani-titanes') || '';
-        return json(res, 200, { ok: true, slug, titulo: 'Los Jóvenes Titanes en Acción', poster: cov, cover: cov, episodios: eps });
+        const cov = daniCoverDe(daniSlug);
+        return json(res, 200, { ok: true, slug, titulo: daniTituloDe(daniSlug), poster: cov, cover: cov, episodios: eps });
       }
       const d = await datosCaricatura(slug);
       if (!d) return json(res, 502, { ok: false, error: 'No pude leer esa caricatura' });
@@ -4953,6 +5024,22 @@ const server = http.createServer(async (req, res) => {
       const r = await buscarEnSitios(q); /* v121: global + fuzzy + sugiere */
       if (/titan(es)?\b/i.test(q)) {
         r.resultados.unshift({ title: 'Los Jóvenes Titanes en Acción (Latino)', url: 'https://danimados.cc/serie/dani-titanes', img: CARI_PORTADAS.get('dani-titanes') || '/covers/dani-titanes.jpg', site: 'Caricaturas', extra: '9 temporadas · 291 episodios' }); /* v174: con ?v= — sin esto el navegador enseñaba la portada VIEJA del caché */
+      }
+      /* v177: además, las 823 series de danimados cascan en la búsqueda */
+      const qD = normalizarTxt(q).split(' ').filter((w) => w.length > 1);
+      if (qD.length) {
+        const daniHits = [];
+        for (const [sl, v] of DANI_CAT_ARR) {
+          const tn = normalizarTxt(v.t);
+          if (qD.every((w) => tn.includes(w)) && !r.resultados.some((x) => String(x.url || '').includes('/' + sl))) {
+            daniHits.push([sl, v]);
+            if (daniHits.length >= 6) break;
+          }
+        }
+        r.resultados = r.resultados.filter((x) => { const mm = /miscaricaturas\.com\/([a-z0-9-]+)/i.exec(x.url || ''); return !(mm && DANI_REEMPLAZAS.has(mm[1])); });
+        for (const [sl, v] of daniHits.reverse()) {
+          r.resultados.unshift({ title: String(v.t).replace(/\xa0/g, ' '), url: 'https://danimados.cc/serie/' + sl, img: v.p || ('/api/dani/poster/' + sl), site: 'Caricaturas', extra: 'Danimados' });
+        }
       }
       if (!r.resultados.length) return json(res, 200, { ok: true, results: [], sugiere: r.sugiere, error: 'No encontré nada — prueba con otras palabras' });
       return json(res, 200, { ok: true, results: r.resultados, sugiere: r.sugiere });
