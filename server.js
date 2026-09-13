@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v186'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v187'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1107,6 +1107,12 @@ async function avanzarAutoEspejo(room) {
 const INTROS_FILE = path.join(DATA_DIR, 'intros.json');
 let INTROS = {};
 try { INTROS = JSON.parse(fs.readFileSync(INTROS_FILE, 'utf8')) || {}; } catch {}
+/* v187: claves POR TEMPORADA en danimados (dani:slug:S#) — lo aprendido
+ * antes (por serie, que siempre salía de la T1) migra a su temporada */
+for (const k of Object.keys(INTROS)) {
+  const m = /^dani:([a-z0-9-]+)$/.exec(k);
+  if (m && !INTROS['dani:' + m[1] + ':1']) { INTROS['dani:' + m[1] + ':1'] = INTROS[k]; delete INTROS[k]; }
+}
 /* v138: los aprendizajes del sistema VIEJO (ventana fija 8→90) tenían fin
  * exactamente en 90 — salían «de más». Se eliminan al arrancar para que la
  * detección por audio aprenda esas series desde cero y bien. */
@@ -1130,7 +1136,7 @@ function introKeysDe(url) {
     const host = new URL(url).hostname.replace(/^www\./, '');
     if (/danimados\.cc$/.test(host)) {
       const m = /\/episodios\/([a-z0-9-]+)-(\d+)x(\d+)\//.exec(new URL(url).pathname);
-      if (m) serie = 'dani:' + m[1]; /* v184: el catálogo danimados también aprende intros */
+      if (m) serie = 'dani:' + m[1] + ':' + m[2]; /* v187: POR TEMPORADA — entre temporadas las intros cambian */
     } else if (/miscaricaturas\.com$/.test(host)) {
       const base = cariSlugDe(url).replace(/-\d{2}x\d{2}[ab]?(-.*)?$/, '');
       if (base) serie = 'mm:' + base;
@@ -5497,7 +5503,13 @@ const server = http.createServer(async (req, res) => {
       if (introJobAtascado(ks.serie)) INTRO_JOBS.delete(ks.serie); /* v185 */
       if (ks.serie && (!datos || datos.by !== 'auto') && fpcalcOk() && !INTRO_JOBS.has(ks.serie) && Date.now() - hace >= 6 * 3600 * 1000) {
         serieCtxFromUrl(String(url.searchParams.get('url') || '')).then((sc) => {
-          if (sc && sc.eps && sc.eps.length > 1) detectarIntroSerie(ks.serie, sc.eps.slice(0, 3).map((e) => e.url));
+          if (sc && sc.eps && sc.eps.length > 1) {
+            /* v187: comparar episodios de LA MISMA TEMPORADA que el pedido */
+            const ped = sc.eps.find((e) => { try { return new URL(e.url).pathname === new URL(String(url.searchParams.get('url') || '')).pathname.replace(/\/$/, ''); } catch { return false; } });
+            const t = ped ? ped.temporada : (sc.eps[0] || {}).temporada;
+            const mismos = sc.eps.filter((e) => e.temporada === t);
+            detectarIntroSerie(ks.serie, (mismos.length >= 2 ? mismos : sc.eps).slice(0, 3).map((e) => e.url));
+          }
         }).catch(() => {});
       }
       return json(res, 200, { ok: true, intro: it && +it.end > +it.start ? { start: +it.start, end: +it.end } : null, detectando: !!(ks.serie && INTRO_JOBS.has(ks.serie)) });
