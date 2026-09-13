@@ -618,7 +618,7 @@ async function cargarIntro(url) {
 function esEpisodioSolo() {
   if (!SOLO || SOLO.cerrado) return false;
   if (SOLO.info && SOLO.info.eps && SOLO.info.eps.length > 1) return true;
-  return /latanime\.org\/ver\/|miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}([ab])?(?:-|$)|lacartoons\.com\/serie\/capitulo\/|animeflv\.[a-z.]+\/ver\/|\/episode\//i.test(SOLO.url || '');
+  return /latanime\.org\/ver\/|miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}([ab])?(?:-|$)|lacartoons\.com\/serie\/capitulo\/|animeflv\.[a-z.]+\/ver\/|\/episode\/|danimados\.cc\/episodios\//i.test(SOLO.url || ''); /* v186: danimados también cuenta como episodio */
 }
 function ventanaIntro() {
   /* {t, dur} del video activo — SOLO en vivo, nativo de sala, espejo */
