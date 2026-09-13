@@ -69,6 +69,16 @@ const S = {
 
 /* ======================= utilidades ======================= */
 
+/* v156: si algo revienta en la app, el toast muestra el mensaje COMPLETO
+ * (antes se cortaba y no se podía diagnosticar) y queda en el log */
+window.addEventListener('error', (e) => {
+  try { console.error('[app] ' + e.message + ' @ ' + (e.filename || '').split('/').pop() + ':' + e.lineno); } catch {}
+  toast('Error interno: ' + e.message, 6000);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  const m = String((e && e.reason && e.reason.message) || e.reason || 'promesa rechazada');
+  console.error('[app] promesa:', m);
+});
 function toast(text, ms = 3200) {
   const el = document.createElement('div');
   el.className = 'toast';
@@ -408,6 +418,9 @@ function posEsperada() {
     : S.nativo.position;
 }
 function activarNativo(st) {
+  /* v156: sin stream no hay nada que activar — el estado puede llegar a
+   * medio resolver y antes reventaba leyendo .m3u8 de algo vacío */
+  if (!st.native || !st.native.m3u8) return;
   const primero = !S.nativo || S.nativo.url !== st.videoUrl;
   if (primero) {
     if (S.nativo) desmontarNativo();

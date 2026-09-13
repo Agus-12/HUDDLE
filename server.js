@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v155'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v156'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -3430,8 +3430,13 @@ async function resolverCaricaturaHttp(epUrl) {
   if (!idx.length) idx = p.key_parts.map((_, i) => i + 1);
   const key = Buffer.concat(idx.map((i) => b64u(p.key_parts[i - 1])));
   const todo = b64u(p.payload), tag = todo.subarray(todo.length - 16), ct = todo.subarray(0, todo.length - 16);
-  const dec = crypto.createDecipheriv('aes-256-gcm', key, b64u(p.iv)).setAuthTag(tag);
-  const fuentes = (JSON.parse(Buffer.concat([dec.update(ct), dec.final()]).toString('utf8')).sources) || [];
+  let fuentes = [];
+  try {
+    const dec = crypto.createDecipheriv('aes-256-gcm', key, b64u(p.iv)).setAuthTag(tag);
+    fuentes = (JSON.parse(Buffer.concat([dec.update(ct), dec.final()]).toString('utf8')).sources) || [];
+  } catch {
+    throw new Error('El sitio cambió el cifrado del video');
+  }
   if (!fuentes.length) throw new Error('El video no trae fuentes');
   fuentes.sort((a, b) => (b.bitrate_kbps || 0) - (a.bitrate_kbps || 0));
   const mejor = fuentes[0];
