@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v172'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v173'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -362,128 +362,6 @@ async function ponerYoutubeNativo(room, watchUrl, userId) {
   return true;
 }
 
-/* v170: LOS JÓVENES TITANES EN ACCIÓN (robingolatino) — el blog tiene la
- * serie COMPLETA en latino con el player propio de BLOGGER (videos de
- * Google, vivos a 2026). Todo HTTP puro: feed JSON del blog para la lista,
- * RPC batchexecute para sacar el stream googlevideo (mp4 combinado) y el
- * proxy propio sirviendo bytes con el Referer/UA exactos que exige. */
-const ROBIN_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36';
-const ROBIN_BASE = 'https://robingolatino.blogspot.com';
-let robinFeed = { at: 0, eps: [] };
-const ROBIN_STREAMS = new Map(); /* token → { nat, at } */
-async function robinLista() {
-  if (robinFeed.eps.length && Date.now() - robinFeed.at < 6 * 3600e3) return robinFeed.eps;
-  const entradas = [];
-  for (let idx = 1; idx <= 126; idx += 25) {
-    const r = await fetchSeguro(ROBIN_BASE + '/feeds/posts/default?alt=json&max-results=25&start-index=' + idx, 15000).catch(() => null);
-    if (!r || !r.ok) break;
-    const j = await r.json();
-    const lote = (j.feed.entry || []);
-    entradas.push(...lote);
-    if (lote.length < 25) break;
-  }
-  const eps = [];
-  const vistos = new Set();
-  let muertos = 0;
-  for (const e of entradas) {
-    const t = String((e.title || {}).$t || '');
-    const m = /(?:cap[ií]tulo|episodio)\s*(\d+)\s*:?\s*(.*)/i.exec(t);
-    if (!m) continue;
-    const link = (e.link || []).find((l) => l.rel === 'alternate');
-    if (!link || !link.href) continue;
-    const contenido = String((e.content || {}).$t || '');
-    /* v170: solo caps cuyo player siga VIVO (el player de Blogger); los
-     * viejos usaban videomega/vimeo y hace años que murieron */
-    if (!contenido.includes('video.g?token=')) { muertos++; continue; }
-    const num = +m[1];
-    if (vistos.has(num)) continue; /* posts duplicados del mismo cap */
-    vistos.add(num);
-    const tit = String(m[2] || '').replace(/\s*espa[ñn]ol.*$/i, '').trim();
-    eps.push({ temporada: 1, ep: num, parte: '', url: link.href,
-      titulo: (tit || ('Capítulo ' + num)).slice(0, 80), num: '1x' + num });
-  }
-  eps.sort((a, b) => a.ep - b.ep);
-  robinFeed = { at: Date.now(), eps };
-  console.log('[robin] lista de la serie: ' + eps.length + ' capítulos vivos (' + muertos + ' con player muerto, saltados)');
-  return eps;
-}
-async function robinRpc(tok) {
-  const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), 12000);
-  try {
-    const r = await fetch('https://www.blogger.com/_/BloggerVideoPlayerUi/data/batchexecute?rpcids=WcwnYd&source-path=%2Fvideo.g&hl=es&authuser=0', {
-      method: 'POST', signal: ctl.signal,
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-        'User-Agent': ROBIN_UA,
-        'Origin': 'https://www.blogger.com',
-        'Referer': 'https://www.blogger.com/',
-      },
-      body: 'f.req=' + encodeURIComponent(JSON.stringify([[['WcwnYd', JSON.stringify([tok, null, 0]), null, 'generic']]])),
-    });
-    if (!r.ok) throw new Error('el player de Blogger contestó ' + r.status);
-    const txt = await r.text();
-    for (const ln of txt.split('\n')) {
-      if (!ln.includes('WcwnYd')) continue;
-      let inner = null;
-      try { inner = JSON.parse(JSON.parse(ln)[0][2]); } catch { continue; } /* dos capas: el payload ya es arreglo */
-      const urls = [];
-      (function busca(x) { if (typeof x === 'string' && x.includes('googlevideo')) urls.push(x); else if (Array.isArray(x)) x.forEach(busca); })(inner);
-      const mejor = urls.find((u) => /[?&]itag=18(&|$)/.test(u)) || urls.find((u) => /[?&]mime=video%2Fmp4|[?&]mime=video\/mp4/.test(u)) || urls[0];
-      if (mejor) return mejor;
-    }
-    throw new Error('el video no dio stream (¿lo bajaron?)');
-  } finally { clearTimeout(t); }
-}
-async function resolverRobinTok(tok) {
-  const c = ROBIN_STREAMS.get(tok);
-  if (c && Date.now() - c.at < 2 * 3600e3) return c.nat;
-  const gv = await robinRpc(tok);
-  let hostGv = '';
-  try { hostGv = new URL(gv).hostname; } catch {}
-  if (hostGv) {
-    hlsReferers.set(hostGv, 'https://youtube.googleapis.com/');
-    try { hlsUAs.set(hostGv, ROBIN_UA); } catch {}
-  }
-  const nat = { m3u8: '/api/hls?u=' + encodeURIComponent(gv), mp4: true, proxy: true, subs: [] };
-  ROBIN_STREAMS.set(tok, { nat, at: Date.now() });
-  return nat;
-}
-async function resolverRobin(url) {
-  const r = await fetchSeguro(url, 12000).catch(() => null);
-  const html = r && r.ok ? await r.text() : '';
-  const tok = (/(?:blogger\.com)?\/video\.g\?token=([A-Za-z0-9_-]{20,})/i.exec(html) || [])[1];
-  if (!tok) throw new Error('ese capítulo ya no tiene video (el player viejo murió) — prueba otro');
-  console.log('[robin] capítulo → stream de Blogger (HTTP puro)');
-  return resolverRobinTok(tok);
-}
-/* mete el capítulo de robingolatino como NATIVO (desde el espejo o al abrirlo) */
-async function ponerRobinNativo(room, watchUrl, userId) {
-  const nat = await resolverRobin(watchUrl);
-  if (mirrors.has(room.code)) await stopMirror(room);
-  let titulo = 'Los Jóvenes Titanes en Acción';
-  try {
-    const eps = await robinLista();
-    const i = eps.findIndex((e) => { try { return new URL(e.url).pathname === new URL(watchUrl).pathname; } catch { return false; } });
-    if (i >= 0) titulo += ' · ' + eps[i].num + (eps[i].titulo ? ' · ' + eps[i].titulo : '');
-  } catch {}
-  room.videoUrl = watchUrl;
-  room.videoTitle = titulo.slice(0, 80);
-  room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
-  room.videoImg = CARI_PORTADAS.get('robin-titanes') || '';
-  room.position = 0;
-  room.isPlaying = false;
-  room.videoDuration = 0;
-  room.updatedAt = Date.now();
-  room.serieCtx = null;
-  serieCtxFromUrl(watchUrl).then((sc) => {
-    if (sc && room.videoUrl === watchUrl) { room.serieCtx = sc; broadcast(room, 'state', stateOf(room)); }
-  }).catch(() => {});
-  sysMsg(room, '🎬 ' + room.videoTitle);
-  broadcast(room, 'state', stateOf(room));
-  return true;
-}
-
 /* v172: DANIMADOS — Teen Titans Go COMPLETO (9 temporadas, 291 eps) en
  * latino, WordPress+Dooplay sin Cloudflare y TODOS los caminos por HTTP:
  * lista del HTML de la serie, player por admin-ajax (doo_player_ajax) y el
@@ -615,7 +493,6 @@ async function resolverNativoInterno(url) {
   if (/latanime\.org\/ver\//i.test(url)) return resolverAnime(url);
   if (/pelisxd\.com\/pelicula\//i.test(url)) return resolverPelisxd(url); /* v98 */
   if (/miscaricaturas\.com\//i.test(url)) return resolverCaricatura(url); /* v102 */
-  if (/robingolatino\.blogspot\./i.test(url)) return resolverRobin(url); /* v170 */
   if (/danimados\.cc\/episodios\//i.test(url)) return resolverDani(url); /* v172 */
   if (/youtube\.com\/(watch|shorts)|youtu\.be\//i.test(url)) return resolverYoutube(url); /* v164 */
   if (/lacartoons\.com\/serie\/capitulo\//i.test(url)) return resolverLacartoons(url); /* v116: sin esto, los capítulos de lacartoons en SALA caían al espejo de navegador (abría la página web en vez de reproducir nativo) */
@@ -945,22 +822,7 @@ async function serieCtxFromUrl(u) {
         }
       }
     }
-        /* v170: Los Jóvenes Titanes en Acción (robingolatino) — la cadena sale
-     * del feed del blog; la URL se compara por pathname (el dominio puede
-     * llegar como .mx/.com y da lo mismo) */
-    if (host.includes('robingolatino.blogspot')) {
-      const eps = await robinLista().catch(() => []);
-      if (eps.length) {
-        const pth = url.pathname;
-        const idx = eps.findIndex((e) => { try { return new URL(e.url).pathname === pth; } catch { return false; } });
-        if (idx >= 0) {
-          const cov = CARI_PORTADAS.get('robin-titanes') || '';
-          return { tipo: 'robin', titulo: 'Los Jóvenes Titanes en Acción', poster: cov, cover: cov, idx,
-            eps: eps.map((e) => ({ url: e.url, num: e.num, temporada: 1, ep: e.ep, parte: '' })) };
-        }
-      }
-    }
-    /* v118: capítulos de Lacartoons — el capId dice la serie y la
+        /* v118: capítulos de Lacartoons — el capId dice la serie y la
      * cadena sale de la misma lista fusionada (misma fuente de verdad) */
     if (host.endsWith('lacartoons.com')) {
       const capId = +((/\/serie\/capitulo\/(\d+)/i.exec(url.pathname) || [])[1] || 0);
@@ -1386,18 +1248,7 @@ async function startMirror(room, rawUrl, userId) {
       throw new Error(String(e.message || e).slice(0, 140));
     }
   }
-    /* v170: los capítulos de robingolatino SIEMPRE nativo — si el player del
-   * post está muerto, error limpio (abrir la página en espejo no sirve: el
-   * video de allí no existe desde hace años) */
-  if (/robingolatino\.blogspot\./i.test(url)) {
-    try { if (await ponerRobinNativo(room, url, userId)) return; }
-    catch (e) {
-      console.log('[espejo] robin no pudo (' + String(e.message || e).slice(0, 70) + ') — error limpio');
-      try { sysMsg(room, '⚠️ ' + String(e.message || e).slice(0, 120)); } catch {}
-      throw new Error(String(e.message || e).slice(0, 140));
-    }
-  }
-  /* v164: si lo que piden es un VIDEO de youtube → NATIVO (el espejo come
+    /* v164: si lo que piden es un VIDEO de youtube → NATIVO (el espejo come
    * muros de login con youtube); la portada/búsqueda sí sigue en espejo */
   if (idYoutubeDe(url)) {
     /* v169: la página watch de youtube es un LABERINTO de captchas para una
@@ -2147,7 +1998,6 @@ async function handleAction(req, res, body) {
          * Chrome, sin frames: full calidad y carga rapidísima. Si no
          * se puede, caemos al espejo de siempre. */
         let urlNat = String(action.url || '').trim();
-        if (/robingolatino\.blogspot\./i.test(urlNat)) { try { urlNat = 'https://robingolatino.blogspot.com' + new URL(urlNat).pathname; } catch {} } /* v170 */
         if (/danimados\.cc/i.test(urlNat)) { try { urlNat = 'https://danimados.cc' + new URL(urlNat).pathname; } catch {} } /* v172 */
         if (/^https?:\/\//i.test(urlNat)) {
           let errNat = '';
@@ -5005,12 +4855,6 @@ const server = http.createServer(async (req, res) => {
         const cov = CARI_PORTADAS.get('dani-titanes') || '';
         return json(res, 200, { ok: true, slug, titulo: 'Los Jóvenes Titanes en Acción', poster: cov, cover: cov, episodios: eps });
       }
-            if (slug === 'robin-titanes') { /* v170: serie del blog robingolatino */
-        const eps = await robinLista().catch(() => []);
-        if (!eps.length) return json(res, 502, { ok: false, error: 'No pude leer el blog de los Titanes — intenta luego' });
-        const cov = CARI_PORTADAS.get('robin-titanes') || '';
-        return json(res, 200, { ok: true, slug, titulo: 'Los Jóvenes Titanes en Acción', poster: cov, cover: cov, episodios: eps });
-      }
       const d = await datosCaricatura(slug);
       if (!d) return json(res, 502, { ok: false, error: 'No pude leer esa caricatura' });
       precargarIntroDeSerie(d.episodios); /* v135 */
@@ -5103,7 +4947,6 @@ const server = http.createServer(async (req, res) => {
       if (!q) return json(res, 400, { ok: false, error: 'Escribe qué quieren ver' });
       const r = await buscarEnSitios(q); /* v121: global + fuzzy + sugiere */
       if (/titan(es)?\b/i.test(q)) {
-        r.resultados.unshift({ title: 'Los Jóvenes Titanes en Acción (Latino)', url: 'https://robingolatino.blogspot.com/serie/robin-titanes', img: '/covers/robin-titanes.jpg', site: 'Caricaturas', extra: '69 capítulos · respaldo' }); /* v170 */
         r.resultados.unshift({ title: 'Los Jóvenes Titanes en Acción (Latino)', url: 'https://danimados.cc/serie/dani-titanes', img: '/covers/dani-titanes.jpg', site: 'Caricaturas', extra: '9 temporadas · 291 episodios' }); /* v172 */
       }
       if (!r.resultados.length) return json(res, 200, { ok: true, results: [], sugiere: r.sugiere, error: 'No encontré nada — prueba con otras palabras' });
