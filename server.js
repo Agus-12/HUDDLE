@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v190'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v191'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -3134,7 +3134,7 @@ async function tendenciasCuevana(periodo, cache) {
     img: String(p.featured_image || '').replace('/w780/', '/w342/'),
     site: 'Cuevana',
     extra: [p.year, p.duration ? `${p.duration} min` : ''].filter(Boolean).join(' · '),
-  })).filter((x) => x.title && x.url);
+  })).filter((x) => x.title && x.url).filter((x) => !cvOcultaUrl(x.url)); /* v191: sin series muertas */
   if (items.length) { cache.at = Date.now(); cache.items = items; }
   return items;
 }
@@ -4688,6 +4688,144 @@ function readBody(req) {
   });
 }
 
+/* v191: series de cine-calidad MUERTAS — auditoría completa (1,139 series):
+ * su 1x1 y 1x2 solo traen tráiler de YouTube o nada. No se muestran en
+ * búsqueda ni tendencias (abrir el resto de URLs directas sigue funcionando) */
+const CV_OCULTAS = new Set([
+  '142033-2',
+  'abominable-y-la-ciudad-invisible-2023-gratis',
+  'acaramelados',
+  'agallas-el-perro-cobarde',
+  'agencia-lockwood-gratis',
+  'animal',
+  'baymax-gratis',
+  'beavis-y-butt-head-gratis',
+  'bel-air-gratis',
+  'beplaying-la-voz-detras-del-sonid-gratis',
+  'by-the-grace-of-the-gods-gratis',
+  'candy-cruz',
+  'capitanes-del-mundo',
+  'carmen-sandiego',
+  'chico-come-universo',
+  'cien-anos-de-soledad',
+  'colin-en-blanco-y-negro',
+  'conversaciones-con-asesinos-las-cintas-de-jeffrey-dahmer-gratis',
+  'corazon-de-invictus-gratis',
+  'corazon-de-oro',
+  'cromosoma-21-gratis',
+  'dejame-entrar-gratis',
+  'deputy',
+  'desde-dentro-gratis',
+  'diablo-guardian',
+  'dmz-gratis',
+  'dragon-age-absolucion-gratis',
+  'dragones-los-nueve-reinos-gratis',
+  'duda-razonable-historia-de-dos-secuestros',
+  'el-adn-del-delito',
+  'el-amor-es-como-el-chachacha',
+  'el-asesino-improbable',
+  'el-asombroso-circo-digital',
+  'el-fin-del-amor-gratis',
+  'el-gabinete-de-curiosidades-de-guillermo-del-toro-gratis',
+  'el-hombre-contra-la-abeja-gratis',
+  'el-legado',
+  'el-metodo-kominsky',
+  'el-palacio-del-este',
+  'el-show-de-patricio-estrella-gratis',
+  'en-tierra-lejana',
+  'erase-una-vez-pero-ya-no-gratis',
+  'escena-del-crimen-el-asesino-de-times-square',
+  'escort-boys',
+  'expatriadas',
+  'fanatico-gratis',
+  'forst',
+  'fraggle-rock-gratis',
+  'fright-krewe',
+  'fuuto-pi',
+  'gannibal-gratis',
+  'gatos-callejeros-de-ricky-gervais',
+  'griselda',
+  'gutierrez-is-mai-neim',
+  'harriet-la-espia-gratis',
+  'hermanas-un-amor-compartido',
+  'hermanos-robots-supergigantes-gratis',
+  'hombres-de-ley-bass-reeves',
+  'home-economics',
+  'hora-de-aventuras-tierras-lejanas',
+  'ironheart',
+  'isla-brava-gratis',
+  'jellystone',
+  'kakegurui-twin-gratis',
+  'kanojo-mo-kanojo',
+  'kim-possible',
+  'la-busqueda-mas-alla-de-la-historia-gratis',
+  'la-cabeza-de-joaquin-murrieta-gratis',
+  'la-chica-de-nieve-gratis',
+  'la-chica-de-oslo',
+  'la-chica-invisible-gratis',
+  'la-conserje-pokemon',
+  'la-escuela-de-la-vida-gratis',
+  'la-hija-de-dios-dalma-maradona-gratis',
+  'la-ninera',
+  'la-paradoja-del-asesino',
+  'la-reina-cleopatra-gratis',
+  'las-chicas-gilmore',
+  'las-luminarias',
+  'las-prendas-que-nos-marcaron',
+  'las-viudas-de-los-jueves-gratis',
+  'lego-dreamzzz-gratis',
+  'llamas-gemelas-como-apagar-el-fuego',
+  'los-montaner-gratis',
+  'los-proud-mas-ruidosos-y-orgullosos-gratis',
+  'lucky-man',
+  'lycoris-recoil-gratis',
+  'manayek-gratis',
+  'mar-de-la-tranquilidad',
+  'marvel-spider-man',
+  'masters-del-universo-revolucion',
+  'medicina-letal-gratis',
+  'mi-padre-el-cazarrecompensas-intergalactico-gratis',
+  'mi-vida-con-los-chicos-walter',
+  'mil-colmillos',
+  'mirada-indiscreta-gratis',
+  'mono-malo',
+  'nadie-en-el-bosque',
+  'nina-de-demonio-gratis',
+  'pablo-escobar-el-patron-del-mal',
+  'papas-por-encargo-gratis',
+  'pobre-diablo-gratis',
+  'pokemon-senda-a-la-cima-gratis',
+  'presidente-curtis',
+  'pts-redes-sociales-gratis',
+  'quedate-a-mi-lado',
+  'ratonera',
+  'sean-eternos-campeones-de-america-gratis',
+  'seleccion-argentina-la-serie-camino-a-qatar-gratis',
+  'south-park',
+  'star-trek-voyager',
+  'star-wars-rebels',
+  'star-wars-the-clone-wars',
+  'super-pupz-gratis',
+  'tan-cerca-de-ti-nace-el-amor',
+  'teen-wolf',
+  'the-best-man-the-final-chapters-gratis',
+  'the-quest-gratis',
+  'thundercats',
+  'thundercats-roar',
+  'tierra-incognita',
+  'tiger-king-la-historia-de-doc-antle',
+  'tragones-y-mazmorras',
+  'triada-gratis',
+  'una-familia-normal',
+  'uzaki-chan-wa-asobitai',
+  'vilma-gratis',
+  'wakefield',
+  'watchmen-gratis',
+  'will-trent-agente-especial-gratis',
+  'y-el-ultimo-hombre',
+]);
+const cvOcultaUrl = (u) => { const m = /cine-calidad\.mx\/serie\/([a-z0-9-]+)/i.exec(u || ''); return !!(m && CV_OCULTAS.has(m[1])); };
+
 /* ===================== v81: modo individual =====================
  * Ver una peli o un episodio SIN sala y SIN el navegador-espejo del
  * servidor: resolvemos la URL directa del video (goodstream HLS) con
@@ -4761,7 +4899,7 @@ async function resolverSolo(pageUrl) {
     try { return await resolverVimeos(embedVimeos, pageUrl); }
     catch (e) { console.warn('[solo] vimeos también falló:', String(e.message || e).slice(0, 80)); }
   }
-  throw err || new Error('Este título no tiene servidor goodstream — se ve en modo sala (👥 Juntos)');
+  throw err || new Error('Este título no tiene servidores disponibles ahora — prueba luego o en sala (👥 Juntos)');
 }
 /* v90: la parte goodstream (lo que antes era resolverSolo a partir del
  * embed) — HLS + subtítulos VTT */
@@ -5370,6 +5508,7 @@ const server = http.createServer(async (req, res) => {
       const q = (url.searchParams.get('q') || '').trim().slice(0, 120);
       if (!q) return json(res, 400, { ok: false, error: 'Escribe qué quieren ver' });
       const r = await buscarEnSitios(q); /* v121: global + fuzzy + sugiere */
+      r.resultados = r.resultados.filter((x) => !cvOcultaUrl(x.url)); /* v191: sin series muertas de cine-calidad */
       if (/titan(es)?\b/i.test(q)) {
         r.resultados.unshift({ title: 'Los Jóvenes Titanes en Acción (Latino)', url: 'https://danimados.cc/serie/dani-titanes', img: daniCoverDe('teen-titans-go'), site: 'Caricaturas', extra: '9 temporadas · 291 episodios' }); /* v178: IMDb */ /* v174: con ?v= — sin esto el navegador enseñaba la portada VIEJA del caché */
       }
