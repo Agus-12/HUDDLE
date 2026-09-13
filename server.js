@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v188'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v189'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -967,13 +967,30 @@ async function serieCtxFromUrl(u) {
       if (idx < 0) return null;
       return { tipo: 'latanime', titulo: d.titulo, poster: d.poster, idx, eps: d.episodios.map((e) => ({ url: e.url, num: 'Episodio ' + e.n })) };
     }
+    m = /\/ver\/([a-z0-9-]+)-(\d+)(?:\/|$)/i.exec(url.pathname);
+    if (m && /animeflv\./.test(host)) {
+      /* v189: cadena de episodios desde la página del anime (AnimeFLV es el
+       * respaldo de Latanime — también merece intros) */
+      const afSlug = m[1], afPed = +m[2];
+      const htmlAF = await fetchSeguro('https://vww.animeflv.one/anime/' + afSlug, 9000).then((r) => (r.ok ? r.text() : '')).catch(() => '');
+      /* la página trae la lista embebida: var eps = [["37","1",""],…] (desc) */
+      let capsAF = [];
+      const mEps = /var\s+eps\s*=\s*\[\[(.*?)\]\]/s.exec(htmlAF);
+      if (mEps) capsAF = [...new Set(mEps[1].split('],[').map((x) => +((x.split(',')[0] || '').replace(/[^0-9]/g, '')) || 0))].filter(Boolean).sort((a, b) => a - b);
+      if (!capsAF.length) capsAF = [...new Set([...htmlAF.matchAll(/\/ver\/[a-z0-9-]+-(\d+)(?:["'?/]|$)/g)].map((x) => +x[1]))].sort((a, b) => a - b);
+      if (capsAF.length) {
+        return { tipo: 'animeflv', titulo: '', poster: '', idx: Math.max(0, capsAF.indexOf(afPed)),
+          eps: capsAF.map((n) => ({ url: 'https://vww.animeflv.one/ver/' + afSlug + '-' + n, num: 'Episodio ' + n })) };
+      }
+      return null;
+    }
     m = /\/episode\/([a-z0-9-]+)-(\d+)x(\d+)/i.exec(url.pathname);
     if (m && /(cine-calidad\.mx|cuevana\.)$/.test(host)) {
       const d = await datosSerieCuevana(m[1]);
       if (!d || !d.episodios || !d.episodios.length) return null;
       const idx = d.episodios.findIndex((e) => e.temporada === +m[2] && e.ep === +m[3]);
       if (idx < 0) return null;
-      return { tipo: 'cuevana', titulo: d.titulo, poster: d.poster, idx, eps: d.episodios.map((e) => ({ url: e.url, num: e.temporada + 'x' + e.ep })) };
+      return { tipo: 'cuevana', titulo: d.titulo, poster: d.poster, idx, eps: d.episodios.map((e) => ({ url: e.url, num: e.temporada + 'x' + e.ep, temporada: e.temporada, ep: e.ep })) };
     }
     /* v118: caricaturas de MisCaricaturas — el slug del episodio
      * («hora-de-aventura-01x02-…») se mapea a su serie y de ahí sale
@@ -1110,8 +1127,8 @@ try { INTROS = JSON.parse(fs.readFileSync(INTROS_FILE, 'utf8')) || {}; } catch {
 /* v187: claves POR TEMPORADA en danimados (dani:slug:S#) — lo aprendido
  * antes (por serie, que siempre salía de la T1) migra a su temporada */
 for (const k of Object.keys(INTROS)) {
-  const m = /^dani:([a-z0-9-]+)$/.exec(k);
-  if (m && !INTROS['dani:' + m[1] + ':1']) { INTROS['dani:' + m[1] + ':1'] = INTROS[k]; delete INTROS[k]; }
+  const m = /^(dani|cv|mm):([a-z0-9-]+)$/.exec(k);
+  if (m && !INTROS[m[1] + ':' + m[2] + ':1']) { INTROS[m[1] + ':' + m[2] + ':1'] = INTROS[k]; delete INTROS[k]; }
 }
 /* v138: los aprendizajes del sistema VIEJO (ventana fija 8→90) tenían fin
  * exactamente en 90 — salían «de más». Se eliminan al arrancar para que la
@@ -1138,8 +1155,10 @@ function introKeysDe(url) {
       const m = /\/episodios\/([a-z0-9-]+)-(\d+)x(\d+)\//.exec(new URL(url).pathname);
       if (m) serie = 'dani:' + m[1] + ':' + m[2]; /* v187: POR TEMPORADA — entre temporadas las intros cambian */
     } else if (/miscaricaturas\.com$/.test(host)) {
-      const base = cariSlugDe(url).replace(/-\d{2}x\d{2}[ab]?(-.*)?$/, '');
-      if (base) serie = 'mm:' + base;
+      const se = cariSlugDe(url);
+      const base = se.replace(/-\d{2}x\d{2}[ab]?(-.*)?$/, '');
+      const tm = /-(\d{2})x\d{2}/.exec(se);
+      if (base) serie = 'mm:' + base + (tm ? ':' + parseInt(tm[1], 10) : ''); /* v189: por temporada */
     } else if (/lacartoons\.com$/.test(host)) {
       const capId = +((/\/serie\/capitulo\/(\d+)/.exec(new URL(url).pathname) || [])[1] || 0);
       const slug = capId ? lctSerieDeCap(capId) : '';
@@ -1148,11 +1167,11 @@ function introKeysDe(url) {
       const m = /\/ver\/([a-z0-9-]+)-episodio-\d+/.exec(new URL(url).pathname);
       if (m) serie = 'la:' + m[1];
     } else if (/animeflv\./.test(host)) {
-      const m = /\/ver\/([a-z0-9-]+)-episodio-\d+/.exec(new URL(url).pathname);
-      if (m) serie = 'af:' + m[1];
+      const m = /\/ver\/([a-z0-9-]+)-(?:\d+|episodio-\d+)/.exec(new URL(url).pathname); /* v189: animeflv usa /ver/slug-N */
+      if (m) serie = 'af:' + m[1].replace(/-\d+$/, '');
     } else if (/(cine-calidad\.mx|cuevana\.)/.test(host)) {
-      const m = /\/episode\/([a-z0-9-]+)-\d+x\d+/.exec(new URL(url).pathname);
-      if (m) serie = 'cv:' + m[1];
+      const m = /\/episode\/([a-z0-9-]+)-(\d+)x\d+/.exec(new URL(url).pathname);
+      if (m) serie = 'cv:' + m[1] + ':' + m[2]; /* v189: POR TEMPORADA, como danimados */
     }
   } catch {}
   return { exacto, serie };
@@ -1268,12 +1287,23 @@ async function descargarInicioEp(m3u8) {
       continue;
     }
     if (!/#EXTM3U/i.test(txt)) {
-      /* mp4/webm directo — solo el primer cacho */
-      const r2 = await pedir(pl, 60000, 'bytes=0-36700160');
-      if (!r2) return null;
-      const ab = await r2.arrayBuffer();
-      if (!ab || ab.byteLength < 3e5) return null;
-      fs.writeFileSync(archivo, Buffer.from(ab));
+      /* mp4/webm directo — v189: muchos CDNs (mp4upload p.ej.) traen el
+       * índice (moov) AL FINAL: bajamos inicio + última porción y escribimos
+       * un archivo CON HUECO (las posiciones cuadran) — ffmpeg encuentra el
+       * moov y decodifica el principio, que es lo que importa */
+      const rH = await pedir(pl, 60000, 'bytes=0-36700160');
+      const rT = await pedir(pl, 30000, 'bytes=-8388608');
+      if (!rH || !rT) return null;
+      const cab = Buffer.from(await rH.arrayBuffer());
+      const cola = Buffer.from(await rT.arrayBuffer());
+      if (!cab || cab.length < 3e5 || !cola || !cola.length) return null;
+      const total = +((/\/(\d+)\s*$/).exec(rT.headers.get('content-range') || '') || [])[1] || 0;
+      if (total && total > cab.length + cola.length) {
+        const fd = fs.openSync(archivo, 'w');
+        try { fs.writeSync(fd, cab, 0, cab.length, 0); fs.writeSync(fd, cola, 0, cola.length, total - cola.length); } finally { fs.closeSync(fd); }
+      } else {
+        fs.writeFileSync(archivo, cab);
+      }
       return archivo;
     }
     /* v187: duración por #EXTINF — los segmentos NO pesan igual entre CDNs
@@ -1286,7 +1316,7 @@ async function descargarInicioEp(m3u8) {
       if (lineas[i2].startsWith('#EXTINF')) {
         const d2 = parseFloat((/#EXTINF:\s*([0-9.]+)/.exec(lineas[i2]) || [])[1] || '0');
         const sg = (lineas[i2 + 1] || '').trim();
-        if (sg && !sg.startsWith('#')) durDe[sg] = d2;
+        if (sg && !sg.startsWith('#')) { try { durDe[new URL(sg, pl).href] = d2; } catch { durDe[sg] = d2; } }
       }
     }
     const segs = lineas.filter((l) => l && !l.startsWith('#')).map((s) => { try { return new URL(s, pl).href; } catch { return null; } }).filter(Boolean).slice(0, 40);
@@ -1395,6 +1425,7 @@ function introBandade(A, B) {
   return { ini: mejorTr.a / 2, fin: (mejorTr.b + 1) / 2, offset: d, frames: mejorTr.n };
 }
 const INTRO_JOBS = new Map(), INTRO_INTENTOS = new Map(); /* v185: clave→hora de inicio */
+let LCT_INTRO_REFRESCO_EN = 0; /* v189: último refresco del mapa de lacartoons */
 function introJobAtascado(k) { const t0 = INTRO_JOBS.get(k); return t0 && Date.now() - t0 > 10 * 60 * 1000; } /* v185: 10 min máximo por intento */
 /* v137: penalización por resultado — fallo de infra (navegador ocupado, red)
  * retrasa el reintento solo 15 min; «no hay intro común» sí espera 6h */
@@ -1485,6 +1516,11 @@ async function detectarIntroSerie(serieKey, urls) {
           penalizarIntro(serieKey, 6 * 3600 * 1000); /* conclusión real: sin intro común — 6h */
           console.log(`[intro] ${serieKey}: los episodios no comparten intro al inicio — no se guarda nada`);
         }
+      } else if (!guardado) {
+        /* v189: ni video ni audio dieron veredicto (huellas nulas, moov ausente…) —
+         * SIN esto cada sondeo reiniciaba el job en bucle */
+        penalizarIntro(serieKey, 15 * 60 * 1000);
+        console.log('[intro] ' + serieKey + ': sin conclusión (video y audio) — reintento en 15 min');
       }
     } finally { try { fs.unlinkSync(f0); } catch {} try { fs.unlinkSync(f1); } catch {} }
   } catch {} finally { INTRO_JOBS.delete(serieKey); }
@@ -5523,6 +5559,21 @@ const server = http.createServer(async (req, res) => {
        * v134: también con datos MANUALES (un clic equivocado no se queda para siempre) */
       const hace = INTRO_INTENTOS.get(ks.serie) || 0;
       if (introJobAtascado(ks.serie)) INTRO_JOBS.delete(ks.serie); /* v185 */
+      /* v189: lacartoons sin mapa cap→serie (server recién actualizado) —
+       * se refrescan sus series en 2º plano; el siguiente sondeo dispara solo */
+      if (!ks.serie && Date.now() - (LCT_INTRO_REFRESCO_EN || 0) > 5 * 60 * 1000 && /lacartoons\.com$/.test((() => { try { return new URL(String(url.searchParams.get('url') || '')).hostname.replace(/^www\./, ''); } catch { return ''; } })())) {
+        LCT_INTRO_REFRESCO_EN = Date.now();
+        console.log('[intro] lacartoons: mapa de series frío — refrescando en 2º plano…');
+        (async () => {
+          const vistas = new Set();
+          for (const lct of [...LCT_MERGE.map((x) => ({ slug: x.slug, lctId: x.lctId })), ...LCT_SERIES.values()]) {
+            if (vistas.has(lct.lctId)) continue;
+            vistas.add(lct.lctId);
+            await refrescarDatosLacartoons(lct).catch(() => {});
+          }
+          console.log('[intro] lacartoons: ' + vistas.size + ' series refrescadas — el mapa ya dispara');
+        })();
+      }
       if (ks.serie && (!datos || datos.by !== 'auto') && fpcalcOk() && !INTRO_JOBS.has(ks.serie) && Date.now() - hace >= 6 * 3600 * 1000) {
         serieCtxFromUrl(String(url.searchParams.get('url') || '')).then((sc) => {
           if (sc && sc.eps && sc.eps.length > 1) {
