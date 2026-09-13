@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v191'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v192'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -3620,6 +3620,175 @@ const LCT_SERIES = new Map([
   ['13', { slug: 'las-aventuras-de-tintin', lctId: 13, titulo: 'Las Aventuras de TinTin' }],
   ['36', { slug: 'wolverine', lctId: 36, titulo: 'Wolverine y los X-Men' }],
   ['281', { slug: 'ben-10-fuerza-alienigena', lctId: 281, titulo: 'Ben 10: Fuerza Alienígena' }],
+
+    /* v192: GRAN ALTA de lacartoons — auditoría completa (503 series del sitio):
+   * cruce FUZZY contra danimados (preferida) + contra nuestras LCT existentes,
+   * y detección de player por serie (probe HTTP del primer capítulo). Solo
+   * entran players vivos: ok.ru (MP4) y rpmvid (HLS). FUERA: 45 con player
+   * roto (sendvid/cubeembed.com/dhtpre) y 214 duplicadas con lo nuestro.
+   * Todo el contenido de lacartoons está doblado en LATINO. 162 series ↓ */
+  ['1', { slug: '2-perros-tontos', lctId: 1, titulo: '2 Perros Tontos' }],
+  ['26', { slug: 'sakura-card-captors', lctId: 26, titulo: 'Sakura Card Captors' }],
+  ['29', { slug: 'samurai-champloo', lctId: 29, titulo: 'Samurai Champloo' }],
+  ['43', { slug: 'trigun', lctId: 43, titulo: 'Trigun' }],
+  ['52', { slug: 'capitan-n-fox-kids', lctId: 52, titulo: 'Capitán N Fox Kids' }],
+  ['53', { slug: 'digimon-digital-monsters-fox-kids', lctId: 53, titulo: 'Digimon: Digital Monsters Fox Kids' }],
+  ['58', { slug: 'el-pajaro-loco-y-amigos-fox-kids', lctId: 58, titulo: 'El Pájaro Loco y Amigos Fox Kids' }],
+  ['61', { slug: 'gundam-wing-fox-kids', lctId: 61, titulo: 'Gundam Wing Fox Kids' }],
+  ['66', { slug: 'monster-rancher-fox-kids', lctId: 66, titulo: 'Monster Rancher Fox Kids' }],
+  ['67', { slug: 'oggy-y-las-cucarachas-fox-kids', lctId: 67, titulo: 'Oggy Y Las Cucarachas Fox Kids' }],
+  ['68', { slug: 'power-rangers-fox-kids', lctId: 68, titulo: 'Power Rangers Fox Kids' }],
+  ['69', { slug: 'power-rangers-zeo-fox-kids', lctId: 69, titulo: 'Power Rangers Zeo Fox Kids' }],
+  ['70', { slug: 'power-rangers-turbo-fox-kids', lctId: 70, titulo: 'Power Rangers Turbo Fox Kids' }],
+  ['71', { slug: 'power-rangers-en-el-espacio-fox-kids', lctId: 71, titulo: 'Power Rangers En El Espacio Fox Kids' }],
+  ['72', { slug: 'power-rangers-en-la-galaxia-perdida-fox-kids', lctId: 72, titulo: 'Power Rangers En La Galaxia Perdida Fox Kids' }],
+  ['74', { slug: 'sailor-moon-fox-kids', lctId: 74, titulo: 'Sailor Moon Fox Kids' }],
+  ['75', { slug: 'shaman-king-fox-kids', lctId: 75, titulo: 'Shaman King Fox Kids' }],
+  ['86', { slug: 'los-3-chiflados-fox-kids', lctId: 86, titulo: 'Los 3 Chiflados Fox Kids' }],
+  ['94', { slug: 'las-nuevas-aventuras-del-oso-yogui-hanna-barbera', lctId: 94, titulo: 'Las Nuevas Aventuras Del Oso Yogui Hanna Barbera' }],
+  ['96', { slug: 'el-pulpo-manotas-hanna-barbera', lctId: 96, titulo: 'El Pulpo Manotas Hanna Barbera' }],
+  ['103', { slug: 'la-bruja-tonta-hanna-barbera', lctId: 103, titulo: 'La bruja Tonta Hanna Barbera' }],
+  ['109', { slug: 'las-olimpiadas-de-la-risa-hanna-barbera', lctId: 109, titulo: 'Las Olimpiadas De La Risa Hanna Barbera' }],
+  ['111', { slug: 'los-osos-montaneses-hanna-barbera', lctId: 111, titulo: 'Los Osos Montañeses Hanna Barbera' }],
+  ['113', { slug: 'maguila-gorila-hanna-barbera', lctId: 113, titulo: 'Maguila Gorila Hanna Barbera' }],
+  ['116', { slug: 'el-escuadron-diabolico-hanna-barbera', lctId: 116, titulo: 'El Escuadrón Diabólico Hanna Barbera' }],
+  ['117', { slug: 'punkin-puss-y-mush-mouse-hanna-barbera', lctId: 117, titulo: 'Punkin Puss y Mush Mouse Hanna Barbera' }],
+  ['146', { slug: 'doug-nickelodeon', lctId: 146, titulo: 'Doug Nickelodeon' }],
+  ['167', { slug: 'la-familia-addams-nickelodeon', lctId: 167, titulo: 'La Familia Addams Nickelodeon' }],
+  ['168', { slug: 'los-munsters-nickelodeon', lctId: 168, titulo: 'Los Munsters Nickelodeon' }],
+  ['169', { slug: 'hechizada-nickelodeon', lctId: 169, titulo: 'Hechizada Nickelodeon' }],
+  ['170', { slug: 'los-vengadores-los-heroes-mas-poderosos-del-planeta-marvel', lctId: 170, titulo: 'Los Vengadores: Los Héroes Más Poderosos Del Planeta Marvel' }],
+  ['175', { slug: 'super-agente-86-nickelodeon', lctId: 175, titulo: 'Super Agente 86 Nickelodeon' }],
+  ['184', { slug: 'yu-gi-oh-nickelodeon', lctId: 184, titulo: 'Yu-Gi-Oh! Nickelodeon' }],
+  ['186', { slug: 'taz-mania-warner-channel', lctId: 186, titulo: 'Taz-Mania Warner Channel' }],
+  ['190', { slug: 'mi-bella-genio-nickelodeon', lctId: 190, titulo: 'Mi Bella Genio Nickelodeon' }],
+  ['191', { slug: 'martin-mystery-nickelodeon', lctId: 191, titulo: 'Martin Mystery Nickelodeon' }],
+  ['193', { slug: 'kid-musculo-fox-kids', lctId: 193, titulo: 'Kid Músculo Fox Kids' }],
+  ['194', { slug: 'yu-yu-hakusho', lctId: 194, titulo: 'Yu yu Hakusho' }],
+  ['196', { slug: 'los-gatos-samurais-fox-kids', lctId: 196, titulo: 'Los Gatos Samurais Fox Kids' }],
+  ['201', { slug: 'ricky-ricon-hanna-barbera', lctId: 201, titulo: 'Ricky Ricón Hanna Barbera' }],
+  ['212', { slug: 'los-vengadores-united-they-stand-marvel', lctId: 212, titulo: 'Los Vengadores: United They Stand Marvel' }],
+  ['221', { slug: 'vr-troopers-fox-kids', lctId: 221, titulo: 'Vr Troopers Fox Kids' }],
+  ['224', { slug: 'super-campeones', lctId: 224, titulo: 'Super Campeones' }],
+  ['230', { slug: 'el-coyote-y-el-corre-caminos-warner-channel', lctId: 230, titulo: 'El Coyote y El Corre Caminos Warner Channel' }],
+  ['231', { slug: 'birdman-hanna-barbera', lctId: 231, titulo: 'Birdman Hanna Barbera' }],
+  ['233', { slug: 'cyborg-009', lctId: 233, titulo: 'Cyborg 009' }],
+  ['234', { slug: 'gi-joe-otros', lctId: 234, titulo: 'Gi Joe Otros' }],
+  ['235', { slug: 'street-sharks-otros', lctId: 235, titulo: 'Street Sharks Otros' }],
+  ['237', { slug: 'heidi-otros', lctId: 237, titulo: 'Heidi Otros' }],
+  ['238', { slug: 'candy-candy-otros', lctId: 238, titulo: 'Candy Candy Otros' }],
+  ['240', { slug: 'voltron-vehiculos-otros', lctId: 240, titulo: 'Voltron Vehiculos Otros' }],
+  ['241', { slug: 'el-jinete-de-sable-y-los-comisarios-estrellas-otros', lctId: 241, titulo: 'El Jinete De Sable Y Los Comisarios Estrellas Otros' }],
+  ['242', { slug: 'mazinger-z-otros', lctId: 242, titulo: 'Mazinger Z Otros' }],
+  ['243', { slug: 'el-gladiador-otros', lctId: 243, titulo: 'El Gladiador Otros' }],
+  ['244', { slug: 'super-magnetron-otros', lctId: 244, titulo: 'Super Magnetrón Otros' }],
+  ['245', { slug: 'el-vengador-otros', lctId: 245, titulo: 'El Vengador Otros' }],
+  ['246', { slug: 'el-galactico-otros', lctId: 246, titulo: 'El Galáctico Otros' }],
+  ['247', { slug: 'capitan-centella-otros', lctId: 247, titulo: 'Capitán Centella Otros' }],
+  ['248', { slug: 'capitan-futuro-otros', lctId: 248, titulo: 'Capitán Futuro Otros' }],
+  ['249', { slug: 'arbegas-el-rayo-custodio-otros', lctId: 249, titulo: 'Arbegas: El Rayo Custodio Otros' }],
+  ['250', { slug: 'fuerza-g-otros', lctId: 250, titulo: 'Fuerza G Otros' }],
+  ['253', { slug: 'oban-star-racers-fox-kids', lctId: 253, titulo: 'Oban Star Racers Fox Kids' }],
+  ['256', { slug: 'full-house-warner-channel', lctId: 256, titulo: 'Full House Warner Channel' }],
+  ['265', { slug: 'death-note-otros', lctId: 265, titulo: 'Death Note Otros' }],
+  ['266', { slug: 'el-gallo-claudio-warner-channel', lctId: 266, titulo: 'El Gallo Claudio Warner Channel' }],
+  ['267', { slug: '101-dalmatas-disney', lctId: 267, titulo: '101 Dalmatas Disney' }],
+  ['268', { slug: 'dragon-quest-fox-kids', lctId: 268, titulo: 'Dragon Quest Fox Kids' }],
+  ['269', { slug: 'wild-c-a-t-s-fox-kids', lctId: 269, titulo: 'Wild C.A.T.S Fox Kids' }],
+  ['271', { slug: 'samurai-warriors-otros', lctId: 271, titulo: 'Samurai Warriors Otros' }],
+  ['275', { slug: 'super-agente-cobra-otros', lctId: 275, titulo: 'Super Agente Cobra Otros' }],
+  ['276', { slug: 'zoids-chaotic-century-otros', lctId: 276, titulo: 'Zoids: Chaotic Century Otros' }],
+  ['287', { slug: 'robotech-otros', lctId: 287, titulo: 'Robotech Otros' }],
+  ['288', { slug: 'el-baron-rojo-otros', lctId: 288, titulo: 'El Baron Rojo Otros' }],
+  ['289', { slug: 'el-conde-patula-otros', lctId: 289, titulo: 'El Conde Pátula Otros' }],
+  ['295', { slug: 'astro-boy', lctId: 295, titulo: 'Astro Boy 1980' }],
+  ['296', { slug: 'astro-boy-2', lctId: 296, titulo: 'Astro Boy 2003' }],
+  ['299', { slug: 'btx-otros', lctId: 299, titulo: 'BTX Otros' }],
+  ['300', { slug: 'btx-neo-otros', lctId: 300, titulo: 'BTX Neo Otros' }],
+  ['302', { slug: 'sam-el-rey-del-judo-otros', lctId: 302, titulo: 'Sam El Rey Del Judo Otros' }],
+  ['303', { slug: 'yu-gi-oh-gx-nickelodeon', lctId: 303, titulo: 'Yu Gi Oh! GX Nickelodeon' }],
+  ['312', { slug: 'zatch-bell', lctId: 312, titulo: 'Zatch Bell' }],
+  ['315', { slug: 'lilo-stich-disney', lctId: 315, titulo: 'Lilo & Stich Disney' }],
+  ['323', { slug: 'corsario-negro-otros', lctId: 323, titulo: 'Corsario Negro Otros' }],
+  ['324', { slug: 'zenki-otros', lctId: 324, titulo: 'Zenki Otros' }],
+  ['325', { slug: 'slam-dunk-otros', lctId: 325, titulo: 'Slam Dunk Otros' }],
+  ['332', { slug: 'happy-tree-friends-otros', lctId: 332, titulo: 'Happy Tree Friends Otros' }],
+  ['349', { slug: 'jayce-y-los-guerreros-rodantes-fox-kids', lctId: 349, titulo: 'Jayce y los Guerreros Rodantes Fox Kids' }],
+  ['350', { slug: 'yin-yang-yo-fox-kids', lctId: 350, titulo: 'Yin Yang Yo! Fox Kids' }],
+  ['354', { slug: 'el-colegio-del-agujero-negro-fox-kids', lctId: 354, titulo: 'El Colegio Del Agujero Negro Fox Kids' }],
+  ['357', { slug: 'felix-el-gato', lctId: 357, titulo: 'Felix El Gato' }],
+  ['361', { slug: 'historia-de-fantasmas', lctId: 361, titulo: 'Historia de Fantasmas' }],
+  ['365', { slug: 'el-misterio-de-anubis-nickelodeon', lctId: 365, titulo: 'El Misterio de Anubis Nickelodeon' }],
+  ['366', { slug: 'yu-gi-oh-5ds-nickelodeon', lctId: 366, titulo: 'YU Gi Oh! 5DS Nickelodeon' }],
+  ['367', { slug: 'zona-tiza-nickelodeon', lctId: 367, titulo: 'Zona Tiza Nickelodeon' }],
+  ['370', { slug: 'ginger-nickelodeon', lctId: 370, titulo: 'Ginger Nickelodeon' }],
+  ['372', { slug: 'blanco-y-negro-nickelodeon', lctId: 372, titulo: 'Blanco y Negro Nickelodeon' }],
+  ['375', { slug: 'hora-de-aventura', lctId: 375, titulo: 'Hora de Aventura' }],
+  ['381', { slug: 'eek-el-gato-fox-kids', lctId: 381, titulo: 'Eek! El Gato Fox Kids' }],
+  ['382', { slug: 'la-garrapata-fox-kids', lctId: 382, titulo: 'La Garrapata Fox Kids' }],
+  ['387', { slug: 'phineas-y-pherb-disney', lctId: 387, titulo: 'Phineas y Pherb Disney' }],
+  ['392', { slug: 'las-3-mellizas-otros', lctId: 392, titulo: 'Las 3 Mellizas Otros' }],
+  ['396', { slug: 'cool-mccool-fox-kids', lctId: 396, titulo: 'Cool McCool Fox Kids' }],
+  ['401', { slug: 'clarissa-lo-explica-todo-nickelodeon', lctId: 401, titulo: 'Clarissa Lo Explica Todo Nickelodeon' }],
+  ['404', { slug: 'popeye-el-marino', lctId: 404, titulo: 'Popeye El Marino' }],
+  ['407', { slug: 'el-lagartijo-de-ned', lctId: 407, titulo: 'El Lagartijo De Ned' }],
+  ['409', { slug: 'batman-el-valiente', lctId: 409, titulo: 'Batman El Valiente' }],
+  ['414', { slug: 'alienators-evolucion-continua-fox-kids', lctId: 414, titulo: 'Alienators: Evolucion Continua Fox Kids' }],
+  ['418', { slug: 'jacobo-dos-dos-fox-kids', lctId: 418, titulo: 'Jacobo Dos Dos Fox Kids' }],
+  ['420', { slug: 'archie-y-sabrina-hanna-barbera', lctId: 420, titulo: 'Archie y Sabrina Hanna Barbera' }],
+  ['427', { slug: 'protagonistas-de-la-historia-warner-channel', lctId: 427, titulo: 'Protagonistas De La Historia Warner Channel' }],
+  ['428', { slug: 'el-mago-otros', lctId: 428, titulo: 'El Mago Otros' }],
+  ['430', { slug: 'el-rey-arturo-otros', lctId: 430, titulo: 'El Rey Arturo Otros' }],
+  ['433', { slug: 'virtua-fighter-otros', lctId: 433, titulo: 'Virtua Fighter Otros' }],
+  ['434', { slug: 'ripley-aunque-usted-no-lo-crea-otros', lctId: 434, titulo: 'Ripley: Aunque Usted No Lo Crea Otros' }],
+  ['436', { slug: 'escuela-de-heroes-otros', lctId: 436, titulo: 'Escuela De Heroes Otros' }],
+  ['442', { slug: 'el-fantastico-max-hanna-barbera', lctId: 442, titulo: 'El Fantastico Max Hanna Barbera' }],
+  ['447', { slug: 'isa-tkm-nickelodeon', lctId: 447, titulo: 'Isa TKM Nickelodeon' }],
+  ['448', { slug: 'isa-tk-nickelodeon', lctId: 448, titulo: 'Isa TK+ Nickelodeon' }],
+  ['454', { slug: 'la-tortuga-franklin-nickelodeon', lctId: 454, titulo: 'La Tortuga Franklin Nickelodeon' }],
+  ['457', { slug: 'super-fizgon-y-despistado-hanna-barbera', lctId: 457, titulo: 'Super Fizgon y Despistado Hanna Barbera' }],
+  ['458', { slug: 'grotescologia-fox-kids', lctId: 458, titulo: 'Grotescologia Fox Kids' }],
+  ['461', { slug: 'shinzo-fox-kids', lctId: 461, titulo: 'Shinzo Fox Kids' }],
+  ['462', { slug: 'angela-anaconda-fox-kids', lctId: 462, titulo: 'Angela Anaconda Fox Kids' }],
+  ['463', { slug: 'power-rangers-a-la-velocidad-de-la-luz-fox-kids', lctId: 463, titulo: 'Power Rangers A La Velocidad De La Luz Fox Kids' }],
+  ['464', { slug: 'power-rangers-fuerza-del-tiempo-fox-kids', lctId: 464, titulo: 'Power Rangers Fuerza Del Tiempo Fox Kids' }],
+  ['465', { slug: 'power-rangers-fueza-salvaje-fox-kids', lctId: 465, titulo: 'Power Rangers Fueza Salvaje Fox Kids' }],
+  ['466', { slug: 'power-rangers-tormenta-ninja-fox-kids', lctId: 466, titulo: 'Power Rangers Tormenta Ninja Fox Kids' }],
+  ['467', { slug: 'power-rangers-dino-trueno-fox-kids', lctId: 467, titulo: 'Power Rangers Dino Trueno Fox Kids' }],
+  ['468', { slug: 'power-rangers-super-patrulla-delta-fox-kids', lctId: 468, titulo: 'Power Rangers Super Patrulla Delta Fox Kids' }],
+  ['469', { slug: 'power-rangers-fuerza-mistica-fox-kids', lctId: 469, titulo: 'Power Rangers Fuerza Mistica Fox Kids' }],
+  ['470', { slug: 'power-rangers-operacion-sobrecarga-fox-kids', lctId: 470, titulo: 'Power Rangers Operacion Sobrecarga Fox Kids' }],
+  ['471', { slug: 'power-rangers-furia-animal-fox-kids', lctId: 471, titulo: 'Power Rangers Furia Animal Fox Kids' }],
+  ['472', { slug: 'power-rangers-rpm-disney', lctId: 472, titulo: 'Power Rangers RPM Disney' }],
+  ['473', { slug: 'power-rangers-samurai-disney', lctId: 473, titulo: 'Power Rangers Samurai Disney' }],
+  ['474', { slug: 'power-rangers-super-samurai-disney', lctId: 474, titulo: 'Power Rangers Super Samurai Disney' }],
+  ['477', { slug: 'power-rangers-dino-charge', lctId: 477, titulo: 'Power Rangers Dino Charge' }],
+  ['478', { slug: 'power-rangers-dino-super-charge', lctId: 478, titulo: 'Power Rangers Dino Super Charge' }],
+  ['479', { slug: 'power-rangers-ninja-steel', lctId: 479, titulo: 'Power Rangers Ninja Steel' }],
+  ['480', { slug: 'power-rangers-super-ninja-steel', lctId: 480, titulo: 'Power Rangers Super Ninja Steel' }],
+  ['481', { slug: 'power-rangers-beast-morphers', lctId: 481, titulo: 'Power Rangers Beast Morphers' }],
+  ['483', { slug: 'arthur', lctId: 483, titulo: 'Arthur' }],
+  ['486', { slug: 'loonatics', lctId: 486, titulo: 'Loonatics' }],
+  ['489', { slug: 'highlander-el-inmortal-otros', lctId: 489, titulo: 'Highlander El Inmortal Otros' }],
+  ['491', { slug: 'salvados-por-la-campana-otros', lctId: 491, titulo: 'Salvados Por La Campana Otros' }],
+  ['492', { slug: 'salvados-por-la-campana-anos-de-universidad-otros', lctId: 492, titulo: 'Salvados Por La Campana: Años De Universidad Otros' }],
+  ['493', { slug: 'los-intocables-de-elliot-mouse-otros', lctId: 493, titulo: 'Los Intocables De Elliot Mouse Otros' }],
+  ['494', { slug: 'xena-la-princesa-guerrera-otros', lctId: 494, titulo: 'Xena La Princesa guerrera Otros' }],
+  ['495', { slug: 'anatole-otros', lctId: 495, titulo: 'Anatole Otros' }],
+  ['496', { slug: 'heroes-de-rescate-otros', lctId: 496, titulo: 'Heroes De Rescate Otros' }],
+  ['497', { slug: 'los-conejitos-torpes-otros', lctId: 497, titulo: 'Los Conejitos Torpes Otros' }],
+  ['498', { slug: 'zoboomafo-otros', lctId: 498, titulo: 'Zoboomafo Otros' }],
+  ['499', { slug: 'clifford-el-gran-perro-rojo-otros', lctId: 499, titulo: 'Clifford El Gran Perro Rojo Otros' }],
+  ['504', { slug: 'escuela-de-espanto-otros', lctId: 504, titulo: 'Escuela De Espanto Otros' }],
+  ['505', { slug: 'fraggle-rock-otros', lctId: 505, titulo: 'Fraggle Rock Otros' }],
+  ['506', { slug: 'animalitos-locos-otros', lctId: 506, titulo: 'Animalitos Locos Otros' }],
+  ['507', { slug: 'los-fantasticos-viajes-de-simbads-el-marino-otros', lctId: 507, titulo: 'Los Fantasticos Viajes De Simbads El Marino Otros' }],
+  ['508', { slug: 'bumpy-y-sus-amigos-otros', lctId: 508, titulo: 'Bumpy y sus Amigos Otros' }],
+  ['509', { slug: 'elliot-el-alce-otros', lctId: 509, titulo: 'Elliot El Alce Otros' }],
+  ['510', { slug: 'el-chavo-del-8-otros', lctId: 510, titulo: 'El Chavo Del 8 Otros' }],
+  ['511', { slug: 'angel-la-nina-de-las-flores-otros', lctId: 511, titulo: 'Angel La Niña De Las Flores Otros' }],
+  ['512', { slug: 'la-familia-robinson-otros', lctId: 512, titulo: 'La Familia Robinson Otros' }],
+  ['516', { slug: 'jem-y-los-hologramas-otros', lctId: 516, titulo: 'Jem y Los Hologramas Otros' }],
 ]);
 /* v113: series de MisCaricaturas cuyas temporadas en inglés se
  * reemplazan por las de lacartoons (latino, auditadas). «tomar» = qué
@@ -6043,7 +6212,21 @@ if (!CRAWL.lista) {
     crawlGuardar();
     console.log('[intro-crawl] cola lista: ' + items.length + ' series por rastrear (una vez cada una — solo cuando nadie está viendo)');
   })();
-} else console.log('[intro-crawl] continuando cola: ' + CRAWL.pend.length + ' pendientes de ' + CRAWL.total);
+} else {
+  /* v192: si había cola guardada, se le SUMAN las series nuevas (p. ej. las
+   * altas de lacartoons) que no estaban cuando se construyó */
+  let sumadas = 0;
+  try {
+    const conocidas = new Set([...CRAWL.pend.map((x) => x.u), ...CRAWL.sinIntro]);
+    for (const sl of LCT_SERIES.keys()) {
+      const u = 'lct:' + (LCT_SERIES.get(sl) || {}).slug;
+      if (u && !conocidas.has(u) && !INTROS[u]) { CRAWL.pend.push({ u }); sumadas++; }
+    }
+  } catch {}
+  CRAWL.total = (CRAWL.total || 0) + sumadas;
+  crawlGuardar();
+  console.log('[intro-crawl] continuando cola: ' + CRAWL.pend.length + ' pendientes de ' + CRAWL.total + (sumadas ? ' (+' + sumadas + ' nuevas)' : ''));
+}
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🎬 Huddle corriendo en http://0.0.0.0:${PORT}`);
