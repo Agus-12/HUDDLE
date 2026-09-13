@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v182'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v183'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -575,6 +575,13 @@ async function daniEpToStream(urlEp) {
       if (r2.ok) { const j2 = await r2.json().catch(() => null); if (j2 && j2.embed_url) embedUrl = j2.embed_url; }
     } finally { clearTimeout(t); }
     if (!embedUrl) continue;
+    /* v183: el ajax a veces regresa la ETIQUETA iframe completa, no la URL
+     * (episodios con player «Vimeus») — sacar la src de dentro */
+    if (/^</.test(embedUrl)) {
+      const src = (/src=["']([^"']+)/.exec(embedUrl) || [])[1] || '';
+      if (!src) continue;
+      embedUrl = src;
+    }
     /* el front hglink (con guard JS) solo ROTA el dominio: hanerix sirve el
      * player de verdad sin guard — si aún no viene desempacable, cambiamos host */
     let html2 = '';
@@ -583,6 +590,41 @@ async function daniEpToStream(urlEp) {
       if (!r3 || !r3.ok) continue;
       const b = await r3.text();
       if (/\.m3u8|eval\(function\(p,a,c,k,e/.test(b)) { html2 = b; break; }
+    }
+    /* v183: cadena VIMEUS (el único player de varios episodios, p.ej. Rick y
+     * Morty T9) — el shell de vimeus.com esconde el embed de vimeos.net, la
+     * misma familia packer que ya rompemos para Cuevana (resolverVimeos) y
+     * de paso trae subtítulos .vtt */
+    if (!html2 && /vimeus\.com|vimeos\.net/i.test(embedUrl)) {
+      try {
+        const shell = await fetchSeguro(embedUrl, 12000).catch(() => null);
+        const sb = shell && shell.ok ? await shell.text() : '';
+        const ev = (/https?:\/\/vimeos\.net\/embed-[a-z0-9]+\.html/i.exec(sb) || [])[0];
+        if (ev) {
+          const rv = await resolverVimeos(ev, urlEp).catch(() => null);
+          if (rv && rv.m3u8) {
+            let bodyV = '';
+            for (const cab2 of [{ 'User-Agent': MIRROR_UA, Referer: ev }, { 'User-Agent': MIRROR_UA }, {}]) {
+              const ctl3 = new AbortController();
+              const t3 = setTimeout(() => ctl3.abort(), 12000);
+              try {
+                const rm2 = await fetch(rv.m3u8, { headers: cab2, signal: ctl3.signal, redirect: 'follow' });
+                const tx = rm2.ok ? await rm2.text() : '';
+                if (/ #EXTM3U/.test(' ' + tx)) { bodyV = tx; break; }
+              } catch {} finally { clearTimeout(t3); }
+            }
+            if (bodyV) {
+              const tok2 = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
+              pelisxdStreams.set(tok2, { body: bodyV, base: rv.m3u8, ref: ev, slug: 'dani', at: ahora });
+              const natV = { m3u8: '/api/xd/' + tok2 + '/index.m3u8', proxy: true, subs: rv.subs || [] };
+              DANI_STREAMS.set(urlEp, { nat: natV, at: ahora });
+              console.log('[dani] cadena vimeus rota para ' + urlEp.slice(-30));
+              return natV;
+            }
+          }
+        }
+      } catch {}
+      continue; /* esta opción no dio nada — siguiente player */
     }
     if (!html2) continue;
     const des = daniDesempacar(html2);
