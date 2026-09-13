@@ -155,7 +155,7 @@ h1 { margin: 0 0 10px; font-size: 40px; letter-spacing: -0.5px; }
 .brand { font-size: 18px; font-weight: 800; }
 /* v36: gente/invitar/salir junto al logo; en vivo + detener en su propia fila */
 .top-quick { display: flex; align-items: center; gap: 8px; margin-left: auto; position: relative; }
-.top-live { display: flex; align-items: center; gap: 8px; }
+.top-live { display: flex; align-items: center; gap: 8px; min-width: 0; } /* v142: la fila puede encoger sin empujar nada afuera */
 
 /* móvil: la barra de arriba se acomoda en varias filas, sin desplazar la pantalla */
 @media (max-width: 700px) {
@@ -1738,7 +1738,15 @@ body.sala-girada .pd-results { max-height: 50dvw; }
 .skip-intro.hidden { display: none; }
 
 /* v141: el hueco de «Detener» muestra el nombre de lo que se ve */
-.sala-titulo { min-width: 0; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; font-size: 12.5px; }
+/* v142: el título ocupa SOLO el espacio que le sobra a la fila (junto a
+ * «En vivo») y se recorta con «…» — jamás se sale de la pantalla */
+.sala-titulo {
+  flex: 1 1 auto; min-width: 0; max-width: 100%;
+  display: inline-flex; align-items: center; justify-content: flex-start; gap: 6px;
+  overflow: hidden; font-weight: 700; font-size: 12.5px; text-align: left;
+}
+.sala-titulo svg { flex: none; }
+.sala-titulo span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 
 /* v131: etiqueta de versión — discreta, para verificar el auto-update */
 .ver-tag { font-size: 10px; color: var(--dim); opacity: 0.75; vertical-align: middle; margin-left: 4px; }
