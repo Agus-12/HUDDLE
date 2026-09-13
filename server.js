@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v157'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v158'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -3448,6 +3448,15 @@ async function resolverCaricaturaHttp(epUrl) {
   if (!/#EXTM3U/.test(body)) throw new Error('Playlist inválido');
   const ahora = Date.now();
   const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
+  /* v158: registrar el host de la CDN ANTES de devolver — sin esto
+   * `servirPlaylist` no proxiea la variante y el master llega al teléfono
+   * con la URL ABSOLUTA de sprintcdn; el teléfono la pide directo con un
+   * token amarrado a la IP del SERVIDOR y la CDN le da 404: el video
+   * nunca entra (esto lo rompí en v157 con el return temprano, que se
+   * saltaba el registro del envoltorio). Con el host registrado, la
+   * variante y los segmentos pasan por /api/hls y los pide el servidor
+   * con SU IP — la misma que pidió el token. */
+  try { hlsReferers.set(new URL(mejor.url).hostname, 'https://player.miscaricaturas.com/'); } catch {}
   pelisxdStreams.set(tok, { body, base: mejor.url, ref: '', slug, at: ahora });
   console.log('[caricaturas] HTTP: ' + slug + ' → ' + (mejor.label || mejor.quality || '?') + ' en ' + ((ahora - t0) / 1000).toFixed(1) + 's (sin navegador)');
   return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
