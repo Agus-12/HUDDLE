@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v198'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v199'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -387,6 +387,16 @@ try {
   } catch {}
   console.log('[latanime] ' + LA_TODOS.size + ' series (' + LA_OCULTAS_SET.size + ' castellano/duplicados fuera)');
 } catch {}
+/* v199: inventario de PELÍCULAS que ya tenemos (cine-calidad) — para no
+ * duplicar las de GoPelis en el buscador */
+const CV_PELIS_TOKENS = [];
+try {
+  for (const l of fs.readFileSync(path.join(__dirname, 'public', 'cine-pelis-titulos.txt'), 'utf8').split('\n')) {
+    const t = normalizarTxt(l);
+    if (t) CV_PELIS_TOKENS.push(new Set(t.split(' ')));
+  }
+  console.log('[pelis] ' + CV_PELIS_TOKENS.length + ' en el inventario de cine-calidad');
+} catch {}
 /* v178: portadas de IMDB (el usuario las pidió «tal y como los jóvenes
  * titanles»... como Teen Titans) — mapa slug → m.media-amazon generado con
  * la API de sugerencias de IMDb; cubre 818 series + los reemplazos nuestros */
@@ -502,15 +512,17 @@ function daniTituloDe(slug) {
   return (v && v.t ? String(v.t).replace(/\xa0/g, ' ') : slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
 }
 function daniCoverDe(slug) { return CARI_PORTADAS.get(DANI_COVER_DE.get(slug) || slug) || DANI_IMDB.get(slug) || '/api/dani/poster/' + slug; } /* v180: portada curada local (IMDb) primero */
-/* ═══════ v198: GOPELIS — series en LATINO por HTTP puro ═══════
- * Catálogo: /series?page=N (3 páginas). Ficha: /series/<slug> trae los
- * enlaces /ver/tv/<tmdbId>?season=N. Episodios: /ver/tv/<id>?season=N
- * (server-rendered «Episodio N»). Player: /api/stream-player trae
- * PAGE_TOKEN; nsrplay /sources?pt=<token> devuelve directUrl (m3u8). */
+/* ═══════ v198/v199: GOPELIS — series y PELÍCULAS en LATINO, HTTP puro ═══════
+ * Series: /series?page=N (3 págs) → ficha /series/<slug> → /ver/tv/<id>?season=N.
+ * Pelis: /peliculas?page=N (15 págs, ~508) → ficha /peliculas/<slug> →
+ * /ver/movie/<tmdbId>. Player: /api/stream-player trae PAGE_TOKEN;
+ * el directUrl de /sources llega VIEJO (403): el sitio mismo re-resuelve
+ * cada servidor con RESOLVE_URL?token=…&pt=… y ese es el m3u8 FRESCO. */
 const GP_BASE = 'https://gopelis.com/';
 const gpCatCache = { at: 0, items: [] };
 const gpDatos = new Map(); /* slug → {at, d} 3 h */
-const gpStream = new Map(); /* id-s-e → {at, m3u8} 1 h */
+const gpStream = new Map(); /* id-s-e → {at, m3u8} 1 h (m3u8 '' = sin servidores vivos, 10 min) */
+const gpPelisCache = { at: 0, items: [] }; /* catálogo de PELÍCULAS, 6 h */
 async function gpCatalogo() {
   if (Date.now() - gpCatCache.at < 6 * 3600 * 1000 && gpCatCache.items.length) return gpCatCache.items;
   const items = [];
@@ -567,25 +579,108 @@ async function datosGopelis(slug) {
   return d;
 }
 async function resolverGopelis(epUrl) {
-  const m = /gopelis\.com\/ver\/tv\/(\d+)\?season=(\d+)&ep=(\d+)/i.exec(epUrl || '');
-  if (!m) throw new Error('Episodio de GoPelis no válido');
+  /* v199: series (/ver/tv/<id>?season=S&ep=E) Y películas (/ver/movie/<id>) */
+  const m = /gopelis\.com\/ver\/(?:tv|movie)\/(\d+)(?:\?season=(\d+)&ep=(\d+))?/i.exec(epUrl || '');
+  if (!m) throw new Error('Título de GoPelis no válido');
+  const esTv = /ver\/tv\//i.test(epUrl);
   const [, id, S, E] = m;
-  const kk = id + '-' + S + '-' + E;
+  const kk = esTv ? id + '-' + S + '-' + E : 'p-' + id;
   const c = gpStream.get(kk);
-  if (c && Date.now() - c.at < 3600 * 1000) return { m3u8: c.m3u8, proxy: true, subs: [] };
-  const r = await fetchSeguro(GP_BASE + 'api/stream-player?source=peliapi-player&type=tv&id=' + id + '&season=' + S + '&episode=' + E, 20000).catch(() => null);
+  if (c && c.m3u8 && Date.now() - c.at < 3600 * 1000) return { m3u8: c.m3u8, proxy: true, subs: [] };
+  if (c && !c.m3u8 && Date.now() - c.at < 3 * 60 * 1000) throw new Error('GoPelis: sin servidores vivos ahora — intenta en unos minutos'); /* v199: negativo corto 3 min */
+  const purl = GP_BASE + 'api/stream-player?source=peliapi-player&type=' + (esTv ? 'tv&id=' + id + '&season=' + S + '&episode=' + E : 'movie&id=' + id);
+  const r = await fetchSeguro(purl, 20000).catch(() => null);
   if (!r || !r.ok) throw new Error('GoPelis no entregó el player');
   const hp = await r.text();
   const apiUrl = (/(?:const\s+)?API_URL\s*=\s*"([^"]+)"/.exec(hp) || [])[1];
   const pt = (/(?:const\s+)?PAGE_TOKEN\s*=\s*"([^"]+)"/.exec(hp) || [])[1];
+  const resUrl = (/(?:const\s+)?RESOLVE_URL\s*=\s*"([^"]+)"/.exec(hp) || [])[1] || 'https://nsrplay.space/api/v1/embed/resolve';
   if (!apiUrl || !pt) throw new Error('GoPelis: player sin token');
   const r2 = await fetchSeguro(apiUrl + (apiUrl.includes('?') ? '&' : '?') + 'pt=' + encodeURIComponent(pt), 20000).catch(() => null);
   if (!r2 || !r2.ok) throw new Error('GoPelis: fuentes no disponibles');
   const d = await r2.json().catch(() => null);
-  const srv = (d && d.servers || []).find((x) => x.directUrl) || null;
-  if (!srv) throw new Error('GoPelis: sin servidores para este episodio');
-  gpStream.set(kk, { at: Date.now(), m3u8: srv.directUrl });
-  return { m3u8: srv.directUrl, proxy: true, subs: [] };
+  /* v199: el directUrl de /sources suele estar VIEJO (403) — el player del
+   * sitio re-resuelve cada servidor con /resolve?token=… y ESE m3u8 fresco
+   * es el que sirve. Se valida cada candidato (#EXTM3U) y gana el primero vivo. */
+  /* v199.2: cada /resolve ROTA el nodo de la CDN y solo algunos viven — se
+   * re-resuelve el mismo token hasta caer en nodo sano (checado rápido en
+   * directo; el ganador se confirma por /api/hls, el mismo camino del cliente) */
+  let ganador = '';
+  const servidores = (d && d.servers || []).filter((x) => x && x.token).slice(0, 8);
+  for (const sv of servidores) {
+    if (ganador) break;
+    for (let k = 0; k < 3 && !ganador; k++) {
+      const ru = resUrl + '?token=' + encodeURIComponent(sv.token) + '&parentUrl=' + encodeURIComponent(purl) + '&pt=' + encodeURIComponent(pt);
+      const rr = await fetchSeguro(ru, 15000).catch(() => null);
+      let du = '';
+      try { const jj = rr && rr.ok ? await rr.json() : null; du = jj && jj.data && typeof jj.data.directUrl === 'string' ? jj.data.directUrl : ''; } catch {}
+      if (!du) continue;
+      if (!esProxeable(du)) break; /* este token no es de la CDN reproducible: siguiente servidor */
+      try {
+        const hh2 = new URL(du).hostname;
+        if (!hlsUAs.has(hh2)) hlsUAs.set(hh2, FETCH_UA); /* el proxy pide con la MISMA UA que emitió el token */
+        if (!hlsReferers.has(hh2)) hlsReferers.set(hh2, '');
+        hlsALs.set(hh2, 'es-MX,es;q=0.9,en;q=0.8'); /* y el mismo Accept-Language */
+      } catch {}
+      const vd = await fetchSeguro(du, 10000).catch(() => null);
+      const ricco = vd && vd.ok && (await vd.text()).includes('#EXTM3U');
+      console.log('[gp] candidato ' + (new URL(du).host) + ' → ' + (vd ? vd.status : 'err') + (ricco ? ' ✓' : ''));
+      if (!ricco) { await new Promise((r3) => setTimeout(r3, 2500)); continue; } /* vimeos acelera las ráfagas: esperar y rotar */
+      const vp = await fetchSeguro('http://127.0.0.1:' + PORT + '/api/hls?u=' + encodeURIComponent(du), 20000).catch(() => null);
+      if (vp && vp.ok && (await vp.text()).includes('#EXTM3U')) { ganador = du; break; }
+    }
+  }
+  if (!ganador) {
+    gpStream.set(kk, { at: Date.now(), m3u8: '' }); /* negativo corto: el usuario puede reintentar */
+    throw new Error('GoPelis: ningún servidor vive para este título');
+  }
+  gpStream.set(kk, { at: Date.now(), m3u8: ganador });
+  return { m3u8: ganador, proxy: true, subs: [] };
+}
+
+/* v199: catálogo de PELÍCULAS de GoPelis (~508, 15 páginas) */
+async function gpCatalogoPelis() {
+  if (Date.now() - gpPelisCache.at < 6 * 3600 * 1000 && gpPelisCache.items.length) return gpPelisCache.items;
+  const items = [];
+  const limpiar = (t) => t.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim().slice(0, 90);
+  for (let p = 1; p <= 16; p++) {
+    const r = await fetchSeguro(GP_BASE + 'peliculas?page=' + p, 15000).catch(() => null);
+    if (!r || !r.ok) continue;
+    const h = await r.text();
+    let nuevos = 0;
+    for (const m of h.matchAll(/href="\/peliculas\/([a-z0-9-]+)"/g)) {
+      if (items.some((x) => x.slug === m[1])) continue;
+      nuevos++;
+      const t = /<h3[^>]*>([^<]+)<\/h3>/.exec(h.slice(m.index, m.index + 6500));
+      const zona = h.slice(Math.max(0, m.index - 1400), m.index);
+      const im = /src="(https:\/\/image\.tmdb\.org[^"]+)"/.exec(zona);
+      if (t) items.push({ slug: m[1], titulo: limpiar(t[1]), img: im ? im[1].replace('/w500/', '/w342/') : '' });
+    }
+    if (!nuevos) break; /* página sin contenido nuevo: fin del listado */
+  }
+  if (items.length) { gpPelisCache.at = Date.now(); gpPelisCache.items = items; }
+  return items;
+}
+
+/* v199: ficha de PELÍCULA → {ok, esPeli, titulo, poster, url(/ver/movie/<id>)} */
+async function datosGopelisPeli(slug) {
+  const c = gpDatos.get('p:' + slug);
+  if (c && Date.now() - c.at < 3 * 3600 * 1000) return c.d;
+  const r = await fetchSeguro(GP_BASE + 'peliculas/' + slug, 15000).catch(() => null);
+  if (!r || !r.ok) throw new Error('GoPelis: ficha no disponible');
+  const h = await r.text();
+  const t = /<h1[^>]*>([^<]+)<\/h1>/.exec(h);
+  const og = /property="og:image" content="([^"]+)"/.exec(h);
+  const vm = /href="(\/ver\/movie\/\d+)"/.exec(h);
+  if (!t || !vm) throw new Error('GoPelis: ficha incompleta');
+  const dres = {
+    ok: true, esPeli: true,
+    titulo: t[1].replace(/\s*\(Ver Online Latino\)\s*/i, '').replace(/\s+/g, ' ').trim().slice(0, 90),
+    poster: og ? og[1] : '',
+    url: GP_BASE + vm[1].replace(/^\//, ''),
+  };
+  gpDatos.set('p:' + slug, { at: Date.now(), d: dres });
+  return dres;
 }
 
 /* v193: portada por TÍTULO desde la API de sugerencias de IMDb (para
@@ -822,6 +917,7 @@ async function resolverNativoInterno(url) {
   if (/danimados\.cc\/episodios\//i.test(url)) return resolverDani(url); /* v172 */
   if (/youtube\.com\/(watch|shorts)|youtu\.be\//i.test(url)) return resolverYoutube(url); /* v164 */
   if (/lacartoons\.com\/serie\/capitulo\//i.test(url)) return resolverLacartoons(url); /* v116: sin esto, los capítulos de lacartoons en SALA caían al espejo de navegador (abría la página web en vez de reproducir nativo) */
+  if (/gopelis\.com\/ver\//i.test(url)) return resolverGopelis(url); /* v198/v199: series y películas de GoPelis nativas en sala */
   return resolverSolo(url);
 }
 
@@ -3063,13 +3159,14 @@ function mismaPagina(a, b) {
   const quitar = (x) => String(x || '').toLowerCase().replace(/\/+$/, '').replace(/^https?:\/\/(www\.)?/, '');
   return quitar(a) === quitar(b);
 }
+const FETCH_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'; /* v199: compartida — vimeos amarra el token a ESTA UA */
 async function fetchSeguro(url, ms) {
   const c = new AbortController();
   const t = setTimeout(() => c.abort(), ms);
   try {
     return await fetch(url, {
       signal: c.signal, redirect: 'follow',
-      headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', 'Accept-Language': 'es-MX,es;q=0.9,en;q=0.8' },
+      headers: { 'User-Agent': FETCH_UA, 'Accept-Language': 'es-MX,es;q=0.9,en;q=0.8' },
     });
   } finally { clearTimeout(t); }
 }
@@ -6948,6 +7045,7 @@ async function sirveElVideo(url, referer) {
 const { Readable } = require('stream');
 const hlsReferers = new Map(); /* v81: host goodstream → embed que sirvió de Referer */
 const hlsUAs = new Map(); /* v170: host → UA exacta (googlevideo de Blogger amarra el stream a la UA que pidió el token) */
+const hlsALs = new Map(); /* v199: host → Accept-Language exacto (mismo fingerprint que la emisión del token) */
 function esGoodstream(u) {
   try { const h = new URL(u).host; return /(^|\.)goodstream\.one$/i.test(h); }
   catch { return false; }
@@ -7002,13 +7100,13 @@ async function proxearHls(req, res, target) {
   let ref = 'https://goodstream.one/';
   let hostUp = '';
   try { hostUp = new URL(target).hostname; } catch {}
-  try { ref = hlsReferers.get(hostUp) || ref; } catch {}
+  try { ref = hlsReferers.has(hostUp) ? hlsReferers.get(hostUp) : ref; } catch {} /* v199: '' guardado = SIN referer (vimeos de GoPelis) */
   /* v90: el mp4 de animes se adelanta/atrás por rangos — los pasamos */
   const cabUp = {
     'User-Agent': (hostUp && hlsUAs.get(hostUp)) || MIRROR_UA, /* v170 */
-    Referer: ref,
-    'Accept-Language': 'es-MX,es;q=0.9,en;q=0.6', /* igual que fetchTexto: hls1 amarra el token al fingerprint */
+    'Accept-Language': (hostUp && hlsALs.get(hostUp)) || 'es-MX,es;q=0.9,en;q=0.6', /* v199: AL por host — vimeos de GoPelis exige el mismo que fetchSeguro */
   };
+  if (ref) cabUp.Referer = ref; /* v199: '' registrado = SIN cabecera Referer (una Referer vacía tumba el token) */
   if (req.headers.range) cabUp.Range = String(req.headers.range);
   let upstream = null;
   for (let intento = 0; intento < 3; intento++) {
@@ -7159,6 +7257,13 @@ const server = http.createServer(async (req, res) => {
         cartoons: cari.cartoons || [], /* v119: apartado propio de Lacartoons */
         generos: (generos || []).map((g) => ({ slug: g.slug, nombre: g.nombre, items: fCV(g.items) })).filter((g) => g.items.length),
       });
+    }
+    if (url.pathname.startsWith('/api/gopelispeli/')) { /* v199: ficha de PELÍCULA de GoPelis */
+      const slug = decodeURIComponent(url.pathname.split('/')[3] || '').toLowerCase();
+      if (!/^[a-z0-9-]{2,90}$/.test(slug)) return json(res, 400, { ok: false, error: 'Película inválida' });
+      const d = await datosGopelisPeli(slug).catch(() => null);
+      if (!d) return json(res, 502, { ok: false, error: 'No pude leer esa película de GoPelis — intenta luego' });
+      return json(res, 200, d);
     }
     if (url.pathname.startsWith('/api/gopelis/')) { /* v198: ficha y episodios de GoPelis (latino) */
       const slug = decodeURIComponent(url.pathname.split('/')[3] || '').toLowerCase();
@@ -7338,6 +7443,21 @@ const server = http.createServer(async (req, res) => {
           });
         }).slice(0, 6);
         for (const g of gpHits.reverse()) r.resultados.unshift({ title: g.titulo, url: GP_BASE + 'series/' + g.slug, img: g.img || '', site: 'GoPelis', extra: 'Latino' });
+        /* v199: PELÍCULAS de GoPelis que NO tenemos (inventario cine-calidad) */
+        const catGp2 = await gpCatalogoPelis();
+        const gpP2 = catGp2.filter((g) => {
+          const tn = normalizarTxt(g.titulo);
+          if (!tn) return false;
+          if (tn.includes(qG) || qG.split(' ').every((w) => w.length > 1 && tn.includes(w))) return true;
+          const inter = tn.split(' ').filter((w) => w.length > 1 && qG.includes(w)).length;
+          if (inter < Math.min(2, tn.split(' ').length)) return false;
+          return true;
+        }).filter((g) => {
+          const ws = normalizarTxt(g.titulo).split(' ');
+          const ya = CV_PELIS_TOKENS.some((ct) => { const n = ws.filter((w) => ct.has(w)).length; return n >= Math.min(2, ws.length); }); /* v199.1: TODOS los tokens — «rio 2» no puede ignorar el «2» */
+          return !ya; /* la tenemos en cine-calidad: fuera */
+        }).filter((g) => !r.resultados.some((x) => normalizarTxt(x.title || '') === normalizarTxt(g.titulo))).slice(0, 3);
+        for (const g of gpP2.reverse()) r.resultados.unshift({ title: g.titulo, url: GP_BASE + 'peliculas/' + g.slug, img: g.img || '', site: 'GoPelis', extra: 'Película · Latino' });
       } catch {}
       /* v193: tarjetas sin carátula → IMDb (o la ficha del propio sitio) */
       const sinCaratula = r.resultados.filter((x) => !x.img);
@@ -7533,7 +7653,7 @@ const server = http.createServer(async (req, res) => {
         const esCari = /miscaricaturas\.com\//i.test(target); /* v102: caricaturas */
         const esLct = /lacartoons\.com\/serie\/capitulo\//i.test(target); /* v112: lacartoons */
         const esDani = /danimados\.cc\/episodios\//i.test(target); /* v179: danimados en Solo — sin esto TODO el catálogo nuevo caía al resolutor viejo de Cuevana: «Este título no tiene servidor goodstream» */
-        const esGp = /gopelis\.com\/ver\/tv\//i.test(target); /* v198: series de GoPelis (latino) */
+        const esGp = /gopelis\.com\/ver\/(?:tv|movie)\//i.test(target); /* v198 series + v199 películas de GoPelis (latino) */
         const r = await (esEpAnime ? resolverAnime(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esGp ? resolverGopelis(target) : resolverSolo(target));
         return json(res, 200, { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy });
       } catch (e) {

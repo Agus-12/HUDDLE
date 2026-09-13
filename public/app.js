@@ -1679,7 +1679,27 @@ $('#daniExClose').addEventListener('click', () => $('#daniEx').classList.add('hi
 $('#daniEx').addEventListener('click', (e) => { if (e.target === e.currentTarget) $('#daniEx').classList.add('hidden'); });
 
 /* v61: ¿es una serie? → abrir el selector en vez del espejo directo */
+/* v199: película de GoPelis — la ficha da la url /ver/movie/<id> y de ahí
+ * todo fluye como cualquier peli (Solo: resolutor; sala: reproducción nativa) */
+async function abrirGopelisPeli(res, enSala) {
+  const sm = /peliculas\/([a-z0-9-]+)/i.exec(res.url || '');
+  if (!sm) { toast('No pude leer esa película'); return; }
+  toast('Buscando la película…');
+  try {
+    const d = await (await fetch('/api/gopelispeli/' + sm[1])).json();
+    if (!d || !d.ok || !d.url) { toast((d && d.error) || 'No pude abrir esa película'); return; }
+    const r2 = { url: d.url, title: d.titulo || res.title || '', img: d.poster || res.img || '' };
+    if (S.modoSolo) { abrirSolo(r2.url, { title: r2.title, img: r2.img }); return; }
+    S.pendingStart = { url: r2.url, name: r2.title, img: r2.img };
+    S.mirrorInfo = { title: r2.title, img: r2.img, url: r2.url, sub: 'Cargando tu sala…' };
+    mostrarPeliLoading();
+    const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+    connect(code);
+  } catch { toast('Sin conexión con el servidor'); }
+}
+
 function elegirTitulo(res, enSala) {
+  if (/gopelis\.com\/peliculas\//i.test(res.url || '')) { abrirGopelisPeli(res, enSala); return true; } /* v199: película de GoPelis (latino) */
   if (/gopelis\.com\/series\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, false, true); return true; } /* v198: GoPelis (latino) */
   if (/lacartoons\.com\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v112: antes que el genérico /serie/ (sus urls también lo traen) */
   if (/danimados\.cc\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v175: ANTES del genérico /serie/ — la tarjeta de danimados es dani-titanes bajo /serie/ y caía en el picker de Cuevana («cargando temporadas» → error) */
