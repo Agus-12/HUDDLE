@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v151'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v152'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -303,6 +303,22 @@ function sysMsg(room, text) {
  * Es la técnica de los "cloud browsers" (Hyperbeam, Kasm…). */
 
 let PUPPETEER = null; // require perezoso
+/* v152: navegador PERSISTENTE — antes cada episodio abría un Chrome desde
+ * cero (2-5 s perdidos por resolución) y lo cerraba al terminar. Ahora se
+ * abre UNO y se reutiliza (solo se cierran las pestañas): caricaturas y
+ * lacartoons resuelven varios segundos más rápido. */
+let NAVEGADOR = null;
+async function getNavegador() {
+  if (NAVEGADOR && NAVEGADOR.connected) return NAVEGADOR;
+  if (!PUPPETEER) { try { PUPPETEER = require('puppeteer'); } catch { throw new Error('El navegador del servidor no está disponible'); } }
+  NAVEGADOR = await PUPPETEER.launch({
+    headless: 'new',
+    ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
+    args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required', '--disable-blink-features=AutomationControlled'],
+  }).catch(() => null);
+  if (NAVEGADOR) NAVEGADOR.on('disconnected', () => { NAVEGADOR = null; });
+  return NAVEGADOR;
+}
 const mirrors = new Map(); // roomCode -> mirror
 
 /* v61: difunde la posición de la peli (barrita con tiempo) cada 2 s */
@@ -2602,14 +2618,11 @@ async function buscarPelisxd(q) {
  * de duración completa (113.6, 113.8 y 101.3 min — nada de teasers). */
 async function extraerStreamwishPeli(pageUrl) {
   if (!PUPPETEER) { try { PUPPETEER = require('puppeteer'); } catch { throw new Error('El navegador del servidor no está disponible'); } }
-  const browser = await PUPPETEER.launch({
-    headless: 'new',
-    ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
-    args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required', '--disable-blink-features=AutomationControlled'],
-  }).catch(() => null);
+  const browser = await getNavegador();
   if (!browser) throw new Error('No pude abrir el navegador del servidor');
+  let page = null;
   try {
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 720 });
     await page.setUserAgent(MIRROR_UA).catch(() => {});
     await page.evaluateOnNewDocument(() => {
@@ -2630,12 +2643,18 @@ async function extraerStreamwishPeli(pageUrl) {
       } catch {}
     });
     page.on('dialog', async (d) => { try { await d.dismiss(); } catch {} });
-    await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await new Promise((r2) => setTimeout(r2, 4000));
-    await page.evaluate(() => {
-      const b = [...document.querySelectorAll('button')].find((x) => /opción 1/i.test(x.textContent || ''));
-      if (b) b.click();
-    }).catch(() => {});
+    /* v152: si la primera carga se pasa de los 30s (sitio lento), un
+     * reintento con más calma en vez de fallar de una vez */
+    try { await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }); }
+    catch { await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 45000 }); }
+    /* v152: clic en cuanto aparezca «Opción 1» (antes esperaba 4s fijos) */
+    for (let i = 0; i < 10 && cap === null; i++) {
+      await new Promise((r2) => setTimeout(r2, 400));
+      await page.evaluate(() => {
+        const b = [...document.querySelectorAll('button')].find((x) => /opción 1/i.test(x.textContent || ''));
+        if (b) b.click();
+      }).catch(() => {});
+    }
     /* hasta ~60 s: el challenge se resuelve solo mientras el player cree que hay un usuario */
     for (let i = 0; i < 20 && !cap; i++) {
       await new Promise((r2) => setTimeout(r2, 3000));
@@ -2655,7 +2674,7 @@ async function extraerStreamwishPeli(pageUrl) {
     if (!cap) throw new Error('El servidor de la peli no entregó el video (intenté con el navegador)');
     return cap;
   } finally {
-    try { await browser.close(); } catch {}
+    try { if (page) await page.close(); } catch {}
   }
 }
 
@@ -3428,14 +3447,11 @@ async function resolverCaricatura(epUrl) {
  * despelleja al servirlos. */
 async function extraerRpmvid(pageUrl) {
   if (!PUPPETEER) { try { PUPPETEER = require('puppeteer'); } catch { throw new Error('El navegador del servidor no está disponible'); } }
-  const browser = await PUPPETEER.launch({
-    headless: 'new',
-    ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
-    args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required', '--disable-blink-features=AutomationControlled'],
-  }).catch(() => null);
+  const browser = await getNavegador();
   if (!browser) throw new Error('No pude abrir el navegador del servidor');
+  let page = null;
   try {
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 720 });
     await page.setUserAgent(MIRROR_UA).catch(() => {});
     await page.evaluateOnNewDocument(() => {
@@ -3449,7 +3465,10 @@ async function extraerRpmvid(pageUrl) {
       master = u;
     });
     page.on('dialog', async (d) => { try { await d.dismiss(); } catch {} });
-    await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    /* v152: si la primera carga se pasa de los 30s (sitio lento), un
+     * reintento con más calma en vez de fallar de una vez */
+    try { await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }); }
+    catch { await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 45000 }); }
     for (let i = 0; i < 12 && !master; i++) {
       await new Promise((r2) => setTimeout(r2, 3000));
       for (const fr of page.frames()) {
@@ -3482,7 +3501,7 @@ async function extraerRpmvid(pageUrl) {
     }
     if (!master) throw new Error('El player de Lacartoons no respondió (va lento) — reintenta');
     return master;
-  } finally { try { await browser.close(); } catch {} }
+  } finally { try { if (page) await page.close(); } catch {} }
 }
 
 /* v119: capítulos de lacartoons con player de OK.RU — el embed trae las
@@ -3968,14 +3987,11 @@ async function resolverAnimeflv(epUrl) {
  * peli — el navegador solo sirvió para DESCUBRIR la URL. */
 async function resolverAnimePorNavegador(epUrl) {
   if (!PUPPETEER) { try { PUPPETEER = require('puppeteer'); } catch { return null; } }
-  const browser = await PUPPETEER.launch({
-    headless: 'new',
-    ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
-    args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required', '--disable-blink-features=AutomationControlled'],
-  }).catch(() => null);
+  const browser = await getNavegador();
   if (!browser) return null;
+  let page = null;
   try {
-    const page = await browser.newPage();
+    page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 });
     await page.setUserAgent(MIRROR_UA).catch(() => {});
     await page.evaluateOnNewDocument(() => {
@@ -4066,7 +4082,7 @@ async function resolverAnimePorNavegador(epUrl) {
     }
     return null;
   } catch { return null; }
-  finally { try { await browser.close(); } catch {} }
+  finally { try { if (page) await page.close(); } catch {} }
 }
 /* v93: probamos que un video directo responda (rangito con su Referer) */
 async function sirveElVideo(url, referer) {
