@@ -26,6 +26,13 @@ fi
 echo "==> Instalando dependencias (si cambiaron) ..."
 npm install --no-audit --no-fund --silent
 
+# v184: detector de intros necesita fpcalc y ffmpeg (silencioso si ya están)
+if ! command -v fpcalc >/dev/null 2>&1 || ! command -v ffmpeg >/dev/null 2>&1; then
+  echo "==> Instalando libchromaprint-tools y ffmpeg (para saltar intros) ..."
+  sudo apt-get update -qq || true
+  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq libchromaprint-tools ffmpeg || true
+fi
+
 echo "==> Reiniciando la app (3 segundos) ..."
 sudo systemctl restart huddle
 

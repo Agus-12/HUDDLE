@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v183'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v184'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1128,7 +1128,10 @@ function introKeysDe(url) {
   let serie = null;
   try {
     const host = new URL(url).hostname.replace(/^www\./, '');
-    if (/miscaricaturas\.com$/.test(host)) {
+    if (/danimados\.cc$/.test(host)) {
+      const m = /\/episodios\/([a-z0-9-]+)-(\d+)x(\d+)\//.exec(new URL(url).pathname);
+      if (m) serie = 'dani:' + m[1]; /* v184: el catálogo danimados también aprende intros */
+    } else if (/miscaricaturas\.com$/.test(host)) {
       const base = cariSlugDe(url).replace(/-\d{2}x\d{2}[ab]?(-.*)?$/, '');
       if (base) serie = 'mm:' + base;
     } else if (/lacartoons\.com$/.test(host)) {
@@ -1223,7 +1226,8 @@ function compararHuellas(A, B) {
 }
 function fpcalcArchivo(archivo, segs) {
   return new Promise((resolve) => {
-    execFile('fpcalc', ['-raw', '-length', String(segs || 280), '-json', archivo], { timeout: 50000, maxBuffer: 8e6 }, (err, so) => {
+    /* v184: SIN -raw — con -raw fpcalc cambia su salida a LISTA de números (no base64), el parseo moría en silencio y la detección nunca dio nada */
+    execFile('fpcalc', ['-length', String(segs || 280), '-json', archivo], { timeout: 90000, maxBuffer: 8e6 }, (err, so) => {
       if (err) return resolve(null);
       try {
         const buf = Buffer.from(String(so).match(/"fingerprint"\s*:\s*"([^"]+)"/)[1], 'base64');
@@ -1285,6 +1289,72 @@ async function descargarInicioEp(m3u8) {
   }
   return null;
 }
+/* v184: DETECCIÓN POR VIDEO — la intro es la MISMA animación en todos los
+ * episodios (el audio re-encodeado difiere demasiado entre uploads: probado,
+ * huella de audio cruzada ~0.39 contra ruido ~0.40 — inservible). Miniaturas
+ * 9x8 a 2 fps + dhash: el tramo donde los frames casan a un DESFAZE constante
+ * ES la intro (verificado: Gravity Falls la clava en 44→83s). Requiere
+ * ffmpeg (setup.sh lo instala). */
+let FFMPEG_OK = null;
+function ffmpegOk() {
+  if (FFMPEG_OK !== null) return FFMPEG_OK;
+  try { FFMPEG_OK = !!execFileSync('which', ['ffmpeg'], { timeout: 4000 }).toString().trim(); }
+  catch { FFMPEG_OK = false; }
+  if (!FFMPEG_OK) console.log('[intro] sin ffmpeg — detección por video apagada (instala ffmpeg)');
+  return FFMPEG_OK;
+}
+function introFramesDe(archivo, segs) {
+  return new Promise((resolve) => {
+    execFile('ffmpeg', ['-v', 'error', '-i', archivo, '-t', String(segs || 240), '-vf', 'fps=2,scale=9x8,format=gray', '-f', 'rawvideo', '-'],
+      { timeout: 180000, maxBuffer: 30e6, encoding: 'buffer' }, (err, so) => {
+        if (err || !so || !so.length) return resolve(null);
+        const FR = 72, osc = [], hashes = [];
+        for (let off = 0; off + FR <= so.length; off += FR) {
+          let h = 0n, bit = 0n, sum = 0;
+          for (let k = 0; k < FR; k++) sum += so[off + k];
+          if (sum / FR < 14) { hashes.push(0n); osc.push(true); continue; } /* casi negro: se omite */
+          for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+            if (so[off + y * 9 + x] > so[off + y * 9 + x + 1]) h |= (1n << bit);
+            bit++;
+          }
+          hashes.push(h); osc.push(false);
+        }
+        resolve({ hashes, osc });
+      });
+  });
+}
+function introBandade(A, B) {
+  const NA = A.hashes.length, NB = B.hashes.length;
+  const ham = (a, b) => { let x = a ^ b, c = 0; while (x) { c += Number(x & 1n); x >>= 1n; } return c; };
+  /* mejor desfase por número de frames que casan (hamming<=8, no negros) */
+  let mejor = { d: 0, c: 0 };
+  for (let d = -480; d <= 480; d++) {
+    let c = 0;
+    for (let ia = Math.max(0, d); ia < Math.min(NA, NB + d); ia++) {
+      const jb = ia - d;
+      if (A.osc[ia] || B.osc[jb]) continue;
+      if (ham(A.hashes[ia], B.hashes[jb]) <= 8) c++;
+    }
+    if (c > mejor.c) mejor = { d, c };
+  }
+  if (mejor.c < 36) return null; /* menos de 18s comunes: nada */
+  /* tramo contiguo con huecos de hasta 6 frames (3s) */
+  const d = mejor.d;
+  const casan = [];
+  for (let ia = Math.max(0, d); ia < Math.min(NA, NB + d); ia++) {
+    const jb = ia - d;
+    if (A.osc[ia] || B.osc[jb]) continue;
+    if (ham(A.hashes[ia], B.hashes[jb]) <= 8) casan.push(ia);
+  }
+  let mejorTr = { a: 0, b: 0, n: 0 }, a0 = casan[0], ult = casan[0], n = 0;
+  for (const ia of casan) {
+    if (ia - ult <= 6) { n++; ult = ia; }
+    else { if (n > mejorTr.n) mejorTr = { a: a0, b: ult, n }; a0 = ia; ult = ia; n = 1; }
+  }
+  if (n > mejorTr.n) mejorTr = { a: a0, b: ult, n };
+  if (mejorTr.n < 36) return null;
+  return { ini: mejorTr.a / 2, fin: (mejorTr.b + 1) / 2, offset: d, frames: mejorTr.n };
+}
 const INTRO_JOBS = new Set(), INTRO_INTENTOS = new Map();
 /* v137: penalización por resultado — fallo de infra (navegador ocupado, red)
  * retrasa el reintento solo 15 min; «no hay intro común» sí espera 6h */
@@ -1313,7 +1383,26 @@ async function detectarIntroSerie(serieKey, urls) {
     const f1 = f0 && await descargarInicioEp(listos[1]);
     if (!f0 || !f1) { penalizarIntro(serieKey, 15 * 60 * 1000); return console.log('[intro] descargas incompletas para ' + serieKey + ' — reintento en 15 min'); }
     try {
-      const [ha, hb] = await Promise.all([fpcalcArchivo(f0), fpcalcArchivo(f1)]);
+        /* v184: VIDEO primero (robusto entre re-encodes), audio de respaldo */
+      let guardado = false;
+      if (ffmpegOk()) {
+        const [fa2, fb2] = await Promise.all([introFramesDe(f0), introFramesDe(f1)]);
+        if (fa2 && fb2) {
+          const band = introBandade(fa2, fb2);
+          if (band && band.fin <= 420 && band.ini <= 240) {
+            INTROS[serieKey] = { start: Math.round(band.ini), end: Math.max(Math.round(band.fin) - 2, Math.round(band.ini) + 30), by: 'auto', at: Date.now() };
+            penalizarIntro(serieKey, 6 * 3600 * 1000);
+            guardarIntros();
+            guardado = true;
+            console.log(`[intro] ✅ ${serieKey}: intro detectada POR VIDEO ${Math.round(band.ini)}s→${Math.round(band.fin)}s (${band.frames} frames casando, desfase ${band.offset})`);
+          } else if (band) {
+            guardado = true; /* zona común fuera del rango de una intro: no se guarda nada */
+            penalizarIntro(serieKey, 6 * 3600 * 1000);
+            console.log(`[intro] ${serieKey}: zona común en video (${Math.round(band.ini)}s→${Math.round(band.fin)}s) no parece una intro — nada que saltar`);
+          }
+        }
+      }
+      const [ha, hb] = guardado ? [null, null] : await Promise.all([fpcalcArchivo(f0), fpcalcArchivo(f1)]);
       if (ha && hb && ha.length > 130 && hb.length > 130) {
         const hit = compararHuellas(ha, hb);
         if (hit && hit.dur >= 45 && hit.fin <= 420 && hit.ini <= 240) {
@@ -5065,6 +5154,7 @@ const server = http.createServer(async (req, res) => {
         const eps = await daniLista(daniSlug).catch(() => []);
         if (!eps.length) return json(res, 502, { ok: false, error: 'No pude leer danimados — intenta luego' });
         const cov = daniCoverDe(daniSlug);
+        precargarIntroDeSerie(eps); /* v184: mientras eligen episodio, el server ya busca la intro */
         return json(res, 200, { ok: true, slug, titulo: daniTituloDe(daniSlug), poster: cov, cover: cov, episodios: eps });
       }
       const d = await datosCaricatura(slug);
