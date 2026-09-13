@@ -440,6 +440,7 @@ const DANI_REEMPLAZAS = new Map([
   ['kenan-y-kel-latino', 'kenan-kel'],
   ['mansion-foster-para-amigos-imaginarios-capitulos-completos', 'mansion-foster-para-amigos-imaginarios'],
   ['las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos', 'las-macabras-aventuras-de-billy-y-mandy'], /* v181: misma serie, otra traducción — dani 88 vs 86 */
+]);
 /* v180: la NUESTRA tiene bastantes más capítulos — la de danimados NO sale
  * en el buscador (una tarjeta por serie) */
 const DANI_OCULTAS = new Set([
