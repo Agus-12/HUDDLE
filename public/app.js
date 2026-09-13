@@ -618,7 +618,7 @@ async function cargarIntro(url) {
 function esEpisodioSolo() {
   if (!SOLO || SOLO.cerrado) return false;
   if (SOLO.info && SOLO.info.eps && SOLO.info.eps.length > 1) return true;
-  return /latanime\.org\/ver\/|miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}([ab])?(?:-|$)|lacartoons\.com\/serie\/capitulo\/|animeflv\.[a-z.]+\/ver\/|\/episode\/|danimados\.cc\/episodios\//i.test(SOLO.url || ''); /* v186: danimados también cuenta como episodio */
+  return /latanime\.org\/ver\/|miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}([ab])?(?:-|$)|lacartoons\.com\/serie\/capitulo\/|animeflv\.[a-z.]+\/ver\/|\/episode\/|danimados\.cc\/episodios\/|gopelis\.com\/ver\/tv\//i.test(SOLO.url || ''); /* v186 dani + v198 gopelis */
 }
 function ventanaIntro() {
   /* {t, dur} del video activo — SOLO en vivo, nativo de sala, espejo */
@@ -1459,9 +1459,9 @@ function imgPorProxy(src) {
   if (/animeflv\.|latanime\.|miscaricaturas\./i.test(src)) return '/api/img?u=' + encodeURIComponent(src); /* v102 */
   return src;
 }
-function abrirSeriePicker(res, enSala, esAnime) {
-  const slugM = /(?:serie|anime)\/([a-z0-9-]+)/i.exec(res.url || '');
-  if (!slugM) { toast('No pude leer esa serie'); return; }
+function abrirSeriePicker(res, enSala, esAnime, esGp) {
+  const slugM = esGp ? (/series\/([a-z0-9-]+)/i.exec(res.url || '') || []) : (/(?:serie|anime)\/([a-z0-9-]+)/i.exec(res.url || '') || []);
+  if (!slugM || !slugM[1]) { toast('No pude leer esa serie'); return; }
   const slug = slugM[1];
   const esLat = /latanime\./i.test(res.url || ''); /* v63: anime de Latanime */
   const pk = $('#seriePicker');
@@ -1473,7 +1473,7 @@ function abrirSeriePicker(res, enSala, esAnime) {
   if (poster0) { po.src = poster0; po.style.display = ''; } else po.style.display = 'none';
   $('#spTemporadas').innerHTML = '';
   $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">Buscando episodios…</div>';
-  fetch((esAnime ? ('/api/anime/' + slug + (esLat ? '?site=latanime' : '')) : '/api/serie/' + slug)).then((r) => r.json()).then((d) => {
+  fetch((esGp ? '/api/gopelis/' + slug : esAnime ? ('/api/anime/' + slug + (esLat ? '?site=latanime' : '')) : '/api/serie/' + slug)).then((r) => r.json()).then((d) => {
     /* v62: animes → una sola lista de episodios, sin miniaturas */
     const eps = esAnime
       ? (d.episodios || []).map((e) => ({ temporada: 1, ep: e.n, url: e.url, titulo: e.titulo || ('Episodio ' + e.n), img: '' }))
@@ -1680,6 +1680,7 @@ $('#daniEx').addEventListener('click', (e) => { if (e.target === e.currentTarget
 
 /* v61: ¿es una serie? → abrir el selector en vez del espejo directo */
 function elegirTitulo(res, enSala) {
+  if (/gopelis\.com\/series\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, false, true); return true; } /* v198: GoPelis (latino) */
   if (/lacartoons\.com\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v112: antes que el genérico /serie/ (sus urls también lo traen) */
   if (/danimados\.cc\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v175: ANTES del genérico /serie/ — la tarjeta de danimados es dani-titanes bajo /serie/ y caía en el picker de Cuevana («cargando temporadas» → error) */
   if (/\/serie\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, false); return true; }
