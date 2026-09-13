@@ -1686,20 +1686,29 @@ body.movil-horizontal #homeFull {
 }
 
 /* ============ v127: menú de búsqueda dentro de la sala ============ */
-/* v143: HOJA INFERIOR — nace desde el borde de abajo (donde ni el teclado ni el scroll la pueden correr) */
-.ms-menu { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: flex-end; justify-content: center; padding: 0 8px; }
+/* ═══ v143→v145: HOJA INFERIOR DEFINITIVA ═══
+ * Tu captura mostró los dos males: la hoja salía APLASTADA (altura del
+ * momento en que el teclado estuvo abierto) y el panel era TRANSLÚCIDO
+ * (--panel es 4.5% de blanco → se «empalmaba» con el chat de atrás).
+ * Ahora: fondo OPACO, altura SIEMPRE grande (76% de la pantalla), anclada
+ * al borde físico de abajo y SIN ajustes dinámicos que la puedan encoger. */
+.ms-menu { position: fixed; inset: 0; z-index: 9000; }
 .ms-menu.hidden { display: none; }
-.ms-menu-back { position: absolute; inset: 0; background: rgba(5, 7, 15, 0.84); }
+.ms-menu-back { position: absolute; inset: 0; background: rgba(3, 5, 10, 0.82); }
 .ms-menu-box {
-  position: relative; width: min(100vw, 560px); max-height: 88%; /* v143: de la zona visible (el overlay la abraza) */
-  display: flex; flex-direction: column; /* v141: orden FÍSICO — el buscador jamás queda debajo de los resultados */
-  overflow: hidden; /* v141: la caja YA NO scrollea — nada se puede «perder» por arriba; solo la lista de resultados scrollea */
-  background: var(--panel);
-  border: 1px solid var(--line); border-bottom: none; border-radius: 18px 18px 0 0; /* v143: pegada al borde de abajo */
-  padding: 14px 14px max(14px, env(safe-area-inset-bottom)); /* v143: respeta la barrita del iPhone */
-  animation: ms-sheet .18s ease-out; /* v143: entra deslizándose desde abajo */
+  position: absolute; left: 0; right: 0; bottom: 0;
+  width: 100%; max-width: 560px; margin: 0 auto;
+  height: min(76vh, 640px); /* v145: SIEMPRE desplegada en grande */
+  height: min(76dvh, 640px);
+  display: flex; flex-direction: column; /* orden físico fijo: título → buscador → resultados → regresar */
+  overflow: hidden;
+  background: #161026; /* v145: OPACO — nada de lo que está atrás se ve ni se empalma */
+  border: 1px solid var(--line); border-bottom: none; border-radius: 18px 18px 0 0;
+  padding: 14px 14px max(14px, env(safe-area-inset-bottom));
+  box-shadow: 0 -18px 60px rgba(0, 0, 0, 0.55);
+  animation: ms-sheet .2s ease-out;
 }
-@keyframes ms-sheet { from { transform: translateY(56px); opacity: .4; } to { transform: none; opacity: 1; } }
+@keyframes ms-sheet { from { transform: translateY(60px); opacity: .5; } to { transform: none; opacity: 1; } }
 .ms-volver { width: 100%; margin-top: 12px; flex: none; }
 .ms-menu-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; flex: none; }
 .ms-menu-t { font-weight: 800; font-size: 15px; }
@@ -1716,10 +1725,8 @@ body.sala-girada #msMenu {
   top: 50%; left: 50%;
   width: 100dvh; height: 100dvw;
   transform: translate(-50%, -50%) rotate(var(--giro-sala));
-  padding: 0 14px;
 }
-body.sala-girada .ms-menu-box { max-height: 80dvw; }
-body.sala-girada .ms-results { max-height: none; }
+body.sala-girada .ms-menu-box { height: min(80dvw, 640px); left: 0; right: 0; }
 body.sala-girada #pageDrop.desde-sala {
   inset: auto;
   top: 50%; left: 50%;

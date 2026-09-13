@@ -3768,16 +3768,14 @@ async function buscarEnSala() {
  * (window.visualViewport) — teclado abierto o cerrado, todo queda a la
  * vista y tocable. La hoja de servidores se pega al fondo visible. */
 function abrazarVisible() {
+  /* v145: el menú grande ya NO se ajusta dinámicamente (eso lo aplastaba
+   * cuando el teclado cerraba sin aviso) — vive fijo al borde de abajo.
+   * La hoja de servidores conserva su ajuste fino. */
   const vv = window.visualViewport;
-  const menu = $('#msMenu'), hoja = $('#pageDrop');
-  const limpiar = (el) => { el.style.top = ''; el.style.height = ''; el.style.bottom = ''; };
-  if (menu) {
-    if (menu.classList.contains('hidden')) limpiar(menu);
-    else if (vv) { menu.style.top = vv.offsetTop + 'px'; menu.style.height = vv.height + 'px'; }
-  }
+  const hoja = $('#pageDrop');
   if (hoja) {
-    if (hoja.classList.contains('hidden') || !hoja.classList.contains('desde-sala')) limpiar(hoja);
-    else if (vv) { const fondoVisible = vv.offsetTop + vv.height; hoja.style.bottom = Math.max(12, window.innerHeight - fondoVisible + 12) + 'px'; }
+    if (hoja.classList.contains('hidden') || !hoja.classList.contains('desde-sala')) { hoja.style.bottom = ''; return; }
+    if (vv) { const fondoVisible = vv.offsetTop + vv.height; hoja.style.bottom = Math.max(12, window.innerHeight - fondoVisible + 12) + 'px'; }
   }
 }
 window.visualViewport && window.visualViewport.addEventListener('resize', abrazarVisible);
