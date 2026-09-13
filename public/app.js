@@ -1179,7 +1179,10 @@ window.addEventListener('pageshow', (e) => { if (e.persisted) location.reload();
     if (!S.canControl) { toast('Solo el anfitrión controla el espejo'); return; }
     /* v62: con la película lista el toque ya no viaja a la página:
      * 1er toque saca los controles 5 segundos; si ya se veían, pausa o sigue */
-    if (S.mirror.ready) { tocarPantallaCine(); return; }
+    /* v167: el modo «tap = controles/pausa» es de PELÍCULAS — en un sitio
+     * web (youtube para buscar, google, lo que sea) el toque viaja a la
+     * página SIEMPRE; antes se lo comía el modo cine y no dejaba navegar */
+    if (S.mirror.ready && /pelicula\/|\/episode\/|\/ver\/|youtube\.com\/watch|youtu\.be\/|youtube\.com\/shorts\//i.test(S.mirror.url || '')) { tocarPantallaCine(); return; }
     const p = toPage(e.clientX, e.clientY);
     if (!p) return;
     /* v29: el servidor contesta si el toque dejó el foco en un cuadro de

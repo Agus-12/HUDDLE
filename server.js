@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v166'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v167'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1267,7 +1267,7 @@ async function startMirror(room, rawUrl, userId) {
      PELÍCULA lo tocamos por ti: la película empieza directa.
      (Series quedan manuales a propósito, mecanismo propio después.) */
   /* v61: páginas de "cine" = películas Y episodios de serie (cine-calidad) */
-  const esPagCine = () => /\/(wp-)?pelicula\/[a-z0-9-]+|\/episode\/|\/ver\//i.test(m.url || '');
+  const esPagCine = () => /\/(wp-)?pelicula\/[a-z0-9-]+|\/episode\/|\/ver\/|youtube\.com\/watch|youtu\.be\/|youtube\.com\/shorts\//i.test(m.url || ''); /* v167: los videos sueltos de youtube (respaldo) también */
   let avisoPlay = false;
   /* v59: pantalla completa — cuando la película arranca, el video llena
    * todo el espejo (sin el decorado de la página alrededor) */
@@ -1427,7 +1427,7 @@ async function startMirror(room, rawUrl, userId) {
         }
       } catch {}
     }
-    if (videoListo && !m.ready) {
+    if (videoListo && !m.ready && esPagCine()) { /* v167: solo pelis/eps — youtube tiene videítos de vista previa en su feed y con ellos mandábamos la sala a «modo película»: botón de play gigante y toques comidos; un sitio web se NAVEGA, no se pausa */
       /* v61→v127: la peli/episodio queda LISTO EN PAUSA en cualquier página
        * (no solo cine) — el botón «Toca para empezar» aparece en la sala y
        * cuando alguien le pica, empieza para todos al mismo tiempo */
@@ -1515,6 +1515,14 @@ async function startMirror(room, rawUrl, userId) {
           broadcast(room, 'mirror-fs', { on: !!on });
         })
         .catch(() => { m.fsCheck = null; });
+    }
+
+    /* v166: la sesión del espejo se guarda CADA MINUTO — si el espejo muere
+     * o lo cierran, el login que hicieron sobrevive (el clon se hace de la
+     * maestra y sin esto un espejo caído se llevaba la sesión consigo) */
+    if (m.dirPerfil && now - (m.ultimaSincro || m.startedAt) > 60000) {
+      m.ultimaSincro = now;
+      sincroSesion(m.dirPerfil);
     }
 
     /* calidad adaptativa: si el ancho de banda sube demasiado, bajamos calidad
