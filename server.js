@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v165'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v166'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -286,28 +286,27 @@ async function resolverYoutube(u) {
   const c = YT_CACHE.get(id);
   if (c && Date.now() - c.at < 2 * 3600 * 1000) return c.nat;
   let ultimoErr = 'sin instancias disponibles';
-  for (const base of YT_INSTANCIAS_PIPED) {
-    try {
+  /* v166: las instancias van en PARALELO — la primera que sirva gana
+   * (antes una lenta retrasaba a todas) */
+  try {
+    const ganador = await Promise.any(YT_INSTANCIAS_PIPED.map(async (base) => {
       const r = await fetchSeguro(base + '/streams/' + id, 9000);
-      if (!r.ok) { ultimoErr = base.split('//')[1] + ' → ' + r.status; continue; }
+      if (!r.ok) throw new Error(base.split('//')[1] + ' → ' + r.status);
       const j = await r.json();
-      if (j.error) { ultimoErr = String(j.error).slice(0, 60); continue; }
+      if (j.error) throw new Error(String(j.error).slice(0, 60));
       if (j.title) YT_TITULOS.set(id, String(j.title).slice(0, 80));
       const vs = j.videoStreams || [];
       const v = vs.find((x) => !x.videoOnly && x.mimeType === 'video/mp4' && x.quality === '360p')
         || vs.find((x) => !x.videoOnly && x.mimeType === 'video/mp4');
-      if (v && v.url) {
-        const chk = await fetchSeguro(v.url, 9000).catch(() => null);
-        if (chk && chk.ok) {
-          try { chk.body && chk.body.cancel(); } catch {}
-          const nat = { m3u8: v.url, mp4: true, proxy: false, subs: [] };
-          YT_CACHE.set(id, { nat, at: Date.now() });
-          return nat;
-        }
-        ultimoErr = 'el stream no respondió';
-      } else ultimoErr = 'sin stream combinado';
-    } catch (e) { ultimoErr = String(e.message || e).slice(0, 60); }
-  }
+      if (!v || !v.url) throw new Error('sin stream combinado');
+      const chk = await fetchSeguro(v.url, 9000).catch(() => { throw new Error('el stream no respondió'); });
+      if (!chk.ok) { try { chk.body && chk.body.cancel(); } catch {} throw new Error('el stream no respondió'); }
+      try { chk.body && chk.body.cancel(); } catch {}
+      return { m3u8: v.url, mp4: true, proxy: false, subs: [] };
+    }));
+    YT_CACHE.set(id, { nat: ganador, at: Date.now() });
+    return ganador;
+  } catch (e) { ultimoErr = String((e && e.errors && e.errors[0] && e.errors[0].message) || e.message || e).slice(0, 60); }
   for (const base of YT_INSTANCIAS_INV) {
     try {
       const r = await fetchSeguro(base + '/api/v1/videos/' + id + '?fields=videoId,title,formatStreams', 9000);
@@ -1052,6 +1051,36 @@ function mirrorState(room) {
   return out;
 }
 
+/* v166: SESIÓN PERSISTENTE DEL ESPEJO — el perfil de Chrome se guarda en
+ * .sesion-yt (fuera de git): quien inicie sesión en una página espejeada
+ * (el «inicia sesión» de youtube, spotify, twitch…) no la vuelve a teclear
+ * NUNCA: cada espejo arranca de una CLONA y al cerrarse se sincroniza de
+ * vuelta a la maestra. Importante: esa sesión queda para TODA la sala —
+ * solo inicien sesión cuentas desechables/de invitado. */
+const DIR_SESION = path.join(__dirname, '.sesion-yt');
+let ultimaSincroSesion = 0;
+function clonarPerfilSesion() {
+  try {
+    if (!fs.existsSync(DIR_SESION)) return '';
+    const os = require('os');
+    const clon = fs.mkdtempSync(path.join(os.tmpdir(), 'huddle-mirror-'));
+    fs.cpSync(DIR_SESION, clon, { recursive: true, force: true });
+    for (const f of fs.readdirSync(clon)) {
+      if (/^Singleton/.test(f)) { try { fs.rmSync(path.join(clon, f), { recursive: true, force: true }); } catch {} }
+    }
+    return clon;
+  } catch { return ''; }
+}
+function sincroSesion(clon) {
+  try {
+    if (!clon || !fs.existsSync(clon)) return;
+    if (Date.now() - ultimaSincroSesion < 30000) return;
+    ultimaSincroSesion = Date.now();
+    fs.mkdirSync(DIR_SESION, { recursive: true });
+    fs.cpSync(clon, DIR_SESION, { recursive: true, force: true });
+  } catch {}
+}
+
 async function startMirror(room, rawUrl, userId) {
   const url = normalizeWebUrl(rawUrl);
   /* v164: si lo que piden es un VIDEO de youtube → NATIVO (el espejo come
@@ -1110,10 +1139,12 @@ async function startMirror(room, rawUrl, userId) {
   /* Chrome headless no emite audio (comprobado a mano); con Xvfb usamos
    * Chrome real, que sí suena en el sink virtual de PulseAudio. */
   const useXvfb = AUDIO_READY && fs.existsSync('/tmp/.X11-unix/X99');
+  const dirPerfil = clonarPerfilSesion(); /* v166: clon de la sesión maestra */
   const browser = await PUPPETEER.launch({
     headless: !useXvfb,
     // CHROME_PATH (opcional): usar un Chromium del sistema, p.ej. en ARM
     ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
+    ...(dirPerfil ? { userDataDir: dirPerfil } : {}), /* v166: sesión persistente */
     args: [
       '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
       '--autoplay-policy=no-user-gesture-required',
@@ -1153,7 +1184,7 @@ async function startMirror(room, rawUrl, userId) {
   }).catch(() => {});
   const cdp = await page.createCDPSession();
 
-  const m = { browser, page, cdp, url, frame: null, dirty: false, timer: null, emptySince: null, ownerId: userId, startedAt: Date.now(), serie: null };
+  const m = { browser, page, cdp, url, frame: null, dirty: false, timer: null, emptySince: null, ownerId: userId, startedAt: Date.now(), serie: null, dirPerfil };
   mirrors.set(room.code, m);
   /* v118: un espejo nuevo APAGA lo nativo — antes el room.native viejo
    * seguía vivo en el estado y el cliente se peleaba entre el video
@@ -1520,6 +1551,8 @@ async function stopMirror(roomOrCode) {
   clearInterval(m.timer);
   if (m.parec) { try { m.parec.kill(); } catch {} }
   try { await m.browser.close(); } catch {}
+  sincroSesion(m.dirPerfil); /* v166: el login que hicieron queda para la próxima */
+  try { if (m.dirPerfil) fs.rmSync(m.dirPerfil, { recursive: true, force: true }); } catch {}
   console.log(`[${new Date().toISOString()}] 🪞 espejo detenido en sala ${code}`);
   const room = rooms.get(code);
   if (room) broadcast(room, 'mirror-state', { active: false, url: '' });
