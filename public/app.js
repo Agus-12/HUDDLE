@@ -2893,9 +2893,11 @@ function crearTarjetaResultado(res, alElegir) {
       im.addEventListener('error', () => {
         const respaldo = /^\/api\/img/.test(res.img || '')
           ? res.img /* v91: ya va por el proxy — reintento tal cual */
-          : /animeflv\.|latanime\./i.test(res.img)
-            ? imgPorProxy(res.img) /* v67: proxy propio */
-            : 'https://wsrv.nl/?url=' + res.img.replace(/^https?:\/\//, '').split('?')[0] + '&w=240';
+          : /^\/covers\//.test(res.img || '')
+            ? res.img /* v196: portada LOCAL del server — se reintenta tal cual (nunca al wsrv) */
+            : /animeflv\.|latanime\./i.test(res.img)
+              ? imgPorProxy(res.img) /* v67: proxy propio */
+              : 'https://wsrv.nl/?url=' + res.img.replace(/^https?:\/\//, '').split('?')[0] + '&w=240';
         if (im.src !== respaldo) im.src = respaldo;
       }, { once: true });
     }

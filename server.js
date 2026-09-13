@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v195'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v196'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -5025,8 +5025,10 @@ const CV_OCULTAS = new Set([
 const CV_OCULTAS_RT = new Set(); /* v195: muertas detectadas EN VIVO (persistente) */
 try { for (const x of JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'cv-ocultas-rt.json'), 'utf8')) || []) CV_OCULTAS_RT.add(x); } catch {}
 let cvRtTimer = null;
+/* v196: series BUENAS confirmadas por el usuario — la autocuración jamás las toca */
+const CV_PROTEGIDAS = new Set(['yellowstone', 'marshals-una-historia-de-yellowstone']);
 function cvOcultaRegistrar(slug) {
-  if (!slug || CV_OCULTAS_RT.has(slug) || CV_OCULTAS.has(slug)) return;
+  if (!slug || CV_OCULTAS_RT.has(slug) || CV_OCULTAS.has(slug) || CV_PROTEGIDAS.has(slug)) return;
   CV_OCULTAS_RT.add(slug);
   console.log('[cuevana] título muerto ocultado en vivo: ' + slug);
   try { clearTimeout(cvRtTimer); } catch {}
