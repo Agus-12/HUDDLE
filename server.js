@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v161'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v162'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -970,7 +970,7 @@ function mirrorState(room) {
 }
 
 async function startMirror(room, rawUrl, userId) {
-  const url = normalizeWebUrl(rawUrl);
+  const url = urlYoutubeEmbed(normalizeWebUrl(rawUrl)) || normalizeWebUrl(rawUrl); /* v162 */
   if (mirrors.has(room.code)) {
     const m = mirrors.get(room.code);
     if ((m.url || '') === url) {
@@ -1096,6 +1096,10 @@ async function startMirror(room, rawUrl, userId) {
   page.on('framenavigated', (f) => {
     if (f === page.mainFrame()) {
       m.url = f.url();
+      /* v162: navegaron a un video de youtube dentro del espejo → se lo
+       * cambia al player embebido (sin muro de login, autoplay) */
+      const emb = urlYoutubeEmbed(m.url);
+      if (emb) { m.page.goto(emb, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {}); return; }
       broadcast(room, 'mirror-state', mirrorState(room));
     }
   });
@@ -1426,6 +1430,32 @@ async function recoverMirror(code, reason) {
   }
   sysMsg(room, '🪞 No se pudo reabrir la página — espejo detenido');
   return false;
+}
+
+/* v162: YOUTUBE SIN MURO DE LOGIN — la IP del servidor es de datacenter y
+ * youtube le enseña «Inicia sesión para confirmar que no eres un bot» al
+ * player normal. El player EMBEBIDO (/embed/) no pasa por ese check y
+ * además autoplay sin gesto. También convierte los clics dentro de youtube
+ * (ver framenavigated): cualquier video que abras va a parar al embed. */
+function urlYoutubeEmbed(u) {
+  try {
+    const x = new URL(u);
+    if (!/(^|\.)youtube\.com$|^youtu\.be$/i.test(x.hostname)) return null;
+    if (/\/embed\//i.test(x.pathname)) return null; /* ya es embed */
+    let id = '';
+    let m = /[?&]v=([A-Za-z0-9_-]{6,16})/.exec(x.search);
+    if (m) id = m[1];
+    if (!id) {
+      m = /^\/(shorts|live|embed)\/([A-Za-z0-9_-]{6,16})/.exec(x.pathname);
+      if (m && m[1] !== 'embed') id = m[2];
+    }
+    if (!id && /(^|\.)youtu\.be$/i.test(x.hostname)) {
+      m = /^\/([A-Za-z0-9_-]{6,16})/.exec(x.pathname);
+      if (m) id = m[1];
+    }
+    if (!id || /^watch$/.test(id)) return null;
+    return 'https://www.youtube.com/embed/' + id + '?autoplay=1&hl=es&cc_lang_pref=es&rel=0';
+  } catch { return null; }
 }
 
 function normalizeWebUrl(url) {

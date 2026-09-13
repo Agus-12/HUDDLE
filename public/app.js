@@ -415,6 +415,19 @@ S.nativoListo = false; /* v127: ¿el video nativo ya dio video? */
 S.salaTitulo = ''; S.salaImg = ''; /* v127: qué se ve en la sala (para la espera de los invitados) */
 S.mirrorT = 0; S.mirrorDur = 0; /* v128: tiempo del video espejado */
 S.introUrl = ''; S.introData = null; S.introFin = 0; S.introT = 0; S.introVistoEn = null; /* v128/v132 */
+/* v162: el audio del espejo en computadoras — los navegadores lo dejan
+ * suspendido hasta que haya un gesto. Además del chip ámbar, CUALQUIER
+ * toque/clic en la sala lo despierta (antes solo el chip servía y en la
+ * compu pasaba desapercibido: «no se escucha» y nada más). */
+document.addEventListener('pointerdown', () => {
+  if (!S.mirror.active || !AU.needAudio) return;
+  ensureAudioCtx().then((ctx) => {
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    if (ctx.state === 'running') $('#audioChip').classList.add('hidden');
+  }).catch(() => {});
+}, true);
+
 function posEsperada() {
   if (!S.nativo) return 0;
   return S.nativo.isPlaying
