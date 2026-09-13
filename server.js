@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v154'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v155'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -3391,6 +3391,62 @@ async function refrescarDatosCaricatura(slug) {
 
 /* capítulo → playlist: mismo navegador del servidor que PelisXD (el
  * embed es de la misma familia streamwish y sirve sprintcdn) */
+/* v155: CARICATURAS SIN NAVEGADOR — hallado a prueba y error: la página
+ * carga el player por AJAX de WordPress (action=get_system_data) → iframe
+ * Byse → /api/videos/<code> → playback cifrado AES-256-GCM que Node
+ * descifra con crypto nativo. Todo HTTP puro: ~3s en vez de 10-25s y sin
+ * abrir Chrome. El navegador queda de RESPALDO por si el sitio cambia. */
+async function resolverCaricaturaHttp(epUrl) {
+  const t0 = Date.now();
+  const slug = cariSlugDe(epUrl);
+  if (!slug) throw new Error('Capítulo de caricatura no válido');
+  /* 1) la página del capítulo trae el contenedor con el id de publicación */
+  const r1 = await fetchSeguro(CARI_BASE + slug + '/', 9000);
+  if (!r1 || !r1.ok) throw new Error('La página del capítulo no respondió');
+  const html = await r1.text();
+  const idm = /anchor-data-container" data-id="(\d+)"/i.exec(html);
+  if (!idm) throw new Error('No encontré el id del capítulo');
+  /* 2) el player llega por ajax de WordPress */
+  const r2 = await fetch(CARI_BASE + 'wp-admin/admin-ajax.php', {
+    method: 'POST',
+    headers: { 'User-Agent': MIRROR_UA, Referer: CARI_BASE + slug + '/', 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'action=get_system_data&target_id=' + idm[1],
+  }).catch(() => null);
+  if (!r2 || !r2.ok) throw new Error('No pude pedir el player al sitio');
+  const j2 = await r2.json().catch(() => null);
+  const im = j2 && j2.success && j2.data && j2.data.html ? /<iframe[^>]*src="(https?:\/\/[^"]+)"/i.exec(j2.data.html) : null;
+  if (!im) throw new Error('El sitio no entregó el player');
+  const embed = new URL(im[1].replace(/\//g, '/'));
+  /* 3) los datos del video (playback cifrado) */
+  const r3 = await fetchSeguro(embed.origin + '/api/videos/' + encodeURIComponent(embed.pathname.split('/').pop() || ''), 10000);
+  if (!r3 || !r3.ok) throw new Error('No pude leer los datos del video');
+  const v = await r3.json().catch(() => null);
+  const p = v && v.playback;
+  if (!p || !Array.isArray(p.key_parts) || !p.payload || !p.iv) throw new Error('Playback no disponible');
+  /* 4) AES-256-GCM: llave = key_parts en las posiciones [version, 31-version] (1-based) */
+  const b64u = (s) => Buffer.from(String(s).replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+  const np = p.key_parts.length, vv = Math.abs(+p.version || 0);
+  let idx = [vv, 31 - vv].filter((i) => i >= 1 && i <= np);
+  if (!idx.length) idx = p.key_parts.map((_, i) => i + 1);
+  const key = Buffer.concat(idx.map((i) => b64u(p.key_parts[i - 1])));
+  const todo = b64u(p.payload), tag = todo.subarray(todo.length - 16), ct = todo.subarray(0, todo.length - 16);
+  const dec = crypto.createDecipheriv('aes-256-gcm', key, b64u(p.iv)).setAuthTag(tag);
+  const fuentes = (JSON.parse(Buffer.concat([dec.update(ct), dec.final()]).toString('utf8')).sources) || [];
+  if (!fuentes.length) throw new Error('El video no trae fuentes');
+  fuentes.sort((a, b) => (b.bitrate_kbps || 0) - (a.bitrate_kbps || 0));
+  const mejor = fuentes[0];
+  if (!mejor || !/^https?:/i.test(mejor.url || '')) throw new Error('Fuente inválida');
+  /* 5) el playlist maestro se cachea como los de PelisXD (2h) */
+  const r4 = await fetchSeguro(mejor.url, 12000);
+  if (!r4 || !r4.ok) throw new Error('No pude leer el playlist');
+  const body = await r4.text();
+  if (!/#EXTM3U/.test(body)) throw new Error('Playlist inválido');
+  const ahora = Date.now();
+  const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
+  pelisxdStreams.set(tok, { body, base: mejor.url, ref: '', slug, at: ahora });
+  console.log('[caricaturas] HTTP: ' + slug + ' → ' + (mejor.label || mejor.quality || '?') + ' en ' + ((ahora - t0) / 1000).toFixed(1) + 's (sin navegador)');
+  return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
+}
 async function resolverCaricatura(epUrl) {
   const slug = cariSlugDe(epUrl);
   if (!slug) throw new Error('Capítulo de caricatura no válido');
@@ -3424,7 +3480,11 @@ async function resolverCaricatura(epUrl) {
    * que se inyectan por JS y no hay que fiarse de él antes de intentar) */
   let cap = null;
   try {
-    cap = await extraerStreamwishPeli(CARI_BASE + slug + '/');
+    try { cap = await resolverCaricaturaHttp(CARI_BASE + slug + '/'); /* v155: HTTP puro primero */ }
+    catch (eH) {
+      console.log('[caricaturas] sin navegador (' + String(eH && eH.message || eH).slice(0, 60) + ') — uso el navegador');
+      cap = await extraerStreamwishPeli(CARI_BASE + slug + '/');
+    }
   } catch (e) {
     try {
       const rPre = await fetchSeguro(CARI_BASE + slug + '/', 8000);
