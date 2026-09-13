@@ -355,7 +355,7 @@ function applyState(st) {
   if (st.switching && S.nativo) {
     if (S.mirrorInfo) {
       S.mirrorInfo.title = S.salaTitulo || S.mirrorInfo.title;
-      S.mirrorInfo.img = S.salaImg || S.mirrorInfo.img;
+      S.mirrorInfo.img = (S.salaImg ? proxyAnimeImg(S.salaImg, 400) : '') || S.mirrorInfo.img;
       if (st.videoUrl) S.mirrorInfo.url = st.videoUrl;
       S.mirrorInfo.sub = 'Preparando el siguiente episodio…';
       S.mirrorInfo.epNum = '';
@@ -363,6 +363,8 @@ function applyState(st) {
     mostrarPeliLoading();
     const pe = $('#peliEstado');
     if (pe) pe.textContent = 'Preparando el siguiente episodio…';
+    const hint = document.querySelector('#peliLoading .peli-hint');
+    if (hint) hint.textContent = 'Cambiando de episodio — un momento…';
     const bx = $('#peliLoading');
     if (bx) { bx.style.animation = 'none'; void bx.offsetWidth; bx.style.animation = ''; } /* relanzar pop */
   }
@@ -1352,6 +1354,8 @@ function mostrarPeliLoading() {
     }
     $('#peliSub').textContent = info.sub || 'Abriendo en el espejo…';
   }
+  const hintN = box.querySelector('.peli-hint');
+  if (hintN) hintN.textContent = 'Toca la pantalla para quitarla — el video entra solo cuando esté listo';
   box.classList.remove('hidden');
   S.envioEn = Date.now(); /* v132: nace la espera — mirror-state inactivo dentro de 25s es TRANSICIÓN a nativo, no aborto */
   arrancarTimerPeli();
@@ -1371,10 +1375,13 @@ function ocultarPeliLoadingSuave() {
   setTimeout(() => ocultarPeliLoading(), falta);
 }
 $('#peliLoading').addEventListener('click', () => {
-  /* v148: la tarjeta SIEMPRE se puede quitar pulsándola (antes solo si el
-   * video ya estaba listo — en los estados bugeados quedabas atrapado).
-   * Si el video sigue cargando, entra solo cuando esté («Toca para empezar»).
-   * Se recuerda cuál contenido se descartó: no revive solo con el MISMO. */
+  /* v148: la tarjeta se puede quitar pulsándola si está atorada (peli/serie
+   * que no arranca). v150: EXCEPCIÓN — durante un CAMBIO DE EPISODIO no se
+   * quita (quitarla te dejaba en el episodio viejo y sin transición). */
+  if (S.epEsperaUrl && Date.now() - (S.epEsperaEn || 0) < 45000) {
+    toast('Cambiando de episodio — espera un momento');
+    return;
+  }
   S.peliTapUrl = (S.mirrorInfo && S.mirrorInfo.url) || '';
   S.peliTapEn = Date.now();
   ocultarPeliLoading();
@@ -1823,7 +1830,13 @@ function updateEpNav() {
    * el server ya resolvió) y solo se va cuando hay video listo o si falló */
   const tarjetitaEp = (mensaje) => {
     S.peliTapEn = 0; /* v148: intención nueva — la tarjeta sale aunque la hayas quitado a mano */
+    /* v150: carátula de la SERIE desde el primer segundo (la miniatura del
+     * episodio viejo confundía — parecía que no había cambiado nada) */
+    if (S.mirrorInfo && S.serieSala && S.serieSala.poster) S.mirrorInfo.img = proxyAnimeImg(S.serieSala.poster, 400);
     if (S.mirrorInfo) { S.mirrorInfo.sub = mensaje; mostrarPeliLoading(); }
+    /* v150: durante el cambio la tarjeta NO se deja quitar */
+    const hint = document.querySelector('#peliLoading .peli-hint');
+    if (hint) hint.textContent = 'Cambiando de episodio — un momento…';
     S.epEsperaUrl = S.mirror.url || (S.nativo && S.nativo.url) || ''; /* v141: estados del ep viejo = ignorar */
     S.epEsperaEn = Date.now();
   };
