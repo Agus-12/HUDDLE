@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v158'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v159'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -3527,6 +3527,76 @@ async function resolverCaricatura(epUrl) {
   return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
 }
 
+/* v159: LACARTOONS/RPMVID SIN NAVEGADOR — ingeniería inversa del player
+ * cubeembed: la API /api/v1/video?id= devuelve HEX cifrado en AES-128-CBC
+ * con LLAVE FIJA (derivada del protocolo dentro del bundle) e IV fijo; el
+ * JSON trae la fuente tiktok y el player la ve reescribiendo /hls/ →
+ * /hlsmod/<dominio>/ sobre el propio cubeembed — ese camino NO amarra los
+ * tokens a la IP: sirve desde cualquier lado. Segundos, sin Chrome. */
+async function resolverRpmvidHttp(capNum, id) {
+  const t0 = Date.now();
+  /* la API del player aletea: el MISMO id responde «not found» por
+   * ventanas de minutos y luego revive — reintentamos corto y, si
+   * persiste, le pasamos el turno al navegador (que sufre lo mismo) */
+  let j = null, ultimoErr = '';
+  for (let intento = 0; intento < 3 && !j; intento++) {
+    if (intento) await new Promise((r) => setTimeout(r, 900));
+    try {
+      const r2 = await fetchSeguro('https://cubeembed.rpmvid.com/api/v1/video?id=' + encodeURIComponent(id) + '&w=1280&h=720&r=lacartoons.com', 10000);
+      if (!r2.ok) { ultimoErr = 'el player rechazó el video (' + r2.status + ')'; continue; }
+      const hex = String(await r2.text() || '').trim();
+      if (!/^[0-9a-f]+$/i.test(hex) || hex.length % 2) { ultimoErr = 'el player cambió su cifrado'; continue; }
+      const d = crypto.createDecipheriv('aes-128-cbc', Buffer.from('kiemtienmua911ca', 'utf8'), Buffer.from('1234567890oiuytr', 'utf8'));
+      j = JSON.parse(Buffer.concat([d.update(Buffer.from(hex, 'hex')), d.final()]).toString('utf8'));
+    } catch (e) { ultimoErr = String(e.message || e).slice(0, 60); }
+  }
+  if (!j) throw new Error(ultimoErr || 'el player no respondió');
+  let cfg = {};
+  try { cfg = JSON.parse(j.streamingConfig || '{}'); } catch {}
+  const ttA = cfg.adjust && cfg.adjust.Tiktok;
+  const ttDom = ttA && ttA.domain;
+  /* maestro: 1er intento por el camino hlsmod del embed (tiktok);
+   * si no trae tiktok o falla, la fuente Cloudflare del JSON */
+  let masterUrl = '', masterHost = '';
+  if (ttDom && j.hlsVideoTiktok) {
+    const u = new URL(j.hlsVideoTiktok, 'https://cubeembed.rpmvid.com/');
+    u.hostname = ttDom;
+    if (ttA.params && ttA.params.v) u.searchParams.set('v', ttA.params.v);
+    const um = new URL(u.href);
+    um.hostname = 'cubeembed.rpmvid.com';
+    um.pathname = um.pathname.replace('/hls/', '/hlsmod/' + ttDom + '/');
+    masterUrl = um.href;
+  }
+  if (!masterUrl && j.cf) masterUrl = j.cf;
+  if (!masterUrl) throw new Error('sin fuente conocida en el player');
+  masterHost = new URL(masterUrl).hostname;
+  let body = '';
+  for (let intento = 0; intento < 2 && !body; intento++) {
+    if (intento) {
+      if (!j.cf || masterUrl === j.cf) break;
+      masterUrl = j.cf; /* segundo intento: la fuente Cloudflare */
+      masterHost = new URL(masterUrl).hostname;
+    }
+    try {
+      const r3 = await fetchSeguro(masterUrl, 10000);
+      if (!r3.ok) { ultimoErr = 'el master no se dejó ver (' + r3.status + ')'; continue; }
+      const b = await r3.text();
+      if (/^#EXTM3U/m.test(b)) body = b;
+      else ultimoErr = 'master inválido';
+    } catch (e) { ultimoErr = String(e.message || e).slice(0, 60); }
+  }
+  if (!body) throw new Error(ultimoErr || 'el master no respondió');
+  /* los hosts quedan registrados: master/variante por cubeembed (hlsmod)
+   * y segmentos por su CDN — todo vía /api/hls con la IP de este server */
+  hlsReferers.set('cubeembed.rpmvid.com', 'https://lacartoons.com/');
+  try { hlsReferers.set(masterHost, 'https://lacartoons.com/'); } catch {}
+  const ahora = Date.now();
+  const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
+  pelisxdStreams.set(tok, { body, base: masterUrl, ref: '', slug: 'lct-' + capNum, at: ahora });
+  console.log('[lacartoons] HTTP: cap ' + capNum + ' (id ' + id + ') en ' + ((ahora - t0) / 1000).toFixed(1) + 's (sin navegador)');
+  return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
+}
+
 /* v112: LACARTOONS — capítulo → playlist. El player cubeembed.rpmvid
  * guarda el m3u8 detrás de una API cifrada que solo él sabe descifrar:
  * el navegador del servidor abre el capítulo, CLICA el play (botón en
@@ -3629,6 +3699,7 @@ async function resolverLacartoons(epUrl) {
   }
   /* v112: chequeo rápido — si la página ya no trae el iframe del player
    * (embed retirado), el error sale claro sin abrir el navegador */
+  let idRpm = '';
   {
     const rPre = await fetchSeguro(epUrl, 10000).catch(() => null);
     const html = rPre && rPre.ok ? await rPre.text().catch(() => '') : '';
@@ -3640,7 +3711,14 @@ async function resolverLacartoons(epUrl) {
       if (!/cubeembed\.rpmvid\.com\/#[a-z0-9]+/i.test(html)) {
         throw new Error('Ese capítulo ya no está disponible en Lacartoons — prueba otro');
       }
+      idRpm = (/cubeembed\.rpmvid\.com\/#([a-z0-9]+)/i.exec(html) || [])[1] || '';
     }
+  }
+  /* v159: HTTP PRIMERO — la página ya nos dio el id del player; si algo
+   * falla, el navegador de respaldo toma el turno como siempre */
+  if (idRpm) {
+    try { return await resolverRpmvidHttp(m[1], idRpm); }
+    catch (eH) { console.log('[lacartoons] sin HTTP (' + String(eH && eH.message || eH).slice(0, 60) + ') — uso el navegador'); }
   }
   /* el navegador clica el player y suelta el master. Hay DOS formatos:
    * - viejo (billy, iCarly): master con una sola variante muxada a+v —

@@ -10,7 +10,7 @@
 | **Cuevana / cine-calidad** (series y pelis) | HTTP (goodstream, como Solo) | ✅ SÍ | ~3-6s |
 | **Goodstream / Vimeos** (modo Solo) | HTTP | ✅ SÍ | ~3-6s |
 | **Lacartoons con player ok.ru** | HTTP (mp4 directo) | ✅ SÍ | ~4s |
-| **Lacartoons con player rpmvid** (iCarly, Ben 10 T3+, Billy y Mandy) | 🌐 NAVEGADOR | ❌ NO | 10-25s |
+| **Lacartoons con player rpmvid** (iCarly, Ben 10 T3+, Billy y Mandy) | ⚡ HTTP (v159: AES del bundle + master /hlsmod) | ✅ SÍ | 1-3s (el player aletea: si el id amanece muerto, respaldo navegador) |
 | **PelisXD** (películas) | 🌐 NAVEGADOR (los servidores los inyecta JS + challenge) | ❌ NO | ~20s |
 | **Espejo** ("Otra página", YouTube) | 🌐 NAVEGADOR (ese es su propósito — no aplica) | — | — |
 
@@ -36,7 +36,7 @@ Lo que encontré en la auditoría:
 - El embed `cubeembed.rpmvid.com/#<hash>` es una app React
 - Su API interna: `/api/v1/info?id=<hash>` y `/api/v1/video?id=<hash>` **responden por HTTP sin token** — pero devuelven un payload **hex cifrado con AES-CBC**
 - El bundle del player trae el descifrado ofuscado (tabla de strings + AES-CBC)
-- **Plan**: extraer la llave/algoritmo del bundle (como hice con Byse) → `resolverLacartoonsHttp`. Todas las muestras de iCarly que probé (5/5 capítulos) usan rpmvid, así que es EL premio pendiente.
+- **HECHO en v159**: llave AES-128-CBC fija extraída del bundle (`kiemtienmua911ca`, IV `1234567890oiuytr`), API `/api/v1/video?id=`, master vía `/hlsmod/<dominio>/` sobre cubeembed (sin amarrar a IP). `resolverRpmvidHttp` con reintentos (el player aletea) + respaldo navegador.
 
 ### 2. PelisXD — DIFICULTAD MEDIA
 - La página de la película **no trae servidores en el HTML** (los inyecta JS) y el embed de streamwish tiene una puerta (challenge) que hoy salta el navegador
