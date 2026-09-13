@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v179'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v180'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -391,6 +391,10 @@ const DANI_POSTERS = new Map(); /* slug → { at, url } */
 /* v177: series nuestras ROTAS o incompletas que danimados tiene bien —
  * el slug nuestro (filas/buscador) ahora SIRVE la versión de danimados */
 const DANI_REEMPLAZAS = new Map([
+  /* v180: purga de duplicados — si las dos fuentes tienen la serie se queda
+   * DANIMADOS (así lo pidió el usuario); conserva la nuestra solo donde tiene
+   * bastantes más capítulos (esas van en DANI_OCULTAS). Portada: el archivo
+   * local curado de IMDb que ya teníamos (DANI_COVER_DE). */
   ['dani-titanes', 'teen-titans-go'],
   ['bob-esponja-capitulos-completos', 'bob-esponja'],
   ['hora-de-aventura-capitulos-completos', 'hora-de-aventuras'],
@@ -402,18 +406,82 @@ const DANI_REEMPLAZAS = new Map([
   ['ben-10-capitulos-completos', 'ben-10'],
   ['jimmy-neutron-capitulos-completos', 'jimmy-neutron-el-nino-genio'],
   ['danny-phantom-capitulos-completos', 'danny-phantom'],
-  ['invasor-zim-temporada-1', 'invasor-zim'],
   ['phineas-y-ferb-capitulos-completos', 'phineas-y-ferb'],
+  /* v180: duplicados verificados capítulo a capítulo — dani gana o empata */
+  ['batman-del-futuro', 'batman-del-futuro'],
+  ['batman-serie-animada', 'batman-la-serie-animada'],
+  ['ben-10-fuerza-alienigena', 'ben-10-fuerza-alienigena'],
+  ['daniel-el-travieso', 'daniel-el-travieso'],
+  ['drake-y-josh', 'drake-y-josh'],
+  ['duck-dodgers', 'duck-dodgers'],
+  ['ed-edd-y-eddy', 'ed-edd-y-eddy'],
+  ['hombres-de-negro', 'hombres-de-negro-la-serie-animada'],
+  ['jonny-quest', 'jonny-quest'],
+  ['kim-possible', 'kim-possible'],
+  ['liga-de-la-justicia', 'la-liga-de-la-justicia'],
+  ['la-sirenita', 'la-sirenita'],
+  ['la-vida-moderna-de-rocko', 'la-vida-moderna-de-rocko'],
+  ['las-aventuras-de-tintin', 'las-aventuras-de-tintin'],
+  ['los-autos-locos', 'los-autos-locos'],
+  ['los-castores-cascarrabias', 'los-castores-cascarrabias'],
+  ['los-supersonicos', 'los-supersonicos'],
+  ['pinky-y-cerebro', 'pinky-y-cerebro'],
+  ['que-hay-de-nuevo-scooby', 'que-hay-de-nuevo-scooby-doo'],
+  ['samurai-jack', 'samurai-jack'],
+  ['scooby-donde-estas', 'scooby-doo-donde-estas'],
+  ['superman-serie-animada', 'superman-la-serie-animada'],
+  ['tiro-loco-mcgraw', 'tiro-loco-mcgraw'],
+  ['ultimate-spider-man', 'ultimate-spider-man'],
+  ['x-men-evolucion', 'x-men-evolucion'],
+  ['x-men-serie-animada', 'x-men-la-serie-animada'],
+  ['monstruos-de-verdad-latino', 'aaahhh-monstruos'],
+  ['daria-capitulos-completos', 'daria'],
+  ['futurama-latino', 'futurama'],
+  ['kenan-y-kel-latino', 'kenan-kel'],
+  ['mansion-foster-para-amigos-imaginarios-capitulos-completos', 'mansion-foster-para-amigos-imaginarios'],
+]);
+/* v180: la NUESTRA tiene bastantes más capítulos — la de danimados NO sale
+ * en el buscador (una tarjeta por serie) */
+const DANI_OCULTAS = new Set([
+  'agallas-el-perro-cobarde', 'el-laboratorio-de-dexter', 'invasor-zim', 'johnny-bravo',
+  'las-chicas-superpoderosas', 'los-padrinos-magicos', 'mucha-lucha', 'oye-arnold',
+  'rocket-power', 'time-squad', 'vaca-y-pollo',
+]);
+/* v180: duplicados INTERNOS (lacartoons + miscaricaturas a la vez) — en el
+ * buscador solo sale la de miscaricaturas (trae más capítulos) */
+const LCT_OCULTAS = new Set([
+  'johnny-bravo', 'chicas-superpoderosas', 'rocket-power', 'mucha-lucha',
+  'invasor-zim', 'vaca-y-pollito', 'la-pantera-rosa', 'un-show-mas',
+]);
+/* v180: portada local curada (la buena, de IMDb) para los reemplazados cuyo
+ * archivo no coincide con el slug de danimados */
+const DANI_COVER_DE = new Map([
+  ['batman-la-serie-animada', 'batman-serie-animada'],
+  ['superman-la-serie-animada', 'superman-serie-animada'],
+  ['x-men-la-serie-animada', 'x-men-serie-animada'],
+  ['hombres-de-negro-la-serie-animada', 'hombres-de-negro'],
+  ['la-liga-de-la-justicia', 'liga-de-la-justicia'],
+  ['que-hay-de-nuevo-scooby-doo', 'que-hay-de-nuevo-scooby'],
+  ['scooby-doo-donde-estas', 'scooby-donde-estas'],
+  ['aaahhh-monstruos', 'monstruos-de-verdad-latino'],
+  ['daria', 'daria-capitulos-completos'],
+  ['futurama', 'futurama-latino'],
+  ['kenan-kel', 'kenan-y-kel-latino'],
+  ['mansion-foster-para-amigos-imaginarios', 'mansion-foster-para-amigos-imaginarios-capitulos-completos'],
 ]);
 function daniSlugDeUrl(urlEp) { return (/\/episodios\/([a-z0-9-]+)-(\d+)x(\d+)\//.exec(String(urlEp || '')) || [])[1] || ''; }
+const DANI_TITULO_FIX = new Map([['daria', 'Daria'], ['kenan-kel', 'Kenan y Kel'], ['m-o-d-o-k', 'M.O.D.O.K.']]);
 function daniTituloDe(slug) {
+  if (DANI_TITULO_FIX.has(slug)) return DANI_TITULO_FIX.get(slug);
   const v = DANI_CAT.get(slug);
   return (v && v.t ? String(v.t).replace(/\xa0/g, ' ') : slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
 }
-function daniCoverDe(slug) { return DANI_IMDB.get(slug) || CARI_PORTADAS.get(slug) || '/api/dani/poster/' + slug; }
+function daniCoverDe(slug) { return CARI_PORTADAS.get(DANI_COVER_DE.get(slug) || slug) || DANI_IMDB.get(slug) || '/api/dani/poster/' + slug; } /* v180: portada curada local (IMDb) primero */
 async function daniPosterUrl(slug) {
   const c = DANI_POSTERS.get(slug);
   if (c && Date.now() - c.at < 24 * 3600e3) return c.url;
+  const local = CARI_PORTADAS.get(DANI_COVER_DE.get(slug) || slug);
+  if (local) return local; /* v180: la portada curada (IMDb) que ya teníamos */
   let u = DANI_IMDB.get(slug) || (DANI_CAT.get(slug) || {}).p || ''; /* v178: IMDb primero */
   if (!u) {
     try {
@@ -3653,7 +3721,7 @@ const CARI_ORDEN = [
   'johnny-bravo-capitulos-completos', 'samurai-jack-temporada-1', 'mucha-lucha-capitulos-completos',
   'mansion-foster-para-amigos-imaginarios-capitulos-completos', 'escuadron-del-tiempo-capitulos-completos',
   'ozzy-y-drix-capitulos-completos', 'la-pantera-rosa-capitulos-completos', 'rocket-power-capitulos-completos',
-  'gallo-claudio-capitulos-completos', 'la-vaca-y-el-pollito-capitulos-completos', 'los-chicos-del-barrio-capitulos-completos',
+  'la-vaca-y-el-pollito-capitulos-completos', 'los-chicos-del-barrio-capitulos-completos',
   'megas-xlr-capitulos-completos', 'monstruos-de-verdad-latino', 'soy-la-comadreja-latino',
 ];
 async function caricaturasDestacadas() {
@@ -3674,7 +3742,7 @@ async function refrescarCariFeed() {
   const items = (await Promise.all(slugs.map(async (slug) => {
     const meta = await cariMetaDe(slug).catch(() => null);
     const h = home.get(slug) || {};
-    const img = DANI_IMDB.get(slug) || (meta && (meta.cover || meta.poster)) || h.img || ''; /* v178: los reemplazados van con portada de IMDb */
+    const img = CARI_PORTADAS.get(slug) || DANI_IMDB.get(slug) || (meta && (meta.cover || meta.poster)) || h.img || ''; /* v180: curada local primero */
     return {
       title: (meta && meta.titulo) || cariLimpia(h.alt || cariBonito(slug)),
       url: CARI_BASE + slug + '/', img, site: 'Caricaturas',
@@ -4944,8 +5012,7 @@ const server = http.createServer(async (req, res) => {
       if (!/^[a-z0-9-]{2,90}$/.test(slug) && !/^[0-9]{1,3}$/.test(slug)) return json(res, 400, { ok: false, error: 'Caricatura inválida' }); /* v119: ids de lacartoons de 1 dígito */
       /* v177: danimados primero — series nuestras ROTAS (reemplazos) y las
      * que SOLO están en danimados. Lo demás sigue en nuestra fuente. */
-      const daniSlug = DANI_REEMPLAZAS.get(slug)
-        || (!CARI_ORDEN.includes(slug) && !LCT_SERIES.has(slug) && DANI_CAT.has(slug) ? slug : '');
+      const daniSlug = DANI_REEMPLAZAS.get(slug) || (!DANI_OCULTAS.has(slug) && DANI_CAT.has(slug) ? slug : ''); /* v180: manda danimados… salvo las ocultas (ahí gana la nuestra) */
       if (daniSlug) {
         const eps = await daniLista(daniSlug).catch(() => []);
         if (!eps.length) return json(res, 502, { ok: false, error: 'No pude leer danimados — intenta luego' });
@@ -5052,12 +5119,19 @@ const server = http.createServer(async (req, res) => {
         const daniHits = [];
         for (const [sl, v] of DANI_CAT_ARR) {
           const tn = normalizarTxt(v.t);
-          if (qD.every((w) => tn.includes(w)) && !r.resultados.some((x) => String(x.url || '').includes('/' + sl))) {
+          if (qD.every((w) => tn.includes(w)) && !DANI_OCULTAS.has(sl) && !r.resultados.some((x) => String(x.url || '').includes('/' + sl))) { /* v180: sin duplicados contra las nuestras */
             daniHits.push([sl, v]);
             if (daniHits.length >= 6) break;
           }
         }
-        r.resultados = r.resultados.filter((x) => { const mm = /miscaricaturas\.com\/([a-z0-9-]+)/i.exec(x.url || ''); return !(mm && DANI_REEMPLAZAS.has(mm[1])); });
+        const slugDeTarjeta = (u2) => {
+          let m2 = /miscaricaturas\.com\/([a-z0-9-]+)/i.exec(u2 || '');
+          if (m2) return m2[1];
+          m2 = /lacartoons\.com\/serie\/(\d+)/i.exec(u2 || '');
+          if (m2) return ([...LCT_SERIES.values()].find((x) => String(x.lctId) === m2[1]) || {}).slug || '';
+          return '';
+        }; /* v180: la purga también aplica a las tarjetas de lacartoons */
+        r.resultados = r.resultados.filter((x) => { const s2 = slugDeTarjeta(x.url); return !DANI_REEMPLAZAS.has(s2) && !(/lacartoons/i.test(x.url || '') && LCT_OCULTAS.has(s2)); });
         for (const [sl, v] of daniHits.reverse()) {
           r.resultados.unshift({ title: String(v.t).replace(/\xa0/g, ' '), url: 'https://danimados.cc/serie/' + sl, img: '/api/dani/poster/' + sl, site: 'Caricaturas', extra: 'Danimados' }); /* v178 */
         }
