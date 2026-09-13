@@ -1319,9 +1319,12 @@ $('#btnSeekFwd').addEventListener('click', () => moverPelicula(30));
 /* iniciar espejo desde el selector (o cambiar de página sin detener) */
 /* v59: pantalla de espera con carátula mientras el servidor prepara todo */
 function mostrarPeliLoading() {
-  const info = S.mirrorInfo;
   const box = $('#peliLoading');
   if (!box) return;
+  /* v148: si la quitaste a mano hace menos de 25s y el contenido NO cambió,
+   * no regresa sola — era la «tarjetita fantasma» que obstruía */
+  const info = S.mirrorInfo;
+  if (S.peliTapEn && Date.now() - S.peliTapEn < 25000 && (!info || !info.url || info.url === S.peliTapUrl)) return;
   S.peliLoadingAt = Date.now(); /* v92: la sala carga rapidísimo ahora — la pantalla dura mínimo 5s */
   if (info) {
     const po = $('#peliPoster');
@@ -1357,7 +1360,15 @@ function ocultarPeliLoadingSuave() {
   if (falta <= 0) return ocultarPeliLoading();
   setTimeout(() => ocultarPeliLoading(), falta);
 }
-$('#peliLoading').addEventListener('click', () => { /* v127: mientras carga, la pantalla NO se quita — solo cuando hay video listo */ if (S.mirror.ready || S.nativoListo) ocultarPeliLoading(); });
+$('#peliLoading').addEventListener('click', () => {
+  /* v148: la tarjeta SIEMPRE se puede quitar pulsándola (antes solo si el
+   * video ya estaba listo — en los estados bugeados quedabas atrapado).
+   * Si el video sigue cargando, entra solo cuando esté («Toca para empezar»).
+   * Se recuerda cuál contenido se descartó: no revive solo con el MISMO. */
+  S.peliTapUrl = (S.mirrorInfo && S.mirrorInfo.url) || '';
+  S.peliTapEn = Date.now();
+  ocultarPeliLoading();
+});
 /* v61: selector de temporadas y episodios para series */
 let spDatos = null; /* lo que devolvió /api/serie */
 /* v62→v67: imágenes de AnimeFLV y Latanime pasan por NUESTRO proxy —
@@ -1801,6 +1812,7 @@ function updateEpNav() {
   /* v136: la tarjetita de espera sale AL INSTANTE (no «cuando quiere» cuando
    * el server ya resolvió) y solo se va cuando hay video listo o si falló */
   const tarjetitaEp = (mensaje) => {
+    S.peliTapEn = 0; /* v148: intención nueva — la tarjeta sale aunque la hayas quitado a mano */
     if (S.mirrorInfo) { S.mirrorInfo.sub = mensaje; mostrarPeliLoading(); }
     S.epEsperaUrl = S.mirror.url || (S.nativo && S.nativo.url) || ''; /* v141: estados del ep viejo = ignorar */
     S.epEsperaEn = Date.now();
