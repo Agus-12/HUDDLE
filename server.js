@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v153'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v154'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -2648,18 +2648,22 @@ async function extraerStreamwishPeli(pageUrl) {
      * reintento con más calma en vez de fallar de una vez */
     try { await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }); }
     catch { await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 45000 }); }
-    /* v152→v153: UN solo clic en cuanto aparezca «Opción 1» — picarla
-     * repetidamente re-navegaba la página y el player nunca cargaba */
-    for (let i = 0; i < 10 && cap === null; i++) {
-      await new Promise((r2) => setTimeout(r2, 400));
-      const clicado = await page.evaluate(() => {
+    /* v154: SECUENCIA COMPROBADA — espera de 4s (el sitio arma el player)
+     * y UN clic. v152 lo picaba 10 veces (re-navegaba, nunca cargaba) y
+     * v153 clicaba demasiado pronto (el botón estaba pero sin función).
+     * Si a los 24s no hay video, UN clic de auxilio y se sigue esperando. */
+    await new Promise((r2) => setTimeout(r2, 4000));
+    await page.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find((x) => /opción 1/i.test(x.textContent || ''));
+      if (b) b.click();
+    }).catch(() => {});
+    await new Promise((r2) => setTimeout(r2, 20000));
+    if (!cap) {
+      await page.evaluate(() => {
         const b = [...document.querySelectorAll('button')].find((x) => /opción 1/i.test(x.textContent || ''));
-        if (b) { b.click(); return true; }
-        return false;
-      }).catch(() => false);
-      if (clicado) break;
+        if (b) b.click();
+      }).catch(() => {});
     }
-    await new Promise((r2) => setTimeout(r2, 1500)); /* v153: que el player arranque con calma */
     /* hasta ~60 s: el challenge se resuelve solo mientras el player cree que hay un usuario */
     for (let i = 0; i < 20 && !cap; i++) {
       await new Promise((r2) => setTimeout(r2, 3000));
