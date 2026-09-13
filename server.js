@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v187'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v188'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1276,12 +1276,25 @@ async function descargarInicioEp(m3u8) {
       fs.writeFileSync(archivo, Buffer.from(ab));
       return archivo;
     }
-    const segs = txt.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).map((s) => { try { return new URL(s, pl).href; } catch { return null; } }).filter(Boolean).slice(0, 30);
+    /* v187: duración por #EXTINF — los segmentos NO pesan igual entre CDNs
+     * (vimeos trae pedazos de 2-5MB y los de danimados ~0.7MB); lo que
+     * importa es cuántos SEGUNDOS de video bajamos, no cuántos pedazos */
+    let durs = [];
+    const lineas = txt.split('\n').map((l) => l.trim());
+    const durDe = {};
+    for (let i2 = 0; i2 < lineas.length; i2++) {
+      if (lineas[i2].startsWith('#EXTINF')) {
+        const d2 = parseFloat((/#EXTINF:\s*([0-9.]+)/.exec(lineas[i2]) || [])[1] || '0');
+        const sg = (lineas[i2 + 1] || '').trim();
+        if (sg && !sg.startsWith('#')) durDe[sg] = d2;
+      }
+    }
+    const segs = lineas.filter((l) => l && !l.startsWith('#')).map((s) => { try { return new URL(s, pl).href; } catch { return null; } }).filter(Boolean).slice(0, 40);
     if (!segs.length) return null;
     /* v185: descarga PARALELA (8 a la vez) — en serie el CDN lento se comía
      * 5+ minutos por episodio y la detección parecía colgada */
     const partes = new Array(segs.length).fill(null);
-    let bytes = 0, fellas = 0;
+    let bytes = 0, fellas = 0, dseg = 0;
     /* v185: el timeout cubre TAMBIÉN el cuerpo — pedir() apaga su reloj al
      * llegar las cabeceras y un cuerpo trabado colgaba arrayBuffer() para
      * siempre (eso eran los «25 minutos detectando» en el Oracle del usuario) */
@@ -1302,13 +1315,14 @@ async function descargarInicioEp(m3u8) {
         if (!rs[k]) { fellas++; continue; }
         partes[i0 + k] = rs[k];
         bytes += rs[k].length;
+        try { dseg += durDe[segs[i0 + k]] || 0; } catch {}
       }
-      console.log('[intro] ep ' + (1 + Math.min(1, 0)) + ': ' + Math.round(100 * (i0 + lote.length) / segs.length) + '% (' + Math.round(bytes / 1e6) + 'MB)');
+      console.log('[intro] bajando: ' + Math.round(100 * (i0 + lote.length) / segs.length) + '% (' + Math.round(bytes / 1e6) + 'MB, ' + Math.round(dseg) + 's de video)');
       if (fellas >= 6) break; /* el CDN se cayó: con lo que hay */
-      if (bytes > 24e6) break;
+      if (bytes > 30e6 || dseg >= 180) break; /* 3 min de video alcanzan de sobra */
     }
-    const buenos = partes.filter(Boolean).length;
-    if (buenos < 24) return null; /* menos de ~2.5 min de video: no alcanza para comparar */
+    const buenoSeg = dseg >= 60 || bytes > 15e6; /* v187: por DURACIÓN — no por número de pedazos */
+    if (!buenoSeg) return null;
     fs.writeFileSync(archivo, Buffer.concat(partes.filter(Boolean)));
     return archivo;
   }
@@ -1405,7 +1419,15 @@ async function detectarIntroSerie(serieKey, urls) {
         console.log('[intro] resolviendo episodio ' + nEp + '…');
         const r = await resolverNativo(u);
         console.log('[intro] episodio ' + nEp + ' resuelto: ' + (r && r.m3u8 ? 'ok' : 'sin m3u8'));
-        if (r && r.m3u8) listos.push(r.m3u8.startsWith('/') ? 'http://127.0.0.1:' + PORT + r.m3u8 : r.m3u8); /* el proxy propio (/api/xd) sirve el playlist con los headers correctos */
+        if (r && r.m3u8) {
+          /* v187: TODO baja por el PROXY propio — los CDNs (vimeos p.ej.)
+           * amarran el token al Referer del embed y rechazan al bajador
+           * directo (403); /api/hls guarda el Referer correcto por host
+           * (es el mismo camino del player, probado) */
+          listos.push(r.m3u8.startsWith('/')
+            ? 'http://127.0.0.1:' + PORT + r.m3u8
+            : 'http://127.0.0.1:' + PORT + '/api/hls?u=' + encodeURIComponent(r.m3u8));
+        }
       } catch (e) { console.log('[intro] un episodio no se dejó resolver: ' + String(e && e.message || e).slice(0, 90)); }
       if (listos.length >= 2) break;
     }
