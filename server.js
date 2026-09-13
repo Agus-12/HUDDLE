@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v180'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v181'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -439,7 +439,7 @@ const DANI_REEMPLAZAS = new Map([
   ['futurama-latino', 'futurama'],
   ['kenan-y-kel-latino', 'kenan-kel'],
   ['mansion-foster-para-amigos-imaginarios-capitulos-completos', 'mansion-foster-para-amigos-imaginarios'],
-]);
+  ['las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos', 'las-macabras-aventuras-de-billy-y-mandy'], /* v181: misma serie, otra traducción — dani 88 vs 86 */
 /* v180: la NUESTRA tiene bastantes más capítulos — la de danimados NO sale
  * en el buscador (una tarjeta por serie) */
 const DANI_OCULTAS = new Set([
@@ -468,6 +468,7 @@ const DANI_COVER_DE = new Map([
   ['futurama', 'futurama-latino'],
   ['kenan-kel', 'kenan-y-kel-latino'],
   ['mansion-foster-para-amigos-imaginarios', 'mansion-foster-para-amigos-imaginarios-capitulos-completos'],
+  ['las-macabras-aventuras-de-billy-y-mandy', 'las-sombrias-aventuras-de-billy-y-mandy-capitulos-completos'],
 ]);
 function daniSlugDeUrl(urlEp) { return (/\/episodios\/([a-z0-9-]+)-(\d+)x(\d+)\//.exec(String(urlEp || '')) || [])[1] || ''; }
 const DANI_TITULO_FIX = new Map([['daria', 'Daria'], ['kenan-kel', 'Kenan y Kel'], ['m-o-d-o-k', 'M.O.D.O.K.']]);
