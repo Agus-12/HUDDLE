@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v163'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v164'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -266,10 +266,93 @@ function epNumDeUrl(url, sc) {
   } catch {}
   return '';
 }
+/* v164: YOUTUBE NATIVO — el espejo está condenado con youtube: la IP del
+ * servidor es de datacenter y youtube le exige login HASTA al player
+ * embebido. Así que los VIDEOS se sacan por instancias públicas (piped /
+ * invidious, mp4 combinado con proxy público) y se reproducen NATIVO:
+ * sincronizado, con audio en cada teléfono y pantalla completa de verdad. */
+const YT_INSTANCIAS_PIPED = ['https://api.piped.private.coffee', 'https://pipedapi.ducks.party'];
+const YT_INSTANCIAS_INV = ['https://iv.catgirl.cloud'];
+const YT_CACHE = new Map(); /* id → { nat, at } — 2 h */
+const YT_TITULOS = new Map(); /* id → título (para el chat/tarjeta) */
+function idYoutubeDe(u) {
+  return ((/[?&]v=([A-Za-z0-9_-]{6,16})/.exec(u || '') || [])[1]
+    || (/youtu\.be\/([A-Za-z0-9_-]{6,16})/.exec(u || '') || [])[1]
+    || (/\/shorts\/([A-Za-z0-9_-]{6,16})/.exec(u || '') || [])[1] || '');
+}
+async function resolverYoutube(u) {
+  const id = idYoutubeDe(u);
+  if (!id) throw new Error('No pude leer el id del video de YouTube');
+  const c = YT_CACHE.get(id);
+  if (c && Date.now() - c.at < 2 * 3600 * 1000) return c.nat;
+  let ultimoErr = 'sin instancias disponibles';
+  for (const base of YT_INSTANCIAS_PIPED) {
+    try {
+      const r = await fetchSeguro(base + '/streams/' + id, 9000);
+      if (!r.ok) { ultimoErr = base.split('//')[1] + ' → ' + r.status; continue; }
+      const j = await r.json();
+      if (j.error) { ultimoErr = String(j.error).slice(0, 60); continue; }
+      if (j.title) YT_TITULOS.set(id, String(j.title).slice(0, 80));
+      const vs = j.videoStreams || [];
+      const v = vs.find((x) => !x.videoOnly && x.mimeType === 'video/mp4' && x.quality === '360p')
+        || vs.find((x) => !x.videoOnly && x.mimeType === 'video/mp4');
+      if (v && v.url) {
+        const chk = await fetchSeguro(v.url, 9000).catch(() => null);
+        if (chk && chk.ok) {
+          try { chk.body && chk.body.cancel(); } catch {}
+          const nat = { m3u8: v.url, mp4: true, proxy: false, subs: [] };
+          YT_CACHE.set(id, { nat, at: Date.now() });
+          return nat;
+        }
+        ultimoErr = 'el stream no respondió';
+      } else ultimoErr = 'sin stream combinado';
+    } catch (e) { ultimoErr = String(e.message || e).slice(0, 60); }
+  }
+  for (const base of YT_INSTANCIAS_INV) {
+    try {
+      const r = await fetchSeguro(base + '/api/v1/videos/' + id + '?fields=videoId,title,formatStreams', 9000);
+      if (!r.ok) { ultimoErr = base.split('//')[1] + ' → ' + r.status; continue; }
+      const j = await r.json();
+      if (j.title) YT_TITULOS.set(id, String(j.title).slice(0, 80));
+      const fx = (j.formatStreams || []).find((x) => +x.itag === 18) || (j.formatStreams || []).find((x) => +x.itag === 22);
+      if (fx) {
+        const url18 = base + '/latest_version?id=' + id + '&itag=' + fx.itag + '&local=true';
+        const chk = await fetchSeguro(url18, 12000).catch(() => null); /* sigue el 302 del proxy */
+        if (chk && chk.ok) {
+          try { chk.body && chk.body.cancel(); } catch {}
+          const nat = { m3u8: url18, mp4: true, proxy: false, subs: [] };
+          YT_CACHE.set(id, { nat, at: Date.now() });
+          return nat;
+        }
+        ultimoErr = 'el stream no respondió';
+      } else ultimoErr = 'sin stream combinado';
+    } catch (e) { ultimoErr = String(e.message || e).slice(0, 60); }
+  }
+  throw new Error('No pude sacar el video de YouTube (' + ultimoErr + ')');
+}
+/* mete un video de youtube como NATIVO (desde el espejo o al abrirlo) */
+async function ponerYoutubeNativo(room, watchUrl, userId) {
+  const id = idYoutubeDe(watchUrl);
+  const nat = await resolverYoutube(watchUrl);
+  if (mirrors.has(room.code)) await stopMirror(room);
+  room.videoUrl = watchUrl;
+  room.videoTitle = 'YouTube: ' + (YT_TITULOS.get(id) || 'video');
+  room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
+  room.videoImg = '';
+  room.position = 0;
+  room.isPlaying = false;
+  room.videoDuration = 0;
+  room.updatedAt = Date.now();
+  sysMsg(room, '🎬 ' + room.videoTitle + ' — tápale para empezar');
+  broadcast(room, 'state', stateOf(room));
+  return true;
+}
+
 async function resolverNativoInterno(url) {
   if (/latanime\.org\/ver\//i.test(url)) return resolverAnime(url);
   if (/pelisxd\.com\/pelicula\//i.test(url)) return resolverPelisxd(url); /* v98 */
   if (/miscaricaturas\.com\//i.test(url)) return resolverCaricatura(url); /* v102 */
+  if (/youtube\.com\/(watch|shorts)|youtu\.be\//i.test(url)) return resolverYoutube(url); /* v164 */
   if (/lacartoons\.com\/serie\/capitulo\//i.test(url)) return resolverLacartoons(url); /* v116: sin esto, los capítulos de lacartoons en SALA caían al espejo de navegador (abría la página web en vez de reproducir nativo) */
   return resolverSolo(url);
 }
@@ -970,7 +1053,13 @@ function mirrorState(room) {
 }
 
 async function startMirror(room, rawUrl, userId) {
-  const url = urlYoutubeEmbed(normalizeWebUrl(rawUrl)) || normalizeWebUrl(rawUrl); /* v162 */
+  const url = normalizeWebUrl(rawUrl);
+  /* v164: si lo que piden es un VIDEO de youtube → NATIVO (el espejo come
+   * muros de login con youtube); la portada/búsqueda sí sigue en espejo */
+  if (idYoutubeDe(url)) {
+    try { if (await ponerYoutubeNativo(room, url, userId)) return; }
+    catch (e) { console.log('[espejo] youtube nativo no pudo (' + String(e.message || e).slice(0, 70) + ') — espejeo la página igual'); }
+  }
   if (mirrors.has(room.code)) {
     const m = mirrors.get(room.code);
     if ((m.url || '') === url) {
@@ -1096,20 +1185,15 @@ async function startMirror(room, rawUrl, userId) {
   page.on('framenavigated', (f) => {
     if (f === page.mainFrame()) {
       m.url = f.url();
-      /* v162: navegaron a un video de youtube dentro del espejo → se lo
-       * cambia al player embebido (sin muro de login, autoplay) */
-      const idNav = ((/[?&]v=([A-Za-z0-9_-]{6,16})/.exec(m.url) || [])[1]
-        || (/youtu\.be\/([A-Za-z0-9_-]{6,16})/.exec(m.url) || [])[1] || '');
-      /* v163: si acabamos de poner ESTE video en embed y aun así el usuario
-       * terminó en el watch, youtube botó el embed — no lo re-convirtamos
-       * (bucle infinito); deja el watch normal */
-      if (!(idNav && m.ultimoEmb && m.ultimoEmb.id === idNav && Date.now() - m.ultimoEmb.at < 60000)) {
-        const emb = urlYoutubeEmbed(m.url);
-        if (emb) {
-          m.ultimoEmb = { id: idNav, at: Date.now() };
-          m.page.goto(emb, { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => {});
-          return;
-        }
+      /* v164: navegaron a un video de youtube dentro del espejo → se cambia
+       * el modo: el video va NATIVO (extraído por piped/invidious), no hay
+       * muro de login posible, hay audio en cada teléfono y fullscreen */
+      const idNav = idYoutubeDe(m.url);
+      if (idNav && !(m.ultimoNat && m.ultimoNat.id === idNav && Date.now() - m.ultimoNat.at < 90000)) {
+        m.ultimoNat = { id: idNav, at: Date.now() };
+        const watchUrl = m.url;
+        ponerYoutubeNativo(room, watchUrl, userId).catch(() => {});
+        return;
       }
       broadcast(room, 'mirror-state', mirrorState(room));
     }
@@ -1691,7 +1775,8 @@ async function handleAction(req, res, body) {
           if (nat) {
             if (mirrors.has(room.code)) stopMirror(room).catch(() => {});
             room.videoUrl = urlNat; programarPrefetchEp(room);
-            room.videoTitle = String(action.title || guessTitle(urlNat)).slice(0, 80);
+            const idYT = idYoutubeDe(urlNat); /* v164: título real del video si la instancia lo dio */
+            room.videoTitle = String((idYT && YT_TITULOS.get(idYT)) || action.title || guessTitle(urlNat)).slice(0, 80);
             room.videoImg = String(action.img || '').slice(0, 400);
             room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
             room.position = 0;
