@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v192'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v193'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -483,6 +483,34 @@ function daniTituloDe(slug) {
   return (v && v.t ? String(v.t).replace(/\xa0/g, ' ') : slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
 }
 function daniCoverDe(slug) { return CARI_PORTADAS.get(DANI_COVER_DE.get(slug) || slug) || DANI_IMDB.get(slug) || '/api/dani/poster/' + slug; } /* v180: portada curada local (IMDb) primero */
+/* v193: portada por TÍTULO desde la API de sugerencias de IMDb (para
+ * tarjetas de búsqueda que llegaron sin imagen: pelisxd, cine-calidad…) */
+const imdbPosterCache = new Map();
+async function imdbPosterDe(titulo) {
+  const t = String(titulo || '').trim();
+  if (!t) return '';
+  const c = imdbPosterCache.get(t.toLowerCase());
+  if (c && Date.now() - c.at < 24 * 3600e3) return c.u;
+  let out = '';
+  const cands = [t];
+  if (/\s y\s /.test(t)) cands.push(t.replace(/\s y\s /, ' & '));
+  if (/:\s*/.test(t)) cands.push(t.split(/:\s*/)[0].trim());
+  for (const q of cands) {
+    if (out) break;
+    try {
+      const letra = (q.replace(/[^a-z0-9]/gi, '')[0] || 'x').toLowerCase();
+      const r = await fetchSeguro('https://v2.sg.media-imdb.com/suggestion/' + encodeURIComponent(letra) + '/' + encodeURIComponent(q.toLowerCase()) + '.json', 8000);
+      if (!r || !r.ok) continue;
+      const d = await r.json().catch(() => null);
+      for (const x of (d && d.d) || []) {
+        const img = x && x.i && x.i.imageUrl;
+        if (img && (x.qid === 'tvSeries' || x.qid === 'movie' || x.qid === 'tvMiniSeries')) { out = img.replace('._V1_.jpg', '._V1_QL75_UX380_.jpg'); break; }
+      }
+    } catch {}
+  }
+  imdbPosterCache.set(t.toLowerCase(), { at: Date.now(), u: out });
+  return out;
+}
 async function daniPosterUrl(slug) {
   const c = DANI_POSTERS.get(slug);
   if (c && Date.now() - c.at < 24 * 3600e3) return c.url;
@@ -5559,8 +5587,12 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname.startsWith('/api/dani/poster/')) { /* v177: póster perezoso og:image */
       const slug = decodeURIComponent(url.pathname.split('/')[4] || '');
-      if (!/^[a-z0-9-]{2,90}$/.test(slug) || !DANI_CAT.has(slug)) return json(res, 404, { ok: false });
-      const u = await daniPosterUrl(slug).catch(() => '');
+      /* v193: hay series con slug unicode (ranma-½, 女生宿舍日常…) — los mapas
+       * los guardan CODIFICADOS, así que se prueba también la forma cruda */
+      const slugRaw = url.pathname.split('/')[4] || '';
+      const catKey = DANI_CAT.has(slug) ? slug : (DANI_CAT.has(slugRaw) ? slugRaw : '');
+      if (!catKey || catKey.length > 120) return json(res, 404, { ok: false });
+      const u = await daniPosterUrl(catKey).catch(() => '');
       if (!u) return json(res, 404, { ok: false });
       res.writeHead(302, { Location: u });
       return res.end();
@@ -5678,6 +5710,21 @@ const server = http.createServer(async (req, res) => {
       if (!q) return json(res, 400, { ok: false, error: 'Escribe qué quieren ver' });
       const r = await buscarEnSitios(q); /* v121: global + fuzzy + sugiere */
       r.resultados = r.resultados.filter((x) => !cvOcultaUrl(x.url)); /* v191: sin series muertas de cine-calidad */
+      /* v193: tarjetas sin carátula → IMDb (o la ficha del propio sitio) */
+      const sinCaratula = r.resultados.filter((x) => !x.img);
+      if (sinCaratula.length) {
+        await Promise.all(sinCaratula.slice(0, 10).map(async (x) => {
+          try {
+            if (/pelisxd\.com\/pelicula\//.test(x.url || '')) {
+              const sl = (x.url.match(/pelicula\/([a-z0-9-]+)/i) || [])[1];
+              const m = sl ? await pelisxdMeta(sl).catch(() => null) : null;
+              if (m && m.poster) { x.img = m.poster; return; }
+            }
+            const u = await imdbPosterDe(x.title).catch(() => '');
+            if (u) x.img = u;
+          } catch {}
+        }));
+      }
       if (/titan(es)?\b/i.test(q)) {
         r.resultados.unshift({ title: 'Los Jóvenes Titanes en Acción (Latino)', url: 'https://danimados.cc/serie/dani-titanes', img: daniCoverDe('teen-titans-go'), site: 'Caricaturas', extra: '9 temporadas · 291 episodios' }); /* v178: IMDb */ /* v174: con ?v= — sin esto el navegador enseñaba la portada VIEJA del caché */
       }
