@@ -240,6 +240,14 @@ S.mirrorTime = null; /* v61: posición de la peli para la barrita */
     const pl = $('#peliLoading');
     if (pl && !pl.classList.contains('hidden') && !/pelicula\/|\/episode\/|\/ver\//i.test(S.mirror.url || '')) ocultarPeliLoading();
   });
+  es.addEventListener('mirror-fs', (e) => {
+    /* v165: alguien puso la página espejeada en pantalla completa (el ⛶ de
+     * youtube, por ejemplo) — todos la acompañamos con la nuestra */
+    const d = JSON.parse(e.data);
+    if (!S.mirror.active || S.nativo) return;
+    if (d.on && !fsActive()) toggleFullscreen();
+    if (!d.on && fsActive()) exitFullscreen();
+  });
   es.addEventListener('mirror-audio', (e) => {
     const d = JSON.parse(e.data);
     feedMirrorAudio(d.d, d.rate);

@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v164'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v165'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1058,7 +1058,10 @@ async function startMirror(room, rawUrl, userId) {
    * muros de login con youtube); la portada/búsqueda sí sigue en espejo */
   if (idYoutubeDe(url)) {
     try { if (await ponerYoutubeNativo(room, url, userId)) return; }
-    catch (e) { console.log('[espejo] youtube nativo no pudo (' + String(e.message || e).slice(0, 70) + ') — espejeo la página igual'); }
+    catch (e) {
+      console.log('[espejo] youtube nativo no pudo (' + String(e.message || e).slice(0, 70) + ') — espejeo la página igual');
+      try { sysMsg(room, '⚠️ No pude sacar el video de YouTube (' + String(e.message || e).slice(0, 60) + '). Abro la página: si pide iniciar sesión puedes entrar con tu cuenta, o reintenta en un minuto.'); } catch {}
+    }
   }
   if (mirrors.has(room.code)) {
     const m = mirrors.get(room.code);
@@ -1189,10 +1192,13 @@ async function startMirror(room, rawUrl, userId) {
        * el modo: el video va NATIVO (extraído por piped/invidious), no hay
        * muro de login posible, hay audio en cada teléfono y fullscreen */
       const idNav = idYoutubeDe(m.url);
-      if (idNav && !(m.ultimoNat && m.ultimoNat.id === idNav && Date.now() - m.ultimoNat.at < 90000)) {
-        m.ultimoNat = { id: idNav, at: Date.now() };
+      if (idNav && m.poniendo !== idNav) { /* v165: si falla, se puede reintentar al toque */
+        m.poniendo = idNav;
         const watchUrl = m.url;
-        ponerYoutubeNativo(room, watchUrl, userId).catch(() => {});
+        ponerYoutubeNativo(room, watchUrl, userId).catch((eH) => {
+          m.poniendo = null;
+          try { sysMsg(room, '⚠️ No pude sacar el video de YouTube (' + String(eH && eH.message || eH).slice(0, 60) + '). Reintenta en un momento o entra a tu cuenta aquí mismo.'); } catch {}
+        });
         return;
       }
       broadcast(room, 'mirror-state', mirrorState(room));
@@ -1464,6 +1470,20 @@ async function startMirror(room, rawUrl, userId) {
       broadcast(room, 'mirror-frame', m.frame);
       m.stats.frames++;
       m.stats.bytes += Math.floor(m.frame.d.length * 0.75);
+    }
+
+    /* v165: el ⛶ de la PÁGINA espejeada (youtube, vimeo…) llena el Chrome
+     * del servidor — invisible para la sala. Al detectarlo, mandamos a
+     * todos a pantalla completa (la de Huddle); al salir, todos salen. */
+    if (!m.fsCheck && m.page && !m.page.isClosed()) {
+      m.fsCheck = m.page.evaluate(() => !!(document.fullscreenElement || document.webkitFullscreenElement))
+        .then((on) => {
+          m.fsCheck = null;
+          if (on === m.fsOn) return;
+          m.fsOn = on;
+          broadcast(room, 'mirror-fs', { on: !!on });
+        })
+        .catch(() => { m.fsCheck = null; });
     }
 
     /* calidad adaptativa: si el ancho de banda sube demasiado, bajamos calidad
