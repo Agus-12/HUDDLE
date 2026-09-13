@@ -349,11 +349,17 @@ function applyState(st) {
   if (typeof pintarTituloSala === 'function') pintarTituloSala(); /* v141 */
   /* v127: en nativo, mientras el video no dé video la sala ve la espera;
    * cuando esté lista y pausada, «Toca para empezar» */
+  /* v146: esperando el nuevo episodio — cualquier estado que llegue hablando
+   * del episodio VIEJO (pausas, latidos, reparaciones) NO toca la tarjeta:
+   * nace al picarle «siguiente» y solo se va con el video NUEVO listo o error */
+  const esperandoEp = !!(S.epEsperaUrl && Date.now() - (S.epEsperaEn || 0) < 45000 && (!st.videoUrl || st.videoUrl === S.epEsperaUrl));
   if (S.nativo && !S.nativoListo && !S.pendingStart) {
-    if (!S.mirrorInfo) S.mirrorInfo = { title: S.salaTitulo, img: S.salaImg, url: st.videoUrl, sub: 'Preparando la sala…' };
-    mostrarPeliLoading();
+    if (!esperandoEp) {
+      if (!S.mirrorInfo) S.mirrorInfo = { title: S.salaTitulo, img: S.salaImg, url: st.videoUrl, sub: 'Preparando la sala…' };
+      mostrarPeliLoading();
+    }
   } else if (S.nativo && S.nativoListo) {
-    ocultarPeliLoading();
+    if (!esperandoEp) ocultarPeliLoading();
     if (st.isPlaying) ocultarPlayBtn(); else mostrarPlayBtn();
   }
   updateControlUi();
@@ -512,6 +518,7 @@ function sincronizarNativo() {
 /* v127: el video nativo dio video → fuera la espera; si va pausado,
  * aparece «Toca para empezar» */
 function nativoListo() {
+  S.epEsperaUrl = null; /* v146: llegó el episodio nuevo — la espera termina */
   S.nativoListo = true;
   ocultarPeliLoading();
   if (S.nativo && !S.nativo.isPlaying) mostrarPlayBtn();
@@ -1785,7 +1792,7 @@ function updateEpNav() {
     S.epEsperaUrl = S.mirror.url || (S.nativo && S.nativo.url) || ''; /* v141: estados del ep viejo = ignorar */
     S.epEsperaEn = Date.now();
   };
-  const alFallo = (r) => { ocultarPeliLoading(); toast((r && r.error) || 'No se pudo'); };
+  const alFallo = (r) => { S.epEsperaUrl = null; ocultarPeliLoading(); toast((r && r.error) || 'No se pudo'); };
   /* v144: UN cambio a la vez — los toques repetidos mientras el server
    * resuelve no encolan basura (por eso «hacía lo que quería»); el server
    * además YA reintenta por su cuenta los fallos transitorios */
@@ -1795,6 +1802,10 @@ function updateEpNav() {
     enVuelo = true;
     toast(mensaje);
     tarjetitaEp(mensaje);
+    /* v146: el episodio actual se PAUSA de inmediato para toda la sala —
+     * la tarjeta queda quieta hasta que el siguiente esté resuelto */
+    sendAction({ type: 'pause' }).catch(() => {});
+    try { const v = $('#roomVideo'); if (v) v.pause(); } catch {}
     sendAction({ type: 'mirror', op })
       .then((r) => { if (r && r.ok === false) alFallo(r); })
       .catch(() => alFallo())

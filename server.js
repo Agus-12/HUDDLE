@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v145'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v146'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -242,13 +242,15 @@ function resolverNativo(url) {
 }
 /* v144: título legible de episodio: «Hora de aventura — T.1 EP.3» */
 function tituloBonitoEp(titulo, num) {
+  /* v146: temporada/capítulo PRIMERO — si el nombre es largo y se recorta
+   * con «…», lo que queda siempre visible es T. y EP. (lo que importa) */
   const t = String(titulo || '').trim().replace(/\s+/g, ' ');
   const s = String(num || '');
   let m = /(\d{1,2})x(\d{1,3})/.exec(s);
-  if (m) return `${t} — T.${+m[1]} EP.${+m[2]}`.slice(0, 90);
+  if (m) return `T.${+m[1]} EP.${+m[2]} · ${t}`.slice(0, 90);
   m = /episodio\s*(\d+)/i.exec(s);
-  if (m) return `${t} — EP.${+m[1]}`.slice(0, 90);
-  return `${t}${s ? ' — ' + s : ''}`.slice(0, 90);
+  if (m) return `EP.${+m[1]} · ${t}`.slice(0, 90);
+  return s ? `${s} · ${t}`.slice(0, 90) : t.slice(0, 90);
 }
 /* v144: ¿qué episodio es esta URL? (de la ruta o del índice en la serie) */
 function epNumDeUrl(url, sc) {
