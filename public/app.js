@@ -1356,6 +1356,8 @@ function mostrarPeliLoading() {
   }
   const hintN = box.querySelector('.peli-hint');
   if (hintN) hintN.textContent = 'Toca la pantalla para quitarla — el video entra solo cuando esté listo';
+  const xc = box.querySelector('.peli-cerrar');
+  if (xc) xc.classList.add('hidden'); /* v151: la ✕ aparece hasta que pasen 8s */
   box.classList.remove('hidden');
   S.envioEn = Date.now(); /* v132: nace la espera — mirror-state inactivo dentro de 25s es TRANSICIÓN a nativo, no aborto */
   arrancarTimerPeli();
@@ -1374,18 +1376,26 @@ function ocultarPeliLoadingSuave() {
   if (falta <= 0) return ocultarPeliLoading();
   setTimeout(() => ocultarPeliLoading(), falta);
 }
-$('#peliLoading').addEventListener('click', () => {
-  /* v148: la tarjeta se puede quitar pulsándola si está atorada (peli/serie
-   * que no arranca). v150: EXCEPCIÓN — durante un CAMBIO DE EPISODIO no se
-   * quita (quitarla te dejaba en el episodio viejo y sin transición). */
-  if (S.epEsperaUrl && Date.now() - (S.epEsperaEn || 0) < 45000) {
-    toast('Cambiando de episodio — espera un momento');
-    return;
-  }
+/* v151: la tarjeta se quita SOLO con la ✕ (a los 8s sale la ✕ — si tarda
+ * mucho ahí le pican). Tocar el resto de la pantalla ya no la quita:
+ * los toques accidentales la bajaban y parecía que nada estaba pasando. */
+$('#peliCerrar').addEventListener('click', (e) => {
+  e.stopPropagation();
   S.peliTapUrl = (S.mirrorInfo && S.mirrorInfo.url) || '';
   S.peliTapEn = Date.now();
+  S.peliCerroEn = Date.now();
   ocultarPeliLoading();
+  toast('Sigue cargando por detrás — entrará sola cuando esté lista');
 });
+function sincronizarCierreTarjeta() {
+  const x = $('#peliCerrar');
+  if (!x) return;
+  const visible = !$('#peliLoading').classList.contains('hidden');
+  const cambiando = S.epEsperaUrl && Date.now() - (S.epEsperaEn || 0) < 45000; /* cambio de episodio: firme los primeros 45s */
+  const ms = Date.now() - (S.peliLoadingAt || 0);
+  x.classList.toggle('hidden', !visible || cambiando || ms < 8000);
+}
+setInterval(sincronizarCierreTarjeta, 500);
 /* v61: selector de temporadas y episodios para series */
 let spDatos = null; /* lo que devolvió /api/serie */
 /* v62→v67: imágenes de AnimeFLV y Latanime pasan por NUESTRO proxy —
