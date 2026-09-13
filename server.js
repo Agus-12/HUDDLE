@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v156'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v157'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -3499,6 +3499,11 @@ async function resolverCaricatura(epUrl) {
     } catch (e2) { if (/MEGA/.test(String(e2.message))) throw e2; }
     throw e;
   }
+  /* v157: el camino HTTP (v155) ya devuelve la respuesta FINAL (playlist
+   * cacheado + m3u8 proxieado) — antes se re-cacheaba como crudo con
+   * body indefinido y `cap.body.match` reventaba: ese era el letrerito
+   * «Cannot read properties…» al entrar a cualquier caricatura */
+  if (cap && cap.m3u8) return cap;
   const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
   pelisxdStreams.set(tok, { body: cap.body, base: cap.url, ref: cap.ref || 'https://f7hyg4q.org/', slug, at: ahora });
   try {
