@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v152'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v153'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -2617,6 +2617,7 @@ async function buscarPelisxd(q) {
  * CUERPO del playlist variante que pide el player. Verificado con pelis
  * de duración completa (113.6, 113.8 y 101.3 min — nada de teasers). */
 async function extraerStreamwishPeli(pageUrl) {
+  const t0 = Date.now(); /* v153: para medir tiempos de resolución */
   if (!PUPPETEER) { try { PUPPETEER = require('puppeteer'); } catch { throw new Error('El navegador del servidor no está disponible'); } }
   const browser = await getNavegador();
   if (!browser) throw new Error('No pude abrir el navegador del servidor');
@@ -2647,14 +2648,18 @@ async function extraerStreamwishPeli(pageUrl) {
      * reintento con más calma en vez de fallar de una vez */
     try { await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }); }
     catch { await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 45000 }); }
-    /* v152: clic en cuanto aparezca «Opción 1» (antes esperaba 4s fijos) */
+    /* v152→v153: UN solo clic en cuanto aparezca «Opción 1» — picarla
+     * repetidamente re-navegaba la página y el player nunca cargaba */
     for (let i = 0; i < 10 && cap === null; i++) {
       await new Promise((r2) => setTimeout(r2, 400));
-      await page.evaluate(() => {
+      const clicado = await page.evaluate(() => {
         const b = [...document.querySelectorAll('button')].find((x) => /opción 1/i.test(x.textContent || ''));
-        if (b) b.click();
-      }).catch(() => {});
+        if (b) { b.click(); return true; }
+        return false;
+      }).catch(() => false);
+      if (clicado) break;
     }
+    await new Promise((r2) => setTimeout(r2, 1500)); /* v153: que el player arranque con calma */
     /* hasta ~60 s: el challenge se resuelve solo mientras el player cree que hay un usuario */
     for (let i = 0; i < 20 && !cap; i++) {
       await new Promise((r2) => setTimeout(r2, 3000));
@@ -2672,6 +2677,7 @@ async function extraerStreamwishPeli(pageUrl) {
       }
     }
     if (!cap) throw new Error('El servidor de la peli no entregó el video (intenté con el navegador)');
+    console.log('[caricaturas] resuelto en ' + ((Date.now() - t0) / 1000).toFixed(1) + 's');
     return cap;
   } finally {
     try { if (page) await page.close(); } catch {}
