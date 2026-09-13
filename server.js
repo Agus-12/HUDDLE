@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v189'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v190'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1429,8 +1429,24 @@ let LCT_INTRO_REFRESCO_EN = 0; /* v189: último refresco del mapa de lacartoons 
 function introJobAtascado(k) { const t0 = INTRO_JOBS.get(k); return t0 && Date.now() - t0 > 10 * 60 * 1000; } /* v185: 10 min máximo por intento */
 /* v137: penalización por resultado — fallo de infra (navegador ocupado, red)
  * retrasa el reintento solo 15 min; «no hay intro común» sí espera 6h */
+const INTRO_VEREDICTOS = new Map(); /* v190: intro | sinintro | fallo — lo consume el rastreador */
 function penalizarIntro(serieKey, ms) {
   INTRO_INTENTOS.set(serieKey, Date.now() + 6 * 3600 * 1000 - ms);
+  if (ms >= 6 * 3600 * 1000) { if (INTRO_VEREDICTOS.get(serieKey) !== 'intro') INTRO_VEREDICTOS.set(serieKey, 'sinintro'); }
+  else INTRO_VEREDICTOS.set(serieKey, 'fallo');
+}
+/* v190: dispara la detección de una serie (la usa el GET de /api/intro y el rastreador) */
+function dispararDeteccionIntro(urlStr, serieKeyFija) {
+  serieCtxFromUrl(urlStr).then((sc) => {
+    if (sc && sc.eps && sc.eps.length > 1) {
+      /* comparar episodios de LA MISMA TEMPORADA que el pedido */
+      const ped = sc.eps.find((e) => { try { return new URL(e.url).pathname === new URL(urlStr).pathname.replace(/\/$/, ''); } catch { return false; } });
+      const t = ped ? ped.temporada : (sc.eps[0] || {}).temporada;
+      const mismos = sc.eps.filter((e) => e.temporada === t);
+      const kk = serieKeyFija || introKeysDe(urlStr).serie;
+      if (kk) detectarIntroSerie(kk, (mismos.length >= 2 ? mismos : sc.eps).slice(0, 3).map((e) => e.url));
+    }
+  }).catch(() => {});
 }
 async function detectarIntroSerie(serieKey, urls) {
   /* v134: correr también cuando lo guardado es aprendido-a-mano (pudo salir de
@@ -1472,15 +1488,18 @@ async function detectarIntroSerie(serieKey, urls) {
     try {
         /* v184: VIDEO primero (robusto entre re-encodes), audio de respaldo */
       let guardado = false;
+      let framesOk = false; /* v190: distingue «no comparten intro» (veredicto) de «los frames fallaron» (fallo de infra) */
       if (ffmpegOk()) {
         console.log('[intro] extrayendo frames de video…');
         const [fa2, fb2] = await Promise.all([introFramesDe(f0), introFramesDe(f1)]);
+        framesOk = !!(fa2 && fb2);
         console.log('[intro] frames: ' + (fa2 && fa2.hashes.length) + ' y ' + (fb2 && fb2.hashes.length));
         if (fa2 && fb2) {
           const band = introBandade(fa2, fb2);
           if (band && band.fin <= 420 && band.ini <= 240) {
             INTROS[serieKey] = { start: Math.round(band.ini), end: Math.max(Math.round(band.fin) - 2, Math.round(band.ini) + 30), by: 'auto', at: Date.now() };
             penalizarIntro(serieKey, 6 * 3600 * 1000);
+            INTRO_VEREDICTOS.set(serieKey, 'intro');
             guardarIntros();
             guardado = true;
             console.log(`[intro] ✅ ${serieKey}: intro detectada POR VIDEO ${Math.round(band.ini)}s→${Math.round(band.fin)}s (${band.frames} frames casando, desfase ${band.offset})`);
@@ -1494,7 +1513,7 @@ async function detectarIntroSerie(serieKey, urls) {
       const esDani = /^dani:/.test(serieKey); /* v185: el audio no sirve en danimados — SOLO video decide */
       const [ha, hb] = guardado || esDani ? [null, null] : await Promise.all([fpcalcArchivo(f0), fpcalcArchivo(f1)]);
       if (esDani && !guardado) {
-        penalizarIntro(serieKey, ffmpegOk() ? 6 * 3600 * 1000 : 15 * 60 * 1000); /* v185: sin ffmpeg reintenta en 15 min (p. ej. tras instalarlo) */
+        penalizarIntro(serieKey, ffmpegOk() && framesOk ? 6 * 3600 * 1000 : 15 * 60 * 1000); /* v190: sin frames NO es veredicto — reintenta en 15 min */
         console.log('[intro] ' + serieKey + ': sin conclusión por video' + (ffmpegOk() ? ' — los episodios no comparten intro al inicio' : ' (FALTA ffmpeg — instálalo y reintenta en 15 min)'));
       }
       else if (ha && hb && ha.length > 130 && hb.length > 130) {
@@ -1504,10 +1523,13 @@ async function detectarIntroSerie(serieKey, urls) {
           const iniSeg = Math.round(hit.ini);
           const anterior = INTROS[serieKey];
           if (anterior && anterior.by === 'manual' && Math.abs(anterior.start - iniSeg) <= 20 && Math.abs(anterior.end - finSeg) <= 20) {
+            penalizarIntro(serieKey, 6 * 3600 * 1000);
+            INTRO_VEREDICTOS.set(serieKey, 'intro');
             console.log(`[intro] ${serieKey}: la huella CONFIRMA la intro aprendida a mano (${iniSeg}→${finSeg}s) — se respeta lo aprendido`);
           } else {
             INTROS[serieKey] = { start: iniSeg, end: finSeg, by: 'auto', at: Date.now() };
             penalizarIntro(serieKey, 6 * 3600 * 1000);
+            INTRO_VEREDICTOS.set(serieKey, 'intro');
             guardarIntros();
             if (anterior && anterior.by === 'manual') console.log(`[intro] ✅ ${serieKey}: la huella CORRIGE la aprendida a mano (estaba ${anterior.start}→${anterior.end}s, verdad del audio: ${iniSeg}→${finSeg}s)`);
             else console.log(`[intro] ✅ ${serieKey}: intro detectada ${iniSeg}s→${finSeg}s`);
@@ -5497,6 +5519,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, items });
     }
     if (url.pathname === '/api/solo' && req.method === 'GET') {
+      crawlUltimaActividad = Date.now(); /* v190 */
       /* v81: resolver el video directo de una página para modo individual */
       const name = (url.searchParams.get('name') || '').trim();
       const tok = url.searchParams.get('tok') || '';
@@ -5545,6 +5568,7 @@ const server = http.createServer(async (req, res) => {
       return servirPlaylist(res, 200, s.body, s.base);
     }
     if (url.pathname === '/api/hls') {
+      crawlUltimaActividad = Date.now(); /* v190: alguien puede estar viendo — el rastreador se pausa */
       /* v81: proxy del stream (solo goodstream) cuando directo falla */
       return proxearHls(req, res, url.searchParams.get('u') || '');
     }
@@ -5575,15 +5599,7 @@ const server = http.createServer(async (req, res) => {
         })();
       }
       if (ks.serie && (!datos || datos.by !== 'auto') && fpcalcOk() && !INTRO_JOBS.has(ks.serie) && Date.now() - hace >= 6 * 3600 * 1000) {
-        serieCtxFromUrl(String(url.searchParams.get('url') || '')).then((sc) => {
-          if (sc && sc.eps && sc.eps.length > 1) {
-            /* v187: comparar episodios de LA MISMA TEMPORADA que el pedido */
-            const ped = sc.eps.find((e) => { try { return new URL(e.url).pathname === new URL(String(url.searchParams.get('url') || '')).pathname.replace(/\/$/, ''); } catch { return false; } });
-            const t = ped ? ped.temporada : (sc.eps[0] || {}).temporada;
-            const mismos = sc.eps.filter((e) => e.temporada === t);
-            detectarIntroSerie(ks.serie, (mismos.length >= 2 ? mismos : sc.eps).slice(0, 3).map((e) => e.url));
-          }
-        }).catch(() => {});
+        dispararDeteccionIntro(String(url.searchParams.get('url') || ''), ks.serie);
       }
       return json(res, 200, { ok: true, intro: it && +it.end > +it.start ? { start: +it.start, end: +it.end } : null, detectando: !!(ks.serie && INTRO_JOBS.has(ks.serie)) });
     }
@@ -5721,7 +5737,7 @@ const server = http.createServer(async (req, res) => {
         });
       return json(res, 200, { ok: true, rooms: list, srvVersion: UI_VERSION });
     }
-    if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION }); /* v122 */
+    if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION, introCrawl: { pend: CRAWL.pend.length, hechas: CRAWL.hechas || 0, total: CRAWL.total || 0 } }); /* v122+190 */
     return serveStatic(req, res, url.pathname);
   } catch (e) {
     console.error(e);
@@ -5779,6 +5795,116 @@ setInterval(() => {
     }
   }
 }, 60000);
+
+/* ═══════ v190: RASTREADOR DE INTROS — recorre TODO el catálogo de series
+ * UNA sola vez (danimados 823 + cine-calidad/cuevana + latanime + caricaturas)
+ * aprendiendo la intro de la primera temporada de cada una, SOLO cuando nadie
+ * está viendo (sin /api/hls ni /api/solo en 60s y sin salas activas). Lo ya
+ * aprendido jamás se vuelve a rastrear; los veredictos «sin intro» tampoco;
+ * los fallos de red van al final y reintentan. Estado en data/intro-crawl.json:
+ * actualizar.sh no lo toca → al reiniciar continúa donde iba. Las temporadas
+ * que no son la 1 se aprenden solas cuando alguien entra (~1 min). ═══════ */
+const CRAWL_FILE = path.join(DATA_DIR, 'intro-crawl.json');
+let CRAWL = { pend: [], sinIntro: [], hechas: 0, total: 0, lista: false, vueltas: 0 };
+try { const cc = JSON.parse(fs.readFileSync(CRAWL_FILE, 'utf8')); if (cc && Array.isArray(cc.pend)) CRAWL = Object.assign(CRAWL, cc); } catch {}
+function crawlGuardar() { try { fs.writeFileSync(CRAWL_FILE, JSON.stringify(CRAWL)); } catch {} }
+let crawlUltimaActividad = Date.now();
+let crawlOcupado = false;
+
+async function crawlConstruir() {
+  const items = [];
+  try { for (const sl of DANI_CAT.keys()) if (!DANI_OCULTAS.has(sl)) items.push({ u: 'dani:' + sl }); } catch {}
+  try {
+    for (const sm of ['tvshow-sitemap.xml', 'tvshow-sitemap2.xml']) {
+      const r = await fetchSeguro('https://cine-calidad.mx/' + sm, 15000).catch(() => null);
+      if (!r || !r.ok) continue;
+      const txt = await r.text();
+      for (const mm of txt.matchAll(/<loc>https:\/\/cine-calidad\.mx\/serie\/([a-z0-9-]+)\/?<\/loc>/gi)) {
+        if (mm[1] && mm[1] !== 'serie') items.push({ u: 'cv:' + mm[1] });
+      }
+    }
+  } catch {}
+  try {
+    for (let p = 1; p <= 90; p++) {
+      const r = await fetchSeguro('https://latanime.org/animes?page=' + p, 12000).catch(() => null);
+      if (!r || !r.ok) break;
+      const txt = await r.text();
+      const ls = [...new Set([...txt.matchAll(/href="https:\/\/latanime\.org\/anime\/([a-z0-9-]+)"/g)].map((x) => x[1]))];
+      for (const sl of ls) items.push({ u: 'la:' + sl });
+      if (ls.length < 20) break; /* última página */
+    }
+  } catch {}
+  try { for (const sl of cariDatos.keys()) items.push({ u: 'mm:' + sl }); } catch {}
+  try { for (const x of LCT_SERIES.values()) items.push({ u: 'lct:' + x.slug }); } catch {}
+  return items;
+}
+
+async function crawlItemUrl(it) {
+  const t = it.u.slice(0, it.u.indexOf(':'));
+  const sl = it.u.slice(t.length + 1);
+  if (t === 'dani') return 'https://danimados.cc/episodios/' + sl + '-1x1/';
+  if (t === 'cv') {
+    const d = await datosSerieCuevana(sl).catch(() => null);
+    if (!d || !d.episodios || !d.episodios.length) return null;
+    const t1 = d.episodios.find((e) => e.temporada === 1) || d.episodios[0];
+    return t1.url || null;
+  }
+  if (t === 'la') return 'https://latanime.org/ver/' + sl + '-episodio-1/';
+  if (t === 'mm') {
+    const d = await datosCaricatura(sl).catch(() => null);
+    return d && d.episodios && d.episodios[0] ? d.episodios[0].url : null;
+  }
+  if (t === 'lct') {
+    const lct = [...LCT_SERIES.values()].find((x) => x.slug === sl);
+    if (!lct) return null;
+    const d = await refrescarDatosLacartoons(lct).catch(() => null);
+    return d && d.episodios && d.episodios[0] ? d.episodios[0].url : null;
+  }
+  return null;
+}
+
+async function crawlTick() {
+  if (crawlOcupado || !CRAWL.lista || !CRAWL.pend.length) return;
+  if (rooms.size > 0 || Date.now() - crawlUltimaActividad < 60000) return; /* nadie viendo */
+  crawlOcupado = true;
+  const it = CRAWL.pend[0];
+  try {
+    const u = await crawlItemUrl(it).catch(() => null);
+    if (!u) { CRAWL.pend.shift(); crawlGuardar(); return; } /* serie muerta o no encontrada: fuera */
+    const ks = introKeysDe(u);
+    if (!ks.serie) { CRAWL.pend.shift(); crawlGuardar(); return; }
+    if (CRAWL.sinIntro.includes(ks.serie) || (INTROS[ks.serie] && INTROS[ks.serie].by === 'auto') || INTROS[ks.exacto]) {
+      CRAWL.pend.shift(); CRAWL.hechas = (CRAWL.hechas || 0) + 1; crawlGuardar(); return; /* ya la sabe o ya se concluyó que no tiene */
+    }
+    if (INTRO_JOBS.has(ks.serie)) return; /* un usuario la disparó: se procesa sola, no duplicar */
+    if (Date.now() - (INTRO_INTENTOS.get(ks.serie) || 0) < 6 * 3600 * 1000) { /* enfriándose: para el fondo de la cola */
+      CRAWL.pend.push(CRAWL.pend.shift());
+      CRAWL.vueltas++;
+      if (CRAWL.vueltas > 2 * (CRAWL.total || 3000)) { console.log('[intro-crawl] muchas vueltas sin avance — pauso la cola'); CRAWL.pend = []; }
+      crawlGuardar();
+      return;
+    }
+    console.log('[intro-crawl] rastreando (' + (CRAWL.total - CRAWL.pend.length + 1) + '/' + CRAWL.total + '): ' + u);
+    dispararDeteccionIntro(u, ks.serie);
+    const t0 = Date.now();
+    await new Promise((ok) => { const iv = setInterval(() => { if (!INTRO_JOBS.has(ks.serie) || Date.now() - t0 > 240000) { clearInterval(iv); ok(); } }, 4000); });
+    CRAWL.pend.shift();
+    const v = INTRO_VEREDICTOS.get(ks.serie);
+    if (v === 'intro' || INTROS[ks.serie] || INTROS[ks.exacto]) CRAWL.hechas = (CRAWL.hechas || 0) + 1;
+    else if (v === 'sinintro') { CRAWL.sinIntro.push(ks.serie); CRAWL.hechas = (CRAWL.hechas || 0) + 1; }
+    else { CRAWL.pend.push(it); CRAWL.vueltas++; } /* fallo transitorio: reintentar al final */
+    crawlGuardar();
+  } catch {} finally { crawlOcupado = false; }
+}
+setInterval(() => { crawlTick().catch(() => {}); }, 25000);
+if (!CRAWL.lista) {
+  (async () => {
+    const items = await crawlConstruir().catch(() => []);
+    CRAWL.pend = items; CRAWL.total = items.length; CRAWL.lista = true;
+    crawlGuardar();
+    console.log('[intro-crawl] cola lista: ' + items.length + ' series por rastrear (una vez cada una — solo cuando nadie está viendo)');
+  })();
+} else console.log('[intro-crawl] continuando cola: ' + CRAWL.pend.length + ' pendientes de ' + CRAWL.total);
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🎬 Huddle corriendo en http://0.0.0.0:${PORT}`);
