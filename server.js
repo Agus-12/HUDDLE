@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v184'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v185'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1270,21 +1270,40 @@ async function descargarInicioEp(m3u8) {
       fs.writeFileSync(archivo, Buffer.from(ab));
       return archivo;
     }
-    const segs = txt.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).map((s) => { try { return new URL(s, pl).href; } catch { return null; } }).filter(Boolean).slice(0, 70);
+    const segs = txt.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#')).map((s) => { try { return new URL(s, pl).href; } catch { return null; } }).filter(Boolean).slice(0, 30);
     if (!segs.length) return null;
-    const out = fs.createWriteStream(archivo);
-    let bytes = 0;
-    for (const s of segs) {
-      const r2 = await pedir(s, 20000);
-      if (!r2) break;
-      const ab = await r2.arrayBuffer();
-      if (!ab || !ab.byteLength) break;
-      bytes += ab.byteLength;
-      out.write(Buffer.from(ab));
-      if (bytes > 45e6) break;
+    /* v185: descarga PARALELA (8 a la vez) — en serie el CDN lento se comía
+     * 5+ minutos por episodio y la detección parecía colgada */
+    const partes = new Array(segs.length).fill(null);
+    let bytes = 0, fellas = 0;
+    /* v185: el timeout cubre TAMBIÉN el cuerpo — pedir() apaga su reloj al
+     * llegar las cabeceras y un cuerpo trabado colgaba arrayBuffer() para
+     * siempre (eso eran los «25 minutos detectando» en el Oracle del usuario) */
+    const uno = async (s) => {
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 15000);
+      try {
+        const r = await fetch(s, { headers: { 'User-Agent': MIRROR_UA, ...(ref ? { Referer: ref } : {}) }, signal: ctl.signal, redirect: 'follow' });
+        if (!r.ok) return null;
+        const ab = await r.arrayBuffer();
+        return ab && ab.byteLength ? Buffer.from(ab) : null;
+      } catch { return null; } finally { clearTimeout(t); }
+    };
+    for (let i0 = 0; i0 < segs.length; i0 += 8) {
+      const lote = segs.slice(i0, i0 + 8);
+      const rs = await Promise.all(lote.map(uno));
+      for (let k = 0; k < rs.length; k++) {
+        if (!rs[k]) { fellas++; continue; }
+        partes[i0 + k] = rs[k];
+        bytes += rs[k].length;
+      }
+      console.log('[intro] ep ' + (1 + Math.min(1, 0)) + ': ' + Math.round(100 * (i0 + lote.length) / segs.length) + '% (' + Math.round(bytes / 1e6) + 'MB)');
+      if (fellas >= 6) break; /* el CDN se cayó: con lo que hay */
+      if (bytes > 24e6) break;
     }
-    await new Promise((r3) => out.end(r3));
-    if (bytes < 3e5) { try { fs.unlinkSync(archivo); } catch {} return null; }
+    const buenos = partes.filter(Boolean).length;
+    if (buenos < 24) return null; /* menos de ~2.5 min de video: no alcanza para comparar */
+    fs.writeFileSync(archivo, Buffer.concat(partes.filter(Boolean)));
     return archivo;
   }
   return null;
@@ -1355,7 +1374,8 @@ function introBandade(A, B) {
   if (mejorTr.n < 36) return null;
   return { ini: mejorTr.a / 2, fin: (mejorTr.b + 1) / 2, offset: d, frames: mejorTr.n };
 }
-const INTRO_JOBS = new Set(), INTRO_INTENTOS = new Map();
+const INTRO_JOBS = new Map(), INTRO_INTENTOS = new Map(); /* v185: clave→hora de inicio */
+function introJobAtascado(k) { const t0 = INTRO_JOBS.get(k); return t0 && Date.now() - t0 > 10 * 60 * 1000; } /* v185: 10 min máximo por intento */
 /* v137: penalización por resultado — fallo de infra (navegador ocupado, red)
  * retrasa el reintento solo 15 min; «no hay intro común» sí espera 6h */
 function penalizarIntro(serieKey, ms) {
@@ -1367,26 +1387,36 @@ async function detectarIntroSerie(serieKey, urls) {
    * NO se re-analiza es lo que ya vino de la huella misma */
   if (!fpcalcOk() || !serieKey || (INTROS[serieKey] && INTROS[serieKey].by === 'auto') || INTRO_JOBS.has(serieKey)) return;
   if (Date.now() - (INTRO_INTENTOS.get(serieKey) || 0) < 6 * 3600 * 1000) return;
-  INTRO_JOBS.add(serieKey);
-  console.log('[intro] detectando intro de ' + serieKey + ' (comparando el audio de 2 episodios)…');
+  INTRO_JOBS.set(serieKey, Date.now());
+  console.log('[intro] herramientas: fpcalc ' + (fpcalcOk() ? 'sí' : 'NO') + ', ffmpeg ' + (ffmpegOk() ? 'sí' : 'NO') + (ffmpegOk() ? '' : ' — SIN VIDEO no se puede detectar en danimados: instala ffmpeg'));
+  console.log('[intro] detectando intro de ' + serieKey + ' (comparando el inicio de 2 episodios)…');
   try {
     const listos = [];
+    let nEp = 0;
     for (const u of urls.slice(0, 3)) {
+      nEp++;
       try {
+        console.log('[intro] resolviendo episodio ' + nEp + '…');
         const r = await resolverNativo(u);
+        console.log('[intro] episodio ' + nEp + ' resuelto: ' + (r && r.m3u8 ? 'ok' : 'sin m3u8'));
         if (r && r.m3u8) listos.push(r.m3u8.startsWith('/') ? 'http://127.0.0.1:' + PORT + r.m3u8 : r.m3u8); /* el proxy propio (/api/xd) sirve el playlist con los headers correctos */
       } catch (e) { console.log('[intro] un episodio no se dejó resolver: ' + String(e && e.message || e).slice(0, 90)); }
       if (listos.length >= 2) break;
     }
     if (listos.length < 2) { penalizarIntro(serieKey, 15 * 60 * 1000); return console.log('[intro] no pude resolver 2 episodios de ' + serieKey + ' — reintento en 15 min'); }
+    console.log('[intro] bajando inicio del episodio 1…');
     const f0 = await descargarInicioEp(listos[0]);
+    console.log('[intro] ep1 bajado: ' + (f0 ? 'ok' : 'FALLO'));
     const f1 = f0 && await descargarInicioEp(listos[1]);
+    console.log('[intro] ep2 bajado: ' + (f1 ? 'ok' : 'FALLO'));
     if (!f0 || !f1) { penalizarIntro(serieKey, 15 * 60 * 1000); return console.log('[intro] descargas incompletas para ' + serieKey + ' — reintento en 15 min'); }
     try {
         /* v184: VIDEO primero (robusto entre re-encodes), audio de respaldo */
       let guardado = false;
       if (ffmpegOk()) {
+        console.log('[intro] extrayendo frames de video…');
         const [fa2, fb2] = await Promise.all([introFramesDe(f0), introFramesDe(f1)]);
+        console.log('[intro] frames: ' + (fa2 && fa2.hashes.length) + ' y ' + (fb2 && fb2.hashes.length));
         if (fa2 && fb2) {
           const band = introBandade(fa2, fb2);
           if (band && band.fin <= 420 && band.ini <= 240) {
@@ -1402,8 +1432,13 @@ async function detectarIntroSerie(serieKey, urls) {
           }
         }
       }
-      const [ha, hb] = guardado ? [null, null] : await Promise.all([fpcalcArchivo(f0), fpcalcArchivo(f1)]);
-      if (ha && hb && ha.length > 130 && hb.length > 130) {
+      const esDani = /^dani:/.test(serieKey); /* v185: el audio no sirve en danimados — SOLO video decide */
+      const [ha, hb] = guardado || esDani ? [null, null] : await Promise.all([fpcalcArchivo(f0), fpcalcArchivo(f1)]);
+      if (esDani && !guardado) {
+        penalizarIntro(serieKey, ffmpegOk() ? 6 * 3600 * 1000 : 15 * 60 * 1000); /* v185: sin ffmpeg reintenta en 15 min (p. ej. tras instalarlo) */
+        console.log('[intro] ' + serieKey + ': sin conclusión por video' + (ffmpegOk() ? ' — los episodios no comparten intro al inicio' : ' (FALTA ffmpeg — instálalo y reintenta en 15 min)'));
+      }
+      else if (ha && hb && ha.length > 130 && hb.length > 130) {
         const hit = compararHuellas(ha, hb);
         if (hit && hit.dur >= 45 && hit.fin <= 420 && hit.ini <= 240) {
           const finSeg = Math.max(Math.round(hit.fin) - 2, Math.round(hit.ini) + 30); /* 2s antes: jamás comerse contenido */
@@ -1466,6 +1501,7 @@ function precargarIntroDeSerie(eps) {
     if (urls.length < 2) return;
     const ks = introKeysDe(urls[0]);
     if (!ks.serie || (INTROS[ks.serie] && INTROS[ks.serie].by === 'auto')) return;
+    if (introJobAtascado(ks.serie)) INTRO_JOBS.delete(ks.serie); /* v185 */
     if (!fpcalcOk() || INTRO_JOBS.has(ks.serie)) return;
     if (Date.now() - (INTRO_INTENTOS.get(ks.serie) || 0) < 6 * 3600 * 1000) return;
     detectarIntroSerie(ks.serie, urls.slice(0, 3));
@@ -5458,6 +5494,7 @@ const server = http.createServer(async (req, res) => {
       /* v133: sin datos para esta serie → detección por audio en segundo plano.
        * v134: también con datos MANUALES (un clic equivocado no se queda para siempre) */
       const hace = INTRO_INTENTOS.get(ks.serie) || 0;
+      if (introJobAtascado(ks.serie)) INTRO_JOBS.delete(ks.serie); /* v185 */
       if (ks.serie && (!datos || datos.by !== 'auto') && fpcalcOk() && !INTRO_JOBS.has(ks.serie) && Date.now() - hace >= 6 * 3600 * 1000) {
         serieCtxFromUrl(String(url.searchParams.get('url') || '')).then((sc) => {
           if (sc && sc.eps && sc.eps.length > 1) detectarIntroSerie(ks.serie, sc.eps.slice(0, 3).map((e) => e.url));
