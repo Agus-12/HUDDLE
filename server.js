@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v140'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v141'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1671,11 +1671,24 @@ async function handleAction(req, res, body) {
           }
         }
         if (room.native && room.serieCtx) {
-          const sc = room.serieCtx;
+          let sc = room.serieCtx;
           const dir = op === 'epNext' ? 1 : -1;
-          const actual = sc.eps.findIndex((e) => e.url === room.videoUrl);
-          const desde = actual >= 0 ? actual : sc.idx;
-          if (desde < 0) return json(res, 400, { ok: false, error: 'No sé qué episodio están viendo — ábrelo del selector' });
+          /* v141: si la URL actual NO está en la lista cacheada, el contexto
+           * está VIEJO — antes caía a sc.idx (un índice de hace tiempo) y
+           * «el siguiente» resultaba ser EL MISMO episodio: la sala «cambiaba»
+           * al mismo video y la tarjetita parpadeaba. Ahora se reconstruye
+           * el contexto al momento. */
+          let actual = sc.eps.findIndex((e) => e.url === room.videoUrl);
+          if (actual < 0) {
+            const scFix = await serieCtxFromUrl(room.videoUrl).catch(() => null);
+            if (scFix && scFix.eps && scFix.eps.length) {
+              room.serieCtx = scFix;
+              sc = scFix;
+              actual = sc.eps.findIndex((e) => e.url === room.videoUrl);
+            }
+          }
+          if (actual < 0) return json(res, 400, { ok: false, error: 'No sé qué episodio están viendo — ábrelo del selector' });
+          const desde = actual;
           if (desde + dir < 0 || desde + dir >= sc.eps.length) {
             return json(res, 400, { ok: false, error: op === 'epNext' ? 'Ya estás en el último episodio' : 'Ya estás en el primer episodio' });
           }
@@ -1689,6 +1702,7 @@ async function handleAction(req, res, body) {
           const saltados = [];
           for (let paso = 1; paso <= 3 && desde + dir * paso >= 0 && desde + dir * paso < sc.eps.length; paso++) {
             const cand = sc.eps[desde + dir * paso];
+            if (cand.url === room.videoUrl) continue; /* v141: jamás «cambiar» al mismo video */
             errN = '';
             nat = await resolverNativo(cand.url).catch((e) => { errN = String(e.message || e).slice(0, 140); return null; });
             if (nat) { elegido = { cand, idx: desde + dir * paso }; break; }
@@ -1727,9 +1741,15 @@ async function handleAction(req, res, body) {
         }
         if (!m || !m.serie) return json(res, 404, { ok: false, error: 'No hay serie en el espejo' });
         let idx = m.serie.eps.findIndex((e) => e.url === (m.url || ''));
-        if (idx < 0) idx = m.serie.idx;
+        if (idx < 0) { /* v141: sin confiar en índices viejos — reconstruir */
+          const scFix = await serieCtxFromUrl(m.url || '').catch(() => null);
+          if (scFix) { m.serie = scFix; broadcast(room, 'mirror-state', mirrorState(room)); }
+          idx = m.serie.eps.findIndex((e) => e.url === (m.url || ''));
+        }
+        if (idx < 0) return json(res, 400, { ok: false, error: 'No sé qué episodio están viendo — ábrelo del selector' });
         const target = m.serie.eps[idx + (op === 'epNext' ? 1 : -1)];
         if (!target) return json(res, 400, { ok: false, error: op === 'epNext' ? 'Ya estás en el último episodio' : 'Ya estás en el primer episodio' });
+        if (target.url === (m.url || '')) return json(res, 400, { ok: false, error: 'No hay episodio hacia ahí — prueba del selector' }); /* v141 */
         /* v127: la sala SABE qué episodio toca ahora (título/carátula para
          * todos, «Continuar viendo» correcto) — antes el salto no tocaba el
          * estado y los invitados se quedaban con el episodio viejo */

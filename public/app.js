@@ -346,6 +346,7 @@ function applyState(st) {
   S.serieSala = (st.native && st.serie) || null; /* v118: serie para siguiente/anterior en nativo */
   S.salaTitulo = String(st.videoTitle || ''); /* v127: info para la espera de TODOS (invitados incluidos) */
   S.salaImg = String(st.videoImg || '');
+  if (typeof pintarTituloSala === 'function') pintarTituloSala(); /* v141 */
   /* v127: en nativo, mientras el video no dé video la sala ve la espera;
    * cuando esté lista y pausada, «Toca para empezar» */
   if (S.nativo && !S.nativoListo && !S.pendingStart) {
@@ -682,6 +683,13 @@ function applyMirrorState(ms) {
    * broadcasteaba mirror-state inactivo y esto ocultaba la pantalla de
    * espera (¡con el video aún sin cargar!) y borraba la info */
   if (S.nativo) return;
+  /* v141: esperando cambio de episodio — los estados que aún hablan del
+   * episodio VIEJO no tocan nada (la tarjetita deja de parpadear); el
+   * estado con la URL NUEVA reactiva el flujo normal */
+  if (S.epEsperaUrl && Date.now() - (S.epEsperaEn || 0) < 45000) {
+    if (!ms.url || ms.url === S.epEsperaUrl) return;
+    S.epEsperaUrl = null;
+  } else S.epEsperaUrl = null;
   S.mirror.active = !!ms.active;
   S.mirror.url = ms.url || '';
   S.mirror.ready = !!(ms.active && ms.ready);
@@ -1181,14 +1189,29 @@ $('#mirrorLayer').addEventListener('wheel', (e) => {
   sendAction({ type: 'mirror', op: 'scroll', deltaY: Math.round(e.deltaY) });
 }, { passive: false });
 
-/* v33: detener el espejo vive en la barra de arriba, junto a Salir */
-$('#btnStopMirrorTop').addEventListener('click', () => {
-  if (S.canControl) {
-    /* v92: sala nativa — se suelta con la acción de video */
+/* v141: donde estaba «Detener» (que ya no sirve en salas nativas) ahora se
+ * ve EL NOMBRE de la serie/episodio o película en curso. Detener sigue
+ * existiendo pero escondido: mantén presionado el nombre medio segundo. */
+let tituloPresT = null;
+$('#btnStopMirrorTop').addEventListener('pointerdown', () => {
+  tituloPresT = setTimeout(() => {
+    tituloPresT = null;
+    if (!S.canControl) return toast('Solo el anfitrión controla la sala');
     if (S.nativo) sendAction({ type: 'video', url: '' });
     else sendAction({ type: 'mirror', op: 'stop' });
-  } else toast('Solo el anfitrión controla la sala');
+    toast('Detenido');
+  }, 550);
 });
+['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => $('#btnStopMirrorTop').addEventListener(ev, () => clearTimeout(tituloPresT)));
+function pintarTituloSala() {
+  const chip = $('#btnStopMirrorTop');
+  if (!chip) return;
+  const t = String(S.salaTitulo || '').trim().replace(/[<>&]/g, '');
+  chip.innerHTML = t
+    ? '<svg class="icon icon-14" viewBox="0 0 24 24" fill="currentColor" style="opacity:.55"><path d="M8 5v14l11-7z"/></svg><span>' + t + '</span>'
+    : '<span style="opacity:.5">Nada en reproducción</span>';
+  chip.title = (t || 'Nada en reproducción') + ' — mantén presionado para detener';
+}
 
 /* v33: navegar el espejo como un navegador normal — atrás / adelante */
 /* v61: barrita con tiempo — pintar y arrastrar para moverte en la peli */
@@ -1748,6 +1771,8 @@ function updateEpNav() {
    * el server ya resolvió) y solo se va cuando hay video listo o si falló */
   const tarjetitaEp = (mensaje) => {
     if (S.mirrorInfo) { S.mirrorInfo.sub = mensaje; mostrarPeliLoading(); }
+    S.epEsperaUrl = S.mirror.url || (S.nativo && S.nativo.url) || ''; /* v141: estados del ep viejo = ignorar */
+    S.epEsperaEn = Date.now();
   };
   const alFallo = (r) => { ocultarPeliLoading(); toast((r && r.error) || 'No se pudo'); };
   prev.addEventListener('click', () => { toast('Abriendo el episodio anterior…'); tarjetitaEp('Abriendo el episodio anterior…'); sendAction({ type: 'mirror', op: 'epPrev' }).then((r) => { if (r && r.ok === false) alFallo(r); }).catch(() => alFallo()); });
@@ -1785,7 +1810,7 @@ function updateControlUi() {
   $('#pagePickBtn').disabled = !S.canControl;
   $('#btnMirror').disabled = !S.canControl;
   $('#mirrorUrl').disabled = !S.canControl;
-  $('#btnStopMirrorTop').disabled = !S.canControl;
+  pintarTituloSala(); /* v141: el hueco de Detener muestra qué se ve */
   $('#chkControl').checked = !!(S.room && S.room.anyoneCanControl);
   $('#chkControl').disabled = !isHost;
   $('#lockHint').textContent = S.canControl ? '' : 'Solo el anfitrión controla el espejo';

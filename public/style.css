@@ -1691,15 +1691,18 @@ body.movil-horizontal #homeFull {
 .ms-menu-back { position: absolute; inset: 0; background: rgba(5, 7, 15, 0.84); }
 .ms-menu-box {
   position: relative; width: min(94vw, 560px); max-height: 92%; /* v140: % del overlay — con el teclado abierto cabe en la zona visible */
-  overflow: hidden auto; -webkit-overflow-scrolling: touch;
+  display: flex; flex-direction: column; /* v141: orden FÍSICO — el buscador jamás queda debajo de los resultados */
+  overflow: hidden; /* v141: la caja YA NO scrollea — nada se puede «perder» por arriba; solo la lista de resultados scrollea */
   background: var(--panel);
   border: 1px solid var(--line); border-radius: 16px; padding: 14px;
 }
-.ms-menu-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.ms-menu-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; flex: none; }
 .ms-menu-t { font-weight: 800; font-size: 15px; }
-.ms-menu-busca { display: flex; gap: 8px; margin-bottom: 10px; }
+.ms-menu-busca { display: flex; gap: 8px; margin-bottom: 10px; flex: none; }
 .ms-menu-busca .input { flex: 1; min-width: 0; }
-.ms-results { max-height: 50vh; overflow-y: auto; -webkit-overflow-scrolling: touch; } /* v138: 50vh — con el teclado abierto los resultados siguen a la vista */
+/* v141: SOLO los resultados scrollean — caben en el espacio que deje el
+ * teclado, siempre DEBAJO del buscador y ENCIMA de «Elegir página web» */
+.ms-results { flex: 1 1 0; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
 /* v138: con el celular HORIZONTAL la sala entera se rota (v77) — el menú y la
  * hoja de servidores (a nivel página desde v136) se rotan con ella, como la
  * pantalla de espera y el selector (v79) */
@@ -1734,7 +1737,10 @@ body.sala-girada .pd-results { max-height: 50dvw; }
 .skip-intro:active { opacity: 0.85; }
 .skip-intro.hidden { display: none; }
 
+/* v141: el hueco de «Detener» muestra el nombre de lo que se ve */
+.sala-titulo { min-width: 0; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; font-size: 12.5px; }
+
 /* v131: etiqueta de versión — discreta, para verificar el auto-update */
 .ver-tag { font-size: 10px; color: var(--dim); opacity: 0.75; vertical-align: middle; margin-left: 4px; }
 
-.ms-paginas { width: 100%; margin-top: 10px; justify-content: center; display: flex; gap: 6px; }
+.ms-paginas { width: 100%; margin-top: 10px; justify-content: center; display: flex; gap: 6px; flex: none; } /* v141 */
