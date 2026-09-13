@@ -3678,15 +3678,17 @@ function cerrarBuscarSala() {
   const menu = $('#msMenu');
   if (menu) menu.classList.add('hidden'); /* v127: cerrar el menú completo */
   $('#msResults').classList.add('hidden');
+  abrazarVisible(); /* v140: limpia los estilos del abrazo */
 }
 async function buscarEnSala() {
   const q = $('#msInput').value.trim();
   const box = $('#msResults');
   if (!q) { cerrarBuscarSala(); return; }
-  /* v138: el teclado del celular EMPUJA el menú fuera de la pantalla (el
-   * WebView desplaza la página para «ver» el input y no la regresa) — se
-   * cierra el teclado al buscar y se regresa la vista al pintar resultados */
+  /* v138/v140: el teclado EMPUJA el menú fuera de la pantalla — al buscar se
+   * baja el teclado moviendo el foco al botón (blur solo a veces basta en el
+   * WebView) y la vista regresa al inicio al pintar resultados */
   try { $('#msInput').blur(); } catch {}
+  try { $('#msGo').focus(); } catch {}
   box.classList.remove('hidden');
   box.innerHTML = '<div class="sr-info"><div class="spinner"></div> Buscando…</div>';
   try {
@@ -3709,6 +3711,28 @@ async function buscarEnSala() {
     box.innerHTML = '<div class="sr-info">Sin conexión con el servidor</div>';
   }
 }
+/* ═══ v140: EL MENÚ VIVE EN LA ZONA REALMENTE VISIBLE ═══
+ * El teclado del celular encoge o DESPLAZA el viewport: por eso el menú
+ * «salía más arriba» y los resultados quedaban detrás del teclado,
+ * imposible tocarlos. Ahora el overlay abraza exactamente el área visible
+ * (window.visualViewport) — teclado abierto o cerrado, todo queda a la
+ * vista y tocable. La hoja de servidores se pega al fondo visible. */
+function abrazarVisible() {
+  const vv = window.visualViewport;
+  const menu = $('#msMenu'), hoja = $('#pageDrop');
+  const limpiar = (el) => { el.style.top = ''; el.style.height = ''; el.style.bottom = ''; };
+  if (menu) {
+    if (menu.classList.contains('hidden')) limpiar(menu);
+    else if (vv) { menu.style.top = vv.offsetTop + 'px'; menu.style.height = vv.height + 'px'; }
+  }
+  if (hoja) {
+    if (hoja.classList.contains('hidden') || !hoja.classList.contains('desde-sala')) limpiar(hoja);
+    else if (vv) { const fondoVisible = vv.offsetTop + vv.height; hoja.style.bottom = Math.max(12, window.innerHeight - fondoVisible + 12) + 'px'; }
+  }
+}
+window.visualViewport && window.visualViewport.addEventListener('resize', abrazarVisible);
+window.visualViewport && window.visualViewport.addEventListener('scroll', abrazarVisible);
+
 /* v127: el buscador vive en un MENÚ modal — se abre limpio, buscas,
  * eliges y sigues en la sala (series → temporadas/episodios de siempre) */
 function abrirMenuBuscarSala() {
@@ -3718,7 +3742,9 @@ function abrirMenuBuscarSala() {
   $('#msInput').value = '';
   $('#msResults').classList.add('hidden');
   $('#msResults').innerHTML = '';
-  setTimeout(() => $('#msInput').focus(), 50);
+  /* v140: SIN autofocus — el teclado subiendo solo era lo que corría el menú
+   * hacia arriba; el usuario pica el campo cuando quiera escribir */
+  abrazarVisible();
 }
 /* v132: la lista de páginas/servidores vive dentro del menú */
 $('#msPaginas').addEventListener('click', () => {
@@ -3728,7 +3754,7 @@ $('#msPaginas').addEventListener('click', () => {
   if (drop) {
     drop.classList.add('desde-sala'); /* v136: fuera del shell que la recortaba — flota sobre todo */
     drop.classList.remove('hidden');
-    setTimeout(() => { try { $('#pdSearch').focus(); } catch {} }, 60);
+    abrazarVisible(); /* v140: pegada al fondo VISIBLE (sin autofocus: el teclado no corre nada) */
   }
 });
 $('#btnMSearch').addEventListener('click', abrirMenuBuscarSala);
@@ -3744,7 +3770,8 @@ async function buscarEnPicker() {
   if (!inp || !box) return;
   const q = inp.value.trim();
   if (!q) { box.innerHTML = ''; return; }
-  try { inp.blur(); } catch {} /* v138: cerrar teclado — mismo mal del menú */
+  try { inp.blur(); } catch {} /* v138/v140: cerrar teclado — el foco pasa al botón */
+  try { $('#pdGo').focus(); } catch {}
   box.innerHTML = '<div class="sr-info"><div class="spinner"></div> Buscando…</div>';
   try {
     const d = await buscarEnServer(q);
@@ -3756,6 +3783,7 @@ async function buscarEnPicker() {
     renderResultados(box, d.results, (res) => {
       $('#pageDrop').classList.add('hidden');
       $('#pageDrop').classList.remove('desde-sala'); /* v136 */
+      abrazarVisible(); /* v140 */
       if (!S.canControl) { toast('Solo el anfitrión puede cambiar de página'); return; }
       toast(`Abriendo ${res.site}…`);
       $('#mirrorUrl').value = res.url;

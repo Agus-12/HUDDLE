@@ -1686,11 +1686,11 @@ body.movil-horizontal #homeFull {
 }
 
 /* ============ v127: menú de búsqueda dentro de la sala ============ */
-.ms-menu { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: flex-start; justify-content: center; padding: 7vh 14px 14px; }
+.ms-menu { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: flex-start; justify-content: center; padding: min(7vh, 56px) 14px 14px; } /* v140: techo modesto */
 .ms-menu.hidden { display: none; }
 .ms-menu-back { position: absolute; inset: 0; background: rgba(5, 7, 15, 0.84); }
 .ms-menu-box {
-  position: relative; width: min(94vw, 560px); max-height: 84vh;
+  position: relative; width: min(94vw, 560px); max-height: 92%; /* v140: % del overlay — con el teclado abierto cabe en la zona visible */
   overflow: hidden auto; -webkit-overflow-scrolling: touch;
   background: var(--panel);
   border: 1px solid var(--line); border-radius: 16px; padding: 14px;
