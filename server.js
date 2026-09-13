@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v173'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v174'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -4947,7 +4947,7 @@ const server = http.createServer(async (req, res) => {
       if (!q) return json(res, 400, { ok: false, error: 'Escribe qué quieren ver' });
       const r = await buscarEnSitios(q); /* v121: global + fuzzy + sugiere */
       if (/titan(es)?\b/i.test(q)) {
-        r.resultados.unshift({ title: 'Los Jóvenes Titanes en Acción (Latino)', url: 'https://danimados.cc/serie/dani-titanes', img: '/covers/dani-titanes.jpg', site: 'Caricaturas', extra: '9 temporadas · 291 episodios' }); /* v172 */
+        r.resultados.unshift({ title: 'Los Jóvenes Titanes en Acción (Latino)', url: 'https://danimados.cc/serie/dani-titanes', img: CARI_PORTADAS.get('dani-titanes') || '/covers/dani-titanes.jpg', site: 'Caricaturas', extra: '9 temporadas · 291 episodios' }); /* v174: con ?v= — sin esto el navegador enseñaba la portada VIEJA del caché */
       }
       if (!r.resultados.length) return json(res, 200, { ok: true, results: [], sugiere: r.sugiere, error: 'No encontré nada — prueba con otras palabras' });
       return json(res, 200, { ok: true, results: r.resultados, sugiere: r.sugiere });
