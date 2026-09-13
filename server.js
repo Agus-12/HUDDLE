@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v178'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v179'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -478,10 +478,12 @@ async function daniEpToStream(urlEp) {
   /* v176: cada capítulo trae hasta 4 players (nume=1..4) y NO todos
    * sirven: el 1x2 de Titanes traía voe.sx (403 DDoS-Guard) en la opción 1
    * mientras hglink (la que sabemos romper) era la 3 — se prueban TODAS
-   * hasta que una entregue player desempacable. El front hglink (con guard
-   * JS) solo ROTA el dominio: hanerix sirve el player de verdad sin guard */
-  let html2 = '';
-  for (let nume = 1; nume <= 4 && !html2; nume++) {
+   * hasta que una entregue video. v179: el master se exige DENTRO del ciclo —
+   * si el player elegido no entrega master (hay CDNs celosos como
+   * cdn-centaurus, y voe/Byse que no entregan nada) SEGUIMOS con la
+   * siguiente opción en vez de rendir todo el capítulo */
+  const ahora = Date.now();
+  for (let nume = 1; nume <= 4; nume++) {
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 12000);
     let embedUrl = '';
@@ -499,30 +501,42 @@ async function daniEpToStream(urlEp) {
       if (r2.ok) { const j2 = await r2.json().catch(() => null); if (j2 && j2.embed_url) embedUrl = j2.embed_url; }
     } finally { clearTimeout(t); }
     if (!embedUrl) continue;
+    /* el front hglink (con guard JS) solo ROTA el dominio: hanerix sirve el
+     * player de verdad sin guard — si aún no viene desempacable, cambiamos host */
+    let html2 = '';
     for (const intento of [embedUrl, embedUrl.replace(/^https:\/\/[^/]+/i, 'https://hanerix.com')]) {
       const r3 = await fetchSeguro(intento, 12000).catch(() => null);
       if (!r3 || !r3.ok) continue;
       const b = await r3.text();
       if (/\.m3u8|eval\(function\(p,a,c,k,e/.test(b)) { html2 = b; break; }
     }
+    if (!html2) continue;
+    const des = daniDesempacar(html2);
+    const m3u8 = (/https:[^"']+?\.m3u8[^"']*/.exec(des) || [])[0];
+    if (!m3u8) continue; /* v179: este player no dio stream — prueba el siguiente */
+    let hostCDN = '';
+    try { hostCDN = new URL(m3u8).hostname; } catch {}
+    if (hostCDN) { hlsReferers.set(hostCDN, ''); try { hlsUAs.set(hostCDN, MIRROR_UA); } catch {} }
+    /* v179: el master se pide con la MISMA UA grande del player (a la 124 de
+     * fetchSeguro le ardía cdn-centaurus) y de repuesto sin UA */
+    let bodyM = '';
+    for (const ua2 of [MIRROR_UA, '']) {
+      const ctl2 = new AbortController();
+      const t2 = setTimeout(() => ctl2.abort(), 12000);
+      try {
+        const rM = await fetch(m3u8, { headers: ua2 ? { 'User-Agent': ua2 } : {}, signal: ctl2.signal, redirect: 'follow' });
+        const t3 = rM.ok ? await rM.text() : '';
+        if (/ #EXTM3U/.test(' ' + t3)) { bodyM = t3; break; }
+      } catch {} finally { clearTimeout(t2); }
+    }
+    if (!bodyM) continue; /* v179: siguiente player */
+    const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
+    pelisxdStreams.set(tok, { body: bodyM, base: m3u8, ref: '', slug: 'dani', at: ahora });
+    const nat = { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
+    DANI_STREAMS.set(urlEp, { nat, at: ahora });
+    return nat;
   }
-  if (!html2) throw new Error('ninguna opción de player sirvió — reintenta');
-  const des = daniDesempacar(html2);
-  const m3u8 = (/https:[^"']+?\.m3u8[^"']*/.exec(des) || [])[0];
-  if (!m3u8) throw new Error('el video no dio stream (quizá se cayó este cap)');
-  const ahora = Date.now();
-  const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
-  let hostCDN = '';
-  try { hostCDN = new URL(m3u8).hostname; } catch {}
-  if (hostCDN) { hlsReferers.set(hostCDN, ''); try { hlsUAs.set(hostCDN, MIRROR_UA); } catch {} }
-  /* el master se cachea con su CUERPO real (para /api/xd) */
-  const rM = await fetchSeguro(m3u8, 12000).catch(() => null);
-  const bodyM = rM && rM.ok ? await rM.text() : '';
-  if (!/#EXTM3U/.test(bodyM)) throw new Error('el master no respondió');
-  pelisxdStreams.set(tok, { body: bodyM, base: m3u8, ref: '', slug: 'dani', at: ahora });
-  const nat = { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
-  DANI_STREAMS.set(urlEp, { nat, at: ahora });
-  return nat;
+  throw new Error('ningún player entregó el video — reintenta');
 }
 async function resolverDani(url) { return daniEpToStream(url); }
 async function ponerDaniNativo(room, urlEp, userId) {
@@ -5184,7 +5198,8 @@ const server = http.createServer(async (req, res) => {
         const esPeliXd = /pelisxd\.com\/pelicula\//i.test(target); /* v98 */
         const esCari = /miscaricaturas\.com\//i.test(target); /* v102: caricaturas */
         const esLct = /lacartoons\.com\/serie\/capitulo\//i.test(target); /* v112: lacartoons */
-        const r = await (esEpAnime ? resolverAnime(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : resolverSolo(target));
+        const esDani = /danimados\.cc\/episodios\//i.test(target); /* v179: danimados en Solo — sin esto TODO el catálogo nuevo caía al resolutor viejo de Cuevana: «Este título no tiene servidor goodstream» */
+        const r = await (esEpAnime ? resolverAnime(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : resolverSolo(target));
         return json(res, 200, { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy });
       } catch (e) {
         console.warn('[solo] no pude resolver', target.slice(0, 70), '→', String(e.message || e).slice(0, 90));
