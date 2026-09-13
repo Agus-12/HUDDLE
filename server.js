@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v168'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v169'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1101,10 +1101,15 @@ async function startMirror(room, rawUrl, userId) {
   /* v164: si lo que piden es un VIDEO de youtube → NATIVO (el espejo come
    * muros de login con youtube); la portada/búsqueda sí sigue en espejo */
   if (idYoutubeDe(url)) {
+    /* v169: la página watch de youtube es un LABERINTO de captchas para una
+     * IP de datacenter (aun con sesión iniciada nos pone «verifica que no
+     * eres un bot» mil veces) — si la extracción falla, mejor error limpio:
+     * el video NUNCA se abre en el espejo */
     try { if (await ponerYoutubeNativo(room, url, userId)) return; }
     catch (e) {
-      console.log('[espejo] youtube nativo no pudo (' + String(e.message || e).slice(0, 70) + ') — espejeo la página igual');
-      try { sysMsg(room, '⚠️ No pude sacar el video de YouTube (' + String(e.message || e).slice(0, 60) + '). Abro la página: si pide iniciar sesión puedes entrar con tu cuenta, o reintenta en un minuto.'); } catch {}
+      console.log('[espejo] youtube nativo no pudo (' + String(e.message || e).slice(0, 70) + ') — error limpio, sin espejo');
+      try { sysMsg(room, '⚠️ No pude sacar el video de YouTube (' + String(e.message || e).slice(0, 60) + '). Reintenta en un minuto — y no lo abrimos en el espejo porque youtube nos pone captchas infinitos.'); } catch {}
+      throw new Error('No pude sacar el video de YouTube — reintenta en un minuto');
     }
   }
   if (mirrors.has(room.code)) {
