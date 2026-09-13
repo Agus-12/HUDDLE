@@ -347,14 +347,24 @@ function applyState(st) {
   S.salaTitulo = String(st.videoTitle || ''); /* v127: info para la espera de TODOS (invitados incluidos) */
   S.salaImg = String(st.videoImg || '');
   if (typeof pintarTituloSala === 'function') pintarTituloSala(); /* v141 */
-  /* v147: mientras el server resuelve el nuevo episodio (switching), la
-   * tarjeta VIVE: muestra ya el nombre nuevo y su spinner — no se queda
-   * congelada con el episodio viejo */
+  /* v147→v149: mientras el server resuelve el nuevo episodio (switching), la
+   * tarjeta muestra YA el nombre nuevo con su spinner. v149: PRIMERO se
+   * actualiza la info y DESPUÉS se pinta — antes mostrarPeliLoading()
+   * re-escribía el nombre con el episodio viejo (quedaba estática) — y se
+   * relanza la animación para que se note el cambio */
   if (st.switching && S.nativo) {
-    const pn = $('#peliNombre'), pe = $('#peliEstado');
-    if (pn && S.salaTitulo) pn.textContent = S.salaTitulo;
-    if (pe) pe.textContent = 'Preparando el siguiente episodio…';
+    if (S.mirrorInfo) {
+      S.mirrorInfo.title = S.salaTitulo || S.mirrorInfo.title;
+      S.mirrorInfo.img = S.salaImg || S.mirrorInfo.img;
+      if (st.videoUrl) S.mirrorInfo.url = st.videoUrl;
+      S.mirrorInfo.sub = 'Preparando el siguiente episodio…';
+      S.mirrorInfo.epNum = '';
+    }
     mostrarPeliLoading();
+    const pe = $('#peliEstado');
+    if (pe) pe.textContent = 'Preparando el siguiente episodio…';
+    const bx = $('#peliLoading');
+    if (bx) { bx.style.animation = 'none'; void bx.offsetWidth; bx.style.animation = ''; } /* relanzar pop */
   }
   /* v127: en nativo, mientras el video no dé video la sala ve la espera;
    * cuando esté lista y pausada, «Toca para empezar» */
