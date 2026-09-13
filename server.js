@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v177'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v178'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -378,6 +378,13 @@ let DANI_CAT = new Map();
 try {
   for (const [sl, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'dani-catalogo.json'), 'utf8')))) DANI_CAT.set(sl, v);
 } catch {}
+/* v178: portadas de IMDB (el usuario las pidió «tal y como los jóvenes
+ * titanles»... como Teen Titans) — mapa slug → m.media-amazon generado con
+ * la API de sugerencias de IMDb; cubre 818 series + los reemplazos nuestros */
+let DANI_IMDB = new Map();
+try {
+  for (const [sl, u] of Object.entries(JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'dani-imdb.json'), 'utf8')))) DANI_IMDB.set(sl, u);
+} catch {}
 const DANI_CAT_ARR = [...DANI_CAT.entries()].sort((a, b) => String(a[1].t).localeCompare(String(b[1].t), 'es'));
 const DANI_FEEDS = new Map(); /* slug → { at, eps } */
 const DANI_POSTERS = new Map(); /* slug → { at, url } */
@@ -403,11 +410,11 @@ function daniTituloDe(slug) {
   const v = DANI_CAT.get(slug);
   return (v && v.t ? String(v.t).replace(/\xa0/g, ' ') : slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
 }
-function daniCoverDe(slug) { return CARI_PORTADAS.get(slug) || '/api/dani/poster/' + slug; }
+function daniCoverDe(slug) { return DANI_IMDB.get(slug) || CARI_PORTADAS.get(slug) || '/api/dani/poster/' + slug; }
 async function daniPosterUrl(slug) {
   const c = DANI_POSTERS.get(slug);
   if (c && Date.now() - c.at < 24 * 3600e3) return c.url;
-  let u = (DANI_CAT.get(slug) || {}).p || '';
+  let u = DANI_IMDB.get(slug) || (DANI_CAT.get(slug) || {}).p || ''; /* v178: IMDb primero */
   if (!u) {
     try {
       const r = await fetchSeguro(DANI_BASE + '/series/' + slug + '/', 12000);
@@ -3653,7 +3660,7 @@ async function refrescarCariFeed() {
   const items = (await Promise.all(slugs.map(async (slug) => {
     const meta = await cariMetaDe(slug).catch(() => null);
     const h = home.get(slug) || {};
-    const img = (meta && (meta.cover || meta.poster)) || h.img || '';
+    const img = DANI_IMDB.get(slug) || (meta && (meta.cover || meta.poster)) || h.img || ''; /* v178: los reemplazados van con portada de IMDb */
     return {
       title: (meta && meta.titulo) || cariLimpia(h.alt || cariBonito(slug)),
       url: CARI_BASE + slug + '/', img, site: 'Caricaturas',
@@ -4914,7 +4921,7 @@ const server = http.createServer(async (req, res) => {
       const por = 60;
       const pag = Math.max(1, +(url.searchParams.get('pag') || 1));
       const ini = (pag - 1) * por;
-      const items = DANI_CAT_ARR.slice(ini, ini + por).map(([sl, v]) => ({ slug: sl, titulo: String(v.t).replace(/\xa0/g, ' '), poster: v.p || ('/api/dani/poster/' + sl) }));
+      const items = DANI_CAT_ARR.slice(ini, ini + por).map(([sl, v]) => ({ slug: sl, titulo: String(v.t).replace(/\xa0/g, ' '), poster: '/api/dani/poster/' + sl })); /* v178: todas por IMDb */
       return json(res, 200, { ok: true, total: DANI_CAT_ARR.length, pag, por, items });
     }
     if (url.pathname.startsWith('/api/caricaturas/')) {
@@ -5023,7 +5030,7 @@ const server = http.createServer(async (req, res) => {
       if (!q) return json(res, 400, { ok: false, error: 'Escribe qué quieren ver' });
       const r = await buscarEnSitios(q); /* v121: global + fuzzy + sugiere */
       if (/titan(es)?\b/i.test(q)) {
-        r.resultados.unshift({ title: 'Los Jóvenes Titanes en Acción (Latino)', url: 'https://danimados.cc/serie/dani-titanes', img: CARI_PORTADAS.get('dani-titanes') || '/covers/dani-titanes.jpg', site: 'Caricaturas', extra: '9 temporadas · 291 episodios' }); /* v174: con ?v= — sin esto el navegador enseñaba la portada VIEJA del caché */
+        r.resultados.unshift({ title: 'Los Jóvenes Titanes en Acción (Latino)', url: 'https://danimados.cc/serie/dani-titanes', img: daniCoverDe('teen-titans-go'), site: 'Caricaturas', extra: '9 temporadas · 291 episodios' }); /* v178: IMDb */ /* v174: con ?v= — sin esto el navegador enseñaba la portada VIEJA del caché */
       }
       /* v177: además, las 823 series de danimados cascan en la búsqueda */
       const qD = normalizarTxt(q).split(' ').filter((w) => w.length > 1);
@@ -5038,7 +5045,7 @@ const server = http.createServer(async (req, res) => {
         }
         r.resultados = r.resultados.filter((x) => { const mm = /miscaricaturas\.com\/([a-z0-9-]+)/i.exec(x.url || ''); return !(mm && DANI_REEMPLAZAS.has(mm[1])); });
         for (const [sl, v] of daniHits.reverse()) {
-          r.resultados.unshift({ title: String(v.t).replace(/\xa0/g, ' '), url: 'https://danimados.cc/serie/' + sl, img: v.p || ('/api/dani/poster/' + sl), site: 'Caricaturas', extra: 'Danimados' });
+          r.resultados.unshift({ title: String(v.t).replace(/\xa0/g, ' '), url: 'https://danimados.cc/serie/' + sl, img: '/api/dani/poster/' + sl, site: 'Caricaturas', extra: 'Danimados' }); /* v178 */
         }
       }
       if (!r.resultados.length) return json(res, 200, { ok: true, results: [], sugiere: r.sugiere, error: 'No encontré nada — prueba con otras palabras' });

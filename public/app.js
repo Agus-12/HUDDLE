@@ -3011,6 +3011,7 @@ async function buscarGlobal(q) {
   }
 }
 function elegirResultadoBusqueda(res) {
+  const daniEx = $('#daniEx'); if (daniEx) daniEx.classList.add('hidden'); /* v178: cerrar el explorador — si no, el picker abría DEBAJO y parecía que «no salía nada» */
   cerrarBuscador(); /* al elegir, esto ya no vive arriba del feed */
   $('#homeSearch').value = ''; /* v122: elegiste algo — no queda texto colgado */
   $('#spInput').value = '';
