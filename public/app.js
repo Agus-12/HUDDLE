@@ -1461,7 +1461,8 @@ function imgPorProxy(src) {
 }
 function abrirSeriePicker(res, enSala, esAnime, esGp) {
   const esNv = /novelas360\.com\/categories\//i.test(res.url || ''); /* v206 */
-  const slugM = esGp ? (/series\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esNv ? (/categories\/([a-z0-9-]+)/i.exec(res.url || '') || []) : (/(?:serie|anime)\/([a-z0-9-]+)/i.exec(res.url || '') || []);
+  const esEnp = /enpantallatv\.com\//i.test(res.url || ''); /* v206.2 */
+  const slugM = esGp ? (/series\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esNv ? (/categories\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esEnp ? (/enpantallatv\.com\/([a-z0-9-]+)/i.exec(res.url || '') || []) : (/(?:serie|anime)\/([a-z0-9-]+)/i.exec(res.url || '') || []);
   if (!slugM || !slugM[1]) { toast('No pude leer esa serie'); return; }
   const slug = slugM[1];
   const esLat = /latanime\./i.test(res.url || ''); /* v63: anime de Latanime */
@@ -1474,7 +1475,7 @@ function abrirSeriePicker(res, enSala, esAnime, esGp) {
   if (poster0) { po.src = poster0; po.style.display = ''; } else po.style.display = 'none';
   $('#spTemporadas').innerHTML = '';
   $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">Buscando episodios…</div>';
-  fetch((esGp ? '/api/gopelis/' + slug : esNv ? '/api/novelas/' + slug : esAnime ? ('/api/anime/' + slug + (esLat ? '?site=latanime' : '')) : '/api/serie/' + slug)).then((r) => r.json()).then((d) => { /* v206 */
+  fetch((esGp ? '/api/gopelis/' + slug : esEnp ? '/api/enp/' + slug : esNv ? '/api/novelas/' + slug : esAnime ? ('/api/anime/' + slug + (esLat ? '?site=latanime' : '')) : '/api/serie/' + slug)).then((r) => r.json()).then((d) => { /* v206 + v206.2 */
     /* v62: animes → una sola lista de episodios, sin miniaturas */
     const eps = esAnime
       ? (d.episodios || []).map((e) => ({ temporada: 1, ep: e.n, url: e.url, titulo: e.titulo || ('Episodio ' + e.n), img: '' }))
@@ -1763,6 +1764,7 @@ function elegirTitulo(res, enSala) {
   if (/\/anime\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, true); return true; }
   if (/miscaricaturas\.com\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v102 */
   if (/novelas360\.com\/categories\//i.test(res.url || '')) { abrirSeriePicker(res, enSala); return true; } /* v206: novelas */
+  if (/enpantallatv\.com\//i.test(res.url || '')) { abrirSeriePicker(res, enSala); return true; } /* v206.2: EnPantallaTV */
   return false;
 }
 
