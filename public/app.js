@@ -3942,11 +3942,17 @@ async function cargarPopulares() {
       wrapL.classList.remove('hidden');
     }
     /* v205: ¿el server arrancó en frío y todavía no tiene caricaturas/
-     * cartoons/live? Se llena por detrás — un solo reintento a los 45 s */
-    if (!(d.caricaturas || []).length && !(d.cartoons || []).length && !(d.liveaction || []).length && !S.carisReintento) {
-      S.carisReintento = true;
-      setTimeout(() => { delete wrap.dataset.cargado; cargarPopulares(); }, 45000);
-    }
+     * cartoons/live? Se llenan por detrás — v205.4: reintento cada 60 s
+     * hasta que aparezcan (antes era un solo intento y a veces se quedaba
+     * corto tras un reinicio del server) */
+    if (!(d.caricaturas || []).length && !(d.cartoons || []).length && !(d.liveaction || []).length) {
+      if (!S.carisIntentos) S.carisIntentos = 0;
+      if (S.carisIntentos < 10) {
+        S.carisIntentos++;
+        delete wrap.dataset.cargado;
+        setTimeout(cargarPopulares, 60000);
+      }
+    } else { S.carisIntentos = 0; }
     /* v101: filas de GÉNERO — seis secciones que rotan cada día; cada una
      * con su ícono y color, y las mismas tarjetas que todo el feed */
     const wrapG = document.querySelector('#generosBox');

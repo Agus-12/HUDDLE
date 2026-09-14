@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v205'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v205.4'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -4378,7 +4378,10 @@ try {
   for (const [k, v] of cacheLeer('postersSeries') || []) postersSeries.set(k, v);
   const ch = cacheLeer('cariHome');
   if (ch && ch.at) { cariHome.at = ch.at; for (const [k, v] of (ch.items || [])) cariHome.items.set(k, v); }
-  const cf = cacheLeer('cariFeed');
+  let cf = cacheLeer('cariFeed');
+  if (!cf) { /* v205.4: un caché guardado por otra versión VALE si trae la forma correcta — las filas de caricaturas/cartoons/live aparecen al instante tras actualizar o reiniciar */
+    try { const dc = JSON.parse(fs.readFileSync(path.join(CACHE_DIR, 'cariFeed.json'), 'utf8')); if (dc && dc.e && dc.e.at) cf = dc.e; } catch {}
+  }
   if (cf && cf.at) { cariFeedCache.at = cf.at; cariFeedCache.items = Array.isArray(cf.items) ? cf.items : []; cariFeedCache.toons = Array.isArray(cf.toons) ? cf.toons : []; cariFeedCache.live = Array.isArray(cf.live) ? cf.live : []; }
   const nCari = cariDatos.size, nSerie = serieCache.size;
   if (nCari || nSerie) console.log('[cache] del disco: ' + nCari + ' caricaturas, ' + nSerie + ' series/animes, ' + cariMeta.size + ' metas' + (cariFeedCache.items.length ? ', feed listo' : ''));
@@ -8356,13 +8359,13 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, rooms: list, srvVersion: UI_VERSION });
     }
     if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION, introCrawl: { pend: CRAWL.pend.length, hechas: CRAWL.hechas || 0, total: CRAWL.total || 0 }, laMuertas: LA_MUERTAS_SET.size, gpOcultas: GP_OCULTAS_SET.size, pxdOcultas: PXD_OCULTAS.size, afOcultas: AF_OCULTAS.size }); /* v122+190+v205.2 */
-    if (url.pathname === '/api/intros') { /* v205.3: ¿cómo van las intros? — abrible en el navegador */
+    if (url.pathname === '/api/intros') { /* v205.3: estado del rastreador — v205.4: en navegador pinta el PANEL; ?json=1 o curl → JSON */
       const SITIOS = { dani: 'Caricaturas', mm: 'Caricaturas', lct: 'Cartoons', la: 'Anime', af: 'AnimeFLV', cv: 'Cuevana' };
       const muestra = Object.entries(INTROS).slice(0, 40).map(([k, v]) => {
         const p = k.split(':');
         return { sitio: SITIOS[p[0]] || p[0], serie: (p[1] || '').replace(/-/g, ' ').replace(/\b[a-z]/g, (c) => c.toUpperCase()).slice(0, 40), temporada: p[2] || '?', inicio: v.start, fin: v.end, via: v.by || 'auto' };
       });
-      return json(res, 200, {
+      const datos = {
         ok: true,
         episodiosAnalizados: CRAWL.hechas || 0,
         episodiosPorAnalizar: CRAWL.total || 0,
@@ -8370,6 +8373,28 @@ const server = http.createServer(async (req, res) => {
         introsAprendidas: Object.keys(INTROS).length,
         seriesSinIntro: (CRAWL.sinIntro || []).length,
         muestra,
+      };
+      if (!/text\/html/i.test(req.headers.accept || '') || url.searchParams.get('json') === '1') return json(res, 200, datos);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(panelHtml());
+    }
+    if (url.pathname === '/api/estado') { /* v205.4: todo el estado en un JSON para el panel */
+      const SITIOS2 = { dani: 'Caricaturas', mm: 'Caricaturas', lct: 'Cartoons', la: 'Anime', af: 'AnimeFLV', cv: 'Cuevana' };
+      const muestra = Object.entries(INTROS).slice(0, 60).map(([k, v]) => {
+        const p = k.split(':');
+        return { sitio: SITIOS2[p[0]] || p[0], serie: (p[1] || '').replace(/-/g, ' ').replace(/\b[a-z]/g, (c) => c.toUpperCase()).slice(0, 40), temporada: p[2] || '?', inicio: v.start, fin: v.end };
+      });
+      const mem = process.memoryUsage();
+      return json(res, 200, {
+        ok: true,
+        version: UI_VERSION,
+        encendidoHace: Math.floor(process.uptime()),
+        memoriaMb: Math.round(mem.rss / 1048576),
+        salasActivas: rooms.size,
+        usuarios: users.size,
+        intros: { analizados: CRAWL.hechas || 0, total: CRAWL.total || 0, enCola: CRAWL.pend.length, aprendidas: Object.keys(INTROS).length, sinIntro: (CRAWL.sinIntro || []).length, muestra },
+        moderacion: { animesMuertos: LA_MUERTAS_SET.size, animesCastDup: LA_OCULTAS_SET.size, gopelis: GP_OCULTAS_SET.size, pelisxd: PXD_OCULTAS.size, animeflv: AF_OCULTAS.size, cuevana: CV_OCULTAS_RT.size, protegidas: CV_PROTEGIDAS.size },
+        catalogos: { caricaturas: cariFeedCache.items.length, cartoons: cariFeedCache.toons.length, liveaction: cariFeedCache.live.length, danimados: DANI_CAT.size, animes: LA_TODOS.size },
       });
     }
     return serveStatic(req, res, url.pathname);
@@ -8582,6 +8607,115 @@ if (!CRAWL.lista || CRAWL.v !== 2) { /* v202: la cola vieja venía con la pagina
 process.on('uncaughtException', (e) => console.error('[error-no-fatal]', String(e && e.stack || e).slice(0, 300)));
 process.on('unhandledRejection', (e) => console.error('[promesa-rechazada]', String(e && e.stack || e).slice(0, 300)));
 
+/* v205.4: PANEL DE ESTADO — página administrativa servida en /api/intros.
+ * Todo inline (sin recursos externos), se refresca solo cada 10 s. */
+function panelHtml() {
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Huddle — Panel de estado</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0d0b14; color: #efeaf7; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; padding: 18px 14px 30px; }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 20px; display: flex; align-items: center; gap: 9px; }
+  h1 .punto { width: 9px; height: 9px; border-radius: 50%; background: #38e08a; box-shadow: 0 0 8px #38e08a; }
+  h1 .ver { font-size: 11px; color: #9d93b5; font-weight: 400; margin-left: auto; }
+  .sub { color: #9d93b5; font-size: 12px; margin: 4px 0 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .card { background: #17131f; border: 1px solid #2a2338; border-radius: 14px; padding: 14px; }
+  .card .n { font-size: 24px; font-weight: 800; }
+  .card .t { color: #9d93b5; font-size: 11px; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.6px; }
+  h2 { font-size: 13px; color: #b8aed0; margin: 20px 0 10px; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 7px; }
+  h2 svg { flex: none; }
+  .barra { background: #241d31; border-radius: 99px; height: 14px; overflow: hidden; margin: 6px 0 6px; }
+  .barra i { display: block; height: 100%; background: linear-gradient(90deg, #8a5cf6, #38e08a); border-radius: 99px; transition: width 0.6s; }
+  .barra-txt { display: flex; justify-content: space-between; color: #9d93b5; font-size: 12px; margin-bottom: 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { background: #17131f; border: 1px solid #2a2338; border-radius: 99px; padding: 7px 13px; font-size: 13px; }
+  .chip b { font-weight: 800; }
+  .chip.ok b { color: #38e08a; } .chip.warn b { color: #ffb020; } .chip.bad b { color: #ff5c7a; }
+  table { width: 100%; border-collapse: collapse; background: #17131f; border-radius: 14px; overflow: hidden; font-size: 13px; }
+  th { text-align: left; color: #9d93b5; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 9px 12px; border-bottom: 1px solid #2a2338; }
+  td { padding: 9px 12px; border-bottom: 1px solid #221c2e; }
+  tr:last-child td { border-bottom: 0; }
+  .pie { color: #9d93b5; font-size: 11px; text-align: center; margin-top: 22px; }
+  @media (max-width: 480px) { td, th { padding: 7px 8px; } .card .n { font-size: 20px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span class="punto"></span> Huddle — Panel de estado <span class="ver" id="ver"></span></h1>
+  <p class="sub">Se actualiza solo cada 10 segundos</p>
+
+  <div class="grid" id="cards"></div>
+
+  <h2><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38e08a" stroke-width="2" stroke-linecap="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/></svg> Rastreador de intros</h2>
+  <div class="card">
+    <div class="barra"><i id="introBarra" style="width:0%"></i></div>
+    <div class="barra-txt"><span id="introTxt"></span><span id="introPct"></span></div>
+    <div class="chips" id="introChips"></div>
+  </div>
+
+  <h2><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffb020" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Moderación automática (títulos ocultados)</h2>
+  <div class="chips" id="modChips"></div>
+
+  <h2><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8a5cf6" stroke-width="2" stroke-linecap="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="m17 2-5 5-5-5"/></svg> Catálogos vivos</h2>
+  <div class="chips" id="catChips"></div>
+
+  <h2><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 7v5l3 2"/></svg> Intros aprendidas</h2>
+  <table id="introTabla"><thead><tr><th>Sitio</th><th>Serie</th><th>Temp.</th><th>Segundos</th></tr></thead><tbody></tbody></table>
+
+  <p class="pie" id="pie">conectando…</p>
+</div>
+<script>
+  function fmtSeg(s) {
+    const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+    return (d ? d + 'd ' : '') + (h ? h + 'h ' : '') + m + 'm';
+  }
+  function chip(clase, txt, n) { return '<span class="chip ' + clase + '">' + txt + ' <b>' + n + '</b></span>'; }
+  function pintar(d) {
+    document.getElementById('ver').textContent = d.version;
+    document.getElementById('cards').innerHTML =
+      '<div class="card"><div class="n">' + fmtSeg(d.encendidoHace) + '</div><div class="t">Encendido</div></div>' +
+      '<div class="card"><div class="n">' + d.memoriaMb + ' MB</div><div class="t">Memoria</div></div>' +
+      '<div class="card"><div class="n">' + d.salasActivas + '</div><div class="t">Salas activas</div></div>' +
+      '<div class="card"><div class="n">' + d.usuarios + '</div><div class="t">Usuarios</div></div>';
+    const ii = d.intros;
+    const pct = ii.total ? Math.round(ii.analizados * 100 / ii.total) : 0;
+    document.getElementById('introBarra').style.width = pct + '%';
+    document.getElementById('introTxt').textContent = ii.analizados.toLocaleString('es') + ' de ' + ii.total.toLocaleString('es') + ' episodios';
+    document.getElementById('introPct').textContent = pct + '%';
+    document.getElementById('introChips').innerHTML =
+      chip('ok', 'Intros aprendidas', ii.aprendidas) + chip('warn', 'Series sin intro', ii.sinIntro) + chip('', 'En cola', ii.enCola);
+    const mo = d.moderacion;
+    document.getElementById('modChips').innerHTML =
+      chip('bad', 'Animes muertos', mo.animesMuertos) + chip('warn', 'Animes cast/dup', mo.animesCastDup) +
+      chip('bad', 'GoPelis', mo.gopelis) + chip('bad', 'PelisXD', mo.pelisxd) + chip('bad', 'AnimeFLV', mo.animeflv) +
+      chip('bad', 'Cuevana', mo.cuevana) + chip('ok', 'Protegidas', mo.protegidas);
+    const ca = d.catalogos;
+    document.getElementById('catChips').innerHTML =
+      chip('', 'Caricaturas', ca.caricaturas) + chip('', 'Cartoons', ca.cartoons) + chip('', 'Live Action', ca.liveaction) +
+      chip('', 'Danimados', ca.danimados) + chip('', 'Animes latanime', ca.animes);
+    const tb = document.querySelector('#introTabla tbody');
+    tb.innerHTML = (ii.muestra || []).map(function (m) {
+      return '<tr><td>' + m.sitio + '</td><td>' + m.serie + '</td><td>T' + m.temporada + '</td><td>' + m.inicio + ' → ' + m.fin + '</td></tr>';
+    }).join('') || '<tr><td colspan="4">Aún no hay intros aprendidas</td></tr>';
+    document.getElementById('pie').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es');
+  }
+  function tic() {
+    fetch('/api/estado').then(function (r) { return r.json(); }).then(pintar).catch(function () {
+      document.getElementById('pie').textContent = 'sin conexión con el server — reintentando…';
+    });
+  }
+  tic();
+  setInterval(tic, 10000);
+</script>
+</body>
+</html>`;
+}
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🎬 Huddle corriendo en http://0.0.0.0:${PORT}`);
 });
