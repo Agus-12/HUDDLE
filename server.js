@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v202'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v203'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -378,6 +378,78 @@ let DANI_CAT = new Map();
 const LA_TODOS = new Set(), LA_OCULTAS_SET = new Set(); /* v198 */
 const LA_MUERTAS_SET = new Set(); /* v200: auditadas con video caído */
 const GP_OCULTAS_SET = new Set(); /* v200: gopelis sin servidores vivos */
+/* v203: PODREDUMBRE — mp4upload borra archivos a diario (Akame ga Kill
+ * murió en vivo en una sesión). 3 fallos espaciados ≥10 min → se oculta
+ * sola. Revisión cada 6 h de las ocultadas con <7 días: si reviven, vuelven. */
+const LA_FALLOS = new Map(); /* slug → { f, last, h } */
+try { for (const [k3, v3] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'la-fallos.json'), 'utf8')) || {})) LA_FALLOS.set(k3, v3); } catch {}
+let laFallosTimer = null;
+function laFallosGuardar() {
+  clearTimeout(laFallosTimer);
+  laFallosTimer = setTimeout(() => { try { fs.writeFileSync(path.join(DATA_DIR, 'la-fallos.json'), JSON.stringify(Object.fromEntries(LA_FALLOS))); } catch {} }, 4000);
+}
+function laFallosRegistrar(slug) {
+  if (!slug) return;
+  const e = LA_FALLOS.get(slug) || { f: 0, last: 0, h: 0 };
+  if (Date.now() - (e.last || 0) < 10 * 60 * 1000) return; /* la misma ráfaga no cuenta como fallos nuevos */
+  e.f = (e.f || 0) + 1;
+  e.last = Date.now();
+  if (e.f >= 3 && !LA_MUERTAS_SET.has(slug)) {
+    e.h = Date.now();
+    LA_MUERTAS_SET.add(slug);
+    try { fs.writeFileSync(path.join(__dirname, 'public', 'latanime-muertas.txt'), [...LA_MUERTAS_SET].sort().join('\n') + '\n'); } catch {}
+    console.log('[podredumbre] la: ' + slug + ' ocultada tras ' + e.f + ' fallos');
+  }
+  LA_FALLOS.set(slug, e);
+  laFallosGuardar();
+}
+function laFallosPerdonar(slug) { if (slug && LA_FALLOS.delete(slug)) laFallosGuardar(); }
+async function laProbe(slug) { /* ¿vive hoy? — el camino barato (HTTP) */
+  try {
+    const r = await fetchSeguro('https://latanime.org/ver/' + slug + '-episodio-1/', 12000);
+    if (!r || !r.ok) return false;
+    const html = await r.text();
+    const links = [...html.matchAll(/<a\b[^>]*class="[^"]*play-video[^"]*"[^>]*data-player="([^"]+)"[^>]*>/gi)];
+    const embeds = links.map((m) => { try { return Buffer.from(m[1], 'base64').toString('utf8'); } catch { return ''; } }).filter((u) => /^https?:\/\//i.test(u));
+    const cands = [...new Set(embeds.filter((u) => /mp4upload\./i.test(u)))];
+    for (const emb of cands.slice(0, 2)) {
+      let em = '';
+      for (let t = 0; t < 2 && !em; t++) {
+        const e2 = await fetchSeguro(emb, 12000).catch(() => null);
+        const tx = e2 && e2.ok ? await e2.text() : '';
+        if (tx.length > 500) em = tx; else await new Promise((r2) => setTimeout(r2, 1200));
+      }
+      if (!em || /file was deleted/i.test(em)) continue;
+      const m = em.match(/player\.src\(\{\s*type:\s*["']video\/mp4["']\s*,\s*src:\s*["'](https?:\/\/[^"']+)["']/i) || em.match(/["'](https?:\/\/[^"'\s<>]*mp4upload[^"'\s<>]*\.mp4[^"'\s<>]*)["']/i);
+      if (m && await sirveElVideo(m[1], emb)) return true;
+    }
+    return false;
+  } catch { return false; }
+}
+let laReviviendo = false;
+async function laRevizar() { /* apelaciones: ocultadas hace <7 días, una a una con calma */
+  if (laReviviendo) return;
+  laReviviendo = true;
+  try {
+    const hoy = Date.now();
+    const cands = [...LA_FALLOS.entries()].filter(([k, v]) => v.h && hoy - v.h < 7 * 24 * 3600 * 1000).sort((a, b) => a[1].h - b[1].h).slice(0, 150);
+    if (cands.length) console.log('[podredumbre] revisando ' + cands.length + ' ocultadas recientes…');
+    let vivas2 = 0;
+    for (const [slug] of cands) {
+      if (await laProbe(slug)) {
+        vivas2++;
+        laMuertaQuitar(slug);
+        LA_FALLOS.delete(slug);
+        laFallosGuardar();
+        console.log('[podredumbre] la: ' + slug + ' REVIVIÓ — visible otra vez');
+      }
+      await new Promise((r2) => setTimeout(r2, 12000));
+    }
+    console.log('[podredumbre] revisión terminada: ' + vivas2 + ' revivieron de ' + cands.length);
+  } finally { laReviviendo = false; }
+}
+setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando…"); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); }, 90 * 1000);
+setInterval(() => { laRevizar().catch(() => {}); }, 6 * 3600 * 1000);
 let laRtTimer = null;
 function laMuertaQuitar(slug) { /* v202: autocuración — una «muerta» que vuelve a resolver reviva */
   if (!slug || !LA_MUERTAS_SET.has(slug)) return;
@@ -385,6 +457,7 @@ function laMuertaQuitar(slug) { /* v202: autocuración — una «muerta» que vu
   clearTimeout(laRtTimer);
   laRtTimer = setTimeout(() => { try { fs.writeFileSync(path.join(__dirname, 'public', 'latanime-muertas.txt'), [...LA_MUERTAS_SET].sort().join('\n') + '\n'); } catch {} }, 3000);
   console.log('[lázaro] la: ' + slug + ' volvió a la vida — fuera de la lista de muertas');
+  LA_FALLOS.delete(slug);
 }
 try {
   for (const [sl, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'dani-catalogo.json'), 'utf8')))) DANI_CAT.set(sl, v);
@@ -6933,15 +7006,17 @@ async function resolverAnime(epUrl) {
   const laSlugM = /latanime\.org\/ver\/([a-z0-9-]+)-episodio-\d+/i.exec(epUrl || '');
   const candidatos = [...new Set(embeds.filter((u) => /mp4upload\./i.test(u)))];
   const directo = candidatos.length ? await extraerMp4(candidatos, epUrl) : null;
-  if (directo) { if (laSlugM) laMuertaQuitar(laSlugM[1]); return directo; }
+  if (directo) { if (laSlugM) { laMuertaQuitar(laSlugM[1]); laFallosPerdonar(laSlugM[1]); } return directo; }
   /* v93: mp4upload agotado (borrado, como le pasó a Evangelion) → que
    * el navegador del servidor lo resuelva UNA vez y todos lo ven nativo.
    * v201: TAMBIÉN cuando el episodio no trae mp4upload (sus players son
    * otros y el navegador sabe sacarles el video) — así resucitan series
    * que por HTTP puro parecían muertas */
   const nat = await resolverAnimePorNavegador(epUrl).catch(() => null);
-  if (nat) { if (laSlugM) laMuertaQuitar(laSlugM[1]); return nat; }
+  if (nat) { if (laSlugM) { laMuertaQuitar(laSlugM[1]); laFallosPerdonar(laSlugM[1]); } return nat; }
+  if (laSlugM) laFallosRegistrar(laSlugM[1]);
   if (!candidatos.length) throw new Error('Este episodio no tiene servidores que Huddle pueda abrir — se ocultó del catálogo');
+  if (laSlugM) laFallosRegistrar(laSlugM[1]);
   throw new Error('Los servidores de este episodio están caídos en Latanime (probé todos, hasta con navegador). Prueba otra versión del anime o más tarde');
 }
 /* v97: episodio de AnimeFLV — la página trae el id en data-encrypt
