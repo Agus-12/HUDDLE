@@ -8356,6 +8356,22 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, rooms: list, srvVersion: UI_VERSION });
     }
     if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION, introCrawl: { pend: CRAWL.pend.length, hechas: CRAWL.hechas || 0, total: CRAWL.total || 0 }, laMuertas: LA_MUERTAS_SET.size, gpOcultas: GP_OCULTAS_SET.size, pxdOcultas: PXD_OCULTAS.size, afOcultas: AF_OCULTAS.size }); /* v122+190+v205.2 */
+    if (url.pathname === '/api/intros') { /* v205.3: ¿cómo van las intros? — abrible en el navegador */
+      const SITIOS = { dani: 'Caricaturas', mm: 'Caricaturas', lct: 'Cartoons', la: 'Anime', af: 'AnimeFLV', cv: 'Cuevana' };
+      const muestra = Object.entries(INTROS).slice(0, 40).map(([k, v]) => {
+        const p = k.split(':');
+        return { sitio: SITIOS[p[0]] || p[0], serie: (p[1] || '').replace(/-/g, ' ').replace(/\b[a-z]/g, (c) => c.toUpperCase()).slice(0, 40), temporada: p[2] || '?', inicio: v.start, fin: v.end, via: v.by || 'auto' };
+      });
+      return json(res, 200, {
+        ok: true,
+        episodiosAnalizados: CRAWL.hechas || 0,
+        episodiosPorAnalizar: CRAWL.total || 0,
+        enCola: CRAWL.pend.length,
+        introsAprendidas: Object.keys(INTROS).length,
+        seriesSinIntro: (CRAWL.sinIntro || []).length,
+        muestra,
+      });
+    }
     return serveStatic(req, res, url.pathname);
   } catch (e) {
     console.error(e);
