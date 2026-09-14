@@ -3699,7 +3699,15 @@ async function pelisxdMeta(slug) {
        * payload (v_source base64, embed listeamed). Sin esto TODO parecía
        * caído y el resolutor rechazaba todas las pelis. */
       const alive = />Opción 1<\/button>/.test(html) || /v_source\\":\\"[A-Za-z0-9=+\/]{30,}/.test(html);
-      return { title: title || slug, poster: og('og:image') || '', year, alive };
+      /* v204.4: dominio del embed — listeamed rechaza IPs de servidor
+       * (cáscara en blanco); detectarlo aquí permite fallar en 2 s y no en 90 */
+      /* v204.4: dominio del embed — listeamed rechaza IPs de servidor
+       * (cáscara en blanco); detectarlo aquí permite fallar en ~5 s y no en 90 */
+      const vm = new RegExp('v_source[^A-Za-z0-9]{0,12}([A-Za-z0-9+/=]{24,})').exec(html);
+      let dom = '';
+      if (vm) { try { dom = (new URL(Buffer.from(vm[1], 'base64').toString('utf8'))).hostname; } catch {} }
+      console.log('[pxd-meta] ' + slug + ' alive=' + alive + ' dom=' + (dom || '—'));
+      return { title: title || slug, poster: og('og:image') || '', year, alive, dom };
     } catch { return null; }
   })();
   if (d) pelisxdMetaCache.set(slug, { at: Date.now(), d });
@@ -3861,6 +3869,7 @@ async function resolverPelisxd(pageUrl) {
   /* 1) ¿tiene enlaces vivos? (falla rápido, sin abrir navegador) */
   const m = await pelisxdMeta(slug);
   if (m && !m.alive) throw new Error('Esta peli tiene los enlaces caídos en PelisXD');
+  if (m && /listeamed/i.test(m.dom || '')) throw new Error('Esta peli usa un reproductor no disponible para Huddle — prueba otra fuente'); /* v204.4 */
   /* 2) el navegador resuelve el challenge y captura el playlist (~20 s la primera vez) */
   const cap = await extraerStreamwishPeli('https://www.pelisxd.com/pelicula/' + slug);
   const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
