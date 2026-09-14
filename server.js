@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v201'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v202'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -378,6 +378,14 @@ let DANI_CAT = new Map();
 const LA_TODOS = new Set(), LA_OCULTAS_SET = new Set(); /* v198 */
 const LA_MUERTAS_SET = new Set(); /* v200: auditadas con video caído */
 const GP_OCULTAS_SET = new Set(); /* v200: gopelis sin servidores vivos */
+let laRtTimer = null;
+function laMuertaQuitar(slug) { /* v202: autocuración — una «muerta» que vuelve a resolver reviva */
+  if (!slug || !LA_MUERTAS_SET.has(slug)) return;
+  LA_MUERTAS_SET.delete(slug);
+  clearTimeout(laRtTimer);
+  laRtTimer = setTimeout(() => { try { fs.writeFileSync(path.join(__dirname, 'public', 'latanime-muertas.txt'), [...LA_MUERTAS_SET].sort().join('\n') + '\n'); } catch {} }, 3000);
+  console.log('[lázaro] la: ' + slug + ' volvió a la vida — fuera de la lista de muertas');
+}
 try {
   for (const [sl, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'dani-catalogo.json'), 'utf8')))) DANI_CAT.set(sl, v);
   /* v198: auditoría LATANIME — 3,453 series; se OCULTAN las castellanas y los
@@ -642,8 +650,46 @@ async function resolverGopelis(epUrl) {
     throw new Error('GoPelis: ningún servidor vive para este título');
   }
   gpStream.set(kk, { at: Date.now(), m3u8: ganador });
+  try { const key = GP_ID_REV.get(id); if (key) gpOcultaQuitar(key); } catch {} /* v202: revivió */
   return { m3u8: ganador, proxy: true, subs: [] };
 }
+
+/* v202: Lázarus de GoPelis — los nodos aletean: si una oculta vuelve a
+ * resolver, reviva. Mapa id-tmdb → clave oculta (fichas en 2º plano). */
+const GP_ID_REV = new Map();
+try {
+    const jg = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'gp-ids.json'), 'utf8')) || [];
+    const pares = Array.isArray(jg) ? jg : Object.entries(jg); /* v202.1: tolerante a objeto y a pares */
+    for (const [k2, v2] of pares) GP_ID_REV.set(k2, v2);
+  } catch {}
+let gpRtTimer = null;
+function gpOcultaQuitar(key) {
+  if (!key || !GP_OCULTAS_SET.has(key)) return;
+  GP_OCULTAS_SET.delete(key);
+  clearTimeout(gpRtTimer);
+  gpRtTimer = setTimeout(() => { try { fs.writeFileSync(path.join(__dirname, 'public', 'gopelis-ocultas.txt'), [...GP_OCULTAS_SET].sort().join('\n') + '\n'); } catch {} }, 3000);
+  console.log('[lázaro] gp: ' + key + ' volvió a la vida — fuera de ocultas');
+}
+async function gpMapaIds() {
+  let nuevos = 0;
+  for (const key of [...GP_OCULTAS_SET]) {
+    if (GP_ID_REV.has(key)) continue;
+    const esPeli = key.startsWith('p:');
+    const slug = esPeli ? key.slice(2) : key;
+    try {
+      const r = await fetchSeguro(GP_BASE + (esPeli ? 'peliculas/' : 'series/') + slug, 15000);
+      if (r && r.ok) {
+        const h = await r.text();
+        const m = esPeli ? /ver\/movie\/(\d+)/.exec(h) : /ver\/tv\/(\d+)/.exec(h);
+        if (m) { GP_ID_REV.set(m[1], key); nuevos++; }
+      }
+    } catch {}
+    await new Promise((r2) => setTimeout(r2, 2500));
+  }
+  try { fs.writeFileSync(path.join(DATA_DIR, 'gp-ids.json'), JSON.stringify([...GP_ID_REV])); } catch {}
+  console.log('[lázaro] gp: mapa de ids listo (' + GP_ID_REV.size + ' entradas, +' + nuevos + ')');
+}
+setTimeout(() => { gpMapaIds().catch(() => {}); }, 90 * 1000); /* tras arrancar, sin estorbar */
 
 /* v199: catálogo de PELÍCULAS de GoPelis (~508, 15 páginas) */
 async function gpCatalogoPelis() {
@@ -6884,16 +6930,17 @@ async function resolverAnime(epUrl) {
   const html = await fetchTexto(epUrl, 'https://latanime.org/');
   const links = [...html.matchAll(/<a\b[^>]*class="[^"]*play-video[^"]*"[^>]*data-player="([^"]+)"[^>]*>/gi)];
   const embeds = links.map((m) => { try { return Buffer.from(m[1], 'base64').toString('utf8'); } catch { return ''; } }).filter((u) => /^https?:\/\//i.test(u));
+  const laSlugM = /latanime\.org\/ver\/([a-z0-9-]+)-episodio-\d+/i.exec(epUrl || '');
   const candidatos = [...new Set(embeds.filter((u) => /mp4upload\./i.test(u)))];
   const directo = candidatos.length ? await extraerMp4(candidatos, epUrl) : null;
-  if (directo) return directo;
+  if (directo) { if (laSlugM) laMuertaQuitar(laSlugM[1]); return directo; }
   /* v93: mp4upload agotado (borrado, como le pasó a Evangelion) → que
    * el navegador del servidor lo resuelva UNA vez y todos lo ven nativo.
    * v201: TAMBIÉN cuando el episodio no trae mp4upload (sus players son
    * otros y el navegador sabe sacarles el video) — así resucitan series
    * que por HTTP puro parecían muertas */
   const nat = await resolverAnimePorNavegador(epUrl).catch(() => null);
-  if (nat) return nat;
+  if (nat) { if (laSlugM) laMuertaQuitar(laSlugM[1]); return nat; }
   if (!candidatos.length) throw new Error('Este episodio no tiene servidores que Huddle pueda abrir — se ocultó del catálogo');
   throw new Error('Los servidores de este episodio están caídos en Latanime (probé todos, hasta con navegador). Prueba otra versión del anime o más tarde');
 }
@@ -7868,7 +7915,7 @@ const server = http.createServer(async (req, res) => {
         });
       return json(res, 200, { ok: true, rooms: list, srvVersion: UI_VERSION });
     }
-    if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION, introCrawl: { pend: CRAWL.pend.length, hechas: CRAWL.hechas || 0, total: CRAWL.total || 0 } }); /* v122+190 */
+    if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION, introCrawl: { pend: CRAWL.pend.length, hechas: CRAWL.hechas || 0, total: CRAWL.total || 0 }, laMuertas: LA_MUERTAS_SET.size, gpOcultas: GP_OCULTAS_SET.size }); /* v122+190 */
     return serveStatic(req, res, url.pathname);
   } catch (e) {
     console.error(e);
@@ -7955,15 +8002,18 @@ async function crawlConstruir() {
       }
     }
   } catch {}
+  /* v202: latanime desde los ARCHIVOS locales — la paginación ?page= del
+   * sitio no funciona (repetía la página 1: la cola vieja venía con
+   * duplicados) y así tampoco rastreamos ocultas ni muertas */
   try {
-    for (let p = 1; p <= 90; p++) {
-      const r = await fetchSeguro('https://latanime.org/animes?page=' + p, 12000).catch(() => null);
-      if (!r || !r.ok) break;
-      const txt = await r.text();
-      const ls = [...new Set([...txt.matchAll(/href="https:\/\/latanime\.org\/anime\/([a-z0-9-]+)"/g)].map((x) => x[1]))];
-      for (const sl of ls) items.push({ u: 'la:' + sl });
-      if (ls.length < 20) break; /* última página */
+    for (const sl of LA_TODOS) {
+      if (LA_OCULTAS_SET.has(sl) || LA_MUERTAS_SET.has(sl)) continue;
+      items.push({ u: 'la:' + sl });
     }
+  } catch {}
+  /* v202: AnimeFLV EXCLUSIVAS (las que latanime cubre no se ven por af) */
+  try {
+    for (const sl of fs.readFileSync(path.join(__dirname, 'public', 'animeflv-slugs.txt'), 'utf8').split('\n')) if (sl.trim()) items.push({ u: 'af:' + sl.trim() });
   } catch {}
   try { for (const sl of cariDatos.keys()) items.push({ u: 'mm:' + sl }); } catch {}
   try { for (const x of LCT_SERIES.values()) items.push({ u: 'lct:' + x.slug }); } catch {}
@@ -7981,6 +8031,27 @@ async function crawlItemUrl(it) {
     return t1.url || null;
   }
   if (t === 'la') return 'https://latanime.org/ver/' + sl + '-episodio-1/';
+  if (t === 'af') {
+    /* v202.2: checa que el episodio tenga mp4upload ANTES de encolar la
+     * detección — si no, el ítem giraría en la cola para siempre */
+    return (async () => {
+      try {
+        const pu = 'https://vww.animeflv.one/ver/' + sl + '-1';
+        const html = await fetchTexto(pu, 'https://vww.animeflv.one/');
+        const enc = (/class="opt"[^>]*data-encrypt="([0-9a-f]+)"/i.exec(html) || [])[1];
+        if (!enc) return null;
+        const ctl2 = new AbortController();
+        const t2 = setTimeout(() => ctl2.abort(), 12000);
+        let cuerpo = '';
+        try {
+          const r2 = await fetch('https://vww.animeflv.one/flv', { method: 'POST', headers: { 'User-Agent': MIRROR_UA, Referer: pu, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest', 'Accept-Language': 'es-MX,es;q=0.9,en;q=0.6' }, body: 'acc=opt&i=' + enc, signal: ctl2.signal, redirect: 'follow' });
+          cuerpo = await r2.text();
+        } catch { return null; } finally { clearTimeout(t2); }
+        const hay = [...cuerpo.matchAll(/<li[^>]*encrypt="([0-9a-f]+)"/gi)].some((m2) => { try { return /mp4upload\./i.test(Buffer.from(m2[1], 'hex').toString('utf8')); } catch { return false; } });
+        return hay ? pu : null;
+      } catch { return null; }
+    })();
+  }
   if (t === 'mm') {
     const d = await datosCaricatura(sl).catch(() => null);
     return d && d.episodios && d.episodios[0] ? d.episodios[0].url : null;
@@ -8028,10 +8099,10 @@ async function crawlTick() {
   } catch {} finally { crawlOcupado = false; }
 }
 setInterval(() => { crawlTick().catch(() => {}); }, 25000);
-if (!CRAWL.lista) {
+if (!CRAWL.lista || CRAWL.v !== 2) { /* v202: la cola vieja venía con la paginación rota de latanime y sin animeflv */
   (async () => {
     const items = await crawlConstruir().catch(() => []);
-    CRAWL.pend = items; CRAWL.total = items.length; CRAWL.lista = true;
+    CRAWL.pend = items; CRAWL.total = items.length; CRAWL.lista = true; CRAWL.v = 2;
     crawlGuardar();
     console.log('[intro-crawl] cola lista: ' + items.length + ' series por rastrear (una vez cada una — solo cuando nadie está viendo)');
   })();
