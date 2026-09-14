@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v204'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v205'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -3539,22 +3539,33 @@ function generosDelDia() {
     .slice(0, 6)
     .map((x) => x.g);
 }
-async function peliculasPorGenero(slug) {
+/* v205: SOLO películas en las filas/género de pelis (las series tienen su
+ * área) + pag para el catálogo «Ver todo» (cine-calidad pagina de verdad) */
+const mapearGenero = (posts) => (posts || []).filter((p) => p.type !== 'serie').map((p) => ({
+  title: String(p.title || ''),
+  url: `https://cine-calidad.mx/pelicula/${p.slug}/`,
+  img: String(p.featured_image || '').replace('/w780/', '/w342/'),
+  site: 'Cuevana',
+  extra: [
+    String(p.date || '').slice(0, 4),
+    p.rating ? `★ ${(+p.rating).toFixed(1)}` : '',
+  ].filter(Boolean).join(' · '),
+})).filter((x) => x.title && x.img);
+async function generoPagina(slug, pag) {
+  const r = await fetchSeguro(`https://cine-calidad.mx/wp-json/mycustom/v1/list-posts?category=${slug}&page=${pag}`, 10000);
+  if (!r.ok) return { items: [], mas: false };
+  const d = await r.json().catch(() => ({}));
+  const posts = d.posts || [];
+  return { items: mapearGenero(posts), mas: posts.length >= 20 }; /* v205: mas del tamaño crudo */
+}
+async function peliculasPorGenero(slug, pag) {
+  if (pag > 1) { /* v205: páginas del catálogo — directas, sin caché */
+    return (await generoPagina(slug, pag)).items.slice(0, 20);
+  }
   const c = generosCache.get(slug);
   if (c && Date.now() - c.at < 60 * 60 * 1000 && c.items.length) return c.items;
-  const r = await fetchSeguro(`https://cine-calidad.mx/wp-json/mycustom/v1/list-posts?category=${slug}&page=1`, 10000);
-  if (!r.ok) return [];
-  const d = await r.json().catch(() => ({}));
-  const items = (d.posts || []).slice(0, 18).map((p) => ({
-    title: String(p.title || ''),
-    url: p.type === 'serie' ? `https://cine-calidad.mx/serie/${p.slug}` : `https://cine-calidad.mx/pelicula/${p.slug}/`,
-    img: String(p.featured_image || '').replace('/w780/', '/w342/'),
-    site: 'Cuevana',
-    extra: [
-      String(p.date || '').slice(0, 4),
-      p.rating ? `★ ${(+p.rating).toFixed(1)}` : '',
-    ].filter(Boolean).join(' · '),
-  })).filter((x) => x.title && x.img);
+  const g = await generoPagina(slug, 1);
+  const items = g.items.slice(0, 18);
   if (items.length) generosCache.set(slug, { at: Date.now(), items });
   return items;
 }
@@ -3893,7 +3904,7 @@ async function resolverPelisxd(pageUrl) {
 const CARI_BASE = 'https://miscaricaturas.com/';
 const cariMeta = new Map();   /* slug → {at, titulo, poster} — 6 h */
 const cariDatos = new Map();  /* slug → {at, d} — 30 min */
-const cariFeedCache = { at: 0, items: [], toons: [] }; /* 1 h — v119: items=MisCaricaturas, toons=Lacartoons (Cartoons) */
+const cariFeedCache = { at: 0, items: [], toons: [], live: [] }; /* 1 h — v119: items=MisCaricaturas, toons=Lacartoons (Cartoons); v205: live=Live Action */
 /* v112: LACARTOONS (lacartoons.com) — fuente nueva de series clásicas.
  * Aporta lo que MisCaricaturas no tiene: las temporadas 1-5 de Billy y
  * Mandy en LATINO (allí solo la T6 está doblada) e iCarly y Drake & Josh
@@ -4220,7 +4231,7 @@ try {
   const ch = cacheLeer('cariHome');
   if (ch && ch.at) { cariHome.at = ch.at; for (const [k, v] of (ch.items || [])) cariHome.items.set(k, v); }
   const cf = cacheLeer('cariFeed');
-  if (cf && cf.at) { cariFeedCache.at = cf.at; cariFeedCache.items = Array.isArray(cf.items) ? cf.items : []; cariFeedCache.toons = Array.isArray(cf.toons) ? cf.toons : []; }
+  if (cf && cf.at) { cariFeedCache.at = cf.at; cariFeedCache.items = Array.isArray(cf.items) ? cf.items : []; cariFeedCache.toons = Array.isArray(cf.toons) ? cf.toons : []; cariFeedCache.live = Array.isArray(cf.live) ? cf.live : []; }
   const nCari = cariDatos.size, nSerie = serieCache.size;
   if (nCari || nSerie) console.log('[cache] del disco: ' + nCari + ' caricaturas, ' + nSerie + ' series/animes, ' + cariMeta.size + ' metas' + (cariFeedCache.items.length ? ', feed listo' : ''));
 } catch {}
@@ -4535,6 +4546,15 @@ async function buscarMiscaricaturas(q) {
 /* v104: la fila de Caricaturas — las clásicas primero y con portada de
  * verdad: portada curada local → póster de la página de la serie → la
  * miniatura de la home. Nunca más banners del widget de relacionados */
+/* v205: series LIVE ACTION (actores reales) — iCarly, Drake & Josh, sitcoms
+ * de Nickelodeon (Clarissa, Ned, Isa TKM, Los Munsters, Hechizada, Mi Bella
+ * Genio, Super Agente 86, Familia Addams, Anubis…), Power Rangers (TODAS
+ * las variantes, vía prefijo), VR Troopers y Los 3 Chiflados (Lacartoons)
+ * + Sabrina y Kenan y Kel (MisCaricaturas). Dejan de mezclarse en
+ * Caricaturas/Cartoons: tienen apartado propio en el feed y catálogo. */
+const CARI_LIVE = new Set(['sabrina-la-bruja-adolescente-latino', 'kenan-y-kel-latino']);
+const LCT_LIVE = new Set(['icarly', 'drake-y-josh', 'los-3-chiflados-fox-kids', 'vr-troopers-fox-kids', 'la-familia-addams-nickelodeon', 'los-munsters-nickelodeon', 'hechizada-nickelodeon', 'super-agente-86-nickelodeon', 'mi-bella-genio-nickelodeon', 'el-misterio-de-anubis-nickelodeon', 'clarissa-lo-explica-todo-nickelodeon', 'el-lagartijo-de-ned', 'isa-tkm-nickelodeon', 'isa-tk-nickelodeon']);
+const esLctLive = (slug) => LCT_LIVE.has(slug) || String(slug).indexOf('power-rangers-') === 0; /* TODAS las variantes de Power Rangers */
 const CARI_ORDEN = [
   'bob-esponja-capitulos-completos', 'hora-de-aventura-capitulos-completos', 'el-chavo-del-8-capitulos-completoss',
   'rick-y-morty-capitulos-completos', 'south-park', 'los-simpsons', 'phineas-y-ferb-capitulos-completos',
@@ -4551,29 +4571,37 @@ const CARI_ORDEN = [
   'megas-xlr-capitulos-completos', 'monstruos-de-verdad-latino', 'soy-la-comadreja-latino',
 ];
 async function caricaturasDestacadas() {
-  const listo = () => ({ caricaturas: cariFeedCache.items, cartoons: cariFeedCache.toons });
+  const listo = () => ({ caricaturas: cariFeedCache.items, cartoons: cariFeedCache.toons, liveaction: cariFeedCache.live }); /* v205: + liveaction */
   if (Date.now() - cariFeedCache.at < 60 * 60 * 1000 && (cariFeedCache.items.length || cariFeedCache.toons.length)) return listo();
   if (cariFeedCache.items.length || cariFeedCache.toons.length) { refrescarCariFeed().catch(() => {}); return listo(); } /* v111: vencido → se sirve y se refresca por detrás */
-  return await refrescarCariFeed();
+  refrescarCariFeed().catch(() => {}); /* v205: arranque en frío NO bloquea el feed — se llena por detrás (el frontend reintenta a los 45 s) */
+  return listo();
 }
 async function refrescarCariFeed() {
   const home = await cariHomeImgs();
-  if (!home.size) return cariFeedCache.items;
+  if (!home.size) return { caricaturas: cariFeedCache.items, cartoons: cariFeedCache.toons, liveaction: cariFeedCache.live };
   const enHome = [...home.keys()];
   const slugs = [
     ...CARI_ORDEN.filter((s) => home.has(s)),
     ...enHome.filter((s) => !CARI_ORDEN.includes(s) && cariEsSerie(s)),
   ].slice(0, 18); /* v107: 18 — entran Sabrina y Kenan y Kel */
-  if (!slugs.length) return cariFeedCache.items;
-  const items = (await Promise.all(slugs.map(async (slug) => {
+  if (!slugs.length) return { caricaturas: cariFeedCache.items, cartoons: cariFeedCache.toons, liveaction: cariFeedCache.live };
+  const mapearCari = async (slug) => {
     const meta = await cariMetaDe(slug).catch(() => null);
     const h = home.get(slug) || {};
     const img = CARI_PORTADAS.get(slug) || DANI_IMDB.get(slug) || (meta && (meta.cover || meta.poster)) || h.img || ''; /* v180: curada local primero */
     return {
+      slug,
       title: (meta && meta.titulo) || cariLimpia(h.alt || cariBonito(slug)),
       url: CARI_BASE + slug + '/', img, site: 'Caricaturas',
     };
-  }))).filter((x) => x.title && x.img);
+  };
+  /* v205: los live action (Sabrina, Kenan y Kel) NO van en la fila de
+   * caricaturas — tienen apartado propio */
+  const limpiar = (x) => { const { slug, ...resto } = x; return resto; };
+  const todos = (await Promise.all(slugs.map(mapearCari))).filter((x) => x.title && x.img);
+  const items = todos.filter((x) => !CARI_LIVE.has(x.slug)).map(limpiar);
+  const liveCari = todos.filter((x) => CARI_LIVE.has(x.slug)).map(limpiar);
   /* v119: apartado propio — las de LACARTOONS ya no se mezclan con las
    * de MisCaricaturas: van a "Cartoons". Son ~79 series, así que se bajan
    * en bloques de 16 en vez de todas a la vez (que no nos racione el
@@ -4581,25 +4609,29 @@ async function refrescarCariFeed() {
    * queda en cache 1 h y después se sirve al instante. */
   const lctLista = [...LCT_SERIES.values()];
   const toons = [];
+  const liveToons = []; /* v205: iCarly, Drake & Josh, Power Rangers… apartado propio */
   for (let i = 0; i < lctLista.length; i += 16) {
     const parte = await Promise.all(lctLista.slice(i, i + 16).map(async (lct) => {
       try {
         const d = await datosCaricatura(String(lct.lctId));
         if (d && d.poster && d.episodios && d.episodios.length) {
-          return { title: d.titulo, url: LCT_BASE + 'serie/' + lct.lctId, img: d.cover || d.poster, site: 'Cartoons' }; /* v120: portada de IMDb primero */
+          const it = { title: d.titulo, url: LCT_BASE + 'serie/' + lct.lctId, img: d.cover || d.poster, site: 'Cartoons' }; /* v120: portada de IMDb primero */
+          return esLctLive(lct.slug) ? { it, vivo: true } : { it, vivo: false };
         }
       } catch {}
       return null;
     }));
-    for (const it of parte) if (it) toons.push(it);
+    for (const p of parte) if (p) (p.vivo ? liveToons : toons).push(p.it);
   }
-  if (items.length || toons.length) {
+  const live = [...liveCari, ...liveToons];
+  if (items.length || toons.length || live.length) {
     cariFeedCache.at = Date.now();
     cariFeedCache.items = items;
     cariFeedCache.toons = toons;
-    cacheGuardar('cariFeed', () => ({ at: cariFeedCache.at, items: cariFeedCache.items, toons: cariFeedCache.toons }));
+    cariFeedCache.live = live;
+    cacheGuardar('cariFeed', () => ({ at: cariFeedCache.at, items: cariFeedCache.items, toons: cariFeedCache.toons, live: cariFeedCache.live }));
   } /* v111: a disco */
-  return { caricaturas: items, cartoons: toons };
+  return { caricaturas: items, cartoons: toons, liveaction: live };
 }
 
 /* episodios de una caricatura — la tabla de la página de la serie.
@@ -5178,6 +5210,83 @@ async function catalogoLocal() {
   }
   if (items.length) catalogoCache = { at: Date.now(), items };
   return items.length ? items : catalogoCache.items;
+}
+
+/* v205: CATÁLOGOS «Ver todo» — paginados para el scroll infinito del feed.
+ * pelis/series: cine-calidad paginado real (20/página) | animes: directorio
+ * de latanime (sin muertas ni ocultas) | caricaturas: MisCaricaturas
+ * completo | cartoons/liveaction: Lacartoons en memoria (live action
+ * separado) | danimados: catálogo base de caricaturas | genero-<slug>:
+ * cine-calidad SOLO películas. */
+const catCache = new Map(); /* clave → { at, items, mas } */
+async function catCv(kind, pag) {
+  const key = 'cv-' + kind + '-' + pag;
+  const c = catCache.get(key);
+  if (c && Date.now() - c.at < 30 * 60 * 1000) return c;
+  const r = await fetchSeguro('https://cine-calidad.mx/wp-json/mycustom/v1/' + kind + '?page=' + pag, 12000);
+  if (!r.ok) return { items: [], mas: false };
+  const d = await r.json().catch(() => []);
+  const arr = Array.isArray(d) ? d : (d.posts || []);
+  const mas = arr.length >= 20; /* v205: página llena del API CRUDO — el filtro de ocultas no corta el scroll */
+  const items = arr.map((p) => ({
+    title: String(p.title || ''),
+    url: kind === 'series' ? 'https://cine-calidad.mx/serie/' + p.slug : 'https://cine-calidad.mx/pelicula/' + p.slug + '/',
+    img: String(p.featured_image || '').replace('/w780/', '/w342/'),
+    site: 'Cuevana',
+    extra: [String(p.date || '').slice(0, 4), p.rating ? '★ ' + (+p.rating).toFixed(1) : ''].filter(Boolean).join(' · '),
+  })).filter((x) => x.title && !cvOcultaUrl(x.url)); /* v200: ocultas fuera */
+  const out = { items, mas };
+  if (items.length) catCache.set(key, { at: Date.now(), items, mas });
+  return out;
+}
+async function catAnimes(pag) {
+  const key = 'la-' + pag;
+  const c = catCache.get(key);
+  if (c && Date.now() - c.at < 6 * 60 * 60 * 1000) return c;
+  const r = await fetchSeguro('https://latanime.org/animes?page=1&p=' + pag, 15000);
+  if (!r.ok) return { items: [], mas: false };
+  const html = await r.text();
+  const crudos = [...html.matchAll(/<a href="(https:\/\/latanime\.org\/anime\/([a-z0-9-]+))">([\s\S]*?)<h3[^>]*>([^<]+)<\/h3>/g)];
+  const mas = crudos.length >= 24; /* v205: página llena del directorio (crudo) */
+  const items = [];
+  for (const m of crudos) {
+    if (items.length >= 24) break;
+    const slug = m[2];
+    if (LA_OCULTAS_SET.has(slug) || LA_MUERTAS_SET.has(slug)) continue; /* v198/v200: cast/dup y muertas fuera */
+    const im = /<img[^>]+class="[^"]*lozad[^"]*"[^>]+src="(https:\/\/latanime\.org\/thumbs\/[^"]+)"/.exec(m[3]); /* la visible, no la comentada */
+    const title = m[4].replace(/\s+/g, ' ').trim().replace(/\s+(latino|castellano|espa\u00f1ol|sub(?:titulado)?)\s*$/i, '').slice(0, 80);
+    if (!title) continue;
+    items.push({ title, url: m[1], img: (im && im[1]) || '', site: 'Latanime', extra: '' });
+  }
+  const out = { items, mas };
+  if (items.length) catCache.set(key, { at: Date.now(), items, mas });
+  return out;
+}
+function lctConCovers() {
+  const porUrl = new Map();
+  for (const t of cariFeedCache.toons) porUrl.set(t.url, t.img);
+  for (const t of cariFeedCache.live) porUrl.set(t.url, t.img);
+  return [...LCT_SERIES.values()].map((lct) => ({
+    _slug: lct.slug,
+    title: lct.titulo,
+    url: LCT_BASE + 'serie/' + lct.lctId,
+    img: CARI_PORTADAS.get(lct.slug) || porUrl.get(LCT_BASE + 'serie/' + lct.lctId) || '',
+    site: 'Cartoons',
+    extra: '',
+  }));
+}
+async function catCaricaturas() {
+  const c = catCache.get('cari-all');
+  if (c && Date.now() - c.at < 60 * 60 * 1000) return c.items;
+  const home = await cariHomeImgs();
+  const items = [];
+  for (const [slug, h] of home) {
+    if (!cariEsSerie(slug) || CARI_LIVE.has(slug)) continue; /* v205: live action aparte */
+    const meta = cariMeta.get(slug);
+    items.push({ title: (meta && meta.titulo) || cariLimpia(h.alt || cariBonito(slug)), url: CARI_BASE + slug + '/', img: CARI_PORTADAS.get(slug) || DANI_IMDB.get(slug) || (meta && (meta.cover || meta.poster)) || h.img || '', site: 'Caricaturas', extra: '' });
+  }
+  if (items.length) catCache.set('cari-all', { at: Date.now(), items });
+  return items;
 }
 
 async function buscarEnSitios(q) {
@@ -7429,6 +7538,7 @@ const server = http.createServer(async (req, res) => {
         ok: true, results: fCV(day), series: fCV(series), animes: fCV(animes),
         caricaturas: cari.caricaturas || [],
         cartoons: cari.cartoons || [], /* v119: apartado propio de Lacartoons */
+        liveaction: cari.liveaction || [], /* v205: iCarly, Drake & Josh, Power Rangers… */
         generos: (generos || []).map((g) => ({ slug: g.slug, nombre: g.nombre, items: fCV(g.items) })).filter((g) => g.items.length),
       });
     }
@@ -7464,6 +7574,44 @@ const server = http.createServer(async (req, res) => {
       const ini = (pag - 1) * por;
       const items = DANI_CAT_ARR.slice(ini, ini + por).map(([sl, v]) => ({ slug: sl, titulo: String(v.t).replace(/\xa0/g, ' '), poster: '/api/dani/poster/' + sl })); /* v178: todas por IMDb */
       return json(res, 200, { ok: true, total: DANI_CAT_ARR.length, pag, por, items });
+    }
+    if (url.pathname.startsWith('/api/catalogo/')) { /* v205: «Ver todo» del feed */
+      const tipo = decodeURIComponent(url.pathname.split('/')[3] || '');
+      const pag = Math.max(1, +(url.searchParams.get('pag') || 1));
+      const por = 24;
+      const trozo = (items) => {
+        const ini = (pag - 1) * por;
+        return { ok: true, pag, por, total: items.length, mas: ini + por < items.length, items: items.slice(ini, ini + por) };
+      };
+      try {
+        if (tipo === 'pelis') { const r = await catCv('movies', pag); return json(res, 200, { ok: true, pag, por: 20, items: r.items, mas: r.mas }); }
+        if (tipo === 'series') { const r = await catCv('series', pag); return json(res, 200, { ok: true, pag, por: 20, items: r.items, mas: r.mas }); }
+        if (tipo === 'animes') { const r = await catAnimes(pag); return json(res, 200, { ok: true, pag, por: 24, items: r.items, mas: r.mas }); }
+        if (tipo === 'caricaturas') return json(res, 200, trozo(await catCaricaturas()));
+        if (tipo === 'cartoons' || tipo === 'liveaction') {
+          const vivo = tipo === 'liveaction';
+          let items = lctConCovers().filter((x) => esLctLive(x._slug) === vivo);
+          if (vivo) { /* v205: + los live action de MisCaricaturas (Sabrina, Kenan y Kel) */
+            const urls = new Set(items.map((x) => x.url));
+            for (const x of cariFeedCache.live) {
+              if (urls.has(x.url)) continue;
+              items.push({ _slug: '', title: x.title, url: x.url, img: x.img, site: x.site, extra: x.extra || '' });
+            }
+          }
+          items = items.sort((a, b) => a.title.localeCompare(b.title, 'es'))
+            .map((x) => { const { _slug, ...resto } = x; return resto; });
+          return json(res, 200, trozo(items));
+        }
+        if (tipo === 'danimados') {
+          const ini = (pag - 1) * por;
+          const items = DANI_CAT_ARR.slice(ini, ini + por).map(([sl, v]) => ({ title: String(v.t).replace(/\xa0/g, ' '), url: 'https://danimados.cc/serie/' + sl, img: daniCoverDe(sl), site: 'Caricaturas', extra: '' }));
+          return json(res, 200, { ok: true, pag, por, total: DANI_CAT_ARR.length, mas: ini + por < DANI_CAT_ARR.length, items });
+        }
+        if (tipo.startsWith('genero-')) { const g = await generoPagina(tipo.slice(7), pag); return json(res, 200, { ok: true, pag, por: 20, items: g.items.slice(0, 20), mas: g.mas }); }
+        return json(res, 404, { ok: false, error: 'Catálogo desconocido' });
+      } catch {
+        return json(res, 502, { ok: false, error: 'No pude leer ese catálogo — intenta luego' });
+      }
     }
     if (url.pathname.startsWith('/api/caricaturas/')) {
       /* v102: episodios de una caricatura (para el selector) */

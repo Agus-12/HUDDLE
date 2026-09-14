@@ -1775,3 +1775,30 @@ body.sala-girada .pd-results { max-height: 50dvw; }
 .ver-tag { font-size: 10px; color: var(--dim); opacity: 0.75; vertical-align: middle; margin-left: 4px; }
 
 .ms-paginas { width: 100%; margin-top: 10px; justify-content: center; display: flex; gap: 6px; flex: none; } /* v141 */
+
+/* v205: catálogo «Ver todo» — botón en cada fila del feed + página propia
+ * con barra fija y scroll infinito (la barra vive en .sp-top-wrap, igual
+ * que el buscador: el visor scrollea por dentro y el volver nunca baja) */
+.ver-todo {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.cat-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  font-weight: 800;
+  font-size: 16px;
+  padding: 0 2px;
+}
+.cat-titulo span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cat-total { flex: none; color: var(--dim); font-size: 12px; }
+.cat-sent { height: 4px; }
+.cat-loader { display: flex; justify-content: center; padding: 14px 0; }

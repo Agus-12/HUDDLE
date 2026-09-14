@@ -1650,33 +1650,87 @@ function cerrarSeriePicker() { $('#seriePicker').classList.add('hidden'); }
 $('#spClose').addEventListener('click', cerrarSeriePicker);
 $('#seriePicker').addEventListener('click', (e) => { if (e.target === e.currentTarget) cerrarSeriePicker(); });
 
-/* v177: explorador de TODAS las series de danimados (823) — grilla paginada;
- * tocar una tarjeta abre el MISMO picker de siempre (danimados → caricaturas) */
-let daniExPag = 0;
-const daniExItems = []; /* v177: acumulado — renderResultados limpia el box, «Cargar más» re-renderiza TODO lo visto */
-function abrirDaniEx() {
-  daniExPag = 0;
-  daniExItems.length = 0;
-  $('#daniExGrid').innerHTML = '<div class="sp-meta" style="grid-column:1/-1;text-align:center;padding:20px 0">Cargando series…</div>';
-  $('#daniExTotal').textContent = '…';
-  $('#daniEx').classList.remove('hidden');
-  cargarDaniExPag();
+/* v205: CATÁLOGO «Ver todo» — página propia por tipo (animes, pelis,
+ * series, caricaturas, cartoons, live action, géneros). Como el buscador:
+ * cubre el feed con barra fija arriba y botón de volver; los títulos
+ * cargan SOLOS mientras bajas (scroll infinito, sin botones «ver más»). */
+const CATALOGOS = {
+  animes: { titulo: 'Animes', color: 'var(--pink)', d: '<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/>' },
+  pelis: { titulo: 'Películas', color: 'var(--amber)', d: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 4v16M17 4v16M2 9h20M2 15h20"/>' },
+  series: { titulo: 'Series', color: 'var(--violet)', d: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="m17 2-5 5-5-5"/>' },
+  caricaturas: { titulo: 'Caricaturas', color: 'var(--cyan)', d: '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/>' },
+  cartoons: { titulo: 'Cartoons', color: 'var(--amber)', d: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>' },
+  liveaction: { titulo: 'Live Action', color: 'var(--green)', d: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
+  danimados: { titulo: 'Caricaturas', color: 'var(--cyan)', d: '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/>' },
+};
+let catEstado = null; /* {tipo, nombre, pag, por, hayMas, cargando} */
+const SVG_CAT = (d, color) => `<svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:${color};">${d}</svg>`;
+
+function abrirCatalogo(tipo, nombre) {
+  const esGenero = String(tipo || '').startsWith('genero:');
+  const conf = esGenero
+    ? { titulo: nombre || 'Género', color: 'var(--green)', d: CATALOGOS.pelis.d } /* los géneros son solo pelis */
+    : CATALOGOS[tipo];
+  if (!conf) return;
+  catEstado = { tipo, pag: 0, por: 0, hayMas: true, cargando: false };
+  $('#catTitulo').innerHTML = SVG_CAT(conf.d, conf.color) + '<span></span>';
+  $('#catTitulo').querySelector('span').textContent = conf.titulo;
+  $('#catTotal').textContent = '';
+  $('#catGrid').innerHTML = '';
+  $('#catScroll').querySelectorAll('.cat-loader').forEach((x) => x.remove());
+  $('#catPage').classList.remove('hidden');
+  $('#catScroll').scrollTop = 0;
+  cargarCatPag();
 }
-function cargarDaniExPag() {
-  daniExPag++;
-  fetch('/api/dani/catalogo?pag=' + daniExPag).then((r) => r.json()).then((d) => {
-    if (!d || !d.ok) { $('#daniExGrid').innerHTML = '<div class="sp-meta" style="grid-column:1/-1;text-align:center;padding:20px 0">Sin conexión — inténtalo de nuevo</div>'; return; }
-    if (daniExPag === 1) daniExItems.length = 0;
-    for (const it of d.items) daniExItems.push({ title: it.titulo, url: 'https://danimados.cc/serie/' + it.slug, img: it.poster, site: 'Caricaturas', extra: '' });
-    $('#daniExTotal').textContent = d.total + ' series';
-    renderResultados($('#daniExGrid'), daniExItems, elegirResultadoBusqueda, true);
-    $('#daniExMas').style.display = d.pag * d.por >= d.total ? 'none' : '';
-  }).catch(() => { $('#daniExGrid').innerHTML = '<div class="sp-meta" style="grid-column:1/-1;text-align:center;padding:20px 0">Sin conexión — inténtalo de nuevo</div>'; });
+
+async function cargarCatPag() {
+  const es = catEstado;
+  if (!es || es.cargando || !es.hayMas) return;
+  es.cargando = true;
+  es.pag++;
+  const loader = document.createElement('div');
+  loader.className = 'cat-loader';
+  loader.innerHTML = '<div class="spinner"></div>';
+  $('#catScroll').appendChild(loader);
+  const ruta = es.tipo.startsWith('genero:') ? 'genero-' + es.tipo.slice(7) : es.tipo;
+  let respuesta = null;
+  try {
+    const r = await fetch('/api/catalogo/' + ruta + '?pag=' + es.pag);
+    respuesta = await r.json();
+  } catch {}
+  loader.remove();
+  if (catEstado !== es) return; /* cambió de catálogo mientras llegaba — no pintar aquí */
+  if (respuesta && respuesta.ok && respuesta.items && respuesta.items.length) {
+    es.por = respuesta.por || 20;
+    /* v205: el server dice si hay más (por página CRUDA — el filtro de
+     * ocultas puede dejar la página corta sin que se acabe el catálogo) */
+    es.hayMas = respuesta.mas === undefined ? respuesta.items.length >= es.por : !!respuesta.mas;
+    $('#catTotal').textContent = respuesta.total ? respuesta.total + ' títulos' : '';
+    for (const it of respuesta.items) {
+      $('#catGrid').appendChild(crearTarjetaResultado(it, (res) => {
+        $('#catPage').classList.add('hidden'); /* al elegir, se cierra como el buscador */
+        tocarFeedResultado(res);
+      }));
+    }
+  } else {
+    es.hayMas = false;
+    if (es.pag === 1) $('#catGrid').innerHTML = '<div class="sr-info">No pude cargar el catálogo — inténtalo luego</div>';
+  }
+  es.cargando = false;
 }
-$('#btnDaniTodas').addEventListener('click', abrirDaniEx);
-$('#daniExMas').addEventListener('click', cargarDaniExPag);
-$('#daniExClose').addEventListener('click', () => $('#daniEx').classList.add('hidden'));
-$('#daniEx').addEventListener('click', (e) => { if (e.target === e.currentTarget) $('#daniEx').classList.add('hidden'); });
+
+/* v205: el centinela al fondo del visor pide la siguiente página al
+ * asomarse — bajar es suficiente, nunca hay que picarle a nada */
+const catObs = new IntersectionObserver((entradas) => {
+  if (entradas.some((x) => x.isIntersecting)) cargarCatPag();
+}, { root: $('#catScroll'), rootMargin: '500px' });
+catObs.observe($('#catSent'));
+$('#catBack').addEventListener('click', () => { catEstado = null; $('#catPage').classList.add('hidden'); });
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.ver-todo');
+  if (!b) return;
+  abrirCatalogo(b.dataset.cat, b.dataset.nombre);
+});
 
 /* v61: ¿es una serie? → abrir el selector en vez del espejo directo */
 /* v199: película de GoPelis — la ficha da la url /ver/movie/<id> y de ahí
@@ -3034,7 +3088,7 @@ async function buscarGlobal(q) {
   }
 }
 function elegirResultadoBusqueda(res) {
-  const daniEx = $('#daniEx'); if (daniEx) daniEx.classList.add('hidden'); /* v178: cerrar el explorador — si no, el picker abría DEBAJO y parecía que «no salía nada» */
+  const catPage = $('#catPage'); if (catPage) catPage.classList.add('hidden'); /* v205: el catálogo sustituye al explorador — el picker siempre ARRIBA */
   cerrarBuscador(); /* al elegir, esto ya no vive arriba del feed */
   $('#homeSearch').value = ''; /* v122: elegiste algo — no queda texto colgado */
   $('#spInput').value = '';
@@ -3813,6 +3867,23 @@ $('#soloEndCancelar').addEventListener('click', pararCuentaSiguiente);
 })();
 /* =================== fin v81: modo individual =================== */
 
+/* v205: toque de una tarjeta del feed o del catálogo — un solo
+ * comportamiento: series → picker de episodios; Solo → directo; Juntos →
+ * crea la sala con la carátula al instante */
+function tocarFeedResultado(res) {
+  if (elegirTitulo(res)) return; /* v61: series → temporadas y episodios */
+  if (S.modoSolo) { /* v81: sin sala — directo en tu dispositivo */
+    abrirSolo(res.url, { title: res.title || '', img: res.img || '' });
+    return;
+  }
+  S.pendingStart = { url: res.url, name: res.title, img: res.img || '' };
+  /* v60: carátula a pantalla completa desde YA — la sala carga por detrás */
+  S.mirrorInfo = { title: res.title || '', img: res.img || '', url: res.url, sub: 'Cargando tu sala…' };
+  mostrarPeliLoading();
+  const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
+  connect(code);
+}
+
 /* v55: populares del día — fila en el inicio, un toque crea la sala */
 async function cargarPopulares() {
   const wrap = document.querySelector('#trendingBox');
@@ -3828,21 +3899,9 @@ async function cargarPopulares() {
     const d = await r.json();
     /* v69: cada sección se muestra con lo que llegue — los animes (arriba)
      * no dependen de que las películas hayan cargado */
-    const hayAlgo = (d.results && d.results.length) || (d.series && d.series.length) || (d.animes && d.animes.length) || (d.caricaturas && d.caricaturas.length) || (d.generos && d.generos.length);
+    const hayAlgo = (d.results && d.results.length) || (d.series && d.series.length) || (d.animes && d.animes.length) || (d.caricaturas && d.caricaturas.length) || (d.liveaction && d.liveaction.length) || (d.generos && d.generos.length);
     if (!d.ok || !hayAlgo) { delete wrap.dataset.cargado; return; }
-    const alTocar = (res) => () => {
-      if (elegirTitulo(res)) return; /* v61: series → temporadas y episodios */
-      if (S.modoSolo) { /* v81: sin sala — directo en tu dispositivo */
-        abrirSolo(res.url, { title: res.title || '', img: res.img || '' });
-        return;
-      }
-      S.pendingStart = { url: res.url, name: res.title, img: res.img || '' };
-      /* v60: carátula a pantalla completa desde YA — la sala carga por detrás */
-      S.mirrorInfo = { title: res.title || '', img: res.img || '', url: res.url, sub: 'Cargando tu sala…' };
-      mostrarPeliLoading();
-      const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
-      connect(code);
-    };
+    const alTocar = (res) => () => tocarFeedResultado(res); /* v205: compartido con el catálogo */
     if (d.results && d.results.length) {
       d.results.slice(0, 16).forEach((res) => fila.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrap.classList.remove('hidden');
@@ -3873,6 +3932,20 @@ async function cargarPopulares() {
     if (wrapT && filaT && d.cartoons && d.cartoons.length) {
       d.cartoons.slice(0, 80).forEach((res) => filaT.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrapT.classList.remove('hidden');
+    }
+    /* v205: LIVE ACTION — iCarly, Drake & Josh, Power Rangers… ya no
+     * viven dentro de Cartoons */
+    const wrapL = document.querySelector('#liveBox');
+    const filaL = document.querySelector('#liveRow');
+    if (wrapL && filaL && d.liveaction && d.liveaction.length) {
+      d.liveaction.slice(0, 16).forEach((res) => filaL.appendChild(crearTarjetaResultado(res, alTocar(res))));
+      wrapL.classList.remove('hidden');
+    }
+    /* v205: ¿el server arrancó en frío y todavía no tiene caricaturas/
+     * cartoons/live? Se llena por detrás — un solo reintento a los 45 s */
+    if (!(d.caricaturas || []).length && !(d.cartoons || []).length && !(d.liveaction || []).length && !S.carisReintento) {
+      S.carisReintento = true;
+      setTimeout(() => { delete wrap.dataset.cargado; cargarPopulares(); }, 45000);
     }
     /* v101: filas de GÉNERO — seis secciones que rotan cada día; cada una
      * con su ícono y color, y las mismas tarjetas que todo el feed */
@@ -3906,6 +3979,15 @@ async function cargarPopulares() {
         sec.innerHTML =
           `<div class="sr-sec-titulo">${SVG(ICONOS[g.slug] || ICONOS.drama, PALETA[i % PALETA.length])}<span>${g.nombre}</span></div>` +
           '<div class="sr-fila"></div>';
+        /* v205: cada género también con su «Ver todo» (solo pelis) */
+        const bt = document.createElement('button');
+        bt.className = 'btn small ghost ver-todo';
+        bt.type = 'button';
+        bt.dataset.cat = 'genero:' + g.slug;
+        bt.dataset.nombre = g.nombre;
+        bt.textContent = 'Ver todo';
+        bt.insertAdjacentHTML('beforeend', '<svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>');
+        sec.querySelector('.sr-sec-titulo').appendChild(bt);
         const filaG = sec.querySelector('.sr-fila');
         g.items.slice(0, 16).forEach((res) => filaG.appendChild(crearTarjetaResultado(res, alTocar(res))));
         wrapG.appendChild(sec);
