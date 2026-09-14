@@ -3802,6 +3802,16 @@ async function extraerStreamwishPeli(pageUrl) {
           return { mx: rr.x + rr.width / 2, my: rr.y + rr.height / 2 };
         }).catch(() => null);
         if (caja2) await page.mouse.click(caja2.mx, caja2.my);
+        /* v204.3: tras montarse el iframe del player nuevo, un clic a su
+         * centro (el play interno suele requerirlo) */
+        await new Promise((r3) => setTimeout(r3, 8000));
+        const ib = await page.evaluate(() => {
+          const f = [...document.querySelectorAll('iframe')].find((i) => /listeamed|embed/i.test(i.src || '') || !i.src);
+          if (!f) return null;
+          const r3 = f.getBoundingClientRect();
+          return { mx: r3.x + r3.width / 2, my: r3.y + r3.height / 2 };
+        }).catch(() => null);
+        if (ib) await page.mouse.click(ib.mx, ib.my);
       }
     }).catch(() => {});
     await new Promise((r2) => setTimeout(r2, 20000));
