@@ -2949,6 +2949,7 @@ function crearTarjetaResultado(res, alElegir) {
     const card = document.createElement('button');
     card.className = 'sr-card';
     card.type = 'button';
+    card.dataset.url = res.url || ''; /* v205.5: para poder quitarla del feed al momento si el server la oculta */
     /* v53: las carátulas de AnimeFLV van por un proxy de imágenes porque
      * en algunos teléfonos/compañías la página bloquea la imagen directa */
     const srcImg = imgPorProxy(res.img || ''); /* v91: nunca dos veces */
@@ -3372,7 +3373,10 @@ async function abrirSolo(pageUrl, info, opts) {
   try {
     const r = await fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(pageUrl));
     const d = await r.json();
-    if (!d.ok) throw new Error(d.error || 'No pude resolver el video');
+    if (!d.ok) {
+      if (d.ocultado) quitarTarjeta(pageUrl); /* v205.5: el server la ocultó — fuera del feed YA, sin cerrar y reabrir */
+      throw new Error(d.error || 'No pude resolver el video');
+    }
     if (!SOLO || SOLO.url !== pageUrl || SOLO.cerrado) return; /* cerraron mientras buscaba */
     SOLO.res = d;
     montarSolo(d, await elegirModoSolo(d)); /* v99: sonda — carrera proxy vs directo */
@@ -3382,6 +3386,11 @@ async function abrirSolo(pageUrl, info, opts) {
       cerrarSolo();
     }
   }
+}
+/* v205.5: el server ocultó un título — sus tarjetas salen del feed al instante */
+function quitarTarjeta(url) {
+  if (!url) return;
+  try { document.querySelectorAll('.sr-card[data-url]').forEach((c) => { if (c.dataset.url === url) c.remove(); }); } catch {}
 }
 /* v99: ¿directo o por el servidor? El token de goodstream puede venir
  * amarrado a la IP que lo pidió (el servidor) — el directo del usuario

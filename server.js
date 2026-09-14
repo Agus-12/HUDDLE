@@ -459,8 +459,8 @@ setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}
 const PXD_OCULTAS = new Set(), AF_OCULTAS = new Set();
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'pxd-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) PXD_OCULTAS.add(l.trim()); } catch {}
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'af-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) AF_OCULTAS.add(l.trim()); } catch {}
-const FALLOS_GP = new Map(), FALLOS_PXD = new Map(), FALLOS_AF = new Map();
-for (const [mapa, arch] of [[FALLOS_GP, 'fallos-gp.json'], [FALLOS_PXD, 'fallos-pxd.json'], [FALLOS_AF, 'fallos-af.json']]) {
+const FALLOS_GP = new Map(), FALLOS_PXD = new Map(), FALLOS_AF = new Map(), FALLOS_CV = new Map();
+for (const [mapa, arch] of [[FALLOS_GP, 'fallos-gp.json'], [FALLOS_PXD, 'fallos-pxd.json'], [FALLOS_AF, 'fallos-af.json'], [FALLOS_CV, 'fallos-cv.json']]) {
   try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR, arch), 'utf8')) || {})) mapa.set(k, v); } catch {}
 }
 const fallosGuardarT = new Map();
@@ -516,9 +516,16 @@ function afPerdonar(slug) { falloPerdonar(FALLOS_AF, 'fallos-af.json', slug); }
 /* Cuevana — el de v195 oculta al primer muerto-total (página viva sin
  * NINGÚN servidor); ahora con perdón y re-chequeo */
 function cvPerdonar(slug) {
+  falloPerdonar(FALLOS_CV, 'fallos-cv.json', slug); /* v205.5 */
   if (!CV_OCULTAS_RT.has(slug)) return;
   CV_OCULTAS_RT.delete(slug); cvPerdonarFile();
   console.log('[lázaro] cv: ' + slug + ' volvió a la vida — fuera de ocultas');
+}
+function cvFallo(slug) { /* v205.5: servidores existían pero TODOS fallaron — 3 de estas y se oculta */
+  falloRegistrar(FALLOS_CV, 'fallos-cv.json', slug, (k2) => {
+    cvOcultaRegistrar(k2);
+    console.log('[podredumbre] cv: ' + k2 + ' ocultada tras 3 fallos');
+  });
 }
 function cvPerdonarFile() { try { fs.writeFileSync(path.join(DATA_DIR, 'cv-ocultas-rt.json'), JSON.stringify([...CV_OCULTAS_RT])); } catch {} }
 
@@ -590,6 +597,36 @@ async function revivirGeneral() {
   revGiro.cv += 3;
   console.log('[revivir] vuelta terminada (' + (probados.length ? probados.join(' | ') : 'sin resurrecciones esta vuelta') + ')');
 }
+
+/* v205.5: EPISODIOS MUERTOS — el episodio concreto (no la serie ni la
+ * temporada) se oculta del picker tras 3 fallos reales; si luego
+ * reproduce, perdona y vuelve. */
+const EPS_FALLOS = new Map(), EPS_MUERTOS = new Set();
+try { for (const x of JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'eps-muertos.json'), 'utf8')) || []) EPS_MUERTOS.add(x); } catch {}
+let epsT1 = null;
+const epsEscribir = () => { try { fs.writeFileSync(path.join(DATA_DIR, 'eps-muertos.json'), JSON.stringify([...EPS_MUERTOS])); } catch {} };
+function esEpUrl(u) {
+  return /latanime\.org\/ver\/[a-z0-9-]+-episodio-\d+/i.test(u) || /animeflv\.one\/ver\/[a-z0-9-]+-\d+/.test(u)
+    || /lacartoons\.com\/serie\/capitulo\//i.test(u) || /danimados\.cc\/episodios\//i.test(u)
+    || /miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}/i.test(u) || /gopelis\.com\/ver\/tv\//i.test(u)
+    || /cine-calidad\.mx\/(?:episode\/|serie\/[a-z0-9-]+\/)/i.test(u);
+}
+function epsFallo(u) {
+  if (!u || !esEpUrl(u)) return;
+  falloRegistrar(EPS_FALLOS, 'fallos-eps.json', u, () => {
+    if (EPS_MUERTOS.has(u)) return;
+    EPS_MUERTOS.add(u); clearTimeout(epsT1); epsT1 = setTimeout(epsEscribir, 3000);
+    console.log('[eps] episodio ocultado del catálogo tras 3 fallos: ' + String(u).slice(0, 90));
+  });
+}
+function epsPerdonar(u) {
+  falloPerdonar(EPS_FALLOS, 'fallos-eps.json', u);
+  if (u && EPS_MUERTOS.has(u)) {
+    EPS_MUERTOS.delete(u); clearTimeout(epsT1); epsT1 = setTimeout(epsEscribir, 3000);
+    console.log('[eps] episodio revivió — de vuelta al picker: ' + String(u).slice(0, 90));
+  }
+}
+const epsVivos = (eps) => (eps || []).filter((e) => e && e.url && !EPS_MUERTOS.has(e.url));
 let laRtTimer = null;
 function laMuertaQuitar(slug) { /* v202: autocuración — una «muerta» que vuelve a resolver reviva */
   if (!slug || !LA_MUERTAS_SET.has(slug)) return;
@@ -7188,13 +7225,14 @@ async function resolverSolo(pageUrl) {
     try { return await resolverVimeos(embedVimeos, pageUrl); }
     catch (e) { console.warn('[solo] vimeos también falló:', String(e.message || e).slice(0, 80)); }
   }
+  const mCv = /cine-calidad\.mx\/(?:serie|pelicula)\/([a-z0-9-]+)/i.exec(pageUrl || '');
   if (!err) {
     /* v195: la página cargó BIEN pero no trae NINGÚN servidor (ni bueno ni
-     * de navegador) = título muerto en el sitio — se oculta solo del feed */
-    const mSlug = /cine-calidad\.mx\/(?:serie|pelicula)\/([a-z0-9-]+)/i.exec(pageUrl || '');
-    if (mSlug) cvOcultaRegistrar(mSlug[1]);
+     * de navegador) = título muerto en el sitio — se oculta AL INSTANTE */
+    if (mCv) cvOcultaRegistrar(mCv[1]);
     throw new Error('Este título ya no está disponible en el sitio — prueba con otro parecido');
   }
+  if (mCv) cvFallo(mCv[1]); /* v205.5: tenía servidores y TODOS fallaron — cuenta para ocultarse */
   throw err || new Error('Este título no tiene servidores disponibles ahora — prueba luego o en sala (👥 Juntos)');
 }
 /* v90: la parte goodstream (lo que antes era resolverSolo a partir del
@@ -7804,10 +7842,11 @@ const server = http.createServer(async (req, res) => {
         if (!eps.length) return json(res, 502, { ok: false, error: 'No pude leer danimados — intenta luego' });
         const cov = daniCoverDe(daniSlug);
         precargarIntroDeSerie(eps); /* v184: mientras eligen episodio, el server ya busca la intro */
-        return json(res, 200, { ok: true, slug, titulo: daniTituloDe(daniSlug), poster: cov, cover: cov, episodios: eps });
+        return json(res, 200, { ok: true, slug, titulo: daniTituloDe(daniSlug), poster: cov, cover: cov, episodios: epsVivos(eps) }); /* v205.5 */
       }
       const d = await datosCaricatura(slug);
       if (!d) return json(res, 502, { ok: false, error: 'No pude leer esa caricatura' });
+      d.episodios = epsVivos(d.episodios); /* v205.5 */
       precargarIntroDeSerie(d.episodios); /* v135 */
       /* v195: mientras eligen episodio, el server YA resuelve el primero —
        * las de lacartoons con player rpmvid tardan 10-40s la primera vez
@@ -7829,6 +7868,7 @@ const server = http.createServer(async (req, res) => {
       if (!/^[a-z0-9-]{2,90}$/.test(slug)) return json(res, 400, { ok: false, error: 'Serie inválida' });
       const dS = await datosSerieCuevana(slug); /* v74: compartida con los botones de episodio */
       if (!dS) return json(res, 502, { ok: false, error: 'No pude leer la serie' });
+      dS.episodios = epsVivos(dS.episodios); /* v205.5: episodios muertos fuera */
       precargarIntroDeSerie(dS.episodios); /* v135 */
       return json(res, 200, dS);
     }
@@ -7839,6 +7879,7 @@ const server = http.createServer(async (req, res) => {
       if ((url.searchParams.get('site') || '').toLowerCase() === 'latanime') {
         const dL = await datosAnimeLatanime(slug); /* v74: compartida con los botones de episodio */
         if (!dL) return json(res, 502, { ok: false, error: 'No pude leer el anime' });
+        dL.episodios = epsVivos(dL.episodios); /* v205.5 */
         precargarIntroDeSerie(dL.episodios); /* v135 */
         return json(res, 200, dL);
       }
@@ -7883,7 +7924,8 @@ const server = http.createServer(async (req, res) => {
           poster: og('og:image') || '',
           episodios: eps,
         };
-        if (!eps.length) return json(res, 404, { ok: false, error: 'Sin episodios' });
+        out.episodios = epsVivos(out.episodios); /* v205.5 */
+        if (!out.episodios.length) return json(res, 404, { ok: false, error: 'Sin episodios' });
         serieCache.set('anime:' + slug, { at: Date.now(), d: out });
         cacheGuardar('serieCache', () => [...serieCache.entries()]); /* v111: a disco */
         return json(res, 200, out);
@@ -8155,11 +8197,13 @@ const server = http.createServer(async (req, res) => {
         const esLct = /lacartoons\.com\/serie\/capitulo\//i.test(target); /* v112: lacartoons */
         const esDani = /danimados\.cc\/episodios\//i.test(target); /* v179: danimados en Solo — sin esto TODO el catálogo nuevo caía al resolutor viejo de Cuevana: «Este título no tiene servidor goodstream» */
         const esGp = /gopelis\.com\/ver\/(?:tv|movie)\//i.test(target); /* v198 series + v199 películas de GoPelis (latino) */
-        const r = await (esEpAnime ? resolverAnime(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esGp ? resolverGopelis(target) : resolverSolo(target));
+        let r;
+        try { r = await (esEpAnime ? resolverAnime(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esGp ? resolverGopelis(target) : resolverSolo(target)); epsPerdonar(target); } /* v205.5 */
+        catch (e2r) { epsFallo(target); throw e2r; } /* v205.5: episodios muertos al contador */
         return json(res, 200, { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy });
       } catch (e) {
         console.warn('[solo] no pude resolver', target.slice(0, 70), '→', String(e.message || e).slice(0, 90));
-        return json(res, 404, { ok: false, error: String(e.message || e).slice(0, 200) });
+        return json(res, 404, { ok: false, error: String(e.message || e).slice(0, 200), ocultado: EPS_MUERTOS.has(target) || /ya no está disponible en el sitio/.test(String(e.message || e)) }); /* v205.5: el cliente quita la tarjeta al momento */
       }
     }
     if (url.pathname === '/api/yt') {
@@ -8393,7 +8437,7 @@ const server = http.createServer(async (req, res) => {
         salasActivas: rooms.size,
         usuarios: users.size,
         intros: { analizados: CRAWL.hechas || 0, total: CRAWL.total || 0, enCola: CRAWL.pend.length, aprendidas: Object.keys(INTROS).length, sinIntro: (CRAWL.sinIntro || []).length, muestra },
-        moderacion: { animesMuertos: LA_MUERTAS_SET.size, animesCastDup: LA_OCULTAS_SET.size, gopelis: GP_OCULTAS_SET.size, pelisxd: PXD_OCULTAS.size, animeflv: AF_OCULTAS.size, cuevana: CV_OCULTAS_RT.size, protegidas: CV_PROTEGIDAS.size },
+        moderacion: { animesMuertos: LA_MUERTAS_SET.size, animesCastDup: LA_OCULTAS_SET.size, gopelis: GP_OCULTAS_SET.size, pelisxd: PXD_OCULTAS.size, animeflv: AF_OCULTAS.size, cuevana: CV_OCULTAS_RT.size, protegidas: CV_PROTEGIDAS.size, epsOcultos: EPS_MUERTOS.size, fallosEnCurso: [FALLOS_GP, FALLOS_PXD, FALLOS_AF, FALLOS_CV, EPS_FALLOS].reduce((a2, mm2) => a2 + [...mm2.values()].filter((x2) => x2.f >= 1 && !x2.h).length, 0) },
         catalogos: { caricaturas: cariFeedCache.items.length, cartoons: cariFeedCache.toons.length, liveaction: cariFeedCache.live.length, danimados: DANI_CAT.size, animes: LA_TODOS.size },
       });
     }
@@ -8648,7 +8692,7 @@ function panelHtml() {
 <body>
 <div class="wrap">
   <h1><span class="punto"></span> Huddle — Panel de estado <span class="ver" id="ver"></span></h1>
-  <p class="sub">Se actualiza solo cada 10 segundos</p>
+  <p class="sub">Se actualiza solo cada 5 segundos</p>
 
   <div class="grid" id="cards"></div>
 
@@ -8694,7 +8738,7 @@ function panelHtml() {
     document.getElementById('modChips').innerHTML =
       chip('bad', 'Animes muertos', mo.animesMuertos) + chip('warn', 'Animes cast/dup', mo.animesCastDup) +
       chip('bad', 'GoPelis', mo.gopelis) + chip('bad', 'PelisXD', mo.pelisxd) + chip('bad', 'AnimeFLV', mo.animeflv) +
-      chip('bad', 'Cuevana', mo.cuevana) + chip('ok', 'Protegidas', mo.protegidas);
+      chip('bad', 'Cuevana', mo.cuevana) + chip('ok', 'Protegidas', mo.protegidas) + chip('bad', 'Episodios', mo.epsOcultos) + chip('warn', 'Fallos en curso', mo.fallosEnCurso);
     const ca = d.catalogos;
     document.getElementById('catChips').innerHTML =
       chip('', 'Caricaturas', ca.caricaturas) + chip('', 'Cartoons', ca.cartoons) + chip('', 'Live Action', ca.liveaction) +
@@ -8711,7 +8755,7 @@ function panelHtml() {
     });
   }
   tic();
-  setInterval(tic, 10000);
+  setInterval(tic, 5000); /* v205.5: casi al momento */
 </script>
 </body>
 </html>`;
