@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v203'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v204'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -3695,7 +3695,11 @@ async function pelisxdMeta(slug) {
         .replace(/\s{2,}/g, ' ')
         .trim()
         .slice(0, 90);
-      return { title: title || slug, poster: og('og:image') || '', year, alive: />Opción 1<\/button>/.test(html) };
+      /* v204: pelisxd migró a Next.js/RSC — el «Opción 1» ahora vive en el
+       * payload (v_source base64, embed listeamed). Sin esto TODO parecía
+       * caído y el resolutor rechazaba todas las pelis. */
+      const alive = />Opción 1<\/button>/.test(html) || /v_source\\":\\"[A-Za-z0-9=+\/]{30,}/.test(html);
+      return { title: title || slug, poster: og('og:image') || '', year, alive };
     } catch { return null; }
   })();
   if (d) pelisxdMetaCache.set(slug, { at: Date.now(), d });
@@ -3761,7 +3765,8 @@ async function extraerStreamwishPeli(pageUrl) {
         const u = r.url();
         /* v106: también cfglobalcdn — los episodios detrás del reproductor
          * propio del sitio (player.miscaricaturas.com) usan ese CDN */
-        if (cap || !/\.m3u8(\?|$)/i.test(u) || !/hls2|sprintcdn|cfglobalcdn/i.test(u)) return;
+        /* v204: sin filtro de host — pelisxd migró su player (listeamed) a otro CDN; el cuerpo (#EXTINF + .ts) ya valida que sea HLS real */
+        if (cap || !/\.m3u8(\?|$)/i.test(u)) return;
         const body = await r.text();
         if (/#EXTINF/.test(body) && /\.ts/i.test(body)) {
           cap = { body, url: u, ref: (r.request().headers() || {}).referer || '' };
@@ -3779,8 +3784,25 @@ async function extraerStreamwishPeli(pageUrl) {
      * Si a los 24s no hay video, UN clic de auxilio y se sigue esperando. */
     await new Promise((r2) => setTimeout(r2, 4000));
     await page.evaluate(() => {
+      /* v204.2: pelisxd estrenó UI — ya no hay botón «Opción 1»: el player
+       * trae un recuadro «Haz clic para reproducir» (clic de mouse real,
+       * el sintético no dispara su montaje del iframe) */
       const b = [...document.querySelectorAll('button')].find((x) => /opción 1/i.test(x.textContent || ''));
-      if (b) b.click();
+      if (b) { b.click(); return 'opcion-1'; }
+      const caja = [...document.querySelectorAll('*')].filter((x) => (x.textContent || '').trim() === 'Haz clic para reproducir').pop();
+      if (caja) { const r2 = caja.getBoundingClientRect(); return { mx: r2.x + r2.width / 2, my: r2.y + r2.height / 2 }; }
+      return null;
+    }).then(async (r2) => {
+      if (r2 && r2.mx) {
+        await page.evaluate((y) => window.scrollTo(0, Math.max(0, y - 300)), r2.my).catch(() => {});
+        await new Promise((r3) => setTimeout(r3, 700));
+        const caja2 = await page.evaluate(() => {
+          const els = [...document.querySelectorAll('*')].filter((x) => (x.textContent || '').trim() === 'Haz clic para reproducir');
+          const rr = els[els.length - 1].getBoundingClientRect();
+          return { mx: rr.x + rr.width / 2, my: rr.y + rr.height / 2 };
+        }).catch(() => null);
+        if (caja2) await page.mouse.click(caja2.mx, caja2.my);
+      }
     }).catch(() => {});
     await new Promise((r2) => setTimeout(r2, 20000));
     if (!cap) {
