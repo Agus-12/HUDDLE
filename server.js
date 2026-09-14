@@ -448,8 +448,148 @@ async function laRevizar() { /* apelaciones: ocultadas hace <7 días, una a una 
     console.log('[podredumbre] revisión terminada: ' + vivas2 + ' revivieron de ' + cands.length);
   } finally { laReviviendo = false; }
 }
-setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando…"); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); }, 90 * 1000);
-setInterval(() => { laRevizar().catch(() => {}); }, 6 * 3600 * 1000);
+setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando…"); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); }, 90 * 1000);
+setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); }, 6 * 3600 * 1000);
+
+/* v205.2: PODREDUMBRE GENERAL — el mismo circuito de latanime (fallos
+ * reales → ocultar; éxito → perdonar; re-chequeo periódico → revivir)
+ * para GoPelis, PelisXD, AnimeFLV y Cuevana. Un capítulo puntual de
+ * caricaturas NO oculta la serie (un muerto no mata una de 300; el feed
+ * ya nace filtrado y el error avisa claro). */
+const PXD_OCULTAS = new Set(), AF_OCULTAS = new Set();
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'pxd-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) PXD_OCULTAS.add(l.trim()); } catch {}
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'af-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) AF_OCULTAS.add(l.trim()); } catch {}
+const FALLOS_GP = new Map(), FALLOS_PXD = new Map(), FALLOS_AF = new Map();
+for (const [mapa, arch] of [[FALLOS_GP, 'fallos-gp.json'], [FALLOS_PXD, 'fallos-pxd.json'], [FALLOS_AF, 'fallos-af.json']]) {
+  try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR, arch), 'utf8')) || {})) mapa.set(k, v); } catch {}
+}
+const fallosGuardarT = new Map();
+function fallosGuardar(mapa, arch) {
+  if (fallosGuardarT.has(arch)) return;
+  const t = setTimeout(() => { fallosGuardarT.delete(arch); try { fs.writeFileSync(path.join(DATA_DIR, arch), JSON.stringify([...mapa.entries()])); } catch {} }, 4000);
+  t.unref(); fallosGuardarT.set(arch, t);
+}
+function falloRegistrar(mapa, arch, clave, alOcultar) {
+  if (!clave) return;
+  const e = mapa.get(clave) || { f: 0, last: 0, h: 0 };
+  if (Date.now() - (e.last || 0) < 10 * 60 * 1000) return; /* la misma ráfaga no cuenta como fallos nuevos */
+  e.f = (e.f || 0) + 1; e.last = Date.now();
+  if (e.f >= 3 && e.h === 0) { e.h = Date.now(); alOcultar(clave); }
+  mapa.set(clave, e);
+  fallosGuardar(mapa, arch);
+}
+function falloPerdonar(mapa, arch, clave) { if (clave && mapa.delete(clave)) fallosGuardar(mapa, arch); }
+let ocT = null;
+function ocultasReescribir(set, archivo) {
+  clearTimeout(ocT);
+  ocT = setTimeout(() => { try { fs.writeFileSync(path.join(__dirname, 'public', archivo), [...set].sort().join('\n') + '\n'); } catch {} }, 3000);
+}
+/* GoPelis — ocultar en vivo por ID (el catálogo filtra por clave slug vía
+ * GP_ID_REV id→clave, el mismo mapa de su Lázaro) */
+function gpOcultarPorId(id) {
+  const key = GP_ID_REV.get(id);
+  falloRegistrar(FALLOS_GP, 'fallos-gp.json', 'gp:' + id, () => {
+    if (!key || GP_OCULTAS_SET.has(key)) return;
+    GP_OCULTAS_SET.add(key);
+    ocultasReescribir(GP_OCULTAS_SET, 'gopelis-ocultas.txt');
+    console.log('[podredumbre] gp: ' + key + ' ocultada tras 3 fallos');
+  });
+}
+function gpPerdonarPorId(id) { falloPerdonar(FALLOS_GP, 'fallos-gp.json', 'gp:' + id); }
+/* PelisXD / AnimeFLV — ocultar por slug */
+function pxdOcultar(slug) {
+  falloRegistrar(FALLOS_PXD, 'fallos-pxd.json', slug, () => {
+    if (PXD_OCULTAS.has(slug)) return;
+    PXD_OCULTAS.add(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt');
+    console.log('[podredumbre] pxd: ' + slug + ' ocultada tras 3 fallos');
+  });
+}
+function pxdPerdonar(slug) { falloPerdonar(FALLOS_PXD, 'fallos-pxd.json', slug); }
+function afOcultar(slug) {
+  falloRegistrar(FALLOS_AF, 'fallos-af.json', slug, () => {
+    if (AF_OCULTAS.has(slug)) return;
+    AF_OCULTAS.add(slug); ocultasReescribir(AF_OCULTAS, 'af-ocultas.txt');
+    console.log('[podredumbre] af: ' + slug + ' ocultada tras 3 fallos');
+  });
+}
+function afPerdonar(slug) { falloPerdonar(FALLOS_AF, 'fallos-af.json', slug); }
+/* Cuevana — el de v195 oculta al primer muerto-total (página viva sin
+ * NINGÚN servidor); ahora con perdón y re-chequeo */
+function cvPerdonar(slug) {
+  if (!CV_OCULTAS_RT.has(slug)) return;
+  CV_OCULTAS_RT.delete(slug); cvPerdonarFile();
+  console.log('[lázaro] cv: ' + slug + ' volvió a la vida — fuera de ocultas');
+}
+function cvPerdonarFile() { try { fs.writeFileSync(path.join(DATA_DIR, 'cv-ocultas-rt.json'), JSON.stringify([...CV_OCULTAS_RT])); } catch {} }
+
+/* re-chequeo general cada 6 h — poquitos por vuelta y con calma */
+let revGiro = { gp: 0, pxd: 0, af: 0, cv: 0 };
+async function revivirGeneral() {
+  const probados = [];
+  /* GoPelis: resolver de verdad (es HTTP puro) — 2 por vuelta */
+  const gpKeys = [...GP_OCULTAS_SET];
+  for (let i = 0; i < 2 && gpKeys.length; i++) {
+    const key = gpKeys[(revGiro.gp + i) % gpKeys.length];
+    try {
+      const esPeli = key.startsWith('p:');
+      const slug = esPeli ? key.slice(2) : key;
+      let url = '';
+      if (esPeli) {
+        const id = [...GP_ID_REV.entries()].find(([, k]) => k === key)?.[0];
+        if (id) url = GP_BASE + 'ver/movie/' + id;
+      } else {
+        const ficha = await datosGopelis(slug).catch(() => null);
+        const ep0 = ficha && ficha.episodios && ficha.episodios[0];
+        if (ep0 && ep0.url) url = ep0.url;
+      }
+      if (url) { await resolverGopelis(url); gpOcultaQuitar(key); probados.push('gp:' + key + ' REVIVIÓ'); }
+    } catch {}
+  }
+  revGiro.gp += 2;
+  /* PelisXD: resolutor completo (1 por vuelta, puede usar navegador) */
+  const pxdKeys = [...PXD_OCULTAS];
+  if (pxdKeys.length) {
+    const slug = pxdKeys[revGiro.pxd % pxdKeys.length]; revGiro.pxd++;
+    try { await resolverPelisxd('https://www.pelisxd.com/pelicula/' + slug); PXD_OCULTAS.delete(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt'); probados.push('pxd:' + slug + ' REVIVIÓ'); } catch {}
+  }
+  /* AnimeFLV: POST /flv + mp4upload vivo (2 por vuelta, sin navegador) */
+  const afKeys = [...AF_OCULTAS];
+  for (let i = 0; i < 2 && afKeys.length; i++) {
+    const slug = afKeys[(revGiro.af + i) % afKeys.length];
+    try {
+      const r = await fetchSeguro('https://vww.animeflv.one/ver/' + slug + '-1', 12000).catch(() => null);
+      const enc = r && r.ok ? (/class="opt"[^>]*data-encrypt="([0-9a-f]+)"/i.exec(await r.text()) || [])[1] : '';
+      const cuerpo = enc ? await fetch('https://vww.animeflv.one/flv', { method: 'POST', headers: { 'User-Agent': MIRROR_UA, Referer: 'https://vww.animeflv.one/ver/' + slug + '-1', 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: 'acc=opt&i=' + enc, signal: AbortSignal.timeout(12000) }).then((x) => x.text()).catch(() => '') : '';
+      const mp4s = [...new Set([...cuerpo.matchAll(/<li[^>]*encrypt="([0-9a-f]+)"/gi)].map((m2) => { try { return Buffer.from(m2[1], 'hex').toString('utf8'); } catch { return ''; } }).filter((u) => /mp4upload\./i.test(u)))];
+      let vive = false;
+      for (const emb of mp4s.slice(0, 2)) {
+        const e2 = await fetchSeguro(emb, 12000).catch(() => null);
+        const tx = e2 && e2.ok ? await e2.text() : '';
+        const mU = tx.match(/["'](https?:\/\/[^"'\s<>]*mp4upload[^"'\s<>]*\.mp4[^"'\s<>]*)["']/i);
+        if (mU && await sirveElVideo(mU[1], emb)) { vive = true; break; }
+      }
+      if (vive) { AF_OCULTAS.delete(slug); ocultasReescribir(AF_OCULTAS, 'af-ocultas.txt'); probados.push('af:' + slug + ' REVIVIÓ'); }
+    } catch {}
+  }
+  revGiro.af += 2;
+  /* Cuevana: la página volvió a ofrecer servidores (3 por vuelta, sin navegador) */
+  const cvKeys = [...CV_OCULTAS_RT].filter((s) => !CV_PROTEGIDAS.has(s));
+  for (let i = 0; i < 3 && cvKeys.length; i++) {
+    const slug = cvKeys[(revGiro.cv + i) % cvKeys.length];
+    try {
+      let html = '';
+      for (const ruta of ['serie/' + slug, 'pelicula/' + slug + '/']) {
+        const r = await fetchSeguro('https://cine-calidad.mx/' + ruta, 12000).catch(() => null);
+        if (r && r.ok) { html = await r.text(); break; }
+      }
+      if (html && (/goodstream\.one\/embed/i.test(html) || /vimeos?\.(net|zip)/i.test(html))) {
+        CV_OCULTAS_RT.delete(slug); cvPerdonarFile(); probados.push('cv:' + slug + ' REVIVIÓ');
+      }
+    } catch {}
+  }
+  revGiro.cv += 3;
+  console.log('[revivir] vuelta terminada (' + (probados.length ? probados.join(' | ') : 'sin resurrecciones esta vuelta') + ')');
+}
 let laRtTimer = null;
 function laMuertaQuitar(slug) { /* v202: autocuración — una «muerta» que vuelve a resolver reviva */
   if (!slug || !LA_MUERTAS_SET.has(slug)) return;
@@ -720,10 +860,12 @@ async function resolverGopelis(epUrl) {
   }
   if (!ganador) {
     gpStream.set(kk, { at: Date.now(), m3u8: '' }); /* negativo corto: el usuario puede reintentar */
+    gpOcultarPorId(id); /* v205.2: podredumbre general — 3 fallos y se oculta sola */
     throw new Error('GoPelis: ningún servidor vive para este título');
   }
   gpStream.set(kk, { at: Date.now(), m3u8: ganador });
   try { const key = GP_ID_REV.get(id); if (key) gpOcultaQuitar(key); } catch {} /* v202: revivió */
+  gpPerdonarPorId(id); /* v205.2 */
   return { m3u8: ganador, proxy: true, subs: [] };
 }
 
@@ -3636,6 +3778,8 @@ async function buscarAnimeflv(q) {
     const url = 'https://vww.animeflv.one/' + href;
     if (vistos.has(url)) continue;
     vistos.add(url);
+    const afSl = (/ver\/([a-z0-9-]+)-\d+/.exec(href) || [])[1] || ''; /* v205.2: ocultadas por podredumbre fuera */
+    if (AF_OCULTAS.has(afSl)) continue;
     out.push({
       title: h3.replace(/&#0?39;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim(),
       url,
@@ -3749,7 +3893,7 @@ async function buscarPelisxd(q) {
   const metas = await Promise.all(top.map((c) => pelisxdMeta(c.s).catch(() => null)));
   return top
     .map((c, i) => ({ c, m: metas[i] }))
-    .filter((x) => x.m && x.m.alive)
+    .filter((x) => x.m && x.m.alive && !PXD_OCULTAS.has(x.c.s)) /* v205.2: ocultadas por podredumbre fuera */
     .slice(0, 6)
     .map((x) => ({
       title: x.m.title,
@@ -3879,10 +4023,14 @@ async function resolverPelisxd(pageUrl) {
   }
   /* 1) ¿tiene enlaces vivos? (falla rápido, sin abrir navegador) */
   const m = await pelisxdMeta(slug);
-  if (m && !m.alive) throw new Error('Esta peli tiene los enlaces caídos en PelisXD');
+  if (m && !m.alive) { pxdOcultar(slug); throw new Error('Esta peli tiene los enlaces caídos en PelisXD'); } /* v205.2 */
   if (m && /listeamed/i.test(m.dom || '')) throw new Error('Esta peli usa un reproductor no disponible para Huddle — prueba otra fuente'); /* v204.4 */
   /* 2) el navegador resuelve el challenge y captura el playlist (~20 s la primera vez) */
-  const cap = await extraerStreamwishPeli('https://www.pelisxd.com/pelicula/' + slug);
+  let cap;
+  try { cap = await extraerStreamwishPeli('https://www.pelisxd.com/pelicula/' + slug); }
+  catch (e) { pxdOcultar(slug); throw e; } /* v205.2: el espejo no entregó — fallo real */
+  pxdPerdonar(slug);
+  if (PXD_OCULTAS.has(slug)) { PXD_OCULTAS.delete(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt'); } /* v205.2: lázaro */
   const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
   pelisxdStreams.set(tok, { body: cap.body, base: cap.url, ref: cap.ref || 'https://f7hyg4q.org/', slug, at: ahora });
   /* los segmentos pasan por el proxy con el Referer del espejo que sirvió */
@@ -7030,7 +7178,7 @@ async function resolverSolo(pageUrl) {
    * también cubre los títulos que antes pedían la sala */
   let err = null;
   if (embed) {
-    try { return await resolverGoodstream(embed, pageUrl); }
+    try { const out = await resolverGoodstream(embed, pageUrl); const mCv = /cine-calidad\.mx\/(?:serie|pelicula)\/([a-z0-9-]+)/i.exec(pageUrl || ''); if (mCv) cvPerdonar(mCv[1]); return out; } /* v205.2: lázaro */
     catch (e) { err = e; }
   }
   if (embedVimeos) {
@@ -7199,14 +7347,20 @@ async function resolverAnimeflv(epUrl) {
   const embeds = [...cuerpo.matchAll(/<li[^>]*encrypt="([0-9a-f]+)"/gi)]
     .map((m) => { try { return Buffer.from(m[1], 'hex').toString('utf8'); } catch { return ''; } })
     .filter((u) => /^https?:\/\//i.test(u));
+  const afSlug = (/\/ver\/([a-z0-9-]+)-\d+/.exec(epUrl || '') || [])[1] || ''; /* v205.2 */
   const candidatos = [...new Set(embeds.filter((u) => /mp4upload\./i.test(u)))];
   const directo = candidatos.length ? await extraerMp4(candidatos, epUrl).catch(() => null) : null;
-  if (directo) return directo;
+  if (directo) {
+    afPerdonar(afSlug);
+    if (AF_OCULTAS.has(afSlug)) { AF_OCULTAS.delete(afSlug); ocultasReescribir(AF_OCULTAS, 'af-ocultas.txt'); } /* lázaro */
+    return directo;
+  }
   /* v205: mp4upload se está acabando (borra archivos a diario) y cada vez
    * más episodios solo traen ok.ru/yourupload/mail.ru — esos van por el
    * navegador del server, mismo mecanismo que resucita los de latanime */
   const nat = await resolverAnimePorNavegador(epUrl, embeds).catch(() => null);
-  if (nat) return nat;
+  if (nat) { afPerdonar(afSlug); return nat; }
+  afOcultar(afSlug); /* v205.2: tras HTTP y navegador, muerte real — cuenta para ocultarse */
   if (!candidatos.length) throw new Error('Este episodio no tiene servidores que Huddle pueda abrir en AnimeFLV — prueba otra versión o más tarde');
   throw new Error('Los servidores de este episodio están caídos en AnimeFLV — prueba otra versión del anime o más tarde');
 }
@@ -8201,7 +8355,7 @@ const server = http.createServer(async (req, res) => {
         });
       return json(res, 200, { ok: true, rooms: list, srvVersion: UI_VERSION });
     }
-    if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION, introCrawl: { pend: CRAWL.pend.length, hechas: CRAWL.hechas || 0, total: CRAWL.total || 0 }, laMuertas: LA_MUERTAS_SET.size, gpOcultas: GP_OCULTAS_SET.size }); /* v122+190 */
+    if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION, introCrawl: { pend: CRAWL.pend.length, hechas: CRAWL.hechas || 0, total: CRAWL.total || 0 }, laMuertas: LA_MUERTAS_SET.size, gpOcultas: GP_OCULTAS_SET.size, pxdOcultas: PXD_OCULTAS.size, afOcultas: AF_OCULTAS.size }); /* v122+190+v205.2 */
     return serveStatic(req, res, url.pathname);
   } catch (e) {
     console.error(e);
