@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v206'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v206.2'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -788,6 +788,8 @@ const epPrefijo = (slug) => {
   if (m) return { pref: slug.slice(0, m.index), temp: +m[1] };
   m = /-(\d{1,2})-capitulo-/.exec(slug);
   if (m) return { pref: slug.slice(0, m.index), temp: +m[1] };
+  m = /-capitulo-/.exec(slug); /* v206.2: «…-capitulo-38-completa» sin temporada */
+  if (m) return { pref: slug.slice(0, m.index), temp: 0 };
   return null;
 };
 const epTempEp = (slug) => {
@@ -795,6 +797,8 @@ const epTempEp = (slug) => {
   if (m) return { temp: +m[1], ep: +m[2] };
   m = /-(\d{1,2})-capitulo-(\d+)/.exec(slug);
   if (m) return { temp: +m[1], ep: +m[2] };
+  m = /-capitulo-(\d+)/.exec(slug); /* v206.2 */
+  if (m) return { temp: 0, ep: +m[1] };
   return null;
 };
 function nv2TarjetasDeHtml(html) {
@@ -840,12 +844,21 @@ async function nv2Buscar(q, pags) {
 async function nv2Recientes() {
   const c = catCache.get('enp-rec');
   if (c && Date.now() - c.at < 60 * 60 * 1000) return c.items;
-  const r = await fetchSeguro(EP_BASE + 'capitulos-completos/', 18000).catch(() => null);
+  /* v206.2: la HOME trae ~145 tarjetas de series con portada (sliders) */
+  const r = await fetchSeguro(EP_BASE, 18000).catch(() => null);
   const html = r && r.ok ? await r.text().catch(() => '') : '';
   const serie = new Map();
-  for (const card of nv2TarjetasDeHtml(html)) {
-    const info = epPrefijo(card.slug) || { pref: card.slug };
-    if (!serie.has(info.pref)) serie.set(info.pref, { title: nvTituloBonito(info.pref), url: EP_BASE + info.pref + '/', img: card.img || '', site: 'Novelas', extra: '' });
+  for (const m of html.matchAll(/<a href="(https:\/\/enpantallatv\.com\/([a-z0-9-]{6,90})\/?)"[^>]*>\s*<img[^>]*src="([^"]+)"/gi)) {
+    let slug = m[2].replace(/\/+$/, '');
+    if (/-online-gratis|capitulos-completos|novelas-(chilenas|colombianas|peruanas|espanolas|americanas|mexicanas|turcas)|estrenos-novelas|telenovela-20\d\d|^year-|^(feed|series|accion|aventura|comedia|crimen|drama|romance|terror|suspenso)$/.test(slug)) continue; /* menús y hubs de región fuera */
+    /* v206.2: los frescos son EPISODIOS — se agrupan por serie (sin capítulo) */
+    const info = epPrefijo(slug);
+    if (info) slug = info.pref;
+    if (serie.has(slug)) continue;
+    let img = m[3];
+    if (img.startsWith('//')) img = 'https:' + img;
+    if (!/^https:\/\/.*wp-content/.test(img)) continue;
+    serie.set(slug, { title: nvTituloBonito(slug), url: EP_BASE + slug + '/', img, site: 'Novelas', extra: '' });
   }
   const items = [...serie.values()];
   if (items.length) catCache.set('enp-rec', { at: Date.now(), items });
@@ -855,7 +868,7 @@ async function nv2Ficha(pref) {
   const eps = [];
   const vistos = new Set();
   let img = '';
-  for (let p = 1; p <= 5; p++) {
+  for (let p = 1; p <= 8; p++) {
     const r = await fetchSeguro(EP_BASE + (p > 1 ? 'page/' + p + '/' : '') + '?s=' + encodeURIComponent(pref.replace(/-/g, ' ')), 18000).catch(() => null);
     const html = r && r.ok ? await r.text().catch(() => '') : '';
     if (!html) break;
