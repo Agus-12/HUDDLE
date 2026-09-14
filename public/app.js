@@ -1460,7 +1460,8 @@ function imgPorProxy(src) {
   return src;
 }
 function abrirSeriePicker(res, enSala, esAnime, esGp) {
-  const slugM = esGp ? (/series\/([a-z0-9-]+)/i.exec(res.url || '') || []) : (/(?:serie|anime)\/([a-z0-9-]+)/i.exec(res.url || '') || []);
+  const esNv = /novelas360\.com\/categories\//i.test(res.url || ''); /* v206 */
+  const slugM = esGp ? (/series\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esNv ? (/categories\/([a-z0-9-]+)/i.exec(res.url || '') || []) : (/(?:serie|anime)\/([a-z0-9-]+)/i.exec(res.url || '') || []);
   if (!slugM || !slugM[1]) { toast('No pude leer esa serie'); return; }
   const slug = slugM[1];
   const esLat = /latanime\./i.test(res.url || ''); /* v63: anime de Latanime */
@@ -1473,7 +1474,7 @@ function abrirSeriePicker(res, enSala, esAnime, esGp) {
   if (poster0) { po.src = poster0; po.style.display = ''; } else po.style.display = 'none';
   $('#spTemporadas').innerHTML = '';
   $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">Buscando episodios…</div>';
-  fetch((esGp ? '/api/gopelis/' + slug : esAnime ? ('/api/anime/' + slug + (esLat ? '?site=latanime' : '')) : '/api/serie/' + slug)).then((r) => r.json()).then((d) => {
+  fetch((esGp ? '/api/gopelis/' + slug : esNv ? '/api/novelas/' + slug : esAnime ? ('/api/anime/' + slug + (esLat ? '?site=latanime' : '')) : '/api/serie/' + slug)).then((r) => r.json()).then((d) => { /* v206 */
     /* v62: animes → una sola lista de episodios, sin miniaturas */
     const eps = esAnime
       ? (d.episodios || []).map((e) => ({ temporada: 1, ep: e.n, url: e.url, titulo: e.titulo || ('Episodio ' + e.n), img: '' }))
@@ -1661,6 +1662,7 @@ const CATALOGOS = {
   caricaturas: { titulo: 'Caricaturas', color: 'var(--cyan)', d: '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/>' },
   cartoons: { titulo: 'Cartoons', color: 'var(--amber)', d: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>' },
   liveaction: { titulo: 'Live Action', color: 'var(--green)', d: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
+  novelas: { titulo: 'Novelas', color: 'var(--pink)', d: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="m17 2-5 5-5-5"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/>' }, /* v206 */
   danimados: { titulo: 'Caricaturas', color: 'var(--cyan)', d: '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/>' },
 };
 let catEstado = null; /* {tipo, nombre, pag, por, hayMas, cargando} */
@@ -1760,6 +1762,7 @@ function elegirTitulo(res, enSala) {
   if (/\/serie\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, false); return true; }
   if (/\/anime\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, true); return true; }
   if (/miscaricaturas\.com\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v102 */
+  if (/novelas360\.com\/categories\//i.test(res.url || '')) { abrirSeriePicker(res, enSala); return true; } /* v206: novelas */
   return false;
 }
 
@@ -1853,6 +1856,7 @@ let SITES = [
   { name: 'PelisXD', full: 'PelisXD — películas en HD (catálogo grande)', url: 'https://www.pelisxd.com/', logo: '/sites/pelisxd.png' }, /* v98 */
   { name: 'Caricaturas', full: 'Mis Caricaturas + Lacartoons — clásicas de nick/CN en latino', url: 'https://miscaricaturas.com/', logo: '/sites/caricaturas.png' }, /* v102; v112: también lacartoons */
   { name: 'YouTube', full: 'YouTube — videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
+  { name: 'Novelas', full: 'Novelas360 — telenovelas por capítulos', url: 'https://novelas360.com/', logo: '/sites/novelas.png' }, /* v206 */
 ];
 function renderPageDrop() {
   const drop = $('#pageDrop');
@@ -3941,6 +3945,13 @@ async function cargarPopulares() {
     if (wrapT && filaT && d.cartoons && d.cartoons.length) {
       d.cartoons.slice(0, 80).forEach((res) => filaT.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrapT.classList.remove('hidden');
+    }
+    /* v206: NOVELAS — telenovelas por capítulos (Novelas360) */
+    const wrapNv = document.querySelector('#nvdBox');
+    const filaNv = document.querySelector('#nvdRow');
+    if (wrapNv && filaNv && d.novelas && d.novelas.length) {
+      d.novelas.forEach((res) => filaNv.appendChild(crearTarjetaResultado(res, alTocar(res))));
+      wrapNv.classList.remove('hidden');
     }
     /* v205: LIVE ACTION — iCarly, Drake & Josh, Power Rangers… ya no
      * viven dentro de Cartoons */
