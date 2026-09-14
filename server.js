@@ -7200,16 +7200,24 @@ async function resolverAnimeflv(epUrl) {
     .map((m) => { try { return Buffer.from(m[1], 'hex').toString('utf8'); } catch { return ''; } })
     .filter((u) => /^https?:\/\//i.test(u));
   const candidatos = [...new Set(embeds.filter((u) => /mp4upload\./i.test(u)))];
-  if (!candidatos.length) throw new Error('Este episodio no tiene servidor mp4upload en AnimeFLV — sus otros servidores no se dejen extraer');
-  const directo = await extraerMp4(candidatos, epUrl);
+  const directo = candidatos.length ? await extraerMp4(candidatos, epUrl).catch(() => null) : null;
   if (directo) return directo;
-  throw new Error('Los servidores mp4upload de este episodio están caídos en AnimeFLV — prueba otra versión del anime o más tarde');
+  /* v205: mp4upload se está acabando (borra archivos a diario) y cada vez
+   * más episodios solo traen ok.ru/yourupload/mail.ru — esos van por el
+   * navegador del server, mismo mecanismo que resucita los de latanime */
+  const nat = await resolverAnimePorNavegador(epUrl, embeds).catch(() => null);
+  if (nat) return nat;
+  if (!candidatos.length) throw new Error('Este episodio no tiene servidores que Huddle pueda abrir en AnimeFLV — prueba otra versión o más tarde');
+  throw new Error('Los servidores de este episodio están caídos en AnimeFLV — prueba otra versión del anime o más tarde');
 }
 /* v93: el navegador del servidor abre el episodio, deja que su
  * reproductor cargue el video, lee la URL que pidió y cierra. El
  * usuario después lo reproduce NATIVO (hls.js/video), como cualquier
- * peli — el navegador solo sirvió para DESCUBRIR la URL. */
-async function resolverAnimePorNavegador(epUrl) {
+ * peli — el navegador solo sirvió para DESCUBRIR la URL.
+ * v205: embedsExternos — AnimeFLV ya NO trae mp4upload en muchos
+ * episodios (ok.ru, yourupload, mail.ru…): le pasamos esa lista y el
+ * mismo mecanismo los prueba dentro del iframe. */
+async function resolverAnimePorNavegador(epUrl, embedsExternos) {
   if (!PUPPETEER) { try { PUPPETEER = require('puppeteer'); } catch { return null; } }
   const browser = await getNavegador();
   if (!browser) return null;
@@ -7258,7 +7266,7 @@ async function resolverAnimePorNavegador(epUrl) {
       }
       return null;
     };
-    const links = await page.evaluate(() => {
+    const links = (embedsExternos && embedsExternos.length) ? embedsExternos.slice() : await page.evaluate(() => {
       try {
         return [...document.querySelectorAll('a.play-video')]
           .filter((a) => (a.getAttribute('data-player') || '').length > 8)
@@ -7292,6 +7300,20 @@ async function resolverAnimePorNavegador(epUrl) {
       /* estos reproductores no se dejan automatizar (anti-bot): solo
        * leer el src si el <video> ya existe — sin esperas largas */
       let hallado = await leerVideoSrc();
+      if (!hallado) { /* v205: algunos solo arrancan con play() desde dentro del frame (muted pasa el bloqueo de autoplay) */
+        for (const fr of page.frames()) {
+          const arranco = await fr.evaluate(() => {
+            try {
+              const v = document.querySelector('video');
+              if (v) { v.muted = true; const p = v.play(); if (p && p.catch) p.catch(() => {}); return true; }
+            } catch {}
+            return false;
+          }).catch(() => false);
+          if (arranco) break;
+        }
+        await new Promise((r3) => setTimeout(r3, 4500));
+        hallado = await leerVideoSrc();
+      }
       if (!hallado && vistos.length) {
         const media = vistos.find((v) => v.tipo === 'm3u8') || vistos.find((v) => v.tipo === 'mp4');
         if (media) hallado = { url: media.url, ref: media.ref || srv };
