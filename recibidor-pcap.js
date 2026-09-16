@@ -332,6 +332,7 @@ function iniciarTcp() {
     let terminando = false;
     let cerrado = false;
     let proximoAviso = 5 * 1024 * 1024;
+    let ultimoEstadoEn = 0;
 
     const terminarConError = (motivo) => {
       if (cerrado) return;
@@ -361,10 +362,16 @@ function iniciarTcp() {
       }
       tam += chunk.length;
       bytesEnCurso = tam;
+      /* La prueba corta también debe mostrar bytes: actualiza el archivo de
+       * estado al primer dato y luego como máximo una vez por 750 ms. */
+      const ahora = Date.now();
+      if (ahora - ultimoEstadoEn >= 750) {
+        ultimoEstadoEn = ahora;
+        guardarEstado({ peer: remoto, temp: true });
+      }
       if (tam >= proximoAviso) {
         log(`TCP recibiendo de ${remoto}: ${bytes(tam)}`);
         proximoAviso += 5 * 1024 * 1024;
-        guardarEstado();
       }
       if (!salida.write(chunk)) {
         socket.pause();
