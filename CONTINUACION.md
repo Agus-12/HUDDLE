@@ -123,7 +123,15 @@ POST `https://{api}/api/vod/info_new`, Content-Type form, body `vod_id={id}&cur_
   cat ~/recibidor.log
   ```
   En PCAPdroid elegir **"TCP Exporter"**, IP `129.80.212.92`, puerto `8080`; capturar/reproducir/detener. Comprobar: `cat ~/captura-movie.pcap.status.json; ls -lh ~/captura-movie.pcap`. TCP no lleva clave: arrancarlo solo para la captura y detenerlo después con `pkill -f '[r]ecibidor-pcap.js'`.
-- **Alternativa al tener el archivo en el teléfono:** arrancar `PCAP_MODE=http PCAP_TOKEN='UNA-CLAVE-LARGA' nohup node recibidor-pcap.js > ~/recibidor.log 2>&1 &`, abrir `http://129.80.212.92:8080/` en el navegador del teléfono, elegir el PCAP y escribir la clave. Estado: `curl -s http://127.0.0.1:8080/health`. Variables: `PCAP_OUT`, `PCAP_PORT`, `PCAP_MAX_MB` (1024 por defecto), `PCAP_IDLE_SECONDS`.
+- **Alternativa al tener el archivo en el teléfono:** en Oracle, pegar:
+  ```bash
+  cd ~/huddle || exit 1
+  pkill -f '[r]ecibidor-pcap.js' 2>/dev/null || true
+  PCAP_MODE=http PCAP_TOKEN='UNA-CLAVE-LARGA' nohup node recibidor-pcap.js > ~/recibidor.log 2>&1 &
+  sleep 1
+  curl -s http://127.0.0.1:8080/health
+  ```
+  Abrir `http://129.80.212.92:8080/` en el navegador del teléfono, elegir el PCAP y escribir la misma clave. Variables: `PCAP_OUT`, `PCAP_PORT`, `PCAP_MAX_MB` (1024 por defecto), `PCAP_IDLE_SECONDS`.
 - Si hacen falta capturas del teléfono: PCAPdroid del amigo (Play Store). CSV export = funciona (solo metadatos, sin URLs). Capturas de pantalla de detalles de conexión = funcionan (leerlas con OCR). PCAP completo = ver §2 cosecha.
 
 ## 7. RESTRICCIONES PERMANENTES DEL USUARIO (obedecer SIEMPRE)
