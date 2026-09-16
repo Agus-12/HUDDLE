@@ -1,0 +1,20 @@
+{
+ "1": {
+  "nombre": "Películas",
+  "primeraPagina": 20,
+  "muestra": [
+   "Coyote contra Acme",
+   "Lilo & Stitch (Tráiler)",
+   "Spider-Man: Brand New Day"
+  ]
+ },
+ "2": {
+  "nombre": "Novela",
+  "primeraPagina": 20,
+  "muestra": [
+   "El señor de los cielos - Temporada 10",
+   "The Mentalist. El mentalista - Temporada 1",
+   "Beauty in Black - Temporada 3"
+  ]
+ }
+}
