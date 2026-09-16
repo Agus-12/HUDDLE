@@ -33,7 +33,7 @@
 - **ÚNICO bloqueo restante:** el `{id-12-hex}` de carpeta por episodio/título. Es un id ALEATORIO de su CMS (no derivable de ids públicos — ya se probó md5/sha1 de web-ep-id, web-vod-id, app-vod-id y combinaciones). Solo aparece en: (a) la respuesta de info_new (cifrada TLS), o (b) **las peticiones HTTP EN CLARO que el app hace al CDN al reproducir** ← la vía práctica.
 - **El amigo ya reprodujo varios episodios** (capturas CSV del 16 sep 02:32 y 04:21; en la de 04:21 hay ~5 m3u8 distintos, 155MB de CDN). Las URLs están en su teléfono — falta extraerlas:
   - **Vía A (preferida):** PCAPdroid → Ajustes → "Volcado PCAP" → **"Archivo PCAP"** (elige carpeta ANTES de capturar, ej. Downloads) → reproducir episodios → el .pcap queda en el teléfono → mandarlo por WhatsApp como documento.
-  - **Vía B (a prueba de balas):** `recibidor-pcap.js` corre en Oracle puerto 8080 (ya abierto en el Security List) y PCAPdroid usa **"TCP Exporter" / pcap-over-IP** con IP `129.80.212.92`, puerto `8080`. Cero archivos en el teléfono; al detener la captura, el PCAP completo queda en `/home/ubuntu/captura-movie.pcap`. **NO usar "Servidor HTTP"**: ese modo deja al teléfono como servidor local, no le manda la captura a Oracle.
+  - **Vía B (a prueba de balas):** `recibidor-pcap.js` corre en Oracle puerto 8080 (ya abierto en el Security List). En PCAPdroid: tocar el **engrane Ajustes** → sección **"Exportador TCP/UDP"** → **"Host del colector"** = `129.80.212.92` y **"Puerto del colector"** = `8080`; volver a la pantalla principal, en **Volcado PCAP** elegir **"Exportador TCP"** y empezar la captura. Cero archivos en el teléfono; al detener la captura, el PCAP completo queda en `/home/ubuntu/captura-movie.pcap`. **NO usar "Servidor HTTP"**: ese modo deja al teléfono como servidor local, no le manda la captura a Oracle. Si no aparece "Exportador TCP", actualizar PCAPdroid (la función existe desde v1.8.6).
   - **Vía C (la que ya funcionó):** el amigo reproduce y manda CAPTURAS DE PANTALLA de PCAPdroid → Conexiones → la conexión HTTP a `movievn.j5t2n.com` → detalle con la URL (la buena es la que dice `index5.m3u8`; las `.ts` también sirven — la carpeta es la misma). El chat anterior leyó esas fotos con **tesseract OCR** (instalar: `sudo apt-get install -y tesseract-ocr`; preprocessar con PIL: 2-3x upscale + escala de grises + contraste 1.4-1.6, probar --psm 6 y 4).
 - **Procesar un pcap recibido:** `tcpdump -nr captura.pcap -A 2>/dev/null | grep -a "GET /vod"` → salen todos los m3u8 y .ts con carpeta. Cada carpeta = ~2 episodios. Luego verificar cada una contra `http://147.124.216.142/vod/1/{...}/index5.m3u8` (200 = buena).
 - **Identificar QUÉ episodio es cada carpeta:** sumar los EXTINF del m3u8 (segundos) y comparar con `vod_duration` del API web (ver §4: info_web_get devuelve la colección con duraciones por episodio). Las duraciones son distintivas.
@@ -122,7 +122,7 @@ POST `https://{api}/api/vod/info_new`, Content-Type form, body `vod_id={id}&cur_
   sleep 1
   cat ~/recibidor.log
   ```
-  En PCAPdroid elegir **"TCP Exporter"**, IP `129.80.212.92`, puerto `8080`; capturar/reproducir/detener. Comprobar: `cat ~/captura-movie.pcap.status.json; ls -lh ~/captura-movie.pcap`. TCP no lleva clave: arrancarlo solo para la captura y detenerlo después con `pkill -f '[r]ecibidor-pcap.js'`.
+  En PCAPdroid: **engrane Ajustes** → **Exportador TCP/UDP** → **Host del colector** = `129.80.212.92`, **Puerto del colector** = `8080`; volver y en **Volcado PCAP** seleccionar **"Exportador TCP"**. Luego capturar/reproducir/detener. Comprobar: `cat ~/captura-movie.pcap.status.json; ls -lh ~/captura-movie.pcap`. TCP no lleva clave: arrancarlo solo para la captura y detenerlo después con `pkill -f '[r]ecibidor-pcap.js'`.
 - **Alternativa al tener el archivo en el teléfono:** en Oracle, pegar:
   ```bash
   cd ~/huddle || exit 1
@@ -174,6 +174,6 @@ POST `https://{api}/api/vod/info_new`, Content-Type form, body `vod_id={id}&cur_
 1. Lee TODO este archivo + `auditorias/hallazgos-cdn.md`.
 2. Clona el repo (el PAT te lo da el usuario) y mira el estado.
 3. Lo más probable es que estés en medio de LA COSECHA: el amigo mandó/mandará un .pcap o fotos → extrae las URLs `/vod/1/.../index5.m3u8` (§2), verifica cada una contra el origen pelado, identifica los episodios por duración contra info_web_get, y arma la sección Movie en Huddle con audio latino.
-4. Si la cosecha se atora: usar `recibidor-pcap.js` v3 + PCAPdroid **"TCP Exporter" / pcap-over-IP** (§2 vía B), NO "Servidor HTTP". La alternativa de archivo ya guardado es `PCAP_MODE=http` con clave (§6).
+4. Si la cosecha se atora: usar `recibidor-pcap.js` v3 + PCAPdroid **"Exportador TCP" / pcap-over-IP**: primero configurar en Ajustes → Exportador TCP/UDP → Host/Puerto del colector (§2 vía B), luego elegir ese modo en Volcado PCAP. NO "Servidor HTTP". La alternativa de archivo ya guardado es `PCAP_MODE=http` con clave (§6).
 5. Cualquier avance → actualiza ESTE archivo (estado, hallazgos, dead ends) → commit → push (`git push origin HEAD:main`).
 6. Recuérdale al usuario revocar el PAT al final.
