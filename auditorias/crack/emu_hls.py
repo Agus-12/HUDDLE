@@ -101,7 +101,37 @@ class Host:
         self.calls['calloc'] += 1
         a = self._alloc(max(n * sz, 16))
         self.uc.mem_write(a, b'\0' * (n * sz))
+        self.track_alloc(a, n * sz)
         return a
+
+    # --- rastreo de strings que la VM construye en el heap ---
+    watched = {}
+    seen_strings = []
+    snapshots = {}
+
+    def track_alloc(self, a, size):
+        if 1 <= size <= 256:
+            self.watched[a] = size
+            self.snapshots[a] = bytes(self.uc.mem_read(a, size))
+
+    def scan_strings(self):
+        """Recoge texto nuevo en las zonas pequeñas reservadas por la VM."""
+        out = []
+        for a, size in list(self.watched.items()):
+            try:
+                b = bytes(self.uc.mem_read(a, size))
+            except Exception:
+                continue
+            if b == self.snapshots.get(a):
+                continue
+            self.snapshots[a] = b
+            for t in b.split(b'\0'):
+                if len(t) >= 3 and all(32 <= c < 127 for c in t):
+                    txt = t.decode()
+                    if txt not in self.seen_strings:
+                        self.seen_strings.append(txt)
+                        out.append((hex(a), txt))
+        return out
 
     def free(self, a):
         self.calls['free'] += 1
@@ -431,6 +461,7 @@ class Emu:
         self.bad_svc = []
         self.opcode_count = 0
         self.opcodes = []
+        self.dispatch = []
         self.vm_trace = []
 
     # -- relocalizaciones --
@@ -515,6 +546,7 @@ class Emu:
             self.block_hits[address] += 1
             if address == BASE + 0xf0154:      # br x0 del dispatcher de opcodes
                 self.opcode_count += 1
+                self.dispatch.append(uc.reg_read(UC_ARM64_REG_X0))
             if len(self.block_seq) < self.trace_blocks:
                 self.block_seq.append(address)
             if self.block_hits[address] == 3_000_000:
@@ -591,6 +623,17 @@ class Emu:
                 self._do_jni(address)
 
         uc.hook_add(UC_HOOK_BLOCK, on_jni, begin=JNI_PAGE, end=JNI_PAGE + 0x40000)
+
+        def on_read_jni_table(uc, access, address, size, value, ud):
+            pc = uc.reg_read(UC_ARM64_REG_PC)
+            if self.jni_table and self.jni_table <= address < self.jni_table + 232 * 8:
+                idx = (address - self.jni_table) // 8
+                self.jni_reads.append((idx, pc))
+                if len(self.jni_reads) < 200:
+                    log(f'    [lectura tabla JNIEnv[{idx}] desde {hex(pc)}]')
+
+        uc.hook_add(UC_HOOK_MEM_READ, on_read_jni_table,
+                    begin=HEAP_BASE, end=HEAP_BASE + HEAP_SZ)
         uc.hook_add(UC_HOOK_BLOCK, on_block)
         uc.hook_add(UC_HOOK_INTR, on_intr)
         uc.hook_add(UC_HOOK_MEM_READ_UNMAPPED | UC_HOOK_MEM_WRITE_UNMAPPED |
@@ -722,7 +765,10 @@ class Emu:
                 pp = struct.unpack('<Q', bytes(uc.mem_read(avalue + i * 8, 8)))[0]
                 v = struct.unpack('<Q', bytes(uc.mem_read(pp, 8)))[0] if pp else 0
                 ptrs.append(v)
-            log(f'    [ffi_call fn={hex(fn)} nargs={nargs} args={tuple(hex(x) for x in ptrs[:5])}]')
+            if not hasattr(self, 'ffi_calls'):
+                self.ffi_calls = []
+            self.ffi_calls.append((fn, nargs, tuple(ptrs[:5])))
+            log(f'    [ffi_call #{len(self.ffi_calls)} fn={hex(fn)} nargs={nargs} args={tuple(hex(x) for x in ptrs[:5])}]')
             if not fn:
                 log('    [ffi_call fn=0 → sonda, no hace nada]')
                 uc.reg_write(UC_ARM64_REG_X0, 0)
@@ -913,12 +959,15 @@ class Emu:
         self.jni_natives = []     # (clase, nombre, firma, fn)
         self.jni_arrays = {}
         self.next_ref = 0x8100
+        self.jni_reads = []
+        self.ffi_calls = []
         table = self.host._alloc(232 * 8)
         for i in range(232):
             a = JNI_PAGE + 0x1000 + i * 0x10
             self.JNI_SLOT_ADDR[a] = i
             uc.mem_write(a, b'\xc0\x03\x5f\xd6')
             uc.mem_write(table + i * 8, struct.pack('<Q', a))
+        self.jni_table = table
         env = self.host._alloc(8)
         uc.mem_write(env, struct.pack('<Q', table))
         itab = self.host._alloc(7 * 8)
@@ -960,6 +1009,19 @@ class Emu:
                 log(f'    [JNI vm slot {slot[1]} -> 0]')
         else:
             nm = self.JNI_NAMES.get(slot, f'slot{slot}')
+            if True:
+                for addr, txt in self.host.scan_strings():
+                    log(f'    [string VM {addr}: "{txt}"]')
+                # la VM lee el JNIEnv: registrar qué slot toca
+                for i in range(8):
+                    v = a[i]
+                    if self.jni_env and v == self.jni_env:
+                        log(f'    [la VM usa JNIEnv (arg {i})]')
+                    if v and (v - self.jni_table) // 8 == (v - self.jni_table) // 8 and \
+                            self.jni_table <= v < self.jni_table + 232 * 8:
+                        log(f'    [la VM toca la tabla JNIEnv índice {(v - self.jni_table)//8}]')
+            if nm == 'GetEnv' or (isinstance(slot, tuple) and slot[1] == 6):
+                self.after_getenv_ops = len(self.opcodes)
             if nm == 'FindClass':
                 cname = self.host.rstr(a[1]).decode('latin1', 'replace')
                 r = self._jni_ref(('class', cname))
@@ -1193,6 +1255,22 @@ def main():
         print('\n(el bytecode no cambió)')
 
     from collections import Counter as _C
+    log('\n== todas las llamadas ffi ==')
+    for i, (fn, n, args) in enumerate(getattr(emu, 'ffi_calls', []), 1):
+        tag = 'DENTRO LIB' if BASE <= fn < BASE + 0x200000 else (
+              'JNI' if JNI_PAGE <= fn < JNI_PAGE + 0x40000 else 'fuera')
+        log(f'  #{i} fn={hex(fn)} ({tag}) nargs={n} args={tuple(hex(x) for x in args)}')
+
+    log('\n== lecturas a la tabla JNIEnv (índice, PC) ==')
+    from collections import Counter as _CC
+    log(f'  total {len(emu.jni_reads)} | por índice: {_CC(i for i, _ in emu.jni_reads).most_common(20)}')
+    log(f'  últimas 15: {[(i, hex(p)) for i, p in emu.jni_reads[-15:]]}')
+
+    log('\n== strings que la VM escribió en el heap ==')
+    for addr, txt in emu.host.scan_strings():
+        log(f'  {addr}: "{txt}"')
+    log(f'  (total {len(emu.host.seen_strings)})')
+
     log(f'\nopcodes ejecutados: {len(emu.opcodes)} | distintos: {sorted(set(emu.opcodes))}')
     log(f'frecuencia: {_C(emu.opcodes).most_common(30)}')
     log(f'últimos 40 opcodes: {emu.opcodes[-40:]}')
