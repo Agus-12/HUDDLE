@@ -25,3 +25,7 @@ movie-mapa-secuencias.json
 movie-mapa-secuencias.txt
 movie-mapa-local.json
 movie-rutas-caidas.json
+
+# volcados grandes reproducibles con rc4_jiagu.py
+auditorias/crack/mips_descifrado.bin
+auditorias/crack/mips_inflado.bin

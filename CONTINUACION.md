@@ -22,6 +22,24 @@
 
 ## 2. ESTADO DEL PROYECTO (17 sep 2026)
 
+### 🔓🔓🔓🔓 CRACK (18 sep, VERIFICADO): CIFRADO DE JIAGU RESUELTO — RC4 con PRGA no estándar
+- **Se descifró la sección `.mips` de `jiagu_descifrada.so` de punta a punta y está COMPROBADO**, no es conjetura:
+  1. `emu_jiagu.py` ahora pone un hook de bloque en `JBASE+0x64bc` y vuelca el **S-box ya inicializado** (`rc4_sbox_1.bin`, 256 B, i0=3 j0=5) en el momento de la llamada. Llamada observada: `buf=0x200198f0 len=599897 estado=0x20019740` — `len` == tamaño exacto de `.mips`.
+  2. `rc4_jiagu.py` reproduce la PRGA y descifra: cabeza `81fd1400 789c7cdd…`
+  3. **Doble prueba de corrección:** los primeros 4 bytes son el tamaño descomprimido en little-endian (`0x0014fd81` = **1,375,617**) y `zlib.decompress(blob[4:])` devuelve **exactamente 1,375,617 B** → `mips_inflado.bin`. Coincide byte a byte en contenido con `jiagu_modulo_vivo.bin` capturado antes en el emulador (3× `HTTP/1.1`, 7× `sign`, desplazados por la base de carga).
+- **La PRGA NO es RC4 estándar** (leída de `0x64bc..0x6540`; esto es lo que hizo fracasar los intentos anteriores con RC4 normal):
+  ```
+  i = (i + 2) & 0xff            # ¡+2, no +1!
+  j = (S[i] + j + 1) & 0xff     # ¡+1 extra!
+  a, b = S[i], S[j]             # valores ANTES del swap
+  S[i], S[j] = b, a
+  ks = S[(a + b) & 0xff]        # índice con los valores pre-swap
+  out ^= ks
+  ```
+  Estado: `[0x000..0x0ff]` = S-box, `[0x100]` = i, `[0x101]` = j. La KSA está en otra parte y **ya no hace falta reimplementarla**: basta capturar el S-box con el hook.
+- **Formato del blob:** `u32 LE (tamaño final) || zlib(deflate)`. Herramienta reutilizable: **`auditorias/crack/rc4_jiagu.py`** (`python3 rc4_jiagu.py [lib.so] [sbox.bin] [prefijo]`) — imprime `COINCIDE ✔` cuando el tamaño declarado y el de zlib cuadran, o `zlib FALLÓ` si el S-box no corresponde. Sirve para cualquier otra lib cifrada igual.
+- **El sign NO está en este módulo.** Búsqueda en `mips_inflado.bin`: `/control` 0, `msg=` 0, `device_id` 0, `verify` 0, `/api/` 0, `info_new` 0, `wsSecret` 0. Sus plantillas HTTP son de **cliente** (`GET %s HTTP/1.1`, `POST %s HTTP/1.1`). → **Siguiente objetivo: aplicar exactamente este mismo método (hook de S-box + `rc4_jiagu.py`) al `.mips` de `libpp_hls.so`** (0x1607d0, 0x17621e B), que es donde vive `com.pp.hls.load()` y, por tanto, el servidor de control.
+
 ### ⚠️ GIT (18 sep, LEER PRIMERO): el repo estaba desincronizado — ya corregido
 - **El remoto era la verdad: `origin/main = 9aabe50`** con 22 commits que este workspace no tenía (v208 `ffc2b66`, v209 `771dd96` y TODO el crack). La rama local era una **reconstrucción divergente** hecha por el snapshot (v207 local = `244e3b5`, v207 remoto = `1f19000`: mismo mensaje, distinto SHA). Se hizo `git reset --hard` al remoto; los archivos de código (`server.js`, `CONTINUACION.md`, `public/`, `catalogo-movie.js`) eran **byte a byte idénticos** al remoto, no se perdió nada.
 - **`.git/config` lo borra el snapshot** (excluye rutas de credenciales) → `git remote -v` salía vacío y no se podía hacer push. Restaurado con `origin = https://github.com/Agus-12/HUDDLE.git` (URL sin token) + `user.name "Huddle Bot"` / `user.email huddle@local`. **El push se hace con la URL one-shot del PAT, nunca se guarda el token en el repo.**

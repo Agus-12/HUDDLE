@@ -21,7 +21,17 @@ import emu_hls as eh
 from emu_hls import BASE, RET_MAGIC, log, HOOKS_ADDR, HOOKS_NAME, ELFFile
 from unicorn import UC_HOOK_BLOCK, UcError
 from unicorn.arm64_const import (UC_ARM64_REG_X0, UC_ARM64_REG_X1,
-                                 UC_ARM64_REG_X2)
+                                 UC_ARM64_REG_X2, UC_ARM64_REG_X30)
+
+# Cifrado del módulo .mips: RC4 con PRGA no estándar en 0x64bc.
+#   x0 = buffer (se cifra/descifra in situ), x1 = longitud, x2 = struct de estado
+#   estado: [0x000..0x0ff] = S-box, [0x100] = i, [0x101] = j
+#   PRGA:  i += 2; j = S[i] + j + 1; swap(S[i],S[j]);
+#          out ^= S[(S[i_ANTES] + S[j_DESPUES]) & 0xff]
+# Con el S-box ya inicializado (post-KSA) se puede reproducir en Python sin
+# reimplementar la KSA — por eso se vuelca aquí.
+RC4_OFF = 0x64bc
+RC4_RET = 0x655c
 
 JLIB = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                     'jiagu_descifrada.so')
@@ -1222,6 +1232,50 @@ class JiaguEmu:
 
         uc.hook_add(UC_HOOK_MEM_WRITE, on_mod_write,
                     begin=MBASE, end=MBASE + MSIZE)
+
+        # ---- volcado del RC4 (0x64bc): entradas + S-box + salida ----
+        self.rc4_calls = []
+
+        def on_rc4(uc, address, size, ud):
+            off = address - JBASE
+            if off == RC4_OFF:
+                x0 = uc.reg_read(UC_ARM64_REG_X0)
+                x1 = uc.reg_read(UC_ARM64_REG_X1)
+                x2 = uc.reg_read(UC_ARM64_REG_X2)
+                info = {'buf': x0, 'len': x1, 'state': x2}
+                self.rc4_calls.append(info)
+                log(f'\n[RC4] llamada #{len(self.rc4_calls)}: buf={hex(x0)} '
+                    f'len={x1} ({hex(x1)}) estado={hex(x2)}')
+                if 0 < x1 <= 8 << 20:
+                    info['entrada'] = bytes(uc.mem_read(x0, x1))
+                try:
+                    info['sbox'] = bytes(uc.mem_read(x2, 0x100))
+                    info['i0'] = uc.mem_read(x2 + 0x100, 1)[0]
+                    info['j0'] = uc.mem_read(x2 + 0x101, 1)[0]
+                    log(f'[RC4]   S-box capturado (i0={info["i0"]} '
+                        f'j0={info["j0"]}): {info["sbox"][:24].hex()}…')
+                    d = os.path.dirname(os.path.abspath(__file__))
+                    p = os.path.join(d, f'rc4_sbox_{len(self.rc4_calls)}.bin')
+                    open(p, 'wb').write(info['sbox'])
+                    log(f'[RC4]   → {p}')
+                except Exception as e:
+                    log(f'[RC4]   no pude leer el estado: {e}')
+            elif off == RC4_RET and self.rc4_calls:
+                info = self.rc4_calls[-1]
+                if info.get('salida') is None and info.get('len'):
+                    try:
+                        info['salida'] = bytes(uc.mem_read(info['buf'],
+                                                           info['len']))
+                        d = os.path.dirname(os.path.abspath(__file__))
+                        p = os.path.join(
+                            d, f'rc4_out_{len(self.rc4_calls)}.bin')
+                        open(p, 'wb').write(info['salida'])
+                        log(f'[RC4]   salida {len(info["salida"])} B → {p} '
+                            f'(cabeza {info["salida"][:8].hex()})')
+                    except Exception as e:
+                        log(f'[RC4]   no pude leer la salida: {e}')
+
+        uc.hook_add(UC_HOOK_BLOCK, on_rc4, begin=JBASE, end=JBASE + 0x100000)
 
     def jni_onload(self, budget=60_000_000):
         log('\n=== jiagu: JNI_OnLoad ===')
