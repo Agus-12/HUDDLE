@@ -1,4 +1,14 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
+
+## 🚀 EMPIEZA AQUÍ (nuevo chat: haz esto EN ORDEN, sin saltar nada)
+1. **Clona el repo** (el PAT te lo da el usuario en el chat, NUNCA está en este archivo porque el repo es público): `git clone https://{PAT}@github.com/Agus-12/HUDDLE.git ~/huddle`
+2. **Lee ESTE archivo completo** + `auditorias/hallazgos-cdn.md` + `auditorias/RESUMEN-COSECHA-PCAP.md` (el mapa con carpetas por novela/episodio).
+3. **Trabaja SIEMPRE dentro del clone del repo** (`~/huddle`). EL REPO ES EL WORKSPACE OFICIAL del proyecto — nada de trabajo importante fuera de él. Así el contexto del chat no se satura: el estado REAL siempre está aquí, en archivos.
+4. La **acción pendiente de este momento** está en §2 "📋 SIGUIENTE PASO" (al día: integrar en Huddle las 5 rutas latinas activas del mapa de secuencias).
+5. **Después de CADA avance o cambio** (sin excepción): actualiza este archivo (estado, hallazgos, dead ends) → `git add -A` → `git commit -m "..."` → `git push origin HEAD:main`. El usuario recibe los cambios en su servidor con `bash actualizar.sh`.
+6. Si el sandbox se resetea a media sesión (pasa: borra .git, node_modules, paquetes, archivos grandes): re-clona o recupera con `git init + git fetch origin + git reset --hard origin/main`, reinstala lo que falte y SIGUE. Nunca empieces de cero: todo lo importante vive aquí.
+
+> **PARA EL CHAT QUE RECIBA ESTE ARCHIVO:** Este archivo es la memoria del proyecto: el chat anterior lo dejó actualizado y TÚ debes dejarlo más actualizado aún. **Regla de oro 1: después de cada avance, actualiza este archivo y súbelo al repo. Regla de oro 2: el repo es el workspace — trabaja desde el clone, no desde archivos sueltos. El workspace del chat NO persiste; el repo SÍ.**
 > **PARA EL CHAT QUE RECIBA ESTE ARCHIVO:** Lee esto COMPLETO antes de responder nada. Este archivo es la memoria del proyecto: el chat anterior lo dejó actualizado y TÚ debes dejarlo más actualizado aún. **Regla de oro: después de cada avance o cambio, actualiza este archivo y súbelo al repo (git commit + push). Nunca dejes el trabajo solo en tu workspace — el workspace NO persiste entre chats; el repo SÍ.**
 
 ---
