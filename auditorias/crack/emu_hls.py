@@ -629,7 +629,7 @@ class Emu:
             if self.jni_table and self.jni_table <= address < self.jni_table + 232 * 8:
                 idx = (address - self.jni_table) // 8
                 self.jni_reads.append((idx, pc))
-                if len(self.jni_reads) < 200:
+                if len(self.jni_reads) < 2000:
                     log(f'    [lectura tabla JNIEnv[{idx}] desde {hex(pc)}]')
 
         uc.hook_add(UC_HOOK_MEM_READ, on_read_jni_table,
@@ -735,7 +735,10 @@ class Emu:
             log(f'    [ffi_call_SYSV prep={hex(a[0])} bloque={hex(a[1])} fn={hex(a[4])}]')
             self._ffi_call_SYSV(a[0], a[1], a[2], a[4])
             return
-        if off == 0xf5088:                      # ffi_call(cif, fn, rvalue, avalue)
+        if off == 0xf5088:
+            self._ffi_call_entry()
+            return
+        if False:
             a = [uc.reg_read(getattr(A64, f'UC_ARM64_REG_X{i}')) for i in range(4)]
             cif, fn, rvalue, avalue = a
             lr = uc.reg_read(UC_ARM64_REG_LR)
@@ -1090,6 +1093,65 @@ class Emu:
             return self._jni_ref(('str', b'MX'))
         return 0
 
+
+    def _ffi_call_entry(self):
+        """ffi_call(cif, fn, rvalue, avalue) — ABI real de libffi."""
+        uc = self.uc
+        cif, fn, rvalue, avalue = (uc.reg_read(getattr(A64, f'UC_ARM64_REG_X{i}')) for i in range(4))
+        abi = struct.unpack('<I', bytes(uc.mem_read(cif, 4)))[0] if cif else 0
+        if abi != 1:
+            log(f'    [ffi_call abi={abi} != FFI_SYSV -> nada]')
+            uc.reg_write(UC_ARM64_REG_X0, 0)
+            self._ret()
+            return
+        nargs = struct.unpack('<I', bytes(uc.mem_read(cif + 0x18, 4)))[0]
+        rtype = struct.unpack('<Q', bytes(uc.mem_read(cif + 0x08, 8)))[0]
+        atypes = struct.unpack('<Q', bytes(uc.mem_read(cif + 0x10, 8)))[0]
+        nargs = min(max(nargs, 0), 8)
+        sizes = []
+        for i in range(nargs):
+            ap = struct.unpack('<Q', bytes(uc.mem_read(atypes + i * 8, 8)))[0]
+            sizes.append(struct.unpack('<I', bytes(uc.mem_read(ap, 4)))[0] if ap else 8)
+        args = []
+        for i in range(nargs):
+            pp = struct.unpack('<Q', bytes(uc.mem_read(avalue + i * 8, 8)))[0]
+            sz = sizes[i] if i < len(sizes) else 8
+            if not pp:
+                args.append(0)
+                continue
+            raw = bytes(uc.mem_read(pp, min(sz, 8)))
+            if sz <= 1:
+                args.append(struct.unpack('<B', raw[:1])[0])
+            elif sz <= 2:
+                args.append(struct.unpack('<H', raw[:2])[0])
+            elif sz <= 4:
+                args.append(struct.unpack('<I', raw[:4])[0])
+            else:
+                args.append(struct.unpack('<Q', raw.ljust(8, b'\0'))[0])
+        self.ffi_calls.append((fn, nargs, tuple(args[:5])))
+        log(f'    [ffi_call #{len(self.ffi_calls)} fn={hex(fn)} nargs={nargs} sizes={sizes} args={tuple(hex(x) for x in args[:5])}]')
+        if not fn:
+            log('    [ffi_call fn=0 -> sonda, no hace nada]')
+            uc.reg_write(UC_ARM64_REG_X0, 0)
+            self._ret()
+            return
+        self.call(fn, args, budget=30_000_000, label=f'ffi->{hex(fn)}', quiet=True)
+        if rvalue:
+            rsz = struct.unpack('<I', bytes(uc.mem_read(rtype, 4)))[0] if rtype else 8
+            x0 = uc.reg_read(UC_ARM64_REG_X0)
+            try:
+                if rsz <= 1:
+                    uc.mem_write(rvalue, struct.pack('<B', x0 & 0xff))
+                elif rsz <= 2:
+                    uc.mem_write(rvalue, struct.pack('<H', x0 & 0xffff))
+                elif rsz <= 4:
+                    uc.mem_write(rvalue, struct.pack('<I', x0 & 0xffffffff))
+                else:
+                    uc.mem_write(rvalue, struct.pack('<Q', x0))
+            except Exception as e:
+                log(f'    !! no pude escribir rvalue {hex(rvalue)}: {e}')
+        self._ret()
+
     def _do_call(self, addr):
         uc = self.uc
         nm = HOOKS_NAME[addr]
@@ -1265,6 +1327,25 @@ def main():
     from collections import Counter as _CC
     log(f'  total {len(emu.jni_reads)} | por índice: {_CC(i for i, _ in emu.jni_reads).most_common(20)}')
     log(f'  últimas 15: {[(i, hex(p)) for i, p in emu.jni_reads[-15:]]}')
+
+    log('\n== zonas de memoria con algo escrito (fuera de la imagen original) ==')
+    import math as _m
+    for start, end, name in ((HEAP_BASE, emu.host.next_alloc, 'heap'),
+                             (MMAP_FIRST, emu.host.next_mmap, 'mmap'),
+                             (STACK_BASE, STACK_BASE + STACK_SZ, 'stack')):
+        a = start
+        while a < end:
+            n = min(0x40000, end - a)
+            try:
+                blk = bytes(emu.uc.mem_read(a, n))
+            except Exception:
+                a += n; continue
+            nz = sum(1 for b in blk if b)
+            if nz > 64:
+                cnt = Counter(blk)
+                ent = -sum((v / n) * _m.log2(v / n) for v in cnt.values())
+                log(f'  {name} {hex(a)}+{hex(n)}: {nz} bytes no nulos, entropía {ent:.2f}')
+            a += n
 
     log('\n== strings que la VM escribió en el heap ==')
     for addr, txt in emu.host.scan_strings():
