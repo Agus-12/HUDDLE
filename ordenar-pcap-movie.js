@@ -18,8 +18,8 @@
  *   ~/movie-pcap-orden.txt
  *
  * Requiere tcpdump (ya usado para extraer las rutas originales). El filtro
- * BPF deja pasar solo paquetes cuyo payload empieza por GET o POST, para no
- * recorrer/imprimir los cientos de MB de segmentos MPEG-TS.
+ * BPF deja pasar solo tráfico TCP SALIENTE hacia HTTP/80: incluye solicitudes
+ * y excluye las respuestas MPEG-TS de cientos de MB.
  */
 
 const fs = require('fs');
@@ -113,10 +113,11 @@ function peticionDePaquete(cabecera, lineas) {
   };
 }
 
-/* tcpdump con este BPF solo emite el paquete que comienza con GET/POST.
- * Si algún dispositivo divide las primeras cuatro letras entre paquetes,
- * el resumen avisará que no encontró solicitudes y conserva el PCAP intacto. */
-const BPF = 'tcp[((tcp[12] & 0xf0) >> 2):4] = 0x47455420 or tcp[((tcp[12] & 0xf0) >> 2):4] = 0x504f5354';
+/* El reproductor usa HTTP/80. Filtrar por dirección evita imprimir los
+ * segmentos, que son respuestas cuyo puerto de origen es 80. El filtro
+ * anterior por desplazamiento del encabezado TCP no funciona en todas las
+ * variantes de captura de PCAPdroid, por eso no se usa. */
+const BPF = 'tcp dst port 80';
 
 function leerPeticiones() {
   return new Promise((resolve, reject) => {
