@@ -1505,6 +1505,33 @@ def main():
             for pa, v in candidatos[-20:]:
                 log(f'    [{hex(pa)}] -> {hex(v)}')
 
+    # ---------- FASE 5 (opcional): __arm_a_1(MEMORYMODULE*, Cryptor*) ----------
+    if '--a1' in sys.argv:
+        log('\n== FASE 5: __arm_a_1 (0xe7998) con MEMORYMODULE/Cryptor de juguete ==')
+        mm = emu.host._alloc(0x400)
+        cr = emu.host._alloc(0x200)
+        emu.uc.mem_write(mm, b'\0' * 0x400)
+        emu.uc.mem_write(cr, b'\0' * 0x200)
+        antes_ops = len(emu.opcodes)
+        antes_dl = len(emu.host.dlopen_log)
+        antes_ds = len(emu.host.dlsym_log)
+        antes_str = len(emu.host.seen_strings)
+        try:
+            rv = emu.call(BASE + 0xe7998, (mm, cr), budget=100_000_000, label='__arm_a_1')
+            log(f'__arm_a_1 devolvió {hex(rv)}')
+        except Exception as ex:
+            log(f'  __arm_a_1 abortó: {str(ex)[:140]}')
+        log(f'opcodes nuevos: {len(emu.opcodes) - antes_ops} | distintos nuevos: {sorted(set(emu.opcodes[antes_ops:]))}')
+        log(f'dlopen nuevos: {emu.host.dlopen_log[antes_dl:]}')
+        log(f'dlsym nuevos: {emu.host.dlsym_log[antes_ds:]}')
+        for t in emu.host.seen_strings[antes_str:][:20]:
+            log(f'  string nueva: "{t[:90]}"')
+        log(f'ffi_calls: {len(emu.ffi_calls)}')
+        for i, (fn, n, args) in enumerate(emu.ffi_calls, 1):
+            log(f'  ffi #{i} fn={hex(fn)} nargs={n} args={tuple(hex(x) for x in args)}')
+        log(f'jni_reads: {len(emu.jni_reads)} últimas {[(i, hex(p2)) for i, p2 in emu.jni_reads[-10:]]}')
+        log(f'últimos 30 pasos VM: {emu.vm_trace[-30:]}')
+
     if do_dump:
         emu.dump(os.path.join(HERE, 'bss_dump.bin'))
 

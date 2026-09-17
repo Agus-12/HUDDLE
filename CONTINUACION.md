@@ -22,6 +22,14 @@
 
 ## 2. ESTADO DEL PROYECTO (17 sep 2026)
 
+### 🔓 CRACK (17 sep): ENCONTRADO el servidor de control + candidata a función sign
+- **El servidor HTTP de control NO está en libpp_hls.so**: está en **`lib/arm64-v8a/libjiagu_sdk_pp_hlsProtected.so`** (759 KB, ya extraída al repo). Imports REALES de red: `socket, bind, listen, accept, recv, send, connect, epoll_*, inet_aton, fork, pthread_create` + string `127.0.0.1`. Esta lib es el cargador jiagu que además sirve `/control?msg=verify...`.
+- Sus 8 exports tienen NOMBRE REAL: `JNI_OnLoad`, `__arm_a_0()`, **`__arm_a_1(_JavaVM*, _JNIEnv*, void*, int&)`**, **`__arm_a_2(char*, ulong, char*, int&, int)` ← candidata FUERTE a la función sign** (datos, largo, buffer salida, largo salida&, flags), `__arm_a_20()`, `__arm_a_21()`, `DynCryptor::__arm_c_0()`, `__arm_c_1::__arm_c_0()`.
+- Su .text está CIFRADO en disco (entropía 7.65; los exports empiezan con un prefijo común de 20 bytes = stub de descifrado/VM). Estático no se puede leer — hay que emularla y volcar el .text descifrado (igual que con libpp_hls).
+- libpp_hls.so: los 46 exports de la zona JNI son **cascarones vacíos** (solo ret). `__arm_a_0(soinfo*)` sí trabaja: parsea, arma estructuras y por ffi llama a lib+0xf8ba4 que guarda `(JavaVM*, ptr)` en un ctx. `__arm_a_1(MEMORYMODULE*, Cryptor*)` corre otra VM (bytecode 0xfaa04, 372 B) que por ffi llama a lib+0xfa29c: valida el Cryptor (vtable+0x18), copia 2 punteros al ctx, crea un objeto y lo encadena en una lista global (0x5d8e20, eslabones +0x1d8) — plomería cripto interna. Ni dlopen/dlsym ni SVC en ninguna de estas rutas.
+- DEX: el APK completo tiene **solo 2 métodos nativos** (compose + ironsource, irrelevantes) → Java NO llama natives del pp_hls directamente; todo va por el servidor de control 127.0.0.1 y/o RegisterNatives del jiagu en runtime.
+- **Plan:** emular libjiagu_sdk_pp_hlsProtected.so (759 KB, 106 imports — hay que añadir stubs socket/epoll/pthread/fork al harness), correr su init/JNI_OnLoad, volcar el .text descifrado, desensamblar `__arm_a_2` y el servidor de control. Si `__arm_a_2` es el sign → oráculo directo; si no, alimentar `msg=verify` al servidor emulado.
+
 ### 🩹 v209 — Lacartoons: capítulo borrado daba un error críptico («aborted») (17 sep, este chat)
 El usuario reportó que *Un Show Más* no reproducía y salía un error tipo «aborted». **No fue causado por v208** — el diagnóstico real:
 - *Un Show Más* 1x1 (`lacartoons.com/serie/capitulo/22984`) tiene el player id `lbrig`, y la API del player responde **404 `Video not found or deleted`**: la fuente borró ESE capítulo. Los caps 1x2/1x3 (ids `ejla6`/`mlhop`) responden 200 y reproducen bien (m3u8 200 + segmentos 200 verificados).
