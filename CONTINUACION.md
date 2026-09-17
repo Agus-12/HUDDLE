@@ -22,6 +22,26 @@
 
 ## 2. ESTADO DEL PROYECTO (17 sep 2026)
 
+### 🔓🔓🔓🔓🔓 CRACK (18 sep, EL AVANCE GRANDE): `libpp_hls.so` DESCIFRADO — EL SERVIDOR DE CONTROL AL DESNUDO
+- **El `.mips` de `libpp_hls.so` usa EL MISMO cifrado que jiagu** (mismo S-box capturado, misma PRGA). `python3 rc4_jiagu.py ../apk/lib/arm64-v8a/libpp_hls.so rc4_sbox_1.bin pphls_mips` → `COINCIDE ✔`.
+  - `.mips`: va 0x1607d0, off 0x1507d0, **1,532,446 B** (0x17621e). Descifrado → header LE `0x0033bfc1` = **3,391,425** y zlib dio exactamente 3,391,425 B → **`pphls_mips_inflado.bin`** (3.3 MB, en `.gitignore` por tamaño; se regenera con ese comando).
+  - **Esto invalida dos notas previas:** NO hay KSA/PRGA en el `.text` de libpp_hls (0 referencias a `[xN,#0x100]`/`[xN,#0x101]`/`cmp #0x100` en 0x6d350–0xfa1e8), y su `.mips` **no** está en 0x1607d0 con tamaño 0x17621e "sin descifrar": ya está descifrado.
+- **El módulo NO es un ELF**: empieza `e1 c0 01 00 00 e0 e1 e1 e1 …` (0xe0/0xe1 por todas partes) → es **bytecode de la VM**, igual que el módulo de jiagu. Por eso no se puede desensamblar directamente.
+- **EL SERVIDOR HTTP ESTÁ AQUÍ** (esto es lo que faltaba). Cadena literal `Server: bad_sdk`. Rutas que acepta:
+  `control` (con `msg=verify` y `msg=up_ck`), `download_control`, `download_info`, `net_info`, `resource` (`resource.mp4`/`resource.m3u8`), `ts`, `m3u8_key`, `/favicon.ico`.
+  Parámetros: `src`, `type`, `resource`, `msg`, `nettype`, `device_id`.
+  Respuestas: `HTTP/1.1 200 OK`, `206 Partial Content`, `403 Forbidden`, `400 Bad Request`, `416`, `503`; JSON `{"code":%d,"message":"%s","resource":"%s"}`; `Content-Range: bytes %lld-%lld/%d`.
+  Nombres internos: `client_accept`, `client_request_thread`, `client_request_init`, `client_recv`, `client_destroy`, `init_interface`, `init done, port:%u`, `create p2p interface failed`, `0.0.0.0`, clave de config **`server_port`** (= el puerto que devuelve `com.pp.hls.load(...)`), `p2p_tracker_addr`, `p2p_port`, `update_config`, `get1_config`, `get1_resource`, `get1_download_info`, `preload_mp4`.
+  Es un **SDK de caché P2P**: baja el stream del CDN, lo cachea y lo sirve por HTTP local, con `Range`, `mp4`/`m3u8`/`ts` y llaves HLS.
+- **Los formatos de firma del CDN están todos aquí** (los genera el SDK para ir al origen):
+  - Wangsu: **`wsSecret=%s&wsTime=%x`** (y variante `%u`)
+  - Aliyun: **`auth_key=%d-%d-%d-%s`** (plantilla `%s-%d-%d-%d-%s`)
+  - **CloudFront: `Signature=%s&Expires=%u&Key-Pair-Id=%s`** con policy **`{"Statement":[{"Resource":"%s%s","Condition":{"DateLessThan":{"AWS:EpochTime":%u}}}]}`** y el error `sign error` → **esto explica los 403 `FunctionGeneratedResponse` del CDN: son URLs firmadas CloudFront con caducidad.**
+  - **`verify=%u-%s`** ← formato de la respuesta del `control?msg=verify`: `<ts>-<firma>`. Y justo entre `verify` y `up_ck` está **`%s%s%s`** = la receta de concatenación de 3 trozos con la que se arma la firma.
+- **Constantes candidatas a sal encontradas en el módulo:** `de304f03fe653f329edfea08ea2046c4` (32 hex, junto a `tracker_report_resource`/`update_config`), `1be0ac56` (junto a `tracker_recv_message`), `abcdef0123456789`, `2021-12-30` ("current version"). El MD5/SHA/HMAC que aparece es de **libcurl + OpenSSL embebidos** (`Curl_MD5_*`, `md5_block_data_order`, `hmac_pkey_meth`), NO primitivas propias.
+- **Ningún secreto conocido del app está en el módulo:** 0 coincidencias de `47Q8tBqO4YqrMHf4`, `ppcineweb123`, `87c2cb7ff568d602d5f806c473345600`, `dsawdf634eebGFHITR5UT9kS0`, `32456738`, `0123456789123456`, `2015030120123456`, `com.movievn`. → **la sal del sign NO es una de las ya probadas** (coherente con los 10 intentos MD5 fallidos de `auditorias/api-movievn-NOTAS.md`).
+- **Lo que falta para cerrar el sign:** saber los 3 trozos del `%s%s%s` y el hash. Como el módulo es bytecode de VM, la vía es **ejecutarlo**: arrancar el servidor del módulo en el emulador y consultar `GET /control?msg=verify&device_id=…&ts=…` (el emu ya encola esa petición en `emu_jiagu.jni_onload`). Alternativa barata: probar `md5/sha1/sha256(device_id + ts + sal)` con las sales de arriba contra `/api/vod/info_new` — pero sin una muestra real de sign no se puede verificar localmente, así que conviene primero la vía del emulador.
+
 ### 🔓🔓🔓🔓 CRACK (18 sep, VERIFICADO): CIFRADO DE JIAGU RESUELTO — RC4 con PRGA no estándar
 - **Se descifró la sección `.mips` de `jiagu_descifrada.so` de punta a punta y está COMPROBADO**, no es conjetura:
   1. `emu_jiagu.py` ahora pone un hook de bloque en `JBASE+0x64bc` y vuelca el **S-box ya inicializado** (`rc4_sbox_1.bin`, 256 B, i0=3 j0=5) en el momento de la llamada. Llamada observada: `buf=0x200198f0 len=599897 estado=0x20019740` — `len` == tamaño exacto de `.mips`.
