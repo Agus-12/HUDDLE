@@ -22,6 +22,15 @@
 
 ## 2. ESTADO DEL PROYECTO (17 sep 2026)
 
+### 🙈 v208 — NOVELAS EXTERNAS OCULTAS (17 sep, este chat)
+El usuario pidió OCULTAR las dos fuentes de novelas agregadas a mano (Novelas360 + EnPantallaTV) porque **se ven en mala calidad**. Implementado con un interruptor, sin borrar nada:
+- `server.js` (junto a `NV_BASE`, ~línea 643): `const NOVELAS_EXTERNAS_ON = false;` ← **para reactivarlas solo se cambia a `true`**.
+- Con el interruptor apagado: el buscador NO consulta `buscarNovelas`/`nv2Buscar`; la fila «Novelas» de portada (`/api/trending`) y el «Ver todo» (`/api/catalogo/novelas`) devuelven SOLO `movieTarjetas()` (app Movie, calidad buena). Los endpoints `/api/novelas/...` y `/api/enp/...` siguen existiendo pero la UI no los alcanza.
+- `public/app.js`: entrada «Novelas» comentada en la lista de fuentes (pageDrop).
+- **Verificado en vivo (:3000):** portada → 2 novelas, todas site `Movie`, 0 externas; ver-todo → igual; `/api/search?q=maria` → 18 resultados, 0 de Novelas360/EnPantalla.
+- Cuando el crack del sign funcione: el catálogo Movie completo entra por `movieTarjetas()`/mapa; no hace falta reactivar las fuentes externas.
+- **Rollback de sandbox #5 durante este cambio:** el git local cayó a 244e3b5 a mitad del push; se rescató con fetch + reset --hard FETCH_HEAD (7c50257) + re-aplicar el parche v208. El crawler sobrevivió (sigue vivo, checkpoint 33255 / 12,211 encontrados).
+
 ### ✅ INTEGRACIÓN MOVIE EN HUDDLE — v207 (17 sep, este chat)
 Las 5 rutas latinas del mapa ya están integradas en el server (`server.js` + `public/app.js`):
 - **Lectura:** solo el mapa local (`~/movie-mapa-secuencias.json`, env `MOVIE_MAPA` para probar). Se recarga solo cuando el archivo cambia; si el mapa se regenera, se olvidan las caídas (evidencia nueva).

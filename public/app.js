@@ -1860,7 +1860,9 @@ let SITES = [
   { name: 'PelisXD', full: 'PelisXD — películas en HD (catálogo grande)', url: 'https://www.pelisxd.com/', logo: '/sites/pelisxd.png' }, /* v98 */
   { name: 'Caricaturas', full: 'Mis Caricaturas + Lacartoons — clásicas de nick/CN en latino', url: 'https://miscaricaturas.com/', logo: '/sites/caricaturas.png' }, /* v102; v112: también lacartoons */
   { name: 'YouTube', full: 'YouTube — videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
-  { name: 'Novelas', full: 'Novelas360 — telenovelas por capítulos', url: 'https://novelas360.com/', logo: '/sites/novelas.png' }, /* v206 */
+  /* v208: Novelas360 fuera de la lista de fuentes — mala calidad. La fila «Novelas» sigue existiendo con el catálogo de la app Movie.
+  { name: 'Novelas', full: 'Novelas360 — telenovelas por capítulos', url: 'https://novelas360.com/', logo: '/sites/novelas.png' },
+  */
 ];
 function renderPageDrop() {
   const drop = $('#pageDrop');

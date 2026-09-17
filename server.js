@@ -635,6 +635,12 @@ const epsVivos = (eps) => (eps || []).filter((e) => e && e.url && !EPS_MUERTOS.h
  * title=""). Ficha = la categoría y sus páginas /page/N/ (12 caps c/u).
  * Player propio en novelas360.cyou (acepta fetch con Referer; los caps
  * con loader de netu.tv son anti-bot → aviso claro). */
+/* v208: interruptor maestro de las novelas externas.
+ * Las dos fuentes (Novelas360 y EnPantallaTV) se ven en mala calidad,
+ * así que quedan OCULTAS por ahora. El catálogo de la app Movie
+ * (movieTarjetas) NO depende de este interruptor: sigue visible.
+ * Para volver a mostrarlas: poner NOVELAS_EXTERNAS_ON = true. */
+const NOVELAS_EXTERNAS_ON = false;
 const NV_BASE = 'https://novelas360.com/';
 const nv2RecientesCache = { at: 0, items: [] };
 setInterval(() => { nv2Recientes().then((it) => { if (it && it.length) { nv2RecientesCache.items = it; nv2RecientesCache.at = Date.now(); } }).catch(() => {}); }, 55 * 60 * 1000); /* v206.2 */
@@ -6074,8 +6080,8 @@ async function buscarEnSitios(q) {
     ...puntuar(latanime),
     ...puntuar(animeflv),
     ...puntuar(cari),
-    ...puntuar(await buscarNovelas(q).catch(() => [])), /* v206 */
-    ...puntuar(await nv2Buscar(q).catch(() => [])), /* v206.2 */
+    ...(NOVELAS_EXTERNAS_ON ? puntuar(await buscarNovelas(q).catch(() => [])) : []), /* v206 — v208: ocultas */
+    ...(NOVELAS_EXTERNAS_ON ? puntuar(await nv2Buscar(q).catch(() => [])) : []), /* v206.2 — v208: ocultas */
     ...puntuar(catalogo.filter((x) => x.site !== 'Cartoons')),
   ];
   /* v121: por NIVELES de relevancia — primero lo que se parece de verdad
@@ -8327,7 +8333,7 @@ const server = http.createServer(async (req, res) => {
         caricaturas: cari.caricaturas || [],
         cartoons: cari.cartoons || [], /* v119: apartado propio de Lacartoons */
         liveaction: cari.liveaction || [], /* v205: iCarly, Drake & Josh, Power Rangers… */
-        novelas: (() => { const a2 = nv.filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url) || [])[1])); const b2 = nv2RecientesCache.items || []; const mez = []; for (let i2 = 0; i2 < Math.max(a2.length, b2.length) && mez.length < 18; i2++) { if (a2[i2]) mez.push(a2[i2]); if (b2[i2]) mez.push(b2[i2]); } return [...movieTarjetas(), ...mez]; })(), /* v206.2: 360 + enpantalla intercaladas — v207: las del app Movie abren la fila */
+        novelas: NOVELAS_EXTERNAS_ON ? (() => { const a2 = nv.filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url) || [])[1])); const b2 = nv2RecientesCache.items || []; const mez = []; for (let i2 = 0; i2 < Math.max(a2.length, b2.length) && mez.length < 18; i2++) { if (a2[i2]) mez.push(a2[i2]); if (b2[i2]) mez.push(b2[i2]); } return [...movieTarjetas(), ...mez]; })() : movieTarjetas(), /* v208: solo Movie */ /* v206.2: 360 + enpantalla intercaladas — v207: las del app Movie abren la fila */
         generos: (generos || []).map((g) => ({ slug: g.slug, nombre: g.nombre, items: fCV(g.items) })).filter((g) => g.items.length),
       });
     }
@@ -8448,7 +8454,7 @@ const server = http.createServer(async (req, res) => {
         if (tipo === 'series') { const r = await catCv('series', pag); return json(res, 200, { ok: true, pag, por: 20, items: r.items, mas: r.mas }); }
         if (tipo === 'animes') { const r = await catAnimes(pag); return json(res, 200, { ok: true, pag, por: 24, items: r.items, mas: r.mas }); }
         if (tipo === 'caricaturas') return json(res, 200, trozo(await catCaricaturas()));
-        if (tipo === 'novelas') { const a2 = (await nvCatalogo()).filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url) || [])[1])); const b2 = await nv2Recientes(); const mez = []; for (let i2 = 0; i2 < Math.max(a2.length, b2.length); i2++) { if (a2[i2]) mez.push(a2[i2]); if (b2[i2]) mez.push(b2[i2]); } return json(res, 200, trozo(mez)); } /* v206.2: 360 + enpantalla */
+        if (tipo === 'novelas') { if (!NOVELAS_EXTERNAS_ON) return json(res, 200, trozo(movieTarjetas())); /* v208: solo Movie */ const a2 = (await nvCatalogo()).filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url) || [])[1])); const b2 = await nv2Recientes(); const mez = []; for (let i2 = 0; i2 < Math.max(a2.length, b2.length); i2++) { if (a2[i2]) mez.push(a2[i2]); if (b2[i2]) mez.push(b2[i2]); } return json(res, 200, trozo(mez)); } /* v206.2: 360 + enpantalla */
         if (tipo === 'cartoons' || tipo === 'liveaction') {
           const vivo = tipo === 'liveaction';
           let items = lctConCovers().filter((x) => esLctLive(x._slug) === vivo);
