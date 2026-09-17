@@ -84,3 +84,32 @@ El sign LO CALCULA LA LIBRERÍA NATIVA (libpp_hls.so, ofuscada; config assets/pp
 
 ## Siguiente paso decidido
 Ronda 3 de captura con WiFi proxy + bypass BIEN puesto (el cert YA está instalado y el okhttp del app YA se dejó descifrar en rondas 1-2 — vimos el POST upgrade). captura_ss_v3.py (commit 625104b) graba el BODY de info_new (el sign) y su RESPUESTA (las URLs). Si el cliente de contenido del app ignora el proxy → plan PCAPdroid+MITM (VPN local, atrapa todo).
+
+## ✅ SIGN RESUELTO POR INGENIERÍA INVERSA (18 sep) — fórmula exacta
+
+Se descifró `libpp_hls.so` (mismo RC4 que jiagu, ver `auditorias/crack/rc4_jiagu.py`) y
+dentro del módulo hay un ELF AArch64 embebido en 0x50429 (`pphls_elf_interno.so`).
+El handler de `GET /control?msg=verify` está en 0xc98f4–0xc9bfc y hace literalmente:
+
+    sprintf(buf, "%s%s%s", device_id, ts, cfg[0x38]);   // 0xc9bb8–0xc9bc8
+    n = hash(buf);                                      // 0xc9bd0
+    hex(buf, n, out);                                   // 0xc9be0
+    memcpy(resp, out, 0x10);                            // w2 = 0x10 → 16 bytes = MD5
+
+**→ `sign = md5( device_id + ts + ck )` en hex de 16 caracteres (minúsculas).**
+
+- `device_id` = el valor TAL CUAL va en la URL (lleva el vod_id pegado:
+  `3736e27f0823b1ba711142488`), `ts` = milisegundos. Sin separadores, sin reordenar.
+- `ck` = campo 0x38 de la config global del SDK. **NO es un secreto fijo del binario**:
+  el propio servidor tiene `msg=up_ck` y `update_ck` para actualizarlo. Por eso los 10
+  intentos MD5 con secretos fijos (47Q8tBqO4YqrMHf4 / 92b991… / 87c2cb7f…) fallaron.
+- El IV de MD5 está en 0x2323f0 y la tabla de constantes en 0x229af0 del ELF interno.
+  Hay también SHA-256 (0x428a2f98 en 0x23249c): si md5 no cuajara, probar sha256[:16].
+- **Falta solo el valor de `ck`** (viene del backend, posiblemente en public/init o vía
+  up_ck). Con él, el oráculo de sign queda completo sin needing el teléfono.
+
+Servidor local del SDK (todo al descubierto en el módulo): rutas `control` (verify/up_ck),
+`download_control`, `download_info`, `net_info`, `resource`, `ts`, `m3u8_key`; params
+`src, type, resource, msg, nettype, device_id`; `Server: bad_sdk`; JSON
+`{"code":%d,"message":"%s","resource":"%s"}`; config `server_port` = el puerto que
+devuelve `com.pp.hls.load(...)`.
