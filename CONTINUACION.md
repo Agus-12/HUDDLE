@@ -4,7 +4,7 @@
 1. **Clona el repo** (el PAT te lo da el usuario en el chat, NUNCA está en este archivo porque el repo es público): `git clone https://{PAT}@github.com/Agus-12/HUDDLE.git ~/huddle`
 2. **Lee ESTE archivo completo** + `auditorias/hallazgos-cdn.md` + `auditorias/RESUMEN-COSECHA-PCAP.md` (el mapa con carpetas por novela/episodio).
 3. **Trabaja SIEMPRE dentro del clone del repo** (`~/huddle`). EL REPO ES EL WORKSPACE OFICIAL del proyecto — nada de trabajo importante fuera de él. Así el contexto del chat no se satura: el estado REAL siempre está aquí, en archivos.
-4. La **acción pendiente de este momento** está en §2 "📋 SIGUIENTE PASO" (al día: integrar en Huddle las 5 rutas latinas activas del mapa de secuencias).
+4. La **acción pendiente de este momento** está en §2 "📋 SIGUIENTE PASO" (al día: la integración de las 5 rutas latinas en Huddle YA está hecha en el server (v207) — falta que el usuario corra `actualizar.sh` + genere el mapa + pegue la salida de `/api/movie/probar`).
 5. **Después de CADA avance o cambio** (sin excepción): actualiza este archivo (estado, hallazgos, dead ends) → `git add -A` → `git commit -m "..."` → `git push origin HEAD:main`. El usuario recibe los cambios en su servidor con `bash actualizar.sh`.
 6. Si el sandbox se resetea a media sesión (pasa: borra .git, node_modules, paquetes, archivos grandes): re-clona o recupera con `git init + git fetch origin + git reset --hard origin/main`, reinstala lo que falte y SIGUE. Nunca empieces de cero: todo lo importante vive aquí.
 
@@ -20,7 +20,27 @@
 - **Su amigo:** tiene el Android con el app **Movie** (piratería, contenido latino: películas y novelas) y hace las pruebas de campo con PCAPdroid (versión Google Play). El amigo NO es técnico: instrucciones cortas tipo receta, por WhatsApp, en español simple.
 - **La misión:** integrar en Huddle (servidor personal del usuario) TODO el contenido del app Movie: catálogo + streams reproducibles de películas y novelas. Huddle es un servidor web propio (Node, sin frameworks raros, SOLO HTTP puro — nada de HTTPS en el server local).
 
-## 2. ESTADO DEL PROYECTO (16 sep 2026)
+## 2. ESTADO DEL PROYECTO (17 sep 2026)
+
+### ✅ INTEGRACIÓN MOVIE EN HUDDLE — v207 (17 sep, este chat)
+Las 5 rutas latinas del mapa ya están integradas en el server (`server.js` + `public/app.js`):
+- **Lectura:** solo el mapa local (`~/movie-mapa-secuencias.json`, env `MOVIE_MAPA` para probar). Se recarga solo cuando el archivo cambia; si el mapa se regenera, se olvidan las caídas (evidencia nueva).
+- **Doble guarda de audio:** el server vuelve a exigir `audio.clasificacion === 'latino-inequivoco'` + `disponibleParaMovieAhora` — *Amar y Cuidar* y `feec4d1e85fe` no pueden entrar aunque el mapa cambiara.
+- **Dónde aparece:** las tarjetas Movie abren la fila **Novelas** (inicio) y cascan primero en el buscador; un toque abre el selector de capítulos de siempre. Sala: se reproducen NATIVAS (playlist local, sin Chrome). Solo: por `/api/solo` como cualquier fuente. Continuar-viendo, vistos y cadena de episodios funcionan con las URLs `https://movie.huddle/ver/{clave}/{T}x{E}`.
+- **Allowlist ESTRICTA (no hay proxy abierto):** `/api/movie/hls/{clave}/{T}x{E}/index5.m3u8|NNNN.ts` solo sirve rutas exactas del mapa activo contra `http://147.124.216.142` (env `MOVIE_ORIGEN` solo para pruebas); segmentos solo `NNNN.ts` (index0-4/6-10, extensiones raras y `../` = 403; `/api/hls?u=` NO acepta el origen). El m3u8 se reescribe a rutas propias (sz/m8 se caen, no hacen falta).
+- **Caídas:** si el origen responde 403/404/410 (manifest o segmento), el episodio se marca en `~/movie-rutas-caidas.json` (ignorado por Git), desaparece de fichas/buscador y se espera evidencia nueva — nunca se sustituye la ruta. Verifiables en `/api/estado` (bloque `movie`).
+- **Diagnóstico:** `curl -s http://127.0.0.1:3000/api/movie/probar` comprueba m3u8 + primer .ts de cada ruta activa contra el origen y marca caídas. **OJO: llamarlo marca caídas si algo responde 403.**
+- **Portadas:** `/api/movie/poster/{clave}` proxya la portada alojada por Movie (cache 1 h); si falla → 302 `/carita.png`.
+- **Probado end-to-end** con origen simulado Y contra el origen real: m3u8 real reescrito (201 segmentos, 0 con sz/m8), segmentos con Range (206), búsqueda/ficha/trending/solo, 8 negativas de allowlist, flujo completo de caída (marcar → ocultar → olvidar al regenerar mapa), portada real (webp 13 KB).
+
+### 🔴 HALLAZGO NUEVO (17 sep): el bypass del origen ahora discrimina por antigüedad
+Comprobado desde el sandbox (mismos resultados que verá cualquier IP):
+- `…/2024/07/25/{carpeta}/index5.m3u8` → **200** pero es `X-Cache: Hit from cloudfront` (Age ≈ 2.3 días: lo dejó cacheado la captura del 16-sep; cuando el TTL venza también dará 403).
+- `…/2024/…/0000.ts` → **403** con `X-Cache: FunctionGeneratedResponse` (una función de CloudFront valida token en los cache-MISS de contenido viejo). Ni con sz/m8, ni Badci, ni UA okhttp, ni por `agent.maqbc.com`/https.
+- Contenido NUEVO sigue abierto: `…/2026/09/11/9db1ede34113/0000.ts` → **200** (3,248,640 bytes) incluso en Miss.
+- Es decir: **hoy los 5 capítulos latinos tienen manifest vivo (cacheado) pero segmentos 403** desde el sandbox. El token capturado del 16-sep ya expiró y `info_new` sigue necesitando el sign nativo (dead end 2).
+- **Pendiente de verificar DESDE EL ORACLE del usuario** (otra POP puede tener otra caché): `curl -s http://127.0.0.1:3000/api/movie/probar`. Si los ts dan 403 también ahí, las rutas quedan marcadas caídas y la integración queda lista esperando evidencia nueva (nueva captura con el app reproduciendo esos capítulos).
+- El API del app SIGUE VIVA (17 sep): `public/init` con el device del amigo devuelve token guest nuevo (code 10000).
 
 ### ✅ LOGRADO
 - **Catálogo histórico (CORRECCIÓN 16 sep):** `auditorias/catalogo-app-completo.json` tiene 8,000 FILAS y `novelas-app-catalogo.json` 240, pero al revisarlos solo hay **20 IDs únicos por tipo**: el scrape anterior repitió la primera página. Sirven como muestra y para los 20 títulos actuales, pero **NO son el catálogo completo**. `search/screen` ignora todos los parámetros de página probados; habrá que reconstruir el catálogo por otra vía más adelante.
@@ -54,10 +74,20 @@
 - **Mapa local reproducible:** `mapear-secuencias-movie.js` lee exclusivamente `~/movie-cosecha-pcap.json` y las huellas públicas versionadas en `auditorias/huellas-secuencias-movie.json`; crea `~/movie-mapa-secuencias.json/.txt`. El mapa contiene rutas locales saneadas, por eso está en `.gitignore`; el script y las huellas no contienen rutas, bodies, consultas ni tokens y sí están publicados. Se probó con fixture: 39 rutas, 38 manifests, 5 grupos confirmados, 38 asignadas, 1 sin asignar, 5 latino activas y 5 excluidas por audio.
 
 ### 📋 SIGUIENTE PASO
-1. En Oracle, después de `bash actualizar.sh`, generar el mapa local con `node mapear-secuencias-movie.js ~/movie-cosecha-pcap.json` y conservarlo fuera de Git.
-2. Integrar en Huddle **solo** las cinco rutas latino activas de ese mapa, por reproductor nativo HLS y allowlist estricta del origen Movie; conservar portada de la ficha Movie y fallback `/carita.png`.
-3. No incorporar *Amar y Cuidar* ni `feec4d1e85fe`. Cuando una ruta activa falle, marcar el episodio y esperar evidencia nueva; no inventar sustitutos.
+1. **Usuario, en Oracle (bloques copy-paste):**
+   ```bash
+   cd ~/huddle || exit 1
+   bash actualizar.sh
+   node mapear-secuencias-movie.js ~/movie-cosecha-pcap.json
+   curl -s http://127.0.0.1:3000/api/movie/probar
+   ```
+   Y pegar la salida aquí. `/api/movie/probar` dice m3u8/ts de cada capítulo (y marca caídas si el origen dice 403).
+2. **Según lo que diga probar:**
+   - Si algún ts da 200/206 → ese capítulo ya se ve en Huddle (fila Novelas / buscador). Probar reproducción real.
+   - Si todos dan 403 → las rutas quedan marcadas caídas (correcto). Para revivirlas hace falta **evidencia nueva**: que el amigo reproduzca en el app esos capítulos con PCAPdroid capturando (Exportador TCP → `recibidor-pcap.js`) y repetir cosecha → mapa (el mapa regenerado olvida las caídas y trae rutas nuevas).
+3. La ventana de los manifests cacheados de 2024 es corta (TTL de ~días desde el 16-sep). No bombardear el origen con comprobaciones repetidas: usar `/api/movie/probar` una vez y listo.
 4. El catálogo completo sigue siendo un trabajo separado: las muestras históricas con paginación defectuosa no deben presentarse como catálogo completo.
+5. Recordatorio: revocar el PAT al cerrar la sesión.
 
 ## 3. INFRAESTRUCTURA Y ACCESOS
 
@@ -128,6 +158,8 @@ POST `https://{api}/api/vod/info_new`, Content-Type form, body `vod_id={id}&cur_
 16. **Paginación de `search/screen`:** los archivos que decían 8,000/240 títulos repiten los mismos 20 IDs; POST con `page`, `page_num`, `pageNo`, `page_no`, `current_page`, `offset`, `limit` y GET con esos parámetros devolvieron la misma primera lista. No tratar esas filas repetidas como catálogo completo ni bombardear la API pidiendo la misma ficha; `identificar-movie.js` deduplica por web-id.
 17. **Filtrar el PCAP con BPF/tcpdump para obtener orden:** tanto el filtro por offset TCP como `tcp dst port 80` dieron cero en la captura real pese a que el URI existe. No repetirlos ni asumir que no hay GET; usar la versión binaria actual de `ordenar-pcap-movie.js`.
 18. **`vod_id` del proxy localhost:** PCAPdroid sí capturó CDN HTTP, pero no las llamadas locales `/control?msg=verify`; el análisis binario real encontró 0. No insistir con esa pista en este PCAP; recuperar los M3U8 originales desde sus respuestas TCP ya guardadas.
+19. **Los .ts viejos por el origen pelado (17 sep):** el bypass `147.124.216.142` ya NO sirve segmentos de carpetas 2024/2025 en cache-miss (`X-Cache: FunctionGeneratedResponse` = 403 de una función de CloudFront que valida token). Los m3u8 de 2024 que aún dan 200 son **cache hits** de la captura del 16-sep y caducan solos. Contenido nuevo (2026) sí sigue abierto. NO reintentar los .ts viejos con variantes (sz/m8, Badci, UA okhttp, https, agent.maqbc.com — todas probadas, 403) ni dar por muerta una ruta sin comprobarla DESDE ORACLE (la caché es por POP). El token capturado caduca en horas: no guardarlo como vía.
+20. **Rutas del CDN con guiones:** la ruta real es `/vod/1/YYYY/MM/DD/{carpeta}/…` con **diagonales**. Con guiones (`2024-02-28`) todo da 403/404 y parece que el origen "cayó" — error ya cometido una vez; el mapa guarda la fecha como `YYYY-MM-DD` y `server.js` la convierte con `movieFechaRuta()` antes de pedir.
 
 ## 6. HERRAMIENTAS DEL LADO DEL USUARIO (Oracle)
 - Verificar conectividad al CDN: `curl -s -m 10 -o /dev/null -w "%{http_code}" "http://147.124.216.142/vod/1/2026/09/11/9db1ede34113/index5.m3u8"` (debe dar 200 — verificado 16-sep).
@@ -177,6 +209,7 @@ POST `https://{api}/api/vod/info_new`, Content-Type form, body `vod_id={id}&cur_
 **En el repo (repo raíz = ~/huddle en el Oracle):**
 - `CONTINUACION.md` — ESTE archivo. Léelo, actualízalo, súbelo.
 - `actualizar.sh` — deploy del usuario (git pull + restart).
+- **Integración Movie (v207)** — vive dentro de `server.js` (bloque `v207: MOVIE`) y `public/app.js` (`elegirTitulo`/`abrirSeriePicker`). Endpoints: `/api/movie/ficha/{clave}`, `/api/movie/poster/{clave}`, `/api/movie/hls/{clave}/{T}x{E}/{index5.m3u8|NNNN.ts}`, `/api/movie/probar`; más el bloque `movie` de `/api/estado`. Env: `MOVIE_MAPA` (ruta del mapa), `MOVIE_ORIGEN` (solo pruebas), `MOVIE_CAIDAS`.
 - `recibidor-pcap.js` — receptor de PCAP para PCAPdroid (puerto 8080): por defecto TCP Exporter / pcap-over-IP con streaming, temporal atómico, validación PCAP y archivo `.status.json`; `PCAP_MODE=http` da página de carga + `GET /health` + `PCAP_TOKEN`.
 - `cosechar-movie.js` — toma `~/movie-m3u8.txt`, revisa los manifests con concurrencia limitada y deja reporte local de estado HTTP, duración `EXTINF` y número de segmentos en `~/movie-cosecha.json` y `~/movie-cosecha.txt`; no descarga .ts ni guarda tokens.
 - `cosechar-pcap-movie.js` — reconstruye únicamente respuestas HTTP de manifest ya presentes en el PCAP clásico, mediante dos pasadas y reensamble TCP, para recuperar estado/duración/segmentos capturados sin llamar al CDN ni guardar video/bodies/tokens. Deja `~/movie-cosecha-pcap.json/.txt` ignorados por git.
@@ -211,7 +244,7 @@ POST `https://{api}/api/vod/info_new`, Content-Type form, body `vod_id={id}&cur_
    node mapear-secuencias-movie.js ~/movie-cosecha-pcap.json
    cat ~/movie-mapa-secuencias.txt
    ```
-   El resultado permite integrar solo cinco rutas latino que siguen activas: *Soy tu dueña* T1E5 y *Lo que la vida me robó* T1E9/E13/E17/E19. Mantener fuera *Amar y Cuidar* (audio tailandés) y la ruta sin manifest.
-4. Si se implementa Movie en Huddle, usar únicamente el mapa local, el reproductor nativo HLS y allowlist de origen; no usar navegador remoto, no exponer un proxy abierto y conservar portada hospedada por Movie + fallback `/carita.png`. Antes de sumar otra ruta, verificar que el audio sea latino; ASR si hay duda.
+   El server (v207) lo lee SOLO: integra únicamente rutas `disponibleParaMovieAhora` con audio `latino-inequivoco` (*Soy tu dueña* T1E5 y *Lo que la vida me robó* T1E9/E13/E17/E19 al 16-sep). *Amar y Cuidar* y la ruta sin manifest no pueden entrar (doble guarda en el server).
+4. La integración Movie YA está hecha (v207): mapa local, reproductor nativo HLS (playlist reescrito propio), allowlist estricta, portada Movie + fallback `/carita.png`, caídas marcadas sin sustitutos. Antes de sumar otra ruta, verificar que el audio sea latino; ASR si hay duda. El estado real de cada ruta se comprueba con `/api/movie/probar` (una sola vez, marca caídas).
 5. Si más adelante hace falta una captura diferente: PCAPdroid **"Exportador TCP" / pcap-over-IP**, no "Servidor HTTP". Pero no pedirla para resolver esta tanda ya cerrada.
 6. Cualquier avance → actualiza ESTE archivo (estado, hallazgos, dead ends) → commit → push (`git push origin HEAD:main`). Recuérdale al usuario revocar el PAT al final.

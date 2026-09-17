@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v206.2'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v207'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -939,6 +939,250 @@ async function resolverEnp(pageUrl) {
   }
   throw new Error('Los servidores de ese capítulo están caídos — prueba otro capítulo u opción');
 }
+
+/* ================= v207: MOVIE (app) — novelas latinas del mapa local =================
+ * Fuente: el mapa local que genera mapear-secuencias-movie.js desde el PCAP
+ * (~/movie-mapa-secuencias.json — ignorado por Git). De ahí salen SOLO las
+ * rutas con evidencia fuerte: audio latino inequívoco + manifest propio +
+ * disponibilidad comprobada (disponibleParaMovieAhora).
+ *
+ * Reglas (CONTINUACION §2/§7 y RESUMEN-COSECHA-PCAP):
+ *  - allowlist ESTRICTA: el servidor solo pide al origen (147.124.216.142,
+ *    http, sin tokens) las carpetas exactas del mapa activo; segmentos solo
+ *    con nombre NNNN.ts. NO es un proxy abierto: nada de ?u= arbitrario.
+ *  - si una ruta activa falla (403/404 del origen), se MARCA como caída y
+ *    se espera evidencia nueva (mapa regenerado) — no se inventan sustitutos.
+ *  - Amar y Cuidar (audio tha) y la ruta sin manifest nunca llegan aquí:
+ *    el mapa ya las deja fuera de disponibleParaMovieAhora.
+ *  - portada = la que aloja Movie (proxy propio) + fallback /carita.png.
+ */
+const MOVIE_HOST_VIRTUAL = 'movie.huddle'; /* host ficticio: identidad de serie/episodio para fichas, sala y continuar-viendo */
+const MOVIE_ORIGEN = (process.env.MOVIE_ORIGEN || 'http://147.124.216.142').replace(/\/+$/, ''); /* el origen pelado (sin wsSecret) */
+const MOVIE_MAPA_RUTA = process.env.MOVIE_MAPA || path.join(os.homedir(), 'movie-mapa-secuencias.json');
+const MOVIE_CAIDAS_RUTA = process.env.MOVIE_CAIDAS || path.join(os.homedir(), 'movie-rutas-caidas.json');
+const MOVIE = { mtimeMs: 0, cargado: false, series: new Map(), porEp: new Map(), caidas: new Map(), caidasMs: 0, avisoFalta: false };
+
+function movieCargarCaidas() {
+  try {
+    const st = fs.statSync(MOVIE_CAIDAS_RUTA);
+    if (st.mtimeMs === MOVIE.caidasMs) return;
+    MOVIE.caidasMs = st.mtimeMs;
+    const d = JSON.parse(fs.readFileSync(MOVIE_CAIDAS_RUTA, 'utf8'));
+    const nuevas = new Map();
+    for (const c of (Array.isArray(d && d.caidas) ? d.caidas : [])) {
+      if (c && /^[0-9a-f]{12}$/.test(String(c.carpeta || ''))) nuevas.set(String(c.carpeta), c);
+    }
+    MOVIE.caidas = nuevas; /* recién aquí: si el JSON venía mal, se conserva lo cargado */
+  } catch {
+    /* sin archivo todavía (o ilegible): si ya teníamos caídas en memoria —las
+     * acabamos de marcar— NO se barren, o /api/movie/probar las «olvidaría»
+     * al releer y el episodio caído reaparecería como disponible */
+    if (!MOVIE.caidas.size) MOVIE.caidas = new Map();
+  }
+}
+function movieGuardarCaidas() {
+  try {
+    const tmp = `${MOVIE_CAIDAS_RUTA}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify({ version: 1, actualizadoEn: new Date().toISOString(), caidas: [...MOVIE.caidas.values()] }, null, 2) + '\n');
+    fs.renameSync(tmp, MOVIE_CAIDAS_RUTA);
+    MOVIE.caidasMs = fs.statSync(MOVIE_CAIDAS_RUTA).mtimeMs;
+  } catch (e) { console.warn('[movie] no pude guardar caídas:', String(e && e.message || e).slice(0, 80)); }
+}
+function movieMarcarCaida(clave, epId, ep, motivo) {
+  if (MOVIE.caidas.has(ep.carpeta)) return;
+  const c = { clave, episodioId: epId, carpeta: ep.carpeta, fechaCarpeta: ep.fechaCarpeta, titulo: ep.tituloSerie, episodio: ep.episodio, motivo: String(motivo || '').slice(0, 140), marcadoEn: new Date().toISOString() };
+  MOVIE.caidas.set(ep.carpeta, c);
+  movieGuardarCaidas();
+  console.warn(`[movie] CAÍDA marcada: ${c.titulo} ${epId} (${c.carpeta}) — ${c.motivo}. Se espera evidencia nueva (mapa regenerado); no se sustituye la ruta.`);
+}
+/* Lee/regenera el índice del mapa cuando el archivo cambia en disco. Si el
+ * mapa se regeneró (evidencia nueva), las caídas marcadas se olvidan. */
+function movieRecargar() {
+  movieCargarCaidas();
+  let st = null;
+  try { st = fs.statSync(MOVIE_MAPA_RUTA); } catch {}
+  if (!st) {
+    if (!MOVIE.avisoFalta) {
+      MOVIE.avisoFalta = true;
+      console.log('[movie] mapa no encontrado en ' + MOVIE_MAPA_RUTA + ' — genera el local con: node mapear-secuencias-movie.js ~/movie-cosecha-pcap.json');
+    }
+    if (MOVIE.series.size) { MOVIE.series = new Map(); MOVIE.porEp = new Map(); }
+    MOVIE.cargado = false;
+    return;
+  }
+  if (st.mtimeMs === MOVIE.mtimeMs && MOVIE.cargado) return;
+  const mapaAntes = MOVIE.mtimeMs;
+  try {
+    const mapa = JSON.parse(fs.readFileSync(MOVIE_MAPA_RUTA, 'utf8'));
+    if (!mapa || mapa.version !== 1 || !Array.isArray(mapa.grupos)) throw new Error('formato de mapa no reconocido');
+    const series = new Map();
+    const porEp = new Map();
+    for (const g of mapa.grupos) {
+      /* doble guarda: solo latino inequívoco (Amar y Cuidar jamás entra) */
+      if (!g || !g.clave || !g.audio || g.audio.clasificacion !== 'latino-inequivoco') continue;
+      const eps = (Array.isArray(g.episodios) ? g.episodios : [])
+        .filter((e) => e && e.disponibleParaMovieAhora && /^[0-9a-f]{12}$/.test(String(e.carpeta || '')))
+        .map((e) => ({
+          clave: String(g.clave), tituloSerie: String(g.titulo || g.clave), temporada: +g.temporada || 1,
+          episodio: +e.episodio || 0, carpeta: String(e.carpeta).toLowerCase(), fechaCarpeta: String(g.fechaCarpeta || ''),
+          duracionSegundos: +e.duracionCapturadaSegundos || +e.duracionCatalogoSegundos || 0,
+          poster: String(g.poster || ''), webId: +g.webId || 0, appId: +g.appId || 0,
+        }))
+        .filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.fechaCarpeta) && e.episodio > 0)
+        .sort((a, b) => a.episodio - b.episodio);
+      if (!eps.length) continue;
+      const serie = { clave: String(g.clave), titulo: String(g.titulo || g.clave), temporada: +g.temporada || 1, poster: String(g.poster || ''), webId: +g.webId || 0, appId: +g.appId || 0, eps };
+      series.set(serie.clave, serie);
+      for (const e of eps) porEp.set(serie.clave + '|' + e.temporada + 'x' + e.episodio, e);
+    }
+    MOVIE.series = series;
+    MOVIE.porEp = porEp;
+    MOVIE.mtimeMs = st.mtimeMs;
+    MOVIE.cargado = true;
+    MOVIE.avisoFalta = false;
+    if (mapaAntes && mapaAntes !== st.mtimeMs && MOVIE.caidas.size) {
+      /* el mapa se regeneró = evidencia nueva: se olvidan las caídas viejas */
+      console.log('[movie] mapa regenerado — se olvidan ' + MOVIE.caidas.size + ' caídas marcadas');
+      MOVIE.caidas = new Map();
+      try { fs.unlinkSync(MOVIE_CAIDAS_RUTA); } catch {}
+      MOVIE.caidasMs = 0;
+    }
+    const nEps = [...series.values()].reduce((n, s) => n + s.eps.length, 0);
+    console.log(`[movie] mapa cargado: ${series.size} series, ${nEps} episodios latinos activos (${MOVIE.caidas.size} caídas marcadas)`);
+  } catch (e) {
+    console.warn('[movie] no pude leer el mapa (' + MOVIE_MAPA_RUTA + '):', String(e && e.message || e).slice(0, 90));
+  }
+}
+/* serie/episodio ACTIVO (no caído) — la allowlist de reproducción */
+function movieSerieActiva(clave) {
+  movieRecargar();
+  const s = MOVIE.series.get(String(clave || '').toLowerCase());
+  if (!s) return null;
+  const vivos = s.eps.filter((e) => !MOVIE.caidas.has(e.carpeta));
+  if (!vivos.length) return null;
+  return { ...s, eps: vivos };
+}
+function movieEpActivo(clave, epId) {
+  movieRecargar();
+  const m = /^(\d+)x(\d+)$/.exec(String(epId || ''));
+  if (!m) return null;
+  const e = MOVIE.porEp.get(String(clave || '').toLowerCase() + '|' + (+m[1]) + 'x' + (+m[2]));
+  if (!e || MOVIE.caidas.has(e.carpeta)) return null;
+  return e;
+}
+function movieUrlEp(clave, epId) { return `https://${MOVIE_HOST_VIRTUAL}/ver/${clave}/${epId}`; }
+function movieTarjetas() {
+  movieRecargar();
+  const tarjetas = [];
+  for (const s of MOVIE.series.values()) {
+    const vivos = s.eps.filter((e) => !MOVIE.caidas.has(e.carpeta));
+    if (!vivos.length) continue; /* toda la serie caída: no se ofrece */
+    tarjetas.push({
+      title: s.titulo + (s.temporada > 1 ? ' (T' + s.temporada + ')' : ''),
+      url: `https://${MOVIE_HOST_VIRTUAL}/serie/${s.clave}`,
+      img: `/api/movie/poster/${s.clave}`,
+      site: 'Movie',
+      extra: vivos.length === 1 ? `Latino · 1 capítulo (${vivos[0].temporada}x${vivos[0].episodio})` : `Latino · ${vivos.length} capítulos`,
+    });
+  }
+  return tarjetas;
+}
+/* Origen estricto: SOLO la carpeta exacta del mapa; segmentos solo NNNN.ts */
+/* fechaCarpeta viene como YYYY-MM-DD (formato del mapa); la ruta del CDN
+ * usa diagonales: /vod/1/YYYY/MM/DD/{carpeta}/… */
+function movieFechaRuta(fechaCarpeta) { return String(fechaCarpeta).replace(/-/g, '/'); }
+function movieOrigenM3u8(ep) { return `${MOVIE_ORIGEN}/vod/1/${movieFechaRuta(ep.fechaCarpeta)}/${ep.carpeta}/index5.m3u8`; }
+function movieOrigenTs(ep, archivo) { return `${MOVIE_ORIGEN}/vod/1/${movieFechaRuta(ep.fechaCarpeta)}/${ep.carpeta}/${archivo}`; }
+async function movieServirM3u8(req, res, clave, epId) {
+  const ep = movieEpActivo(clave, epId);
+  if (!ep) return json(res, 404, { ok: false, error: 'Ese capítulo no está disponible en Movie' });
+  let up = null;
+  try { up = await fetchSeguro(movieOrigenM3u8(ep), 15000); } catch {}
+  if (!up || !up.ok) {
+    const estado = up ? up.status : 0;
+    if (estado === 403 || estado === 404 || estado === 410) movieMarcarCaida(clave, epId, ep, 'el origen respondió HTTP ' + estado);
+    return json(res, 502, { ok: false, error: 'El servidor de Movie no respondió — intenta más tarde' });
+  }
+  let txt = '';
+  try { txt = await up.text(); } catch { return json(res, 502, { ok: false, error: 'No pude leer la lista de Movie' }); }
+  if (!/#EXTM3U/.test(txt)) return json(res, 502, { ok: false, error: 'La lista de Movie vino vacía' });
+  /* segmentos relativos (NNNN.ts?sz=…&m8=…) → NUESTRA ruta allowlisted;
+   * sz/m8 (integridad S3) no hacen falta en el origen pelado: se caen */
+  const base = `/api/movie/hls/${encodeURIComponent(clave)}/${encodeURIComponent(epId)}/`;
+  const reescrito = txt.split('\n').map((l) => {
+    const s = l.trim();
+    if (!s || s.startsWith('#')) return l;
+    const m = /^(\d{3,6}\.ts)/.exec(s);
+    return m ? base + m[1] : s;
+  }).join('\n');
+  res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl', 'Cache-Control': 'no-store' });
+  res.end(reescrito);
+}
+async function movieServirTs(req, res, clave, epId, archivo) {
+  if (!/^\d{3,6}\.ts$/.test(archivo)) return json(res, 403, { ok: false, error: 'No permitido' });
+  const ep = movieEpActivo(clave, epId);
+  if (!ep) return json(res, 404, { ok: false, error: 'Ese capítulo no está disponible en Movie' });
+  const cabUp = {};
+  if (req.headers.range) cabUp.Range = String(req.headers.range);
+  let up = null;
+  try {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 30000);
+    try { up = await fetch(movieOrigenTs(ep, archivo), { headers: Object.assign({ 'User-Agent': FETCH_UA }, cabUp), signal: ctl.signal, redirect: 'follow' }); }
+    finally { clearTimeout(t); }
+  } catch {}
+  if (!up) return json(res, 502, { ok: false, error: 'El servidor de video no respondió' });
+  if (!up.ok && up.status !== 206) {
+    try { up.body && up.body.cancel(); } catch {}
+    /* 403/404/410 del origen = la ruta cayó de verdad (la función del CDN
+     * ya valida o el objeto no está): se marca el episodio y se espera
+     * evidencia nueva — igual que con el manifest */
+    if (up.status === 403 || up.status === 404 || up.status === 410) movieMarcarCaida(clave, epId, ep, 'segmento ' + archivo + ': el origen respondió HTTP ' + up.status);
+    else console.warn(`[movie] segmento ${archivo} de ${ep.tituloSerie} ${epId}: HTTP ${up.status}`);
+    return json(res, up.status === 404 ? 404 : 502, { ok: false, error: 'El servidor de video respondió ' + up.status });
+  }
+  const cab = { 'Content-Type': 'video/MP2T', 'Cache-Control': 'no-store', 'Accept-Ranges': 'bytes' };
+  for (const h of ['content-range', 'content-length']) { const v = up.headers.get(h); if (v) cab[h] = v; }
+  res.writeHead(up.status, cab);
+  Readable.fromWeb(up.body).on('error', () => {}).pipe(res);
+}
+/* portada alojada por Movie (URL exacta del mapa) + fallback /carita.png */
+const moviePosterCache = new Map(); /* clave → {buf, ct, at} | {fallo: at} */
+async function movieServirPoster(req, res, clave) {
+  movieRecargar();
+  const s = MOVIE.series.get(String(clave || '').toLowerCase());
+  const alCarita = () => { res.writeHead(302, { Location: '/carita.png', 'Cache-Control': 'no-store' }); res.end(); };
+  if (!s || !/^https?:\/\//i.test(s.poster)) return alCarita();
+  const c = moviePosterCache.get(s.clave);
+  if (c && !c.fallo && Date.now() - c.at < 60 * 60 * 1000) {
+    res.writeHead(200, { 'Content-Type': c.ct, 'Cache-Control': 'public, max-age=86400' });
+    return res.end(c.buf);
+  }
+  if (c && c.fallo && Date.now() - c.fallo < 10 * 60 * 1000) return alCarita();
+  try {
+    const r = await fetchSeguro(s.poster, 8000);
+    const ct = (r.headers.get('content-type') || '').toLowerCase();
+    if (!r.ok || !/^image\//.test(ct)) throw new Error('HTTP ' + (r && r.status));
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 3000000) throw new Error('demasiado grande');
+    moviePosterCache.set(s.clave, { buf, ct, at: Date.now() });
+    res.writeHead(200, { 'Content-Type': ct, 'Cache-Control': 'public, max-age=86400' });
+    return res.end(buf);
+  } catch {
+    moviePosterCache.set(s.clave, { fallo: Date.now() });
+    return alCarita();
+  }
+}
+/* resolución para Solo y para la sala nativa: playlist LOCAL reescrito */
+async function resolverMovie(pageUrl) {
+  const m = /^\/ver\/([a-z0-9-]+)\/(\d+x\d+)$/i.exec((() => { try { return new URL(pageUrl).pathname; } catch { return ''; } })());
+  if (!m) throw new Error('URL de Movie no válida');
+  const ep = movieEpActivo(m[1], m[2]);
+  if (!ep) { const e2 = new Error('Ese capítulo ya no está disponible en Movie'); throw e2; }
+  return { m3u8: `/api/movie/hls/${encodeURIComponent(m[1])}/${encodeURIComponent(m[2])}/index5.m3u8`, mp4: false, proxy: false, subs: [] };
+}
+/* ================= fin v207: MOVIE ================= */
+
 let laRtTimer = null;
 function laMuertaQuitar(slug) { /* v202: autocuración — una «muerta» que vuelve a resolver reviva */
   if (!slug || !LA_MUERTAS_SET.has(slug)) return;
@@ -1529,6 +1773,7 @@ async function ponerDaniNativo(room, urlEp, userId) {
 }
 
 async function resolverNativoInterno(url) {
+  if (new RegExp(MOVIE_HOST_VIRTUAL.replace(/\./g, '\\.') + '\\/ver\\/', 'i').test(url)) return resolverMovie(url); /* v207: Movie nativo en sala (playlist local) */
   if (/latanime\.org\/ver\//i.test(url)) return resolverAnime(url);
   if (/pelisxd\.com\/pelicula\//i.test(url)) return resolverPelisxd(url); /* v98 */
   if (/miscaricaturas\.com\//i.test(url)) return resolverCaricatura(url); /* v102 */
@@ -1806,6 +2051,17 @@ async function serieCtxFromUrl(u) {
   try {
     const url = new URL(u);
     const host = url.hostname.toLowerCase();
+    /* v207: Movie (mapa local) — cadena de capítulos activos de la serie */
+    if (host === MOVIE_HOST_VIRTUAL) {
+      const mm = /^\/ver\/([a-z0-9-]+)\/(\d+)x(\d+)$/i.exec(url.pathname);
+      if (!mm) return null;
+      const s = movieSerieActiva(mm[1]);
+      if (!s) return null;
+      const idx = s.eps.findIndex((e) => e.temporada === +mm[2] && e.episodio === +mm[3]);
+      if (idx < 0) return null;
+      return { tipo: 'movie', titulo: s.titulo, poster: '/api/movie/poster/' + s.clave, idx,
+        eps: s.eps.map((e) => ({ url: movieUrlEp(s.clave, e.temporada + 'x' + e.episodio), num: 'Capítulo ' + e.episodio })) };
+    }
     let m = /\/ver\/([a-z0-9-]+)-episodio-(\d+)/i.exec(url.pathname);
     if (m && host.endsWith('latanime.org')) {
       const d = await datosAnimeLatanime(m[1]);
@@ -8071,7 +8327,7 @@ const server = http.createServer(async (req, res) => {
         caricaturas: cari.caricaturas || [],
         cartoons: cari.cartoons || [], /* v119: apartado propio de Lacartoons */
         liveaction: cari.liveaction || [], /* v205: iCarly, Drake & Josh, Power Rangers… */
-        novelas: (() => { const a2 = nv.filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url) || [])[1])); const b2 = nv2RecientesCache.items || []; const mez = []; for (let i2 = 0; i2 < Math.max(a2.length, b2.length) && mez.length < 18; i2++) { if (a2[i2]) mez.push(a2[i2]); if (b2[i2]) mez.push(b2[i2]); } return mez; })(), /* v206.2: 360 + enpantalla intercaladas */
+        novelas: (() => { const a2 = nv.filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url) || [])[1])); const b2 = nv2RecientesCache.items || []; const mez = []; for (let i2 = 0; i2 < Math.max(a2.length, b2.length) && mez.length < 18; i2++) { if (a2[i2]) mez.push(a2[i2]); if (b2[i2]) mez.push(b2[i2]); } return [...movieTarjetas(), ...mez]; })(), /* v206.2: 360 + enpantalla intercaladas — v207: las del app Movie abren la fila */
         generos: (generos || []).map((g) => ({ slug: g.slug, nombre: g.nombre, items: fCV(g.items) })).filter((g) => g.items.length),
       });
     }
@@ -8093,7 +8349,60 @@ const server = http.createServer(async (req, res) => {
       d.episodios = epsVivos(d.episodios); /* v205.5 */
       return json(res, 200, d);
     }
-    if (url.pathname.startsWith('/api/gopelispeli/')) { /* v199: ficha de PELÍCULA de GoPelis */
+      if (url.pathname === '/api/movie/probar') { /* v207: diagnóstico — comprueba m3u8 + primer .ts de cada ruta activa contra el origen */
+        movieRecargar();
+        const probarUno = async (u, conRango) => {
+          try {
+            const ctl = new AbortController();
+            const t = setTimeout(() => ctl.abort(), 12000);
+            const cab = { 'User-Agent': FETCH_UA };
+            if (conRango) cab.Range = 'bytes=0-1023';
+            try {
+              const r = await fetch(u, { headers: cab, signal: ctl.signal, redirect: 'follow' });
+              try { r.body && r.body.cancel(); } catch {}
+              return r.status;
+            } finally { clearTimeout(t); }
+          } catch { return 0; }
+        };
+        const filas = [];
+        for (const s of MOVIE.series.values()) {
+          for (const e of s.eps) {
+            const id = e.temporada + 'x' + e.episodio;
+            if (MOVIE.caidas.has(e.carpeta)) { filas.push({ serie: s.titulo, ep: id, carpeta: e.carpeta, m3u8: 'caída marcada', ts: '-', listo: false }); continue; }
+            const em = await probarUno(movieOrigenM3u8(e), false);
+            const ets = em === 200 ? await probarUno(movieOrigenTs(e, '0000.ts'), true) : '-';
+            const cayo = [403, 404, 410].includes(em) || [403, 404, 410].includes(ets);
+            if (cayo) movieMarcarCaida(s.clave, id, e, `comprobación /api/movie/probar: m3u8 ${em}, ts ${ets}`);
+            filas.push({ serie: s.titulo, ep: id, carpeta: e.carpeta, m3u8: em, ts: ets, listo: em === 200 && (ets === 200 || ets === 206) });
+          }
+        }
+        return json(res, 200, { ok: true, origen: MOVIE_ORIGEN, rutas: filas });
+      }
+      if (url.pathname.startsWith('/api/movie/ficha/')) { /* v207: ficha de una novela del app Movie (mapa local) */
+        const clave = decodeURIComponent(url.pathname.split('/')[4] || '').toLowerCase();
+        if (!/^[a-z0-9-]{3,90}$/.test(clave)) return json(res, 400, { ok: false, error: 'Serie inválida' });
+        const s = movieSerieActiva(clave);
+        if (!s) return json(res, 404, { ok: false, error: 'Esa novela no está disponible en Movie ahora' });
+        return json(res, 200, {
+          ok: true, titulo: s.titulo, poster: '/api/movie/poster/' + s.clave,
+          episodios: s.eps.map((e) => ({
+            temporada: e.temporada, ep: e.episodio, titulo: 'Capítulo ' + e.episodio,
+            url: movieUrlEp(s.clave, e.temporada + 'x' + e.episodio), img: '',
+          })),
+        });
+      }
+      if (url.pathname.startsWith('/api/movie/poster/')) { /* v207: portada alojada por Movie (fallback /carita.png) */
+        return movieServirPoster(req, res, decodeURIComponent(url.pathname.split('/')[4] || '').toLowerCase());
+      }
+      if (url.pathname.startsWith('/api/movie/hls/')) { /* v207: playlist/segmentos del origen Movie — allowlist estricta del mapa */
+        const clave = decodeURIComponent(url.pathname.split('/')[4] || '').toLowerCase();
+        const epId = decodeURIComponent(url.pathname.split('/')[5] || '');
+        const archivo = url.pathname.split('/')[6] || '';
+        if (!/^[a-z0-9-]{3,90}$/.test(clave) || !/^\d{1,2}x\d{1,3}$/.test(epId) || archivo.includes('/')) return json(res, 400, { ok: false, error: 'Petición inválida' });
+        if (/^index5\.m3u8$/i.test(archivo)) return movieServirM3u8(req, res, clave, epId);
+        return movieServirTs(req, res, clave, epId, decodeURIComponent(archivo));
+      }
+      if (url.pathname.startsWith('/api/gopelispeli/')) { /* v199: ficha de PELÍCULA de GoPelis */
       const slug = decodeURIComponent(url.pathname.split('/')[3] || '').toLowerCase();
       if (!/^[a-z0-9-]{2,90}$/.test(slug)) return json(res, 400, { ok: false, error: 'Película inválida' });
       const d = await datosGopelisPeli(slug).catch(() => null);
@@ -8337,6 +8646,21 @@ const server = http.createServer(async (req, res) => {
         }).filter((g) => !r.resultados.some((x) => normalizarTxt(x.title || '') === normalizarTxt(g.titulo))).slice(0, 3);
         for (const g of gpP2.reverse()) r.resultados.unshift({ title: g.titulo, url: GP_BASE + 'peliculas/' + g.slug, img: g.img || '', site: 'GoPelis', extra: 'Película · Latino' });
       } catch {}
+      /* v207: MOVIE (app) — las novelas latinas del mapa local cascan primero
+       * en la búsqueda (mismo criterio de parecido que GoPelis, por título) */
+      try {
+        const qM = normalizarTxt(q);
+        if (qM.length > 1) {
+          const pelisM = movieTarjetas().filter((t) => {
+            const tn = normalizarTxt(t.title);
+            if (!tn) return false;
+            if (tn.includes(qM) || qM.split(' ').every((w) => w.length > 1 && tn.includes(w))) return true;
+            const inter = tn.split(' ').filter((w) => w.length > 1 && qM.includes(w)).length;
+            return inter >= Math.min(2, tn.split(' ').length);
+          });
+          for (const t of pelisM.reverse()) r.resultados.unshift(t);
+        }
+      } catch {}
       /* v193: tarjetas sin carátula → IMDb (o la ficha del propio sitio) */
       const sinCaratula = r.resultados.filter((x) => !x.img);
       if (sinCaratula.length) {
@@ -8534,8 +8858,9 @@ const server = http.createServer(async (req, res) => {
         const esGp = /gopelis\.com\/ver\/(?:tv|movie)\//i.test(target); /* v198 series + v199 películas de GoPelis (latino) */
         const esNv = /novelas360\.com\/video\//i.test(target); /* v206 novelas */
         const esEnp = /enpantallatv\.com\/[a-z0-9-]*capitulo/i.test(target); /* v206.2 */
+        const esMovie = new RegExp(MOVIE_HOST_VIRTUAL.replace(/\./g, '\\.') + '\\/ver\\/', 'i').test(target); /* v207: Movie (mapa local) */
         let r;
-        try { r = await (esEpAnime ? resolverAnime(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esGp ? resolverGopelis(target) : esNv ? resolverNovela(target) : esEnp ? resolverEnp(target) : resolverSolo(target)); epsPerdonar(target); } /* v205.5 + v206 + v206.2 */
+        try { r = await (esMovie ? resolverMovie(target) : esEpAnime ? resolverAnime(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esGp ? resolverGopelis(target) : esNv ? resolverNovela(target) : esEnp ? resolverEnp(target) : resolverSolo(target)); epsPerdonar(target); } /* v205.5 + v206 + v206.2 + v207 */
         catch (e2r) { epsFallo(target); throw e2r; } /* v205.5: episodios muertos al contador */
         return json(res, 200, { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy });
       } catch (e) {
@@ -8776,6 +9101,16 @@ const server = http.createServer(async (req, res) => {
         intros: { analizados: CRAWL.hechas || 0, total: CRAWL.total || 0, enCola: CRAWL.pend.length, aprendidas: Object.keys(INTROS).length, sinIntro: (CRAWL.sinIntro || []).length, muestra },
         moderacion: { animesMuertos: LA_MUERTAS_SET.size, animesCastDup: LA_OCULTAS_SET.size, gopelis: GP_OCULTAS_SET.size, pelisxd: PXD_OCULTAS.size, animeflv: AF_OCULTAS.size, cuevana: CV_OCULTAS_RT.size, novelas: NV_OCULTAS.size, protegidas: CV_PROTEGIDAS.size, epsOcultos: EPS_MUERTOS.size, fallosEnCurso: [FALLOS_GP, FALLOS_PXD, FALLOS_AF, FALLOS_CV, FALLOS_NV, EPS_FALLOS].reduce((a2, mm2) => a2 + [...mm2.values()].filter((x2) => x2.f >= 1 && !x2.h).length, 0) },
         catalogos: { caricaturas: cariFeedCache.items.length, cartoons: cariFeedCache.toons.length, liveaction: cariFeedCache.live.length, danimados: DANI_CAT.size, animes: LA_TODOS.size, novelas: nvdCache.items.length },
+        movie: (() => { /* v207: estado del mapa local del app Movie */
+          movieRecargar();
+          const seriesM = [...MOVIE.series.values()].map((s) => ({
+            titulo: s.titulo, clave: s.clave,
+            episodios: s.eps.length,
+            activos: s.eps.filter((e) => !MOVIE.caidas.has(e.carpeta)).length,
+            caidos: s.eps.filter((e) => MOVIE.caidas.has(e.carpeta)).map((e) => e.temporada + 'x' + e.episodio),
+          }));
+          return { mapa: fs.existsSync(MOVIE_MAPA_RUTA) ? MOVIE_MAPA_RUTA : 'FALTA — generar con mapear-secuencias-movie.js', origen: MOVIE_ORIGEN, series: seriesM, caidas: [...MOVIE.caidas.values()] };
+        })(),
       });
     }
     return serveStatic(req, res, url.pathname);
