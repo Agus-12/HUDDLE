@@ -60,8 +60,38 @@ Recon binario real (este chat) sobre `auditorias/apk/lib/arm64-v8a/libpp_hls.so`
   - `.text` visible = solo 577 KB (VM + pegamento); `.bss` de 3 MB = zona de trabajo; `.data` arranca cifrado. Anti-análisis: `sigaction`, `dl_iterate_phdr`, `dladdr`, lectura de `/proc/self/maps`; APIs de red/threads ocultas vía `dlopen/dlsym`.
 - **Consecuencia dura:** Ghidra estático sobre el archivo = prácticamente inútil (dead end 9 confirmado y AMPLIADO: no hay solo ofuscación OLLVM, hay bytecode cifrado de una VM custom). Revertir la VM a mano = semanas.
 - **Vía viva = ORÁCULO DINÁMICO** (no entender el algoritmo, solo USARLO): correr la lib en un entorno Android real/emulado con un JNIEnv de juguete, dejar que levante su servidor 127.0.0.1 y pedirle `/control?msg=verify&device_id={DEV}{VOD_ID}&ts={ms}` → el body ES el sign. Si funciona, el mismo arnés corre en el Oracle (Ampere A1 = ARM64) y Huddle mintea signs solos → automatización TOTAL (info_new → vod_url de cualquier título).
-- **Herramientas ya listas en el sandbox:** qemu-aarch64-static, NDK r27c descargado (sysroot bionic), capstone/unicorn (pip), gcc cross. El primer intento (arnés C + JNI stub + qemu) sigue en curso; riesgo = chequeos anti-entorno de la lib.
-- **Atajo que lo cambiaría todo (PREGUNTAR AL AMIGO):** un teléfono Android ROOTEADO (o que se pueda rootear) → Frida hookea el handler de /control en minutos y además revela la función interna. Preguntado al usuario el 17-sep.
+- **Herramientas:** capstone + unicorn + pyelftools (pip). qemu-aarch64-static y el NDK se instalan/descargan si hacen falta, pero **no se usaron**: el emulador Unicorn puro resultó viable y no necesita sysroot de Android.
+- **Root descartado:** el usuario confirmó el 17-sep que no tiene Android rooteado → la vía Frida queda fuera; seguimos por emulación.
+
+### 🛠️ EMULADOR FUNCIONANDO (17 sep) — `auditorias/crack/`
+`emu_hls.py` (Unicorn ARM64, sin Android) ya hace, verificado por ejecución:
+1. Carga los 2 segmentos PT_LOAD, aplica las 164 relocalizaciones
+   (`R_AARCH64_RELATIVE` + `GLOB_DAT`/`JUMP_SLOT`; 30 apuntan a símbolos
+   internos como `interpreter_wrap_int64_t` y `ffi_*`, el resto a trampolines).
+2. Implementa la libc que la lib importa (malloc/calloc/memcpy/mmap/mprotect/
+   `uncompress`/fopen/fgets/strstr/sigaction/`dlopen`/`dlsym`…) y un `dlsym`
+   falso que anuncia ~70 APIs (socket/bind/pthread/…) para ver qué pide.
+3. Reimplementa el **libffi embebido** (la lib lo usa para llamar a Java):
+   `ffi_prep_cif*` rellena el cif, `ffi_call(cif, fn, rvalue, avalue)` ejecuta
+   `fn` con los args desreferenciados de `avalue`, `ffi_closure_*` crea
+   trampolines reales (`ldr x17,#8; br x17`) porque el ABI de esta lib lee el
+   descriptor desde x17.
+4. Ejecuta `INIT_ARRAY[0]` (`0xe7bd8`) hasta retornar.
+5. Construye un `JavaVM`/`JNIEnv` de juguete (232 slots con trampolines
+   propios) y llama `JNI_OnLoad` (`0xe7c34`).
+
+**Hasta dónde llega:** `JNI_OnLoad` se ejecuta, la VM corre 988 opcodes y pide
+`GetEnv` con versión `0x10004` (JNI 1.4). Ahí se detiene: devuelve 0 en vez de
+`0x10006` y no llega a `RegisterNatives`, así que `jni_natives.txt` sale vacío.
+Falta satisfacer lo que la VM comprueba justo después de `GetEnv`.
+
+**Detalle del intérprete (para quien siga):** decodifica un bitstream con
+campos de 5/6 bits y despacha por tabla (`br x0` en `0xf0154`). Bytecode de
+`JNI_OnLoad` = 2,904 B en `0xfaf20`, entropía 7.09 (cifrado), no cambia durante
+la ejecución. Opcodes vistos: 0,1,2,4,5,6,9,18,19,25 y 735,959,1074,1187,
+1683,1692,1700.
+
+**Reproducir:** `pip install pyelftools capstone unicorn && python3 auditorias/crack/emu_hls.py --budget 400`
 - Nota: `pp_hlsProtected.dat` (assets) trae magic `*#*#0123456789ES9876543210#*#*` — probable config cifrada que la VM consume; el arnés debe poder leérsela (ruta del "apk").
 
 ### ✅ LOGRADO
