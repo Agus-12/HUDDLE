@@ -51,6 +51,21 @@ Comprobado desde el sandbox (mismos resultados que verá cualquier IP):
 - Prueba real (17 sep): 21 ids → 7 títulos (~33 % de densidad en zona poblada; la zona baja <81 000 va vacía). Estimado total: ~30-33 h de rastreo; se puede correr en el Oracle igual (`cd ~/huddle && nohup node catalogo-movie.js > ~/catalogo.log 2>&1 &` — es reanudable, si se corta se relanza y sigue).
 - **Falta (siguiente tanda):** integrar el catálogo rastreado en Huddle (buscador/feed con portadas Movie). Catálogo ≠ video: las URLs de stream siguen saliendo solo de capturas frescas (sign nativo sigue bloqueado) y el contenido viejo hoy exige tokens (dead end 19).
 
+### 🔓 PLAN B EN MARCHA (17 sep): reconocimiento de libpp_hls.so COMPLETADO
+Recon binario real (este chat) sobre `auditorias/apk/lib/arm64-v8a/libpp_hls.so` (2.9 MB, ARM64, stripped):
+- **PROTECCIÓN = MÁQUINA VIRTUAL PROPIA (estilo VMProtect), no un packer simple.** Evidencia:
+  - init #1 (`0xe7bd8`) llama a **`interpreter_wrap_int64_t`** con 5 args: blob de bytecode de 936 B (`0xfab78`), región de 1.5 MB en `0x1606f0` y la sección **`.mips` (`0x1607d0`, 1,532,446 B)** + su tamaño. `.mips` tiene **entropía 7.9999 bits/byte** = cifrada a tope (sin atajo zlib offline; probado).
+  - Familia `interpreter_wrap_{int64_t,float,double}(+_bridge)` = el dispatcher de la VM; **libffi embebido** (`ffi_prep_closure_loc`, `ffi_java_raw_call`…) = cómo el bytecode llama funciones nativas/Java.
+  - Los **9,674 exports ofuscados** (`A101S9v63mXfa`…) son casi seguro stubs de entrada a la VM.
+  - `.text` visible = solo 577 KB (VM + pegamento); `.bss` de 3 MB = zona de trabajo; `.data` arranca cifrado. Anti-análisis: `sigaction`, `dl_iterate_phdr`, `dladdr`, lectura de `/proc/self/maps`; APIs de red/threads ocultas vía `dlopen/dlsym`.
+- **Consecuencia dura:** Ghidra estático sobre el archivo = prácticamente inútil (dead end 9 confirmado y AMPLIADO: no hay solo ofuscación OLLVM, hay bytecode cifrado de una VM custom). Revertir la VM a mano = semanas.
+- **Vía viva = ORÁCULO DINÁMICO** (no entender el algoritmo, solo USARLO): correr la lib en un entorno Android real/emulado con un JNIEnv de juguete, dejar que levante su servidor 127.0.0.1 y pedirle `/control?msg=verify&device_id={DEV}{VOD_ID}&ts={ms}` → el body ES el sign. Si funciona, el mismo arnés corre en el Oracle (Ampere A1 = ARM64) y Huddle mintea signs solos → automatización TOTAL (info_new → vod_url de cualquier título).
+- **Herramientas ya listas en el sandbox:** qemu-aarch64-static, NDK r27c descargado (sysroot bionic), capstone/unicorn (pip), gcc cross. El primer intento (arnés C + JNI stub + qemu) sigue en curso; riesgo = chequeos anti-entorno de la lib.
+- **Atajo que lo cambiaría todo (PREGUNTAR AL AMIGO):** un teléfono Android ROOTEADO (o que se pueda rootear) → Frida hookea el handler de /control en minutos y además revela la función interna. Preguntado al usuario el 17-sep.
+- Nota: `pp_hlsProtected.dat` (assets) trae magic `*#*#0123456789ES9876543210#*#*` — probable config cifrada que la VM consume; el arnés debe poder leérsela (ruta del "apk").
+
+### ✅ LOGRADO
+
 ### ✅ LOGRADO
 - **Catálogo histórico (CORRECCIÓN 16 sep):** `auditorias/catalogo-app-completo.json` tiene 8,000 FILAS y `novelas-app-catalogo.json` 240, pero al revisarlos solo hay **20 IDs únicos por tipo**: el scrape anterior repitió la primera página. Sirven como muestra y para los 20 títulos actuales, pero **NO son el catálogo completo**. `search/screen` ignora todos los parámetros de página probados; habrá que reconstruir el catálogo por otra vía más adelante.
 - **Huddle ya tiene** 3 pestañas funcionando (anime/cine/novelas de otras fuentes), sala automática, continuar-viendo con póster, reproductor individual, etc. (ver §7 restricciones).
