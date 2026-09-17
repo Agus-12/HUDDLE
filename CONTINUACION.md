@@ -22,6 +22,31 @@
 
 ## 2. ESTADO DEL PROYECTO (17 sep 2026)
 
+### 🎯🎯🎯 CRACK (18 sep): **FÓRMULA DEL SIGN ENCONTRADA** — `sign = md5(device_id + ts + ck)` en minúsculas
+- Dentro del módulo descifrado de `libpp_hls` hay **un ELF AArch64 completo embebido en el offset 0x50429** (`e_type=ET_DYN`, `e_machine=EM_AARCH64`, entry `0xa6570`, 3,062,680 B). Extraído a **`auditorias/crack/pphls_elf_interno.so`**. Sus program headers están borrados pero **el código es ARM64 real y desensambla** (`.text` ≈ 0x80000–0x1e0000). El resto del módulo (0–0x50429) es bytecode de la VM 360 (0 % decodificable como ARM; los `ret` que aparecen son ruido: 1/2³² × 3.4 M ≈ 800 esperados, hay 5561).
+- **El handler de `control?msg=verify` está en `0xc98f4`–`0xc9bfc`** (se llega comparando el param `msg` con `"verify"` vía `strcmp` en `0x9cd40`). Lo que hace, instrucción por instrucción:
+  ```
+  0xc990c  x3 = &param_device_id            ; x19-0x4c8
+  0xc9910  si *device_id == 0 → error "request 'control' verify, missing param"
+  0xc9918  x4 = &param_ts                   ; x19-0x488
+  0xc991c  si *ts == 0      → mismo error
+  0xc9ba8  [ctx+0x10c4] = 9                 ; tipo de respuesta
+  0xc9bac  x20 = ctx-0x208                  ; buffer de salida
+  0xc9bb8  x2 = [ [0x2d9000+0x5a8] + 0x38 ] ; ← 3er trozo: campo 0x38 de la config global
+  0xc9bbc  x1 = "%s%s%s"
+  0xc9bc8  sprintf(buf, "%s%s%s", device_id, ts, cfg[0x38])
+  0xc9bd0  w1 = hash(buf)                   ; longitud
+  0xc9be0  hex(buf, w1, x19-0x598)          ; a hexadecimal
+  0xc9bf0  w2 = 0x10                        ; ← 16 bytes = MD5
+  0xc9bf8  memcpy(resp, hex, 16)
+  ```
+  → **`sign = md5( device_id ‖ ts ‖ ck )` escrito como hex de 16 caracteres.** El ELF tiene el IV de MD5 en `0x2323f0` (`67452301 efcdab89 98badcfe 10325476`) y la tabla de constantes en `0x229af0` (`d76aa478…`); también hay SHA-256 (`0x428a2f98` en `0x23249c`), así que **si md5 no cuaja, probar sha256 truncado a 16 bytes** — pero `w2=0x10` apunta a MD5.
+- **`ck` NO es un secreto fijo del binario:** es el campo `0x38` de la config global, y el propio servidor tiene `msg=up_ck` (handler en `0xc9a2c`) y la función `update_ck` para actualizarlo. Por eso **los 10 intentos MD5 con secretos fijos fallaron** (`47Q8tBqO4YqrMHf4`, `92b991…`, `87c2cb7f…`): falta el `ck` que el app recibe del backend.
+- **Parámetros exactos:** `device_id` es el valor TAL CUAL viene en la URL (en la captura real: `3736e27f0823b1ba711142488`, que ya lleva el `vod_id` pegado) y `ts` los milisegundos. No se trocean ni se reordenan.
+- **Lo único que falta para el oráculo: el valor de `ck`.** Vías, en orden de coste: (1) verlo en la respuesta de `/api/public/init` (la llamada de prueba sin firma correcta devolvió `系统出问题啦~请稍后再试`); (2) capturar `GET /control?msg=up_ck` en el teléfono; (3) buscar el setter del campo `0x38` en el ELF interno y ver de dónde lo saca.
+- **Mapa de referencias ya resuelto** (ADRP+ADD decodificados a mano sobre el ELF interno, 7460 refs, 3023 a cadenas): `init done, port:%u`←0xc89a4 · `msg`←0xc93c8 · `device_id`←0xc93f0 · `nettype`←0xc93dc · `download_control`←0xc951c · `resource.m3u8`←0xc9630 · `m3u8_key`←0xc9684 · `net_info`←0xc96e8 · **`verify`←0xc98fc** · **`up_ck`←0xc9a34** · **`%s%s%s`←0xc9bbc** · `client_request_thread`←0xca39c · `wsSecret=%s&wsTime=%u`←0xcc6ec · `auth_key=%d-%d-%d-%s`←0xcc7b8 · `Signature=%s&Expires=%u&Key-Pair-Id=%s`←0xcc91c · `source_get_request_uri`←0xcc878 · `1be0ac56`←0xcd6f8 · `de304f03fe653f329edfea08ea2046c4`←0xd45a8 · `server_port`←0xd67dc,0xd7274 · `update_ck`←0xd6818.
+- **OJO con capstone:** el `disasm` lineal se detiene en el primer byte no decodificable y este binario tiene datos intercalados → hay que decodificar ADRP/ADD a mano palabra por palabra (el script está implícito en el comando del commit; `adrp` = `(w&0x9f000000)==0x90000000`, `add imm` = `(w&0xff800000)==0x91000000`).
+
 ### 🔓🔓🔓🔓🔓 CRACK (18 sep, EL AVANCE GRANDE): `libpp_hls.so` DESCIFRADO — EL SERVIDOR DE CONTROL AL DESNUDO
 - **El `.mips` de `libpp_hls.so` usa EL MISMO cifrado que jiagu** (mismo S-box capturado, misma PRGA). `python3 rc4_jiagu.py ../apk/lib/arm64-v8a/libpp_hls.so rc4_sbox_1.bin pphls_mips` → `COINCIDE ✔`.
   - `.mips`: va 0x1607d0, off 0x1507d0, **1,532,446 B** (0x17621e). Descifrado → header LE `0x0033bfc1` = **3,391,425** y zlib dio exactamente 3,391,425 B → **`pphls_mips_inflado.bin`** (3.3 MB, en `.gitignore` por tamaño; se regenera con ese comando).
