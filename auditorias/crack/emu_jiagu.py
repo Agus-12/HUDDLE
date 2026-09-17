@@ -97,6 +97,7 @@ NARGS_JIAGU = {
     'fputs': 2, 'fwrite': 4, 'fflush': 1, 'setvbuf': 4, 'fseek': 3,
     'ftell': 1, 'rewind': 1, 'remove': 1, 'tmpfile': 0, 'tmpnam': 1,
     'fprintf': 2, 'puts': 1, 'putchar': 1, 'strcat': 2,
+    'sscanf': 6, 'fopen': 2, 'fgets': 3,
     '__errno': 0, 'feof': 1, 'readdir': 1, 'opendir': 1, 'closedir': 1,
     'stat': 2, 'fstat': 2, 'lseek': 3, 'access': 2, 'mkdir': 2,
     'inet_aton': 2, 'inotify_init': 0, 'signal': 2, 'ldexp': 2,
@@ -655,7 +656,220 @@ class JiaguHost(eh.Host):
         import math
         return math.ldexp(float(x), e)
 
-    # dlsym extendido: exports REALES de libpp_hls
+
+    # ---------------- zlib (streaming real sobre zlib de Python) ----------
+    def _zstreams(self):
+        if not hasattr(self, '_zs'):
+            self._zs = {}
+        return self._zs
+
+    def deflateInit_(self, strm, level, ver, sz):
+        return self.deflateInit2_(strm, level, 8, 15, 8, 0, ver, sz)
+
+    def deflateInit2_(self, strm, level, method, wbits, memlvl, strat,
+                      ver, sz):
+        import zlib as _z
+        st = {'co': _z.compressobj(max(-1, min(9, level & 0xffffffff if level >= 0 else -1)),
+                                   _z.DEFLATED, wbits, memlvl or 8, strat or 0),
+              'mode': 'd'}
+        self._zstreams()[strm] = st
+        # z_stream: total_in@16 total_out@40 state@56 adler@96 (64-bit)
+        self.uc.mem_write(strm + 16, struct.pack('<Q', 0))
+        self.uc.mem_write(strm + 40, struct.pack('<Q', 0))
+        self.uc.mem_write(strm + 56, struct.pack('<Q', 0x5A11))
+        self.uc.mem_write(strm + 96, struct.pack('<Q', 1))
+        return 0
+
+    def inflateInit_(self, strm, ver, sz):
+        return self.inflateInit2_(strm, 15, ver, sz)
+
+    def inflateInit2_(self, strm, wbits, ver, sz):
+        import zlib as _z
+        w = wbits if wbits < 0 or wbits > 15 else wbits
+        st = {'do': _z.decompressobj(w), 'mode': 'i',
+              'outq': b'', 'eos': False}
+        self._zstreams()[strm] = st
+        self.uc.mem_write(strm + 16, struct.pack('<Q', 0))
+        self.uc.mem_write(strm + 40, struct.pack('<Q', 0))
+        self.uc.mem_write(strm + 56, struct.pack('<Q', 0x5A12))
+        self.uc.mem_write(strm + 96, struct.pack('<Q', 1))
+        return 0
+
+    def _zs_fields(self, strm):
+        f = struct.unpack('<QQQQQQ', bytes(self.uc.mem_read(strm, 48)))
+        return f  # next_in, avail_in, total_in, next_out, avail_out, total_out
+
+    def _zs_set_out(self, strm, next_out, avail_out, total_out):
+        self.uc.mem_write(strm + 24, struct.pack('<QQQ', next_out, avail_out,
+                                                 total_out))
+
+    def deflate(self, strm, flush):
+        st = self._zstreams().get(strm)
+        if not st:
+            return -2
+        ni, ai, ti, no, ao, to = self._zs_fields(strm)
+        data = bytes(self.uc.mem_read(ni, ai)) if ai else b''
+        import zlib as _z
+        if flush == 4:  # Z_FINISH
+            out = st['co'].compress(data) + st['co'].flush(_z.Z_FINISH)
+        elif flush == 2:  # Z_FULL_FLUSH
+            out = st['co'].compress(data) + st['co'].flush(_z.Z_FULL_FLUSH)
+        elif flush == 3:  # Z_SYNC_FLUSH
+            out = st['co'].compress(data) + st['co'].flush(_z.Z_SYNC_FLUSH)
+        else:
+            out = st['co'].compress(data)
+        put = out[:ao]
+        if put:
+            self.uc.mem_write(no, put)
+        self.uc.mem_write(strm, struct.pack('<QQQ', ni + ai, 0, ti + ai))
+        self._zs_set_out(strm, no + len(put), ao - len(put), to + len(put))
+        self.uc.mem_write(strm + 96, struct.pack('<Q', _z.adler32(data, 1)))
+        if flush == 4:
+            return 1 if len(out) <= ao else -5
+        return 0 if len(out) <= ao else -5
+
+    def inflate(self, strm, flush):
+        st = self._zstreams().get(strm)
+        if not st:
+            return -2
+        ni, ai, ti, no, ao, to = self._zs_fields(strm)
+        data = bytes(self.uc.mem_read(ni, ai)) if ai else b''
+        outq = st['outq']
+        consumed = 0
+        if data and not st['eos']:
+            try:
+                outq += st['do'].decompress(data) if not hasattr(st['do'], 'unused_data') or True else b''
+                consumed = ai - len(getattr(st['do'], 'unused_data', b''))
+                if st['do'].eof:
+                    st['eos'] = True
+            except Exception:
+                return -3
+        put = outq[:ao]
+        if put:
+            self.uc.mem_write(no, put)
+        st['outq'] = outq[len(put):]
+        self.uc.mem_write(strm, struct.pack('<QQQ', ni + consumed,
+                                            ai - consumed, ti + consumed))
+        self._zs_set_out(strm, no + len(put), ao - len(put), to + len(put))
+        if st['eos'] and not st['outq']:
+            return 1  # Z_STREAM_END
+        return 0
+
+    def deflateEnd(self, strm):
+        self._zstreams().pop(strm, None)
+        self.uc.mem_write(strm + 56, struct.pack('<Q', 0))
+        return 0
+
+    def inflateEnd(self, strm):
+        return self.deflateEnd(strm)
+
+    def inflateReset(self, strm):
+        import zlib as _z
+        st = self._zstreams().get(strm)
+        if st:
+            st['do'] = _z.decompressobj(15)
+            st['outq'] = b''
+            st['eos'] = False
+        return 0
+
+    def compress2(self, dst, dstlen_p, src, srclen, level):
+        import zlib as _z
+        data = bytes(self.uc.mem_read(src, srclen))
+        out = _z.compress(data, 6 if level in (-1, 0) else level)
+        if dstlen_p:
+            cap = struct.unpack('<I', bytes(self.uc.mem_read(dstlen_p, 4)))[0]
+            if cap < len(out):
+                self.uc.mem_write(dstlen_p, struct.pack('<I', len(out)))
+                return -5
+            self.uc.mem_write(dstlen_p, struct.pack('<I', len(out)))
+        self.uc.mem_write(dst, out)
+        return 0
+
+    def compress(self, dst, dstlen_p, src, srclen):
+        return self.compress2(dst, dstlen_p, src, srclen, -1)
+
+    def crc32(self, crc, buf, n=0):
+        import zlib as _z
+        data = bytes(self.uc.mem_read(buf, n)) if buf and n else b''
+        return _z.crc32(data, crc & 0xFFFFFFFF) & 0xFFFFFFFF
+
+    def adler32(self, ad, buf, n=0):
+        import zlib as _z
+        data = bytes(self.uc.mem_read(buf, n)) if buf and n else b''
+        return _z.adler32(data, ad & 0xFFFFFFFF) & 0xFFFFFFFF
+
+    def sprintf(self, buf, fmt_a, *rest):
+        s = self.rstr(fmt_a)
+        try:
+            txt = s.decode('latin1')
+        except Exception:
+            txt = str(s)
+        out = []
+        it = iter(range(len(rest)))
+        i = 0
+        while i < len(txt):
+            c = txt[i]
+            if c == '%' and i + 1 < len(txt):
+                j = i + 1
+                while j < len(txt) and txt[j] in '#0-+. lhz':
+                    j += 1
+                conv = txt[j] if j < len(txt) else ''
+                if conv == '%':
+                    out.append('%')
+                elif conv in ('d', 'i'):
+                    out.append(str(struct.unpack('<i', struct.pack('<I', next(it, 0) & 0xffffffff))[0]))
+                elif conv == 'u':
+                    out.append(str(next(it, 0) & 0xffffffff))
+                elif conv == 'x':
+                    out.append('%x' % next(it, 0))
+                elif conv == 'X':
+                    out.append('%X' % next(it, 0))
+                elif conv == 'p':
+                    out.append('0x%x' % next(it, 0))
+                elif conv == 's':
+                    a = next(it, 0)
+                    out.append(self.rstr(a).decode('latin1', 'replace') if a else '(null)')
+                elif conv == 'c':
+                    out.append(chr(next(it, 0) & 0xff))
+                elif conv == 'l' and j + 1 < len(txt) and txt[j+1] in 'dux':
+                    out.append(str(next(it, 0)))
+                    j += 1
+                else:
+                    out.append(txt[i:j+1])
+                i = j + 1
+                continue
+            out.append(c)
+            i += 1
+        data = ''.join(out).encode('latin1', 'replace') + b'\0'
+        self.uc.mem_write(buf, data)
+        return len(data) - 1
+
+    def creat(self, p_a, mode):
+        return self.open(p_a, 0o102, mode)
+
+    def gzopen(self, *a):
+        return 0
+
+    def gzwrite(self, *a):
+        return 0
+
+    def gzclose(self, *a):
+        return 0
+
+    def zError(self, *a):
+        return 0
+
+    # ---------------- C++ ABI mínimos ------------------------------------
+    def cxa_atexit_impl(self, *a):
+        return 0
+
+    def pthread_key_create(self, *a):
+        return 0
+
+    def pthread_once(self, *a):
+        return 0
+
+    # dlsym extendido: exports REALES de libpp_hls + símbolos de datos
     def dlsym(self, handle, name_a):
         self.calls['dlsym'] += 1
         nm = self.rstr(name_a).decode('latin1')
@@ -664,13 +878,165 @@ class JiaguHost(eh.Host):
             addr = self.hls_exports[nm]
         else:
             addr = HOOKS_ADDR.get(nm, 0)
-        log(f'    [dlsym "{nm}" → {hex(addr)}]')
+        if not addr:
+            # símbolos de DATOS del emulador base (__sF, __stack_chk_guard…)
+            addr = getattr(self.ge.emu, 'DATA_SYMS', {}).get(nm, 0)
+        if not addr:
+            # stub genérico dinámico: el dispatcher cae en Host.stub(nm,…) → 0
+            ge = self.ge
+            if not hasattr(ge, 'next_stub'):
+                ge.next_stub = max(HOOKS_ADDR.values()) + 0x10
+            addr = ge.next_stub
+            ge.next_stub += 0x10
+            HOOKS_NAME[addr] = nm
+            self.uc.mem_write(addr, b'\xc0\x03\x5f\xd6')
+            log(f'    [dlsym "{nm}" → {hex(addr)} (stub genérico)]')
+        else:
+            log(f'    [dlsym "{nm}" → {hex(addr)}]')
         return addr
+
+    # fopen: /proc/self/maps incluye también los segmentos de jiagu
+    def fopen(self, p_a, m_a):
+        p = self.rstr(p_a).decode('latin1')
+        if p == '/proc/self/maps':
+            lines = eh.VFILE.get('/proc/self/maps', b'').decode().split('\n')
+            extra = []
+            for va, sz in getattr(self.ge, 'jiagu_segs', []):
+                extra.append(f'{JBASE+va:x}-{JBASE+va+sz:x} r-xp 00000000 '
+                             f'fe:00 1 /data/app/libpp_hls.so!libjiagu.so')
+            body = ('\n'.join([l for l in lines if l] + extra) + '\n').encode()
+            h = 0x7100 + len(self.files)
+            self.files[h] = bytearray(body)
+            self.calls['fopen'] += 1
+            log(f'    [fopen "/proc/self/maps" (+{len(extra)} líneas jiagu)]')
+            return h
+        return eh.Host.fopen(self, p_a, m_a)
+
+    # sscanf funcional: %lx %x %d %s %n %c y supresores %*
+    def sscanf(self, s_a, fmt_a, *outs):
+        self.calls['sscanf'] += 1
+        s = self.rstr(s_a).decode('latin1', 'replace')
+        fmt = self.rstr(fmt_a).decode('latin1', 'replace')
+        i = j = n = 0
+        L = len(s)
+        while j < len(fmt):
+            c = fmt[j]
+            if c == '%':
+                j += 1
+                if j < len(fmt) and fmt[j] == '%':
+                    j += 1
+                    continue
+                sup = False
+                if j < len(fmt) and fmt[j] == '*':
+                    sup = True
+                    j += 1
+                while j < len(fmt) and fmt[j].isdigit():
+                    j += 1
+                # modificadores de longitud: l, ll, h, hh, z, j, t
+                while j < len(fmt) and fmt[j] in 'lhqjzt':
+                    j += 1
+                conv = fmt[j] if j < len(fmt) else ''
+                j += 1
+                if conv == 'n':
+                    if not sup and n < len(outs) and outs[n]:
+                        self.uc.mem_write(outs[n], struct.pack('<I', i))
+                    continue
+                while i < L and s[i] in ' \t\r\n':
+                    i += 1
+                if conv == 'x' or conv == 'p' or conv == 'X':
+                    k = i
+                    while k < L and s[k] in '0123456789abcdefABCDEF':
+                        k += 1
+                    if k == i:
+                        break
+                    val = int(s[i:k], 16)
+                    i = k
+                    if not sup:
+                        if n >= len(outs) or not outs[n]:
+                            break
+                        self.uc.mem_write(outs[n], struct.pack('<Q', val))
+                        n += 1
+                elif conv == 'd' or conv == 'u':
+                    k = i
+                    if k < L and s[k] in '+-':
+                        k += 1
+                    while k < L and s[k].isdigit():
+                        k += 1
+                    if k == i or not s[i:k].lstrip('+-').isdigit():
+                        break
+                    val = int(s[i:k])
+                    i = k
+                    if not sup:
+                        if n >= len(outs) or not outs[n]:
+                            break
+                        self.uc.mem_write(outs[n], struct.pack('<Q', val & 0xFFFFFFFFFFFFFFFF))
+                        n += 1
+                elif conv == 's':
+                    k = i
+                    while k < L and s[k] not in ' \t\r\n':
+                        k += 1
+                    if k == i:
+                        break
+                    if not sup:
+                        if n >= len(outs) or not outs[n]:
+                            break
+                        self.uc.mem_write(outs[n], s[i:k].encode('latin1') + b'\0')
+                        n += 1
+                    i = k
+                elif conv == 'c':
+                    if i >= L:
+                        break
+                    if not sup:
+                        if n >= len(outs) or not outs[n]:
+                            break
+                        self.uc.mem_write(outs[n], s[i].encode('latin1'))
+                        n += 1
+                    i += 1
+                else:
+                    break
+            elif c in ' \t\r\n':
+                while i < L and s[i] in ' \t\r\n':
+                    i += 1
+                j += 1
+            else:
+                if i >= L or s[i] != c:
+                    break
+                i += 1
+                j += 1
+        if self.calls['sscanf'] <= 6:
+            log(f'    [sscanf "{s[:60]}" fmt="{fmt[:40]}" → {n}]')
+        return n
 
 
 # atributos con nombre reservado / con mangling
 setattr(JiaguHost, 'raise', JiaguHost.kill)
 setattr(JiaguHost, '__errno', JiaguHost._errno_impl)
+setattr(JiaguHost, '__cxa_atexit', JiaguHost.cxa_atexit_impl)
+def _sysprop(self, name_a, val_a):
+    nm = self.rstr(name_a).decode('latin1', 'replace')
+    PROPS = {
+        'ro.build.version.sdk': '33', 'ro.build.version.release': '13',
+        'ro.product.cpu.abi': 'arm64-v8a', 'ro.product.model': 'Pixel 6',
+        'ro.product.brand': 'google', 'ro.product.manufacturer': 'Google',
+        'ro.build.display.id': 'TQ3A.230901.001',
+        'ro.debuggable': '0', 'ro.secure': '1',
+        'ro.kernel.qemu': '0', 'ro.hardware': 'oriole',
+        'persist.sys.timezone': 'America/Mexico_City',
+        'ro.build.fingerprint': 'google/oriole/oriole:13/TQ3A.230901.001',
+    }
+    v = PROPS.get(nm, '')
+    if v:
+        self.uc.mem_write(val_a, v.encode() + b'\0')
+        log(f'    [__system_property_get("{nm}") = "{v}"]')
+    else:
+        log(f'    [__system_property_get("{nm}") → vacío]')
+    return len(v)
+
+
+setattr(JiaguHost, '__system_property_get', _sysprop)
+setattr(JiaguHost, '__system_property_find', lambda self, n: 0)
+setattr(JiaguHost, '__system_property_read_callback',
+        lambda self, a, b, c: 0)
 setattr(JiaguHost, '__clear_cache', JiaguHost.clear_cache_impl)
 setattr(JiaguHost, '__aarch64_sync_cache_range', JiaguHost.clear_cache_impl)
 
@@ -683,6 +1049,56 @@ class JiaguEmu:
         for nm in NUEVOS:
             eh.HOOK_TABLE_NAMES[nm] = nm
         eh.HOOK_TABLE_NAMES['close'] = 'close'
+        # trampolines zlib/C++ faltantes (el módulo 360 los resuelve por dlsym)
+        _ZLIB = {
+            'deflateInit_': 4, 'deflateInit2_': 8, 'deflate': 2,
+            'deflateEnd': 1, 'inflateInit_': 3, 'inflateInit2_': 4,
+            'inflate': 2, 'inflateEnd': 1, 'inflateReset': 1,
+            'compress': 4, 'compress2': 5, 'uncompress': 4, 'crc32': 3,
+            'adler32': 3, 'gzopen': 2, 'gzwrite': 4, 'gzclose': 1,
+            'zError': 1, 'zlibVersion': 0,
+            '__cxa_atexit': 3, 'pthread_key_create': 2, 'pthread_once': 2,
+            '__system_property_get': 2, '__system_property_find': 1,
+            '__system_property_read_callback': 3, 'getrandom': 3,
+            'sysconf': 1, 'mmap64': 6, 'pread64': 5, 'pwrite64': 5,
+            'strlen': 1, 'strcmp': 2, 'strncmp': 3, 'strchr': 2,
+            'memmove': 3, 'memcpy': 3, 'strtol': 3, 'strtod': 2,
+            'atoi': 1, 'getenv': 1, 'localtime_r': 2,
+            'srandom': 1, 'random': 0, 'abort': 0, 'longjmp': 2,
+            'setjmp': 1, 'vfprintf': 3, 'vsprintf': 2, 'vsnprintf': 4,
+            'snprintf': 4, 'sprintf': 3, 'printf': 2, 'strrchr': 2,
+            'strstr': 2, 'strdup': 1, 'strncat': 3, 'strncpy': 3,
+            'memset': 3, 'memchr': 3, 'memcmp': 3, 'qsort': 4,
+            'pthread_mutex_trylock': 1, 'pthread_cond_broadcast': 1,
+            'pthread_cond_init': 2, 'pthread_cond_destroy': 1,
+            'pthread_mutexattr_init': 1, 'pthread_mutexattr_settype': 2,
+            'pthread_mutexattr_destroy': 1, 'pthread_getattr_np': 2,
+            'pthread_attr_getstack': 2, 'pthread_attr_destroy': 1,
+            'dl_iterate_phdr': 2, 'dlclose': 1, 'dlerror': 0,
+            'getauxval': 1, 'prctl': 5, 'sigaction': 3,
+            'sigaltstack': 2, 'gettid': 0, 'nanosleep': 2,
+            'clock_gettime': 2, 'gettimeofday': 2, 'time': 1,
+            'strtoll': 3, 'strtoull': 3, 'atoll': 1, 'llabs': 1,
+            'fabs': 1, 'floor': 1, 'ceil': 1, 'sqrt': 1, 'pow': 2,
+            '__assert2': 4, '__assert': 4, 'err': 2, 'errx': 2,
+            'syscall': 6, 'getpid': 0, 'getuid': 0, 'geteuid': 0,
+            'open64': 3, 'fopen64': 2, 'freopen': 3, 'fclose': 1,
+            'fread': 4, 'fwrite': 4, 'fflush': 1, 'feof': 1,
+            'fgets': 3, 'fseek': 3, 'ftell': 1, 'rewind': 1,
+            'isatty': 1, 'fileno': 1, 'write': 3, 'read': 3,
+            'close': 1, 'lseek64': 3, 'fstat64': 2, 'stat64': 2,
+            'access': 2, 'unlink': 1, 'rename': 2, 'remove': 1,
+            'creat': 2, 'link': 2, 'symlink': 2, 'readlink': 3,
+            'chmod': 2, 'utimes': 2, 'truncate': 2, 'statfs': 2,
+            'mkdir': 2, 'rmdir': 1, 'opendir': 1, 'readdir': 1,
+            'closedir': 1, 'realpath': 2, 'getcwd': 2, 'chdir': 1,
+        }
+        # (registrados en HOOK_TABLE_NAMES antes de eh.Emu(): el emulador
+        #  base crea sus trampolines automáticamente para estos nombres)
+        for _nm, _k in _ZLIB.items():
+            if _nm not in eh.HOOK_TABLE_NAMES:   # no pisar mapeos base
+                eh.HOOK_TABLE_NAMES[_nm] = _nm
+            eh.Emu.NARGS.setdefault(_nm, _k)
         eh.Emu.NARGS.update(NARGS_JIAGU)
 
         self.emu = eh.Emu()
@@ -697,6 +1113,7 @@ class JiaguEmu:
         log(f'[jiagu] exports de libpp_hls disponibles para dlsym: '
             f'{len(self.hls_exports)}')
 
+        self.jiagu_segs = []
         self.sock_names = []
         self.fork_calls = 0
         self.pending_threads = []
@@ -724,6 +1141,7 @@ class JiaguEmu:
             size = (((va + msz) + 0xfff) & ~0xfff) - p0
             uc.mem_map(JBASE + p0, size)
             uc.mem_write(JBASE + va, self.jdata[off:off + fsz].ljust(msz, b'\0'))
+            self.jiagu_segs.append((p0, size))
             log(f'[jiagu] segmento {hex(va)} → {hex(JBASE+p0)}+{hex(size)}')
 
         dyn = self.jelf.get_section_by_name('.dynsym')
@@ -790,6 +1208,20 @@ class JiaguEmu:
         from unicorn import UC_HOOK_MEM_WRITE
         uc.hook_add(UC_HOOK_MEM_WRITE, on_r2_write,
                     begin=JBASE + R2_LO, end=JBASE + R2_HI)
+
+        # escrituras en el módulo 360 (para ver su autodescifrado)
+        self.mod_pages = set()
+
+        def on_mod_write(uc, access, address, size, value, ud):
+            pg = (address - MBASE) >> 12
+            if pg not in self.mod_pages:
+                self.mod_pages.add(pg)
+                pc = uc.reg_read(0x200)
+                log(f'    [1ª escritura módulo pág {hex(pg << 12)} '
+                    f'desde PC={hex(pc)} (off {hex(pc - MBASE)})]')
+
+        uc.hook_add(UC_HOOK_MEM_WRITE, on_mod_write,
+                    begin=MBASE, end=MBASE + MSIZE)
 
     def jni_onload(self, budget=60_000_000):
         log('\n=== jiagu: JNI_OnLoad ===')
@@ -961,11 +1393,13 @@ def main():
     ap.add_argument('--modinit', action='store_true')
     ap.add_argument('--exports-j', action='store_true')
     ap.add_argument('--server-directo', action='store_true')
+    ap.add_argument('--natives', action='store_true')
+    ap.add_argument('--nargs', type=int, default=12)
     args = ap.parse_args()
 
     ge = JiaguEmu()
     if args.load or (not args.run and not args.modinit and not args.exports_j
-                    and not args.server_directo):
+                    and not args.server_directo and not args.natives):
         log('[solo carga OK]')
         return
     if args.modinit and not args.run:
@@ -1010,6 +1444,39 @@ def main():
         log(f'[escrituras r2 tras exports: {len(ge.r2_writes)}]')
         peek_and_dump(ge)
         log(f'\n== red total ==\n{ge.sock_names}')
+        if ge.host.captured_send:
+            log(f'\n== RESPUESTA ==\n{bytes(ge.host.captured_send)!r}')
+        return
+    if args.natives:
+        ge.r2_writes = []
+        ge.jni_onload(budget=args.budget * 1_000_000)
+        log(f'\n== llamando natives registrados ({len(ge.emu.jni_natives)}) ==')
+        cls = ge.emu._jni_ref(('class', 'com/stub/StubApp'))
+        for cname, nm_, sig, fn in ge.emu.jni_natives:
+            for i in range(args.nargs):
+                n0 = len(ge.r2_writes)
+                r2b = ge.r2_hit
+                log(f'\n---- {nm_}({i}) fn={hex(fn)} ----')
+                try:
+                    r = ge.emu.call(fn, (ge.emu.jni_env, cls, i),
+                                    budget=30_000_000, label=f'{nm_}({i})')
+                    info = ge.emu.jni_strings.get(r)
+                    if info:
+                        log(f'  → {nm_}({i}) = {hex(r)} {info!r}')
+                    else:
+                        log(f'  → {nm_}({i}) = {hex(r)}')
+                except RuntimeError as e:
+                    log(f'  fin: {e}')
+                except UcError as e:
+                    log(f'  UcError: {e}')
+                nw = len(ge.r2_writes) - n0
+                if nw or ge.r2_hit != r2b:
+                    log(f'  **** {nm_}({i}): {nw} escrituras r2, '
+                        f'hit={hex(ge.r2_hit) if ge.r2_hit else None} ****')
+                    ge.dump_r2()
+        peek_and_dump(ge)
+        log(f'\n== JNI ==\nnatives={ge.emu.jni_natives}')
+        log(f'\n== red ==\n{ge.sock_names}')
         if ge.host.captured_send:
             log(f'\n== RESPUESTA ==\n{bytes(ge.host.captured_send)!r}')
         return

@@ -949,20 +949,45 @@ class Emu:
 
     # ---------------- JNI de juguete ----------------
     JNI_NAMES = {
-        4: 'GetVersion', 6: 'FindClass', 13: 'Throw', 15: 'ExceptionOccurred',
+        4: 'GetVersion', 6: 'FindClass', 13: 'Throw', 14: 'ThrowNew',
+        25: 'EnsureLocalCapacity', 26: 'PushLocalFrame', 26.5: '',
+        15: 'ExceptionOccurred', 16: 'ExceptionDescribe',
         17: 'ExceptionClear', 21: 'NewGlobalRef', 22: 'DeleteGlobalRef',
         23: 'DeleteLocalRef', 24: 'IsSameObject', 27: 'AllocObject',
-        28: 'NewObject', 30: 'NewObjectA', 31: 'GetObjectClass', 32: 'IsInstanceOf',
-        33: 'GetMethodID', 34: 'CallObjectMethod', 36: 'CallObjectMethodA',
-        49: 'CallIntMethod', 52: 'CallLongMethod', 61: 'CallVoidMethod',
-        64: 'GetObjectField', 69: 'GetIntField', 70: 'GetLongField',
-        94: 'GetStaticMethodID', 114: 'CallStaticObjectMethod',
-        116: 'CallStaticObjectMethodA', 124: 'CallStaticIntMethod',
-        141: 'CallStaticVoidMethod', 167: 'NewStringUTF', 169: 'GetStringUTFChars',
-        171: 'GetStringUTFLength', 172: 'GetArrayLength', 174: 'NewObjectArray',
-        184: 'GetByteArrayElements', 186: 'GetCharArrayElements',
-        206: 'GetFieldID', 215: 'RegisterNatives', 228: 'ExceptionCheck',
+        28: 'NewObject', 29: 'NewObjectV', 30: 'NewObjectA',
+        31: 'GetObjectClass', 32: 'IsInstanceOf',
+        33: 'GetMethodID', 34: 'CallObjectMethod', 35: 'CallObjectMethodV',
+        36: 'CallObjectMethodA',
+        43: 'CallBooleanMethod', 46: 'CallByteMethod', 49: 'CallIntMethod',
+        52: 'CallLongMethod', 58: 'CallFloatMethod', 61: 'CallVoidMethod',
+        62: 'CallVoidMethodV', 63: 'CallVoidMethodA',
+        94: 'GetObjectField', 95: 'GetBooleanField', 97: 'GetIntField',
+        98: 'GetLongField', 113: 'GetStaticMethodID',
+        114: 'CallStaticObjectMethod', 115: 'CallStaticObjectMethodV',
+        116: 'CallStaticObjectMethodA', 123: 'CallStaticBooleanMethod',
+        126: 'CallStaticIntMethod', 129: 'CallStaticLongMethod',
+        141: 'CallStaticVoidMethod', 142: 'CallStaticVoidMethodV',
+        143: 'CallStaticVoidMethodA', 144: 'GetStaticFieldID',
+        145: 'GetStaticObjectField', 146: 'GetStaticBooleanField',
+        148: 'GetStaticIntField', 150: 'GetStaticIntField',
+        152: 'GetStaticLongField', 157: 'GetStaticObjectField',
+        163: 'NewString',
+        165: 'GetStringChars', 167: 'NewStringUTF', 168: 'GetStringUTFLength',
+        169: 'GetStringUTFChars', 170: 'ReleaseStringUTFChars',
+        171: 'GetArrayLength', 172: 'NewObjectArray',
+        173: 'GetObjectArrayElement', 174: 'SetObjectArrayElement',
+        175: 'NewBooleanArray', 176: 'NewByteArray', 177: 'NewCharArray',
+        182: 'GetBooleanArrayElements', 183: 'GetByteArrayElements',
+        184: 'GetCharArrayElements', 185: 'GetIntArrayElements',
+        191: 'ReleaseBooleanArrayElements', 192: 'ReleaseByteArrayElements',
+        199: 'GetByteArrayRegion', 200: 'SetByteArrayRegion',
+        206: 'GetFieldID', 207: 'SetObjectField', 208: 'SetBooleanField',
+        210: 'SetIntField',
+        215: 'RegisterNatives', 216: 'UnregisterNatives',
+        217: 'MonitorEnter', 218: 'MonitorExit',
+        228: 'ExceptionCheck',
         229: 'NewDirectByteBuffer', 230: 'GetDirectBufferAddress',
+        231: 'GetDirectBufferCapacity',
     }
     JNI_SLOT_ADDR = {}
 
@@ -1032,7 +1057,7 @@ class Emu:
                 for addr, txt in self.host.scan_strings():
                     log(f'    [string VM {addr}: "{txt}"]')
                 # la VM lee el JNIEnv: registrar qué slot toca
-                for i in range(8):
+                for i in range(len(a)):
                     v = a[i]
                     if self.jni_env and v == self.jni_env:
                         log(f'    [la VM usa JNIEnv (arg {i})]')
@@ -1077,10 +1102,12 @@ class Emu:
                 log(f'    [JNI {nm}("{mname}") -> {hex(r)}]')
             elif nm == 'GetFieldID':
                 mname = self.host.rstr(a[2]).decode('latin1', 'replace')
-                r = self._jni_ref(('fid', mname))
-                log(f'    [JNI GetFieldID("{mname}") -> {hex(r)}]')
+                msig = self.host.rstr(a[3]).decode('latin1', 'replace')
+                r = self._jni_ref(('fid', mname, msig))
+                log(f'    [JNI GetFieldID("{mname}","{msig}") -> {hex(r)}]')
             elif nm in ('CallObjectMethod', 'CallStaticObjectMethod',
-                        'CallObjectMethodA', 'CallStaticObjectMethodA'):
+                        'CallObjectMethodA', 'CallStaticObjectMethodA',
+                        'CallObjectMethodV'):
                 ref = a[2]
                 info = self.jni_strings.get(ref, ('mid', '?', ''))
                 mname = info[1] if len(info) > 1 else '?'
@@ -1088,6 +1115,89 @@ class Emu:
                 log(f'    [JNI {nm}("{mname}") -> {hex(r)}]')
             elif nm == 'GetArrayLength':
                 r = self.jni_arrays.get(a[1], 0)
+                log(f'    [JNI GetArrayLength({hex(a[1])}) -> {r}]')
+            elif nm == 'GetObjectArrayElement':
+                r = self._jni_arr_elem(a[1], a[2])
+                log(f'    [JNI GetObjectArrayElement({hex(a[1])}, {a[2]}) -> {hex(r)}]')
+            elif nm in ('GetStaticMethodID',):
+                mname = self.host.rstr(a[2]).decode('latin1', 'replace')
+                msig = self.host.rstr(a[3]).decode('latin1', 'replace')
+                r = self._jni_ref(('smid', mname, msig))
+                log(f'    [JNI GetStaticMethodID("{mname}","{msig}") -> {hex(r)}]')
+            elif nm in ('CallStaticObjectMethod', 'CallStaticObjectMethodA',
+                        'CallStaticObjectMethodV'):
+                info = self.jni_strings.get(a[2], ('smid', '?', ''))
+                mname = info[1] if len(info) > 1 else '?'
+                r = self._jni_ret_static_object(mname, a)
+                log(f'    [JNI CallStaticObjectMethod("{mname}") -> {hex(r)}]')
+            elif nm in ('CallStaticIntMethod', 'CallStaticBooleanMethod',
+                        'CallStaticLongMethod'):
+                info = self.jni_strings.get(a[2], ('smid', '?', ''))
+                mname = info[1] if len(info) > 1 else '?'
+                r = 1
+                log(f'    [JNI {nm}("{mname}") -> {r}]')
+            elif nm in ('CallStaticVoidMethod', 'CallVoidMethod',
+                        'CallVoidMethodA', 'CallStaticVoidMethodV',
+                        'CallStaticVoidMethodA', 'CallVoidMethodV'):
+                info = self.jni_strings.get(a[2], ('mid', '?', ''))
+                mname = info[1] if len(info) > 1 else '?'
+                log(f'    [JNI {nm}("{mname}") ok]')
+                r = 0
+            elif nm in ('CallIntMethod', 'CallBooleanMethod', 'CallByteMethod',
+                        'CallLongMethod', 'CallFloatMethod'):
+                info = self.jni_strings.get(a[2], ('mid', '?', ''))
+                mname = info[1] if len(info) > 1 else '?'
+                r = 1
+                log(f'    [JNI {nm}("{mname}") -> {r}]')
+            elif nm == 'GetObjectClass':
+                r = self._jni_ref(('class', f'obj{a[1]:x}'))
+                log(f'    [JNI GetObjectClass({hex(a[1])}) -> {hex(r)}]')
+            elif nm in ('GetObjectField',):
+                info = self.jni_strings.get(a[2], ('fid', '?', ''))
+                fname = info[1] if len(info) > 1 else '?'
+                fsig = info[2] if len(info) > 2 else ''
+                r = self._jni_ret_field(fname, a)
+                log(f'    [JNI GetObjectField("{fname}") -> {hex(r)}]')
+            elif nm in ('GetIntField', 'GetLongField', 'GetBooleanField'):
+                info = self.jni_strings.get(a[2], ('fid', '?'))
+                fname = info[1] if len(info) > 1 else '?'
+                r = 0
+                log(f'    [JNI {nm}("{fname}") -> 0]')
+            elif nm == 'GetStaticIntField':
+                info = self.jni_strings.get(a[2], ('sfid', '?'))
+                fname = info[1] if len(info) > 1 else '?'
+                r = 33 if fname == 'SDK_INT' else 0
+                log(f'    [JNI GetStaticIntField("{fname}") -> {r}]')
+            elif nm in ('GetStaticBooleanField', 'GetStaticLongField'):
+                r = 0
+            elif nm == 'GetStaticFieldID':
+                mname = self.host.rstr(a[2]).decode('latin1', 'replace')
+                r = self._jni_ref(('sfid', mname))
+                log(f'    [JNI GetStaticFieldID("{mname}") -> {hex(r)}]')
+            elif nm == 'GetStaticObjectField':
+                info = self.jni_strings.get(a[2], ('sfid', '?'))
+                fname = info[1] if len(info) > 1 else '?'
+                r = self._jni_ret_static_field(fname)
+                log(f'    [JNI GetStaticObjectField("{fname}") -> {hex(r)}]')
+            elif nm == 'IsSameObject':
+                r = 1 if a[1] == a[2] else 0
+            elif nm in ('NewGlobalRef',):
+                r = a[1]
+            elif nm in ('EnsureLocalCapacity', 'PushLocalFrame'):
+                r = 0
+            elif nm in ('Throw', 'ThrowNew', 'ExceptionDescribe',
+                        'ExceptionOccurred', 'ExceptionClear',
+                        'ReleaseStringUTFChars', 'ReleaseByteArrayElements',
+                        'SetIntField', 'SetObjectField', 'UnregisterNatives'):
+                r = 0
+            elif nm in ('NewByteArray', 'NewIntArray'):
+                r = self._jni_ref(('arr', a[1]))
+                self.jni_arrays[r] = a[1]
+                log(f'    [JNI {nm}({a[1]}) -> {hex(r)}]')
+            elif nm == 'NewObjectArray':
+                r = self._jni_ref(('oarr', a[1]))
+                self.jni_arrays[r] = a[1]
+                log(f'    [JNI NewObjectArray({a[1]}) -> {hex(r)}]')
             elif nm == 'GetVersion':
                 r = 0x00010006
                 log(f'    [JNI GetVersion -> {hex(r)}]')
@@ -1111,8 +1221,76 @@ class Emu:
             return self._jni_ref(('str', b'es'))
         if mname == 'getCountry':
             return self._jni_ref(('str', b'MX'))
-        return 0
+        if mname in ('getSourceDir', 'getPackageCodePath', 'getAbsolutePath',
+                     'getPath', 'getCanonicalPath'):
+            return self._jni_ref(('str', b'/data/app/com.movievn.cinevi/base.apk'))
+        if mname in ('getFilesDir', 'getCacheDir', 'getDataDir',
+                     'getApplicationContext', 'getClassLoader',
+                     'getPackageInfo', 'getApplicationInfo',
+                     'getSystemService', 'getAssets'):
+            return self._jni_ref(('obj', f'call:{mname}'))
+        if mname == 'getFileStreamPath':
+            return self._jni_ref(('obj', 'File'))
+        return self._jni_ref(('obj', f'generic:{mname}'))
 
+
+    def _jni_ret_static_object(self, mname, a):
+        if mname in ('currentActivityThread',):
+            return self._jni_ref(('obj', 'ActivityThread'))
+        if mname in ('getSystemContext',):
+            return self._jni_ref(('obj', 'Context'))
+        if mname in ('getApplication', 'getApplicationContext'):
+            return self._jni_ref(('obj', 'Application'))
+        if mname in ('currentClassLoader', 'getClassLoader'):
+            return self._jni_ref(('obj', 'ClassLoader'))
+        if mname in ('getPackageName', 'currentPackageName',
+                     'currentProcessName'):
+            return self._jni_ref(('str', b'com.movievn.cinevi'))
+        if mname in ('getPackageCodePath', 'getSourceDir',
+                     'getPackageResourcePath'):
+            return self._jni_ref(('str', b'/data/app/com.movievn.cinevi/base.apk'))
+        if mname in ('getFilesDir', 'getDir', 'getDataDir', 'getCacheDir'):
+            return self._jni_ref(('obj', 'File'))
+        if mname in ('getAbsolutePath', 'getPath', 'getCanonicalPath',
+                     'toString'):
+            return self._jni_ref(('str', b'/data/app/com.movievn.cinevi/base.apk'))
+        if mname in ('getSystemService',):
+            return self._jni_ref(('obj', 'SystemService'))
+        if mname in ('getSystemServiceName',):
+            return self._jni_ref(('str', b'activity'))
+        if mname in ('getProperty',):
+            return self._jni_ref(('str', b''))
+        # genérico: objeto opaco
+        return self._jni_ref(('obj', f'static:{mname}'))
+
+    def _jni_ret_static_field(self, fname):
+        return self._jni_ref(('obj', f'sfield:{fname}'))
+
+    def _jni_ret_field(self, fname, a):
+        APK = b'/data/app/~~x/com.movievn.cinevi-1/base.apk'
+        if fname in ('sourceDir', 'publicSourceDir'):
+            return self._jni_ref(('str', APK))
+        if fname in ('nativeLibraryDir',):
+            return self._jni_ref(('str', b'/data/app/~~x/com.movievn.cinevi-1/lib/arm64'))
+        if fname in ('packageName', 'processName', 'mPackageName',
+                     'mProcessName'):
+            return self._jni_ref(('str', b'com.movievn.cinevi'))
+        if fname in ('mAllApplications', 'dexElements'):
+            r = self._jni_ref(('oarr', fname))
+            self.jni_arrays[r] = 1
+            return r
+        if fname in ('pathList', 'classLoader', 'mClassLoader', 'loadedApk',
+                     'mBoundApplication', 'app', 'info',
+                     'mInitialApplication', 'mPackages',
+                     'applicationInfo', 'mApplication'):
+            return self._jni_ref(('obj', f'field:{fname}'))
+        return self._jni_ref(('obj', f'field:{fname}'))
+
+    def _jni_arr_elem(self, arr, idx):
+        info = self.jni_strings.get(arr, ('arr', 0))
+        kind = info[0]
+        if kind == 'oarr' or True:
+            return self._jni_ref(('obj', f'elem{arr:x}_{idx}'))
 
     def _ffi_call_entry(self):
         """ffi_call(cif, fn, rvalue, avalue) — ABI real de libffi."""
