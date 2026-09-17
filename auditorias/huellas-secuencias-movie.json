@@ -1,0 +1,335 @@
+{
+  "version": 1,
+  "revisadoEn": "2026-09-16",
+  "descripcion": "Huellas de duración de secuencias ya verificadas contra las fichas públicas de Movie. No contiene rutas de CDN, consultas ni tokens; esas rutas se escriben únicamente en el mapa local ignorado por Git.",
+  "fuenteCatalogo": "https://albd.h4c5.com/api/vod/info_web_get",
+  "toleranciaSegundos": 1,
+  "series": [
+    {
+      "clave": "amar-y-cuidar-t1",
+      "fechaCarpeta": "2026-09-16",
+      "titulo": "Amar y Cuidar",
+      "temporada": 1,
+      "webId": 594285,
+      "appId": 2049688168,
+      "poster": "https://0000.k0j5n7.com/img/vod_pic/20260916/2f1ff68d760d.webp",
+      "audio": {
+        "clasificacion": "excluido",
+        "motivo": "El TS inspeccionado de esta secuencia trae audio tha y apertura tailandesa; no se incorpora como audio latino."
+      },
+      "secuencia": {
+        "inicioEpisodio": 1,
+        "paso": 2,
+        "episodios": [
+          {
+            "numero": 1,
+            "duracionSegundos": 2949
+          },
+          {
+            "numero": 3,
+            "duracionSegundos": 2875
+          },
+          {
+            "numero": 5,
+            "duracionSegundos": 2887
+          },
+          {
+            "numero": 7,
+            "duracionSegundos": 3004
+          },
+          {
+            "numero": 9,
+            "duracionSegundos": 3583
+          }
+        ]
+      },
+      "resultadoObservado": {
+        "rutasEnGrupo": 5,
+        "manifestsConDuracion": 5,
+        "episodiosAsignados": [
+          1,
+          3,
+          5,
+          7,
+          9
+        ],
+        "errorAbsolutoTotalSegundos": 1.4,
+        "nota": "Identificación de secuencia alta; no se integra por audio tailandés confirmado."
+      }
+    },
+    {
+      "clave": "lo-que-la-vida-me-robo-t1",
+      "fechaCarpeta": "2024-07-25",
+      "titulo": "Lo que la vida me robó",
+      "temporada": 1,
+      "webId": 296157,
+      "appId": 550018978,
+      "poster": "https://0000.k0j5n7.com/img/vod_pic/20231110/c9506c834ef9.webp",
+      "audio": {
+        "clasificacion": "latino-inequivoco",
+        "motivo": "Telenovela mexicana originalmente en español; no hay duda razonable de doblaje."
+      },
+      "secuencia": {
+        "inicioEpisodio": 1,
+        "paso": 2,
+        "episodios": [
+          {
+            "numero": 1,
+            "duracionSegundos": 2789
+          },
+          {
+            "numero": 3,
+            "duracionSegundos": 2755
+          },
+          {
+            "numero": 5,
+            "duracionSegundos": 2769
+          },
+          {
+            "numero": 7,
+            "duracionSegundos": 2581
+          },
+          {
+            "numero": 9,
+            "duracionSegundos": 2578
+          },
+          {
+            "numero": 11,
+            "duracionSegundos": 2572
+          },
+          {
+            "numero": 13,
+            "duracionSegundos": 2515
+          },
+          {
+            "numero": 15,
+            "duracionSegundos": 2555
+          },
+          {
+            "numero": 17,
+            "duracionSegundos": 2546
+          },
+          {
+            "numero": 19,
+            "duracionSegundos": 2566
+          }
+        ]
+      },
+      "resultadoObservado": {
+        "rutasEnGrupo": 10,
+        "manifestsConDuracion": 10,
+        "episodiosAsignados": [
+          1,
+          3,
+          5,
+          7,
+          9,
+          11,
+          13,
+          15,
+          17,
+          19
+        ],
+        "errorAbsolutoTotalSegundos": 0.93
+      }
+    },
+    {
+      "clave": "soy-tu-duena-t1",
+      "fechaCarpeta": "2024-02-28",
+      "titulo": "Soy tu dueña",
+      "temporada": 1,
+      "webId": 194467,
+      "appId": 1262348233,
+      "poster": "https://0000.k0j5n7.com/img/vod_pic/20240228/7ed9288fee26.webp",
+      "audio": {
+        "clasificacion": "latino-inequivoco",
+        "motivo": "Telenovela mexicana originalmente en español; no hay duda razonable de doblaje."
+      },
+      "secuencia": {
+        "inicioEpisodio": 1,
+        "paso": 2,
+        "episodios": [
+          {
+            "numero": 1,
+            "duracionSegundos": 2925
+          },
+          {
+            "numero": 3,
+            "duracionSegundos": 2637
+          },
+          {
+            "numero": 5,
+            "duracionSegundos": 2607
+          },
+          {
+            "numero": 7,
+            "duracionSegundos": 2621
+          },
+          {
+            "numero": 9,
+            "duracionSegundos": 2610
+          },
+          {
+            "numero": 11,
+            "duracionSegundos": 2552
+          },
+          {
+            "numero": 13,
+            "duracionSegundos": 2561
+          },
+          {
+            "numero": 15,
+            "duracionSegundos": 2570
+          },
+          {
+            "numero": 17,
+            "duracionSegundos": 2549
+          },
+          {
+            "numero": 19,
+            "duracionSegundos": 2550
+          }
+        ]
+      },
+      "resultadoObservado": {
+        "rutasEnGrupo": 10,
+        "manifestsConDuracion": 10,
+        "episodiosAsignados": [
+          1,
+          3,
+          5,
+          7,
+          9,
+          11,
+          13,
+          15,
+          17,
+          19
+        ],
+        "errorAbsolutoTotalSegundos": 0.92
+      }
+    },
+    {
+      "clave": "la-usurpadora-t1",
+      "fechaCarpeta": "2025-06-12",
+      "titulo": "La usurpadora",
+      "temporada": 1,
+      "webId": 455144,
+      "appId": 1377486448,
+      "poster": "https://0000.k0j5n7.com/img/vod_pic/20240926/46255b2ab3a8.webp",
+      "audio": {
+        "clasificacion": "latino-inequivoco",
+        "motivo": "Telenovela mexicana originalmente en español; no hay duda razonable de doblaje."
+      },
+      "secuencia": {
+        "inicioEpisodio": 1,
+        "paso": 2,
+        "episodios": [
+          {
+            "numero": 1,
+            "duracionSegundos": 2636
+          },
+          {
+            "numero": 3,
+            "duracionSegundos": 2467
+          },
+          {
+            "numero": 5,
+            "duracionSegundos": 2432
+          },
+          {
+            "numero": 7,
+            "duracionSegundos": 2434
+          },
+          {
+            "numero": 9,
+            "duracionSegundos": 2289
+          },
+          {
+            "numero": 11,
+            "duracionSegundos": 2308
+          },
+          {
+            "numero": 13,
+            "duracionSegundos": 2375
+          },
+          {
+            "numero": 15,
+            "duracionSegundos": 2448
+          },
+          {
+            "numero": 17,
+            "duracionSegundos": 2491
+          },
+          {
+            "numero": 19,
+            "duracionSegundos": 2483
+          }
+        ]
+      },
+      "resultadoObservado": {
+        "rutasEnGrupo": 10,
+        "manifestsConDuracion": 9,
+        "episodiosAsignados": [
+          1,
+          3,
+          7,
+          9,
+          11,
+          13,
+          15,
+          17,
+          19
+        ],
+        "errorAbsolutoTotalSegundos": 2.895,
+        "nota": "La décima ruta no tuvo manifest recuperable y se mantiene sin episodio asignado; no se infiere como E5."
+      }
+    },
+    {
+      "clave": "marimar-t1",
+      "fechaCarpeta": "2024-03-27",
+      "titulo": "Marimar",
+      "temporada": 1,
+      "webId": 214998,
+      "appId": 1665377628,
+      "poster": "https://0000.k0j5n7.com/img/vod_pic/20240327/031c331ddf7f.webp",
+      "audio": {
+        "clasificacion": "latino-inequivoco",
+        "motivo": "Telenovela mexicana originalmente en español; no hay duda razonable de doblaje."
+      },
+      "secuencia": {
+        "inicioEpisodio": 1,
+        "paso": 2,
+        "episodios": [
+          {
+            "numero": 1,
+            "duracionSegundos": 1218
+          },
+          {
+            "numero": 3,
+            "duracionSegundos": 1307
+          },
+          {
+            "numero": 5,
+            "duracionSegundos": 1301
+          },
+          {
+            "numero": 7,
+            "duracionSegundos": 1233
+          }
+        ]
+      },
+      "resultadoObservado": {
+        "rutasEnGrupo": 4,
+        "manifestsConDuracion": 4,
+        "episodiosAsignados": [
+          1,
+          3,
+          5,
+          7
+        ],
+        "errorAbsolutoTotalSegundos": 1.173
+      }
+    }
+  ]
+}
