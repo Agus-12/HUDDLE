@@ -1183,7 +1183,7 @@ class Emu:
         if fnname == 'stub':
             args = [nm] + args
         if self.trace_calls and nm not in ('malloc', 'free', 'memcpy', 'memset'):
-            log(f'    → {nm}({", ".join(hex(x) for x in args[:4])})')
+            log(f'    → {nm}({", ".join(hex(x) if isinstance(x, int) else str(x) for x in args[:4])})')
         try:
             r = fn(*args)
         except RuntimeError:
