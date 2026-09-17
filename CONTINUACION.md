@@ -35,7 +35,8 @@
   - **Vía A (preferida):** PCAPdroid → Ajustes → "Volcado PCAP" → **"Archivo PCAP"** (elige carpeta ANTES de capturar, ej. Downloads) → reproducir episodios → el .pcap queda en el teléfono → mandarlo por WhatsApp como documento.
   - **Vía B (a prueba de balas):** `recibidor-pcap.js` corre en Oracle puerto 8080 (ya abierto en el Security List). En PCAPdroid: tocar el **engrane Ajustes** → sección **"Exportador TCP/UDP"** → **"Host del colector"** = `129.80.212.92` y **"Puerto del colector"** = `8080`; volver a la pantalla principal, en **Volcado PCAP** elegir **"Exportador TCP"** y empezar la captura. Cero archivos en el teléfono; al detener la captura, el PCAP completo queda en `/home/ubuntu/captura-movie.pcap`. **NO usar "Servidor HTTP"**: ese modo deja al teléfono como servidor local, no le manda la captura a Oracle. Si no aparece "Exportador TCP", actualizar PCAPdroid (la función existe desde v1.8.6).
   - **Vía C (la que ya funcionó):** el amigo reproduce y manda CAPTURAS DE PANTALLA de PCAPdroid → Conexiones → la conexión HTTP a `movievn.j5t2n.com` → detalle con la URL (la buena es la que dice `index5.m3u8`; las `.ts` también sirven — la carpeta es la misma). El chat anterior leyó esas fotos con **tesseract OCR** (instalar: `sudo apt-get install -y tesseract-ocr`; preprocessar con PIL: 2-3x upscale + escala de grises + contraste 1.4-1.6, probar --psm 6 y 4).
-- **Procesar un pcap recibido:** `tcpdump -nr captura.pcap -A 2>/dev/null | grep -a "GET /vod"` → salen todos los m3u8 y .ts con carpeta. Cada carpeta = ~2 episodios. Luego verificar cada una contra `http://147.124.216.142/vod/1/{...}/index5.m3u8` (200 = buena).
+- **Captura #1 RECIBIDA completa:** `~/captura-movie.pcap` = 667,476,285 bytes / 636.6 MiB; TCP Exporter funcionó de punta a punta. `~/movie-m3u8.txt` contiene **39 rutas únicas** de carpetas, ya extraídas (no repetir la captura ni borrar el PCAP). El listado incluye fechas 2024/2025/2026; no descartar las antiguas hasta validarlas.
+- **Procesar un pcap recibido:** `tcpdump -nr captura.pcap -A 2>/dev/null | grep -a "GET /vod"` → salen todos los m3u8 y .ts con carpeta. Para la captura #1, usar ahora `node cosechar-movie.js ~/movie-m3u8.txt`: consulta solo los 39 manifests, valida HTTP/HLS, suma `EXTINF` y guarda `~/movie-cosecha.json` + `~/movie-cosecha.txt`. No baja segmentos ni guarda tokens. Cada carpeta = ~2 episodios. Luego identificar cada una por duración contra `info_web_get`.
 - **Identificar QUÉ episodio es cada carpeta:** sumar los EXTINF del m3u8 (segundos) y comparar con `vod_duration` del API web (ver §4: info_web_get devuelve la colección con duraciones por episodio). Las duraciones son distintivas.
 
 ### 📋 PLAN DESPUÉS DE LA COSECHA
@@ -159,6 +160,7 @@ POST `https://{api}/api/vod/info_new`, Content-Type form, body `vod_id={id}&cur_
 - `CONTINUACION.md` — ESTE archivo. Léelo, actualízalo, súbelo.
 - `actualizar.sh` — deploy del usuario (git pull + restart).
 - `recibidor-pcap.js` — receptor de PCAP para PCAPdroid (puerto 8080): por defecto TCP Exporter / pcap-over-IP con streaming, temporal atómico, validación PCAP y archivo `.status.json`; `PCAP_MODE=http` da página de carga + `GET /health` + `PCAP_TOKEN`.
+- `cosechar-movie.js` — toma `~/movie-m3u8.txt`, revisa los manifests con concurrencia limitada y deja reporte local de estado HTTP, duración `EXTINF` y número de segmentos en `~/movie-cosecha.json` y `~/movie-cosecha.txt`; no descarga .ts ni guarda tokens.
 - `captura_ss_v2.py`, `captura_ss_v3.py` — scripts mitmproxy (rondas WiFi proxy; ya casi obsoletos, PCAPdroid los reemplazó).
 - `auditorias/catalogo-app-completo.json` — catálogo 8,000+ títulos del app.
 - `auditorias/novelas-app-catalogo.json` — 240 novelas con ids web/app/pianwei.
@@ -173,7 +175,7 @@ POST `https://{api}/api/vod/info_new`, Content-Type form, body `vod_id={id}&cur_
 ## 9. INSTRUCCIONES PARA EL SIGUIENTE CHAT (resumen ejecutivo)
 1. Lee TODO este archivo + `auditorias/hallazgos-cdn.md`.
 2. Clona el repo (el PAT te lo da el usuario) y mira el estado.
-3. Lo más probable es que estés en medio de LA COSECHA: el amigo mandó/mandará un .pcap o fotos → extrae las URLs `/vod/1/.../index5.m3u8` (§2), verifica cada una contra el origen pelado, identifica los episodios por duración contra info_web_get, y arma la sección Movie en Huddle con audio latino.
+3. La captura #1 YA está en Oracle (`~/captura-movie.pcap`, 636.6 MiB) y hay 39 rutas en `~/movie-m3u8.txt`: primero correr `node cosechar-movie.js ~/movie-m3u8.txt`, leer `~/movie-cosecha.txt` y luego identificar los episodios por duración contra `info_web_get`. Para nuevas capturas: extraer rutas `/vod/1/.../index5.m3u8` (§2) y repetir el reporte. No subir PCAP ni reportes crudos al repo público.
 4. Si la cosecha se atora: usar `recibidor-pcap.js` v3 + PCAPdroid **"Exportador TCP" / pcap-over-IP**: primero configurar en Ajustes → Exportador TCP/UDP → Host/Puerto del colector (§2 vía B), luego elegir ese modo en Volcado PCAP. NO "Servidor HTTP". La alternativa de archivo ya guardado es `PCAP_MODE=http` con clave (§6).
 5. Cualquier avance → actualiza ESTE archivo (estado, hallazgos, dead ends) → commit → push (`git push origin HEAD:main`).
 6. Recuérdale al usuario revocar el PAT al final.
