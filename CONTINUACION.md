@@ -22,7 +22,30 @@
 
 ## 2. ESTADO DEL PROYECTO (17 sep 2026)
 
+### ⛔⛔⛔ CRACK (18 sep, TARDE): **CORRECCIÓN — las pruebas en vivo NO eran válidas. La API está caída.**
+Todo lo probado "en vivo" hoy contra `https://surfclick.vd7au6.com` **no prueba nada**, y la nota anterior que decía *"la prueba es concluyente porque public/init devuelve code:10000"* quedó **desmentida**:
+- Verificación directa (6 repeticiones, misma petición, mismo host): `POST /api/public/init` con **sign correcto y verificado** (`MD5('47Q8tBqO4YqrMHf4'+device_id+cur_time)` en mayúsculas) devuelve **`系统出问题啦~请稍后再试`** ("problema del sistema, inténtalo después"). `type/get_list` igual.
+- Otros hosts: `escc.k5ca.com`, `o.z2v3m6.com`, `movievn.m5e7.com` → **403 Forbidden**. `movievn.z3azky.com`, `albd.h4c5.com` → mismo error chino.
+- **Regla nueva: antes de dar por fallida una fórmula, comprobar que `public/init` con sign conocido devuelve `code:10000`.** Si no, el servidor está caído y el resultado no significa nada. (El texto plano `error1` que apareció en una tanda fue transitorio: la misma petición dio después el error chino.)
+- **Consecuencia: las 360 variantes de fórmula probadas hoy (5 hashes × órdenes × trozos) y las 80 de llaves de app NO están descartadas.** Hay que repetirlas cuando el backend responda.
+
+**Hallazgos NUEVOS y sólidos de hoy (independientes del servidor):**
+1. **`ck` completo, leído de la red** (respuesta real de `public/init` guardada antes): `result.sys_conf.p2p_config` contiene
+   `[BASE]^backup_domain=http://147.124.216.142^sec_domain=null^ck_t=1^ck_tt=1^ck_p=0^ck=92b991dfcf878f362f6044f3d6e013255c0726617e4d17858890ecdab1d291c7^[P2P]^p2p_tracker_addr=47.253.51.203:7202^p2p_stunserver_addr=stun.l.google.com^`
+   → **`ck = 92b991dfcf878f362f6044f3d6e013255c0726617e4d17858890ecdab1d291c7`** (64 hex; antes solo se tenía el valor truncado `92b991…291c7`). Este string `p2p_config` es exactamente lo que Java le pasa al SDK nativo, así que es el candidato nº 1 a `cfg[0x38]`.
+2. **DOS llaves de app en el DEX** (`classes7.dex`), formato `LLAVE+com.movievn.cinevi+63`:
+   - `6A21635498FB7F1E13648270050E1346E` ← la que ya se sabía (da el salt `47Q8tBqO4YqrMHf4` de las cabeceras)
+   - `6BE2FB29B23E42031B1900D85E0756B75` ← **NUEVA, sin probar** (aparece en un okhttp 4.9.3, o sea una versión anterior del app)
+3. **Decodificado confirmado del handler `verify`** (revisado instrucción por instrucción, `0xc98f4`–`0xc9bfc`):
+   `strcmp(msg,"verify")` en `0x9cd40` → si `*device_id==0` o `*ts==0` error → `[ctx+0x10c4]=9` → `sprintf(buf,"%s%s%s", device_id, ts, [ [0x2d9000+0x5a8] + 0x38 ])` → `hash` → `hex` → `memcpy(resp,hex,0x10)`.
+   **OJO, corrección:** `0x22e020` NO es un formato, es el nombre de función **`resource_update_cookie_exec`** (etiqueta de log). Y `0xc9344` es el epílogo (`ldr x21,[x21,#0xb68]` = comprobación de canario + `ret`), no la construcción de la respuesta. El formato de respuesta es **`verify=%u-%s`** en `0x22efef`, referenciado desde `0xcc9f4`.
+4. **El firmador NO está localizado todavía.** La función que referencia `verify=%u-%s` (`0xcc900`–`0xccad8`) es un **constructor de query strings / cliente HTTP** (usa `%s-%s#%s` en 7 sitios, `snprintf` en `0x9d140` llamado 255 veces), no el cálculo del hash. Buscar el `ck` estáticamente sigue siendo dead end (279 sitios `STR [xN,#0x38]`, ninguno en la zona del parser de config `0xd4000`–`0xd8000`).
+5. **Decisión: dejar de adivinar y capturar.** El `sign` real viaja **en el cuerpo del POST** de `/api/vod/info_new`, que SÍ es tráfico de internet y SÍ se captura (el certificado mitmproxy ya está instalado en el teléfono del amigo y el okhttp del app acepta user CAs). Con un `info_new` capturado se tiene `(device_id, cur_time, sign)` real → el `ck` sale por fuerza bruta local en segundos, y de paso se valida la fórmula.
+   → **Addon nuevo: `auditorias/captura_sign.py`** (el anterior `captura_ss.py` imprimía cabeceras y respuestas pero **NO el cuerpo del POST**, que es donde vive el `sign`). Guarda cada flujo a `~/captura-sign.jsonl` sin truncar.
+6. **Rollback de sandbox nº 12** durante esta tanda: `HEAD` local había retrocedido a `244e3b5` (v207) y el ref `origin/main` estaba viejo en `b8df245`, pero **el remoto real sí tenía `069bc22`** y **todos los archivos de trabajo sobrevivieron en disco** (`rc4_jiagu.py`, `rc4_sbox_1.bin`, `probar_sign.py`, `pphls_elf_interno.so`, `pphls_mips_inflado.bin`). Se recuperó con `git fetch {PAT} main` + `git reset --soft FETCH_HEAD`. **Lección: un `HEAD` viejo no significa trabajo perdido — comprobar `git fetch` antes de asumir nada.**
+
 ### 🎯🎯🎯 CRACK (18 sep): **FÓRMULA DEL SIGN ENCONTRADA** — `sign = md5(device_id + ts + ck)` en minúsculas
+> ⚠️ **Leer primero el bloque ⛔ de arriba:** la fórmula está leída del código pero **NO verificada en vivo** (el backend está caído). Tratarla como hipótesis fuerte, no como hecho.
 - Dentro del módulo descifrado de `libpp_hls` hay **un ELF AArch64 completo embebido en el offset 0x50429** (`e_type=ET_DYN`, `e_machine=EM_AARCH64`, entry `0xa6570`, 3,062,680 B). Extraído a **`auditorias/crack/pphls_elf_interno.so`**. Sus program headers están borrados pero **el código es ARM64 real y desensambla** (`.text` ≈ 0x80000–0x1e0000). El resto del módulo (0–0x50429) es bytecode de la VM 360 (0 % decodificable como ARM; los `ret` que aparecen son ruido: 1/2³² × 3.4 M ≈ 800 esperados, hay 5561).
 - **El handler de `control?msg=verify` está en `0xc98f4`–`0xc9bfc`** (se llega comparando el param `msg` con `"verify"` vía `strcmp` en `0x9cd40`). Lo que hace, instrucción por instrucción:
   ```
@@ -266,6 +289,12 @@ la ejecución. Opcodes vistos: 0,1,2,4,5,6,9,18,19,25 y 735,959,1074,1187,
 - **Mapa local reproducible:** `mapear-secuencias-movie.js` lee exclusivamente `~/movie-cosecha-pcap.json` y las huellas públicas versionadas en `auditorias/huellas-secuencias-movie.json`; crea `~/movie-mapa-secuencias.json/.txt`. El mapa contiene rutas locales saneadas, por eso está en `.gitignore`; el script y las huellas no contienen rutas, bodies, consultas ni tokens y sí están publicados. Se probó con fixture: 39 rutas, 38 manifests, 5 grupos confirmados, 38 asignadas, 1 sin asignar, 5 latino activas y 5 excluidas por audio.
 
 ### 📋 SIGUIENTE PASO
+0. **🔴 PRIORIDAD 1 (18 sep tarde) — CAPTURA DEL SIGN REAL.** El backend de la API está caído (ver bloque ⛔), así que adivinar la fórmula no se puede validar. La vía barata y definitiva: capturar un `POST /api/vod/info_new` del teléfono del amigo (el `sign` viene en el cuerpo del POST, que sí es tráfico de internet y sí se descifra porque el cert mitmproxy ya está instalado). Pasos:
+   - **Usuario, en Oracle:** pegar el bloque "CAPTURA DEL SIGN" de `auditorias/captura-sign-RECESTA.md` (instala `captura_sign.py`, enciende el proxy 8080, sirve el cert).
+   - **Amigo:** receta de WhatsApp en ese mismo archivo (10 min: proxy manual + abrir Movie + darle PLAY 1 minuto + quitar proxy).
+   - **Usuario:** `grep -c '>>>' ~/captura-sesion.txt` y luego `cat ~/captura-sign.jsonl | tail -40` → pegarme la salida.
+   - **Yo:** con `(device_id, cur_time, sign)` reales resuelvo el `ck` por fuerza bruta local (espacio: los 5 candidatos ya listados + variantes de orden/hash) y valido la fórmula `md5(device_id‖ts‖ck)`.
+   - Cerrar al terminar: `pkill -f mitmdump` (con `block_global=false` el proxy acepta a cualquiera mientras viva).
 1. **Usuario, en Oracle (bloques copy-paste):**
    ```bash
    cd ~/huddle || exit 1
