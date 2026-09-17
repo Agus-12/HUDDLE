@@ -1423,6 +1423,88 @@ def main():
     log(f'\ndlopen: {emu.host.dlopen_log}')
     log(f'dlsym ({len(emu.host.dlsym_log)}): {list(dict.fromkeys(emu.host.dlsym_log))[:60]}')
 
+    # ---------- FASE 3 (opcional): llamar uno a uno los exports de la zona JNI ----------
+    if '--exports' in sys.argv or '--a0' in sys.argv:
+        _dyn = emu.elf.get_section_by_name('.dynsym')
+        zona = sorted({(sym.name, sym['st_value']) for sym in _dyn.iter_symbols()
+                       if sym['st_info']['type'] == 'STT_FUNC' and sym['st_value']
+                       and sym['st_shndx'] != 'SHN_UNDEF'
+                       and 0xe7000 <= sym['st_value'] < 0xe9000
+                       and sym.name != 'JNI_OnLoad'})
+        if '--exports' in sys.argv:
+            log(f'\n== FASE 3: probando {len(zona)} exports de la zona 0xe7000-0xe9000 ==')
+            interesantes = []
+            for nm, off in zona:
+                antes_dl = len(emu.host.dlopen_log)
+                antes_ds = len(emu.host.dlsym_log)
+                antes_rd = len(emu.jni_reads)
+                antes_str = len(emu.host.seen_strings)
+                antes_ops = len(emu.opcodes)
+                log(f'\n--- {nm} (0x{off:x}) ---')
+                try:
+                    emu.call(BASE + off, (vm,), budget=60_000_000, label=nm, quiet=True)
+                except Exception as ex:
+                    log(f'  {nm} abortó: {str(ex)[:110]}')
+                nuevos_dl = emu.host.dlopen_log[antes_dl:]
+                nuevos_ds = emu.host.dlsym_log[antes_ds:]
+                nuevos_str = emu.host.seen_strings[antes_str:]
+                ops = len(emu.opcodes) - antes_ops
+                if nuevos_dl or nuevos_ds or nuevos_str or emu.jni_reads[antes_rd:]:
+                    interesantes.append(nm)
+                    log(f'  ** {nm}: dlopen={nuevos_dl} dlsym={nuevos_ds}')
+                    for t in nuevos_str[:12]:
+                        log(f'     string: "{t[:90]}"')
+                else:
+                    log(f'  (sin actividad nueva; {ops} opcodes VM)')
+            log(f'\n== exports con actividad interesante: {interesantes} ==')
+
+        # ---------- FASE 4 (opcional): __arm_a_0 primero; ver el contexto que deja ----------
+        if '--a0' in sys.argv:
+            log('\n== FASE 4: __arm_a_0 (0xe7944) con soinfo de juguete ==')
+            si = emu.host._alloc(0x400)
+            emu.uc.mem_write(si, b'\0' * 0x400)
+            try:
+                emu.call(BASE + 0xe7944, (si,), budget=100_000_000, label='__arm_a_0', quiet=True)
+            except Exception as ex:
+                log(f'  __arm_a_0 abortó: {str(ex)[:120]}')
+            log(f'\ndlopen: {emu.host.dlopen_log[-10:]}')
+            log(f'dlsym últimos: {list(dict.fromkeys(emu.host.dlsym_log))[-30:]}')
+            log(f'ffi_calls totales: {len(emu.ffi_calls)}')
+            for i, (fn, n, args) in enumerate(emu.ffi_calls, 1):
+                log(f'  ffi #{i} fn={hex(fn)} nargs={n} args={tuple(hex(x) for x in args)}')
+            log(f'jni_reads totales: {len(emu.jni_reads)} últimas: {[(i, hex(p2)) for i, p2 in emu.jni_reads[-10:]]}')
+            log('\n-- últimos 6 ffi_call: función destino desensamblada --')
+            from capstone import Cs as _Cs, CS_ARCH_ARM64 as _A, CS_MODE_LITTLE_ENDIAN as _M
+            _md = _Cs(_A, _M)
+            for fn, n, args in emu.ffi_calls[-6:]:
+                if BASE <= fn < BASE + 0x200000:
+                    off = fn - BASE
+                    try:
+                        code = bytes(emu.uc.mem_read(fn, 48))
+                        lins = ['%s %s' % (i.mnemonic, i.op_str) for i in _md.disasm(code, off)][:6]
+                        log(f'  fn lib+{hex(off)}: ' + ' ; '.join(lins))
+                    except Exception as ex:
+                        log(f'  fn lib+{hex(off)}: ilegible ({ex})')
+                else:
+                    log(f'  fn {hex(fn)} (fuera de la lib)')
+            # ¿dónde quedó el contexto? punteros a heap en .data/.bss
+            log('\n-- punteros a heap escritos fuera del heap (búsqueda en .data/.bss y zonas mapeadas) --')
+            import struct as _st
+            heap_lo, heap_hi = HEAP_BASE, emu.host.next_alloc
+            candidatos = []
+            for a, sz in emu.segments:
+                try:
+                    blk = bytes(emu.uc.mem_read(a, min(sz, 0x400000)))
+                except Exception:
+                    continue
+                for i in range(0, len(blk) - 7, 8):
+                    v = _st.unpack_from('<Q', blk, i)[0]
+                    if heap_lo <= v < heap_hi:
+                        candidatos.append((a + i, v))
+            log(f'  {len(candidatos)} punteros a heap dentro de segmentos de la lib (últimos 20):')
+            for pa, v in candidatos[-20:]:
+                log(f'    [{hex(pa)}] -> {hex(v)}')
+
     if do_dump:
         emu.dump(os.path.join(HERE, 'bss_dump.bin'))
 
