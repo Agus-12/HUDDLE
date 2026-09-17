@@ -974,6 +974,7 @@ class Emu:
         self.next_ref = 0x8100
         self.jni_reads = []
         self.jni_unknown = []
+        self.getenv_env_addr = 0
         self.direct_calls = []
         self.ffi_calls = []
         table = self.host._alloc(232 * 8)
@@ -1019,7 +1020,10 @@ class Emu:
         if isinstance(slot, tuple):
             if slot[1] == 6:                  # GetEnv(vm, &env, version)
                 uc.mem_write(a[1], struct.pack('<Q', self.jni_env))
-                log(f'    [JNI GetEnv -> env {hex(self.jni_env)}]')
+                self.getenv_env_addr = a[1]
+                self.after_getenv_ops = len(self.opcodes)
+                log(f'    [JNI GetEnv(version={hex(a[2])}) -> env {hex(self.jni_env)} escrito en {hex(a[1])}; '
+                    f'opcode #{self.after_getenv_ops}]')
             else:
                 log(f'    [JNI vm slot {slot[1]} -> 0]')
         else:
@@ -1036,8 +1040,10 @@ class Emu:
                             self.jni_table <= v < self.jni_table + 232 * 8:
                         log(f'    [la VM toca la tabla JNIEnv índice {(v - self.jni_table)//8}]')
             if nm == 'GetEnv' or (isinstance(slot, tuple) and slot[1] == 6):
+                self.getenv_env_addr = a[1]
                 self.after_getenv_ops = len(self.opcodes)
-            if nm == 'RegisterNatives':
+                log(f'    [GetEnv: env se escribirá en {hex(a[1])}]')
+            if nm == 'FindClass':
                 cname = self.host.rstr(a[1]).decode('latin1', 'replace')
                 r = self._jni_ref(('class', cname))
                 log(f'    [JNI FindClass("{cname}") -> {hex(r)}]')
@@ -1084,6 +1090,7 @@ class Emu:
                 r = self.jni_arrays.get(a[1], 0)
             elif nm == 'GetVersion':
                 r = 0x00010006
+                log(f'    [JNI GetVersion -> {hex(r)}]')
             elif nm == 'ExceptionCheck':
                 r = 0
             else:
@@ -1340,6 +1347,11 @@ def main():
     from collections import Counter as _CC
     log(f'  total {len(emu.jni_reads)} | por índice: {_CC(i for i, _ in emu.jni_reads).most_common(20)}')
     log(f'  últimas 15: {[(i, hex(p)) for i, p in emu.jni_reads[-15:]]}')
+
+    if emu.getenv_env_addr:
+        v = struct.unpack('<Q', bytes(emu.uc.mem_read(emu.getenv_env_addr, 8)))[0]
+        log(f'\nvalor final en la salida de GetEnv ({hex(emu.getenv_env_addr)}): {hex(v)}')
+        log(f'  env de juguete era: {hex(emu.jni_env)}  tabla: {hex(emu.jni_table)}')
 
     log('\n== llamadas directas a funciones conocidas ==')
     from collections import Counter as _CD
