@@ -20,9 +20,9 @@ Copia y pega TODO este bloque:
 
 ```bash
 cd ~/huddle || exit 1
-git pull --ff-only
-cp auditorias/captura_sign.py ~/captura_sign.py
-ls -l ~/captura_sign.py
+bash actualizar.sh
+cp ~/huddle/auditorias/captura_sign.py ~/captura_sign.py
+ls -l ~/captura_sign.py ~/.mitmproxy/mitmproxy-ca-cert.pem
 cp ~/.mitmproxy/mitmproxy-ca-cert.pem ~/huddle/public/mitm.crt
 pkill -f mitmdump; sleep 1
 nohup ~/.local/bin/mitmdump -s ~/captura_sign.py --listen-host 0.0.0.0 --listen-port 8080 --set block_global=false > ~/captura-sesion.txt 2>&1 &
@@ -32,8 +32,17 @@ tail -3 ~/captura-sesion.txt
 curl -s -o /dev/null -w "cert en la web: %{http_code}\n" http://127.0.0.1:3000/mitm.crt
 ```
 
-**Qué tiene que salir:** una línea con `mitmdump`, otra que diga `listening at *:8080`
-y `cert en la web: 200`. Si sale otra cosa, pégame la salida tal cual.
+**Qué tiene que salir, en orden:**
+1. `APP ACTUALIZADA Y CORRIENDO: http://129.80.212.92:3000` (lo de siempre)
+2. una línea tipo `-rw-r--r-- ... /home/ubuntu/captura_sign.py` (el capturador nuevo copiado)
+3. una línea con `mitmdump` (el proceso vivo)
+4. `Listening on http://*:8080` o parecido
+5. `cert en la web: 200`
+
+Si sale otra cosa, pégame la salida TAL CUAL, completa.
+
+⚠️ Si `ls -l ~/captura_sign.py` dice "No such file", el repo no se actualizó:
+pégame lo que dijo `actualizar.sh`.
 
 ---
 
