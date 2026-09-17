@@ -130,6 +130,24 @@ function mapaCosecha() {
   return mapa;
 }
 
+/* El identificador deja su caché junto a la cosecha. Aquí solo se toman
+ * appId/título/webId: jamás device_id, sign, URL de reproducción o tokens. */
+function mapaCachePorAppId() {
+  const archivo = path.join(COSECHA ? path.dirname(COSECHA) : SALIDA_DIR, 'movie-episodios-cache.json');
+  const cache = cargarJson(archivo, null);
+  const mapa = new Map();
+  for (const serie of cache && cache.series && typeof cache.series === 'object' ? Object.values(cache.series) : []) {
+    const appId = Number(serie && serie.appId);
+    if (!Number.isFinite(appId) || appId <= 0 || mapa.has(appId)) continue;
+    mapa.set(appId, {
+      appId,
+      webId: Number(serie.webId || 0),
+      titulo: String(serie.titulo || ''),
+    });
+  }
+  return { archivo, mapa };
+}
+
 function sinQuery(valor) {
   const limpio = String(valor || '').split('?')[0].split('#')[0];
   try {
@@ -171,6 +189,31 @@ function extraerSolicitudHttp(datos) {
   };
 }
 
+/* El proxy local del app pide /control?msg=verify antes de info_new. El
+ * parámetro device_id pega 16 caracteres de dispositivo + el vod_id decimal.
+ * Extraemos únicamente ese vod_id; el identificador del teléfono se descarta. */
+function extraerControlVerify(datos) {
+  const posGet = datos.indexOf(GET);
+  const posPost = datos.indexOf(POST);
+  let inicio = -1;
+  if (posGet >= 0 && (posPost < 0 || posGet <= posPost)) inicio = posGet;
+  else if (posPost >= 0) inicio = posPost;
+  if (inicio < 0) return null;
+  const texto = datos.subarray(inicio, Math.min(datos.length, inicio + 16 * 1024)).toString('latin1');
+  const primera = texto.match(/^(?:GET|POST)\s+([^\s]+)\s+HTTP\/\d(?:\.\d)?/i);
+  if (!primera) return null;
+  let url;
+  try { url = new URL(primera[1], 'http://proxy.local'); } catch { return null; }
+  if (url.pathname !== '/control' || url.searchParams.get('msg') !== 'verify') return null;
+  const compuesto = String(url.searchParams.get('device_id') || '');
+  const directo = String(url.searchParams.get('vod_id') || '');
+  /* No guardar device_id: solo aceptar el sufijo decimal tras sus 16 chars. */
+  const sufijo = compuesto.match(/^[a-f0-9]{16}(\d+)$/i);
+  const bruto = directo || (sufijo ? sufijo[1] : '');
+  const appId = Number(bruto);
+  return Number.isFinite(appId) && appId > 0 ? { appId } : null;
+}
+
 function rutasM3u8EnPaquete(datos) {
   const rutas = [];
   let desde = 0;
@@ -196,7 +239,9 @@ function anotarPaquete(estado, datos, milisegundos) {
   const tiempo = fechaUtc(milisegundos);
   const rutas = rutasM3u8EnPaquete(datos);
   const solicitud = extraerSolicitudHttp(datos);
+  const control = extraerControlVerify(datos);
 
+  if (control) estado.controles.push({ tiempo, ...control });
   for (const ruta of rutas) {
     /* Una URL de manifest siempre vive en la solicitud. Se permite no haber
      * visto GET si PCAPdroid partió "GET " entre dos paquetes: el patrón de
@@ -317,7 +362,7 @@ function escanearPcapng(lector, primeros4, estado) {
 
 function escanearArchivo() {
   const lector = new LectorBinario(PCAP);
-  const estado = { formato: '', paquetesLeidos: 0, paquetesTruncados: 0, manifests: [], contextosHttp: [] };
+  const estado = { formato: '', paquetesLeidos: 0, paquetesTruncados: 0, manifests: [], contextosHttp: [], controles: [] };
   try {
     const primeros4 = lector.tomar(4);
     if (!primeros4) throw new Error('PCAP vacío');
@@ -333,6 +378,24 @@ function formatoEstado(meta) {
   if (!meta) return 'sin validar en cosecha';
   if (meta.ok) return `HLS válido · ${meta.duracion} · ${meta.segmentos} segmentos`;
   return `HTTP ${meta.estado || '?'}${meta.error ? ` · ${meta.error}` : ''}`;
+}
+
+function enlazarControles(controles, manifests, cachePorAppId) {
+  return controles.map((control) => {
+    const salida = { ...control, ficha: cachePorAppId.get(control.appId) || null, manifestCercano: null };
+    const t = Date.parse(control.tiempo);
+    let mejor = null;
+    for (const manifest of manifests) {
+      const diferencia = (Date.parse(manifest.tiempo) - t) / 1000;
+      if (!Number.isFinite(diferencia)) continue;
+      if (!mejor || Math.abs(diferencia) < Math.abs(mejor.diferenciaSegundos)) {
+        mejor = { carpeta: manifest.carpeta, ruta: manifest.ruta, diferenciaSegundos: Number(diferencia.toFixed(3)) };
+      }
+    }
+    /* Más de dos minutos deja de ser una correlación temporal útil. */
+    if (mejor && Math.abs(mejor.diferenciaSegundos) <= 120) salida.manifestCercano = mejor;
+    return salida;
+  });
 }
 
 function textoReporte(reporte) {
@@ -352,6 +415,18 @@ function textoReporte(reporte) {
     lineas.push(`    ${x.host || '(Host no venía en el mismo paquete)'} · ${x.ruta}`);
   }
   lineas.push('');
+  lineas.push(`VOD_ID DEL PROXY LOCAL VISIBLES: ${reporte.controles.length}`);
+  if (!reporte.controles.length) {
+    lineas.push('  Ninguno visible: PCAPdroid puede no incluir tráfico localhost; es normal.');
+  }
+  for (const x of reporte.controles) {
+    const ficha = x.ficha ? `${x.ficha.titulo || '(sin título)'} · web ${x.ficha.webId}` : 'sin ficha en la caché actual';
+    const cerca = x.manifestCercano
+      ? ` · manifest cercano ${x.manifestCercano.carpeta} (${x.manifestCercano.diferenciaSegundos >= 0 ? '+' : ''}${x.manifestCercano.diferenciaSegundos.toFixed(3)} s)`
+      : '';
+    lineas.push(`  ${x.tiempo} · app ${x.appId} · ${ficha}${cerca}`);
+  }
+  lineas.push('');
   lineas.push(`OTRAS PETICIONES HTTP DE CONTEXTO: ${reporte.contextosHttp.length}`);
   if (!reporte.contextosHttp.length) {
     lineas.push('  Ninguna visible (la ficha/portada puede haber viajado por HTTPS; es normal).');
@@ -366,6 +441,7 @@ function textoReporte(reporte) {
 
 (async () => {
   const cosecha = mapaCosecha();
+  const cache = mapaCachePorAppId();
   console.log('Leyendo el PCAP directamente en bloques; no se descargan ni imprimen segmentos…');
   const escaneo = escanearArchivo();
   const conteoRuta = new Map();
@@ -379,20 +455,25 @@ function textoReporte(reporte) {
       cosecha: cosecha.get(x.ruta) || null,
     };
   });
+  const controles = enlazarControles(escaneo.controles, manifests, cache.mapa);
   const reporte = {
-    version: 2,
+    version: 3,
     generadoEn: new Date().toISOString(),
     pcap: PCAP,
     cosecha: COSECHA || '',
+    cacheEpisodios: cache.archivo,
     formato: escaneo.formato,
-    filtro: 'escaneo binario local de rutas exactas /vod/1/.../index5.m3u8; queries y headers no se guardan',
+    filtro: 'escaneo binario local de rutas exactas /vod/1/.../index5.m3u8 y control verify; queries, device_id y headers no se guardan',
     manifests,
+    controles,
     contextosHttp: escaneo.contextosHttp.slice(0, 500),
     resumen: {
       paquetesLeidos: escaneo.paquetesLeidos,
       paquetesTruncados: escaneo.paquetesTruncados,
       manifestsDetectados: manifests.length,
       rutasUnicas: conteoRuta.size,
+      controlesVerify: controles.length,
+      controlesConFicha: controles.filter((x) => x.ficha).length,
       contextosHttp: Math.min(escaneo.contextosHttp.length, 500),
     },
   };
