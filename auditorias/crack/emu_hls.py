@@ -595,6 +595,13 @@ class Emu:
             except Exception:
                 pass
 
+        def on_direct(uc, address, size, ud):
+            off = address - BASE
+            if off in self.DIRECT:
+                log(f'    [llamada directa a {self.DIRECT[off]} ({hex(off)}) x0={hex(uc.reg_read(UC_ARM64_REG_X0))} '
+                    f'x1={hex(uc.reg_read(UC_ARM64_REG_X1))} x2={hex(uc.reg_read(UC_ARM64_REG_X2))}]')
+                self.direct_calls.append((off, uc.reg_read(UC_ARM64_REG_X0)))
+
         def on_libcode(uc, address, size, ud):
             off = address - BASE
             if off in self.FFI_HANDLED or off in self.PLT_MAP:
@@ -615,6 +622,7 @@ class Emu:
                 uc.reg_write(UC_ARM64_REG_PC, tgt)
 
         uc.hook_add(UC_HOOK_BLOCK, on_libcode, begin=BASE, end=BASE + 0x149998)
+        uc.hook_add(UC_HOOK_BLOCK, on_direct, begin=BASE, end=BASE + 0x149998)
         uc.hook_add(UC_HOOK_CODE, on_opcode, begin=BASE + 0xf0148, end=BASE + 0xf014c)
         uc.hook_add(UC_HOOK_BLOCK, on_closure, begin=CLOSURE_PAGE, end=CLOSURE_PAGE + 0x100000)
 
@@ -718,6 +726,8 @@ class Emu:
 
     # direcciones dentro de la lib que interceptamos (no son PLT de imports)
     # PLT_MAP: instancia, se llena en _build_plt_map
+    DIRECT = {0xe7c88: 'GetEnv_wrapper', 0xe7cc8: 'fini_1', 0xe7d0c: 'fini_2',
+              0xe7b20: 'init_helper', 0xe7bd8: 'init_1', 0xe7c34: 'JNI_OnLoad'}
     FFI_HANDLED = {0xf4764, 0xf5088, 0xf5ed0, 0xf5eec, 0xf5314, 0xf59bc,
                    0xf5f10, 0xf5c7c, 0xf5cc0, 0xf627c, 0xf62c0, 0xf61e8,
                    0xf5be8, 0xf4fb8, 0xf5948, 0xf5a30, 0xf5f18, 0xf5f7c,
@@ -963,6 +973,8 @@ class Emu:
         self.jni_arrays = {}
         self.next_ref = 0x8100
         self.jni_reads = []
+        self.jni_unknown = []
+        self.direct_calls = []
         self.ffi_calls = []
         table = self.host._alloc(232 * 8)
         for i in range(232):
@@ -1025,7 +1037,7 @@ class Emu:
                         log(f'    [la VM toca la tabla JNIEnv índice {(v - self.jni_table)//8}]')
             if nm == 'GetEnv' or (isinstance(slot, tuple) and slot[1] == 6):
                 self.after_getenv_ops = len(self.opcodes)
-            if nm == 'FindClass':
+            if nm == 'RegisterNatives':
                 cname = self.host.rstr(a[1]).decode('latin1', 'replace')
                 r = self._jni_ref(('class', cname))
                 log(f'    [JNI FindClass("{cname}") -> {hex(r)}]')
@@ -1076,6 +1088,7 @@ class Emu:
                 r = 0
             else:
                 log(f'    [JNI {nm} args={tuple(hex(x) for x in a[1:5])} -> 0]')
+                self.jni_unknown.append((slot, tuple(a[1:5])))
         uc.reg_write(UC_ARM64_REG_X0, r & 0xFFFFFFFFFFFFFFFF)
         uc.reg_write(UC_ARM64_REG_PC, lr)
 
@@ -1327,6 +1340,16 @@ def main():
     from collections import Counter as _CC
     log(f'  total {len(emu.jni_reads)} | por índice: {_CC(i for i, _ in emu.jni_reads).most_common(20)}')
     log(f'  últimas 15: {[(i, hex(p)) for i, p in emu.jni_reads[-15:]]}')
+
+    log('\n== llamadas directas a funciones conocidas ==')
+    from collections import Counter as _CD
+    log(f'  {_CD(emu.DIRECT[o] for o, _ in emu.direct_calls).most_common()}')
+
+    log('\n== slots JNI desconocidos que la librería tocó ==')
+    for slot, args in getattr(emu, 'jni_unknown', []):
+        log(f'  slot {slot} args={tuple(hex(x) for x in args)}')
+    if not getattr(emu, 'jni_unknown', []):
+        log('  (ninguno)')
 
     log('\n== zonas de memoria con algo escrito (fuera de la imagen original) ==')
     import math as _m
