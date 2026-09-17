@@ -5672,14 +5672,21 @@ async function resolverRpmvidHttp(capNum, id) {
     if (intento) await new Promise((r) => setTimeout(r, 900));
     try {
       const r2 = await fetchSeguro('https://cubeembed.rpmvid.com/api/v1/video?id=' + encodeURIComponent(id) + '&w=1280&h=720&r=lacartoons.com', 10000);
-      if (!r2.ok) { ultimoErr = 'el player rechazó el video (' + r2.status + ')'; continue; }
+      if (!r2.ok) { ultimoErr = 'el player rechazó el video (' + r2.status + ')'; if (r2.status === 404 || r2.status === 410) ultimoErr = 'borrado'; /* v209: el player lo eliminó — ni el navegador lo revive */ continue; }
       const hex = String(await r2.text() || '').trim();
       if (!/^[0-9a-f]+$/i.test(hex) || hex.length % 2) { ultimoErr = 'el player cambió su cifrado'; continue; }
       const d = crypto.createDecipheriv('aes-128-cbc', Buffer.from('kiemtienmua911ca', 'utf8'), Buffer.from('1234567890oiuytr', 'utf8'));
       j = JSON.parse(Buffer.concat([d.update(Buffer.from(hex, 'hex')), d.final()]).toString('utf8'));
     } catch (e) { ultimoErr = String(e.message || e).slice(0, 60); }
   }
-  if (!j) throw new Error(ultimoErr || 'el player no respondió');
+  if (!j) {
+    /* v209: si el player respondió 404/410 en los reintentos, el capítulo fue
+     * borrado de la fuente — error claro (y compatible con EP_MUERTO_RE para
+     * que el salto automático de la sala lo brinque) en vez de abrir el
+     * navegador y morir con un «aborted» incomprensible. */
+    if (ultimoErr === 'borrado') throw new Error('Ese capítulo ya no está disponible en Lacartoons — el player lo borró; prueba otro');
+    throw new Error(ultimoErr || 'el player no respondió');
+  }
   let cfg = {};
   try { cfg = JSON.parse(j.streamingConfig || '{}'); } catch {}
   const ttA = cfg.adjust && cfg.adjust.Tiktok;
@@ -5848,7 +5855,12 @@ async function resolverLacartoons(epUrl) {
    * falla, el navegador de respaldo toma el turno como siempre */
   if (idRpm) {
     try { return await resolverRpmvidHttp(m[1], idRpm); }
-    catch (eH) { console.log('[lacartoons] sin HTTP (' + String(eH && eH.message || eH).slice(0, 60) + ') — uso el navegador'); }
+    catch (eH) {
+      /* v209: capítulo borrado de la fuente = no hay nada que rascar con el
+       * navegador; el error limpio viaja directo al usuario */
+      if (/ya no está disponible/i.test(String(eH && eH.message || eH))) throw eH;
+      console.log('[lacartoons] sin HTTP (' + String(eH && eH.message || eH).slice(0, 60) + ') — uso el navegador');
+    }
   }
   /* el navegador clica el player y suelta el master. Hay DOS formatos:
    * - viejo (billy, iCarly): master con una sola variante muxada a+v —

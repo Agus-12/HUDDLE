@@ -22,6 +22,13 @@
 
 ## 2. ESTADO DEL PROYECTO (17 sep 2026)
 
+### 🩹 v209 — Lacartoons: capítulo borrado daba un error críptico («aborted») (17 sep, este chat)
+El usuario reportó que *Un Show Más* no reproducía y salía un error tipo «aborted». **No fue causado por v208** — el diagnóstico real:
+- *Un Show Más* 1x1 (`lacartoons.com/serie/capitulo/22984`) tiene el player id `lbrig`, y la API del player responde **404 `Video not found or deleted`**: la fuente borró ESE capítulo. Los caps 1x2/1x3 (ids `ejla6`/`mlhop`) responden 200 y reproducen bien (m3u8 200 + segmentos 200 verificados).
+- Antes, el 404 del player caía al respaldo de navegador, que moría con un error sin traducir («aborted»/«el navegador no está disponible») → el usuario veía eso.
+- **v209:** si el player responde 404/410, `resolverRpmvidHttp` lanza «Ese capítulo ya no está disponible en Lacartoons — el player lo borró; prueba otro» (encaja con `EP_MUERTO_RE`, así que en sala el **salto automático lo brinca** y sigue con el siguiente). `resolverLacartoons` ya no manda al navegador cuando el capítulo está borrado.
+- **Medido:** cap borrado → 404 con el mensaje claro en 3.3 s (antes: ~15-30 s y error críptico); cap sano → 200 en 0.8 s.
+- **Rollback de sandbox #6** durante este cambio: git local cayó a 244e3b5 otra vez; los archivos del working tree conservaron los cambios. Rescate = fetch + reset --hard FETCH_HEAD (ffc2b66). El crawler sobrevivió de nuevo.
 ### 🙈 v208 — NOVELAS EXTERNAS OCULTAS (17 sep, este chat)
 El usuario pidió OCULTAR las dos fuentes de novelas agregadas a mano (Novelas360 + EnPantallaTV) porque **se ven en mala calidad**. Implementado con un interruptor, sin borrar nada:
 - `server.js` (junto a `NV_BASE`, ~línea 643): `const NOVELAS_EXTERNAS_ON = false;` ← **para reactivarlas solo se cambia a `true`**.
