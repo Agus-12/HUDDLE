@@ -42,6 +42,15 @@ Comprobado desde el sandbox (mismos resultados que verá cualquier IP):
 - **Pendiente de verificar DESDE EL ORACLE del usuario** (otra POP puede tener otra caché): `curl -s http://127.0.0.1:3000/api/movie/probar`. Si los ts dan 403 también ahí, las rutas quedan marcadas caídas y la integración queda lista esperando evidencia nueva (nueva captura con el app reproduciendo esos capítulos).
 - El API del app SIGUE VIVA (17 sep): `public/init` con el device del amigo devuelve token guest nuevo (code 10000).
 
+### 🟡 CATÁLOGO COMPLETO — RASTREO EN CURSO (17 sep)
+`search/screen` no pagina (dead end 16), pero `info_web_get` responde CUALQUIER id web → se puede reconstruir el catálogo recorriendo ids. Herramienta nueva: **`catalogo-movie.js`** (en el repo):
+- Recorre ids 1→650 000 (margen sobre el mayor visto, 594285) con 3 obreros × 250 ms (~5.5 ids/s, cortés; pausa 20 s ante 429/5xx).
+- **Reanudable:** checkpoint en `auditorias/catalogo-web/checkpoint.json` (VA AL REPO — sobrevive resets). Fichas por bloques de 25 000 ids en `auditorias/catalogo-web/bloque-{N}.json` (también al repo).
+- Cuando una ficha trae `series_info`, los ids de las demás temporadas se marcan cubiertos (no se re-piden).
+- Guarda por título: nombre, tipo, año, idioma, portada Movie, pianwei (app-id), si terminó, temporadas (ids web) y **capítulos [web-ep-id, duración s]** — sirve de huella para futuras cosechas (probado: LQV T1 → 197 caps, E1 = 2789 s = la huella exacta).
+- Prueba real (17 sep): 21 ids → 7 títulos (~33 % de densidad en zona poblada; la zona baja <81 000 va vacía). Estimado total: ~30-33 h de rastreo; se puede correr en el Oracle igual (`cd ~/huddle && nohup node catalogo-movie.js > ~/catalogo.log 2>&1 &` — es reanudable, si se corta se relanza y sigue).
+- **Falta (siguiente tanda):** integrar el catálogo rastreado en Huddle (buscador/feed con portadas Movie). Catálogo ≠ video: las URLs de stream siguen saliendo solo de capturas frescas (sign nativo sigue bloqueado) y el contenido viejo hoy exige tokens (dead end 19).
+
 ### ✅ LOGRADO
 - **Catálogo histórico (CORRECCIÓN 16 sep):** `auditorias/catalogo-app-completo.json` tiene 8,000 FILAS y `novelas-app-catalogo.json` 240, pero al revisarlos solo hay **20 IDs únicos por tipo**: el scrape anterior repitió la primera página. Sirven como muestra y para los 20 títulos actuales, pero **NO son el catálogo completo**. `search/screen` ignora todos los parámetros de página probados; habrá que reconstruir el catálogo por otra vía más adelante.
 - **Huddle ya tiene** 3 pestañas funcionando (anime/cine/novelas de otras fuentes), sala automática, continuar-viendo con póster, reproductor individual, etc. (ver §7 restricciones).
@@ -215,6 +224,7 @@ POST `https://{api}/api/vod/info_new`, Content-Type form, body `vod_id={id}&cur_
 - `cosechar-pcap-movie.js` — reconstruye únicamente respuestas HTTP de manifest ya presentes en el PCAP clásico, mediante dos pasadas y reensamble TCP, para recuperar estado/duración/segmentos capturados sin llamar al CDN ni guardar video/bodies/tokens. Deja `~/movie-cosecha-pcap.json/.txt` ignorados por git.
 - `identificar-movie.js` — toma el reporte de cosecha, suma las fichas actuales de `?channel_id=230` de la vitrina al catálogo local, consulta `vod/info_web_get`, cachea las colecciones y propone título/temporada/episodio por duración; deduplica el catálogo defectuoso por `id`. `MOVIE_VITRINA=0` lo limita a la muestra local. Sus coincidencias son candidatas, no asignaciones definitivas si hay empate.
 - `mapear-secuencias-movie.js` — toma exclusivamente `~/movie-cosecha-pcap.json`, preserva el orden de cada fecha y contrasta las respuestas históricas contra las huellas aprobadas. Solo asigna una ruta con su propio manifest coincidente; si falta manifest no infiere episodio. Genera `~/movie-mapa-secuencias.json/.txt`, ambos ignorados por Git.
+- `catalogo-movie.js` — rastreador del catálogo completo vía `info_web_get` (ids 1→650 000, cortés y reanudable). Salidas AL REPO: `auditorias/catalogo-web/checkpoint.json` + `bloque-{N}.json`. Ver §2 "CATÁLOGO COMPLETO".
 - `ordenar-pcap-movie.js` — escanea directamente PCAP/PCAPNG YA recibido, por bloques y sin depender de `tcpdump`, para generar orden temporal de rutas M3U8 + posibles requests HTTP de portada/ficha. También extrae solo el app `vod_id` (nunca device_id/query/sign) de `/control?msg=verify` y lo cruza con la caché/manifest cercano. No descarga video ni altera el PCAP; reportes locales ignorados por git.
 - `captura_ss_v2.py`, `captura_ss_v3.py` — scripts mitmproxy (rondas WiFi proxy; ya casi obsoletos, PCAPdroid los reemplazó).
 - `auditorias/catalogo-app-completo.json` — 8,000 filas históricas, pero solo 20 IDs únicos por tipo (paginación repetida; NO catálogo completo).
