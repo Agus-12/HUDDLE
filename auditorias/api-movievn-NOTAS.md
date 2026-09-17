@@ -7,7 +7,7 @@ Auth (confirmada con datos reales de la captura del amigo):
 - headers: app_id: movievn, version: 40000, sys_platform: 2, device_id: 3736e27f0823b1ba (el del teléfono amigo), channel_code: **movievn_sh_1000** (¡nuevo! antes se usaba netcine), cur_time: ms, token: <de public/init>, user-agent: okhttp/4.12.0
 - sign = MD5('47Q8tBqO4YqrMHf4' + device_id + cur_time).toUpperCase()
 - Respuestas: base64 sin padding → AES-128-CBC key '0123456789123456' IV '2015030120123456' → JSON
-- FUNCIONAN: public/init (token guest), type/get_list (Películas=1, Novela=2, …), search/screen?type_id=N&page=1 (GET o POST)
+- FUNCIONAN: public/init (token guest), type/get_list (Películas=1, Novela=2, …), search/screen?type_id=N (GET o POST; devuelve una primera lista de 20). La paginación no quedó resuelta: los parámetros de página probados repiten esa lista.
 - BLINDADO: vod/info_new (HTTP 200 pero error chino "系统出问题啦~请稍后再试" en plano) — probado con app-id, web-id, con/without audio_type, incluso en albd.h4c5.com con app-auth. NO insistir ciegamente.
 
 ### 2. API WEB (la vitrina escc.k5ca.com) — https://albd.h4c5.com/api  ← NUEVO DESCUBRIMIENTO
@@ -19,8 +19,9 @@ Auth 100% reproducible (extraída del JS de la vitrina):
 - app_id por host: escc.k5ca.com→ppcinewebes, mecc.k5ca.com→ppcinewebes, ptbbu/ptzzu→ppcinewebpt, phbbu/phn18/phzzb→ppcinewebph, esbbu→ppcinewebes, frbbu→ppcinewebfr, idbbu/idppc/idoop/idvvu→ppcinewebid; default ppcineweb
 - FUNCIONAN:
   - POST type/get_list (body vacío ok)
-  - POST search/screen (body: type_id=2&page=1) — ¡catálogo completo! type_id=2 = Novela (240+ series)
+  - POST search/screen (body: `type_id=2`) — primera lista de 20 novelas. **Corrección 2026-09-16:** los intentos de paginar con `page`, `page_num`, `pageNo`, `page_no`, `current_page`, `offset` y `limit` repiten esos mismos 20 IDs; no equivale a un catálogo completo.
   - GET vod/info_web_get?vod_id=<WEB-ID>&audio_type=1&date=AAAAMMDDHHd → FICHA COMPLETA con vod_collection (capítulos con id, duración, is_p2p) + audio_type_option + series_info (temporadas)
+  - `https://escc.k5ca.com/?channel_id=230` devuelve HTML SSR con 83 fichas actuales de Telenovela (a 2026-09-16), útil para ampliar candidatos de duración. Es una vitrina cambiante, **no** el catálogo completo.
   - date = YYYYMMDD + HH + floor(MM/10) (UTC funcionó)
 - IDs: la web usa SUS PROPIOS ids (Ej: Señor de los cielos T10 web=579658, app=1898251857). El campo **pianwei** del resultado web = app-id. OJO: info_web_get con app-id da {} vacío.
 
@@ -35,7 +36,7 @@ Auth 100% reproducible (extraída del JS de la vitrina):
 - FIX RONDA 2: en el proxy WiFi del teléfono, campo "No usar proxy para" (bypass): 127.0.0.1,localhost → el app reproduce normal y su tráfico de API/CDN sí pasa por mitmproxy.
 
 ## Archivos
-- ~/auditorias/novelas-app-catalogo.json — 240 novelas del app (web ids + pianwei + portadas k0j5n7.com + totales de caps)
+- ~/auditorias/novelas-app-catalogo.json — 240 filas históricas pero solo 20 novelas/IDs únicos repetidos (web ids + pianwei + portadas k0j5n7.com + totales de caps); no es el catálogo completo.
 - ~/auditorias/movievn-web.js — script funcional de la API web (auth + search + info_web_get)
 - Kit v3 del otro chat: uploads/kit-android-prestado.md (mensajes WhatsApp, FASES)
 
