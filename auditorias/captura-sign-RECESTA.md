@@ -14,6 +14,51 @@ hace falta el addon nuevo `captura_sign.py` (ya está en el repo).
 
 ---
 
+## PASO 0 — ANTES DE NADA: revisar si la firma YA está en el PCAP viejo (coste cero)
+
+La captura de PCAPdroid del 15-16 sep (`~/captura-movie.pcap`, 636 MiB) ya está en el
+servidor. Si en esa sesión el amigo llegó a abrir una ficha, el `info_new` con su `sign`
+ya estaría ahí y no haría falta pedirle nada. Pegar esto en Oracle:
+
+```bash
+ls -lh ~/captura-movie.pcap 2>/dev/null || echo "NO ESTA el pcap"
+for f in ~/captura-movie.pcap ~/captura-sesion.txt; do
+  [ -f "$f" ] || continue
+  echo "===== $f ====="
+  echo "-- info_new:  $(LC_ALL=C grep -a -c 'info_new' "$f")"
+  echo "-- vod_id=:   $(LC_ALL=C grep -a -c 'vod_id=' "$f")"
+  echo "-- sign=:     $(LC_ALL=C grep -a -c 'sign=' "$f")"
+done
+echo "===== contexto (primeras coincidencias) ====="
+LC_ALL=C grep -a -o -E '.{0,120}(info_new|vod_id=[0-9]+&[^"]{0,160}|sign=[0-9a-fA-F]{32})' \
+  ~/captura-movie.pcap ~/captura-sesion.txt 2>/dev/null | head -40
+```
+
+- Si salen líneas con `info_new` o `sign=<32 hex>` → **pegármelas tal cual**, se acabó.
+- Si todo da `0` → en esa sesión no se llegó a abrir ninguna ficha → PASO 1.
+
+---
+
+## Qué salió mal la vez pasada (leído de la captura real)
+
+La única petición que cayó fue `POST /api/public/upgrade`, con respuesta
+`{"code":10000,"message":"Success"}`. O sea: **el proxy sí descifraba bien el tráfico de
+la API**, pero el app **nunca llegó a pedir el video** — no hay ningún `info_new`.
+
+Por qué: el app arranca un servidor propio DENTRO del teléfono (`127.0.0.1`) y el
+reproductor se conecta a él. Con el proxy puesto en WiFi, esa llamada local también se
+intentaba enrutar por el proxy y se rompía → nada se reproducía → nunca se pedía el video.
+Por eso el otro chat indicó poner la excepción de localhost en "omitir proxy".
+
+**Consecuencia práctica:** para esta captura **NO hace falta que el video se reproduzca**.
+El `info_new` (que es lo que trae la firma) se pide al **abrir la ficha**, antes de tocar
+PLAY. Así que: abrir ficha, esperar 20 s, listo.
+
+Y por si acaso, en el proxy ponemos excepciones amplias (`localhost`, `127.0.0.1`,
+`10.*`, `192.168.*`) para no romper el componente local del app.
+
+---
+
 ## PASO 1 — Tú, en Oracle (entra a `ubuntu@huddle` como siempre)
 
 Copia y pega TODO este bloque:
@@ -48,7 +93,7 @@ pégame lo que dijo `actualizar.sh`.
 
 ## PASO 2 — Mensaje para tu amigo (copia y pega en WhatsApp)
 
-> Oye, me haces un favor de 10 minutos? 🙏 Es una prueba en tu teléfono,
+> Oye, me haces un favor de 5 minutos? 🙏 Es una prueba en tu teléfono,
 > no le pasa nada y al final lo dejamos igual.
 >
 > 1. En Chrome entra a: `129.80.212.92:3000/mitm.crt`
@@ -58,11 +103,17 @@ pégame lo que dijo `actualizar.sh`.
 >    *(Si ya lo instalaste la vez pasada, sáltate el 1 y el 2.)*
 > 3. Ahora el proxy: Ajustes → WiFi → tu red → el engranaje →
 >    **Configuración de proxy** → **Manual**
->    Servidor: `129.80.212.92`   Puerto: `8080`   → Guardar
-> 4. Abre el app **Movie** → entra a cualquier película o novela →
->    **dale PLAY y déjalo correr 1 minuto** (que cargue y se vea el video).
-> 5. Cierra el app.
-> 6. Y lo más importante: quita el proxy. Mismo lugar del paso 3 →
+>    Servidor: `129.80.212.92`   Puerto: `8080`
+>    Y donde dice **"Omitir proxy para"** (o "Bypass") escribe exactamente esto:
+>    `localhost, 127.0.0.1, 10.*, 192.168.*`
+>    → Guardar
+> 4. Abre el app **Movie** → busca una película o novela →
+>    **ABRE su ficha y quédate ahí 20 segundos** mirando la portada y la sinopsis.
+>    *(No hace falta que le des PLAY ni que el video funcione — con abrir la ficha basta.
+>    Si de casualidad sí reproduce, mejor, déjalo 1 minuto.)*
+> 5. Repite el paso 4 con **2 o 3 títulos distintos**, uno tras otro.
+> 6. Cierra el app.
+> 7. Y lo más importante: quita el proxy. Mismo lugar del paso 3 →
 >    Proxy: **Ninguno** → Guardar. 🙌
 >
 > Avísame cuando termines.

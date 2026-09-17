@@ -22,6 +22,42 @@
 
 ## 2. ESTADO DEL PROYECTO (17 sep 2026)
 
+### ✅ CRACK (18 sep): **FÓRMULA DE LAS CABECERAS VERIFICADA CONTRA UNA CAPTURA REAL — coincidencia exacta**
+El usuario pegó el resultado de una captura mitmproxy anterior (`~/captura-sesion.txt` en Oracle). Petición real del teléfono:
+```
+POST https://surfclick.vd7au6.com/api/public/upgrade
+  app_id: movievn      version: 40000     sys_platform: 2
+  device_id: 3736e27f0823b1ba             channel_code: movievn_sh_1000
+  cur_time: 1789515864447                 (= 2026-09-15 23:44:24 UTC)
+  token: gAAAAABqqSpPhjbhvV8e08AIfhMyEJjy1TGDSPXEHr18SpQdCUFXWUPzeL6OYKNKo-JeoSCUVAz7nfMh6So7BhIRg10KQhdHLYFvDOlijjuM8GPW-T0DjTJP9sp_GmAzKW-lm0Kicp5J
+  sign: A526BDCB05C2CD7AE5EF38D96E56687F
+  user-agent: okhttp/4.12.0
+  RESP: {"code": 10000, "message": "Success", "result": null}
+```
+Comprobado en Python: `MD5('47Q8tBqO4YqrMHf4' + '3736e27f0823b1ba' + '1789515864447').hexdigest().upper()`
+= `A526BDCB05C2CD7AE5EF38D96E56687F` → **COINCIDE byte a byte**. Descartadas en el mismo lote:
+`md5(dev+ts+salt)`, `md5(salt+ts+dev)`, `sha1[:32]`, `sha256[:32]`.
+⇒ **La fórmula de las cabeceras de la API está CERRADA y probada con evidencia real.** Lo que sigue
+sin probar es el `sign` del CUERPO del POST de `/api/vod/info_new` (ese lo firma el nativo con `ck`).
+
+**Diagnóstico de por qué la captura anterior no sirvió (leído de esos mismos datos):**
+- En toda la sesión cayó **UNA sola petición** (`public/upgrade`). No hay `public/init` (el `token`
+  venía cacheado de una sesión anterior) y **no hay ningún `info_new`** → el app nunca pidió el video.
+- El usuario relata que con el proxy puesto "al entrar a la app no se reproducía nada" y que el otro
+  chat le indicó poner una excepción de localhost en "omitir proxy".
+- **Causa:** el app levanta un servidor propio en `127.0.0.1` y el reproductor se conecta a él; con el
+  proxy de WiFi esa llamada local se intenta enrutar por el proxy y se rompe → nada reproduce → nunca
+  se pide el video.
+- **Corrección del plan:** para conseguir el `info_new` **NO hace falta que el video se reproduzca**.
+  El `info_new` se pide al **abrir la ficha**, antes del PLAY. Nueva receta (paso 0 = revisar el PCAP
+  viejo, coste cero; paso 2 = abrir 2-3 fichas sin necesidad de PLAY; proxy con bypass
+  `localhost, 127.0.0.1, 10.*, 192.168.*`): `auditorias/captura-sign-RECESTA.md`.
+- **OJO con los rollbacks (van 13):** en esta tanda el sandbox se reinició a mitad de un `commit` y el
+  HEAD local quedó colgando de `244e3b5` (historial viejo), lo que hizo que el push fuera rechazado.
+  Además **dos ediciones ya hechas a CONTINUACION.md y a la receta desaparecieron del árbol de trabajo**.
+  Recuperación: `git fetch {PAT} main` → `git reset --hard FETCH_HEAD` → rehacer las ediciones → commit.
+  **Regla: verificar con `grep -c` que la edición sigue en el archivo ANTES de dar por hecho que está.**
+
 ### ⛔⛔⛔ CRACK (18 sep, TARDE): **CORRECCIÓN — las pruebas en vivo NO eran válidas. La API está caída.**
 Todo lo probado "en vivo" hoy contra `https://surfclick.vd7au6.com` **no prueba nada**, y la nota anterior que decía *"la prueba es concluyente porque public/init devuelve code:10000"* quedó **desmentida**:
 - Verificación directa (6 repeticiones, misma petición, mismo host): `POST /api/public/init` con **sign correcto y verificado** (`MD5('47Q8tBqO4YqrMHf4'+device_id+cur_time)` en mayúsculas) devuelve **`系统出问题啦~请稍后再试`** ("problema del sistema, inténtalo después"). `type/get_list` igual.
