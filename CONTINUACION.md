@@ -190,7 +190,14 @@ POST `https://{api}/api/vod/info_new`, Content-Type form, body `vod_id={id}&cur_
 - `auditorias/api-movievn-NOTAS.md` — notas históricas del API (rutas, flujo, cifras).
 - `auditorias/hallazgos-cdn.md` — el informe del hallazgo del CDN abierto (16 sep).
 - `auditorias/huellas-secuencias-movie.json` — cinco firmas públicas de duración y metadatos de serie (sin rutas ni tokens) que permiten regenerar el mapa local de 38 asignaciones confirmadas; *Amar y Cuidar* está marcada excluida por audio tailandés.
-- `auditorias/m3u8-capturado-señor-cielos.m3u8` — m3u8 real de muestra; `auditorias/seg0.ts` — segmento verificado.
+- `auditorias/m3u8-capturado-señor-cielos.m3u8` — m3u8 real de muestra.
+- `auditorias/RESUMEN-CONTINUACION.md` — resumen técnico de la era mitmproxy/StorySprout (el hallazgo de block_global, etc.).
+- `auditorias/INFORME-PPCINE-OTRO-CHAT.md` — análisis del PPCine original hecho en otro chat (tc.f.a, proxy local, veredicto de semanas de reversa).
+- `auditorias/kit-android-prestado.md` — el kit de instrucciones para la captura con el teléfono del amigo.
+- `auditorias/seg0.ts` — segmento MPEG-TS verificado (3.2MB) del CDN abierto.
+- `auditorias/capturas-y-fotos/` — los CSV de PCAPdroid y las fotos del teléfono del amigo con las URLs capturadas (evidencia original; legibles con OCR: tesseract + PIL 2-3x contraste 1.4).
+- `auditorias/apk/lib/arm64-v8a/libpp_hls.so` + `auditorias/apk/assets/pp_hlsProtected.dat` — la lib nativa y su config cifrada (para el plan Ghidra de último recurso; la APK completa re-descargable, ver §3).
+
 - (El resto del repo = Huddle mismo: server, 3 pestañas, players, etc.)
 
 **Fuera del repo (re-crear si hacen falta):** la APK (URL en §3), decompilados jadx (re-ejecutar jadx 1.4.7 sobre la APK; las clases clave: 7=VideoPlayDetailActivity, 8=VIDEOPLAYDETAILVIEWMODEL, 3=API/decryptores).
