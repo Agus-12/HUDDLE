@@ -196,7 +196,7 @@ POST `https://{api}/api/vod/info_new`, Content-Type form, body `vod_id={id}&cur_
 - `auditorias/kit-android-prestado.md` — el kit de instrucciones para la captura con el teléfono del amigo.
 - `auditorias/seg0.ts` — segmento MPEG-TS verificado (3.2MB) del CDN abierto.
 - `auditorias/capturas-y-fotos/` — los CSV de PCAPdroid y las fotos del teléfono del amigo con las URLs capturadas (evidencia original; legibles con OCR: tesseract + PIL 2-3x contraste 1.4).
-- `auditorias/apk/lib/arm64-v8a/libpp_hls.so` + `auditorias/apk/assets/pp_hlsProtected.dat` — la lib nativa y su config cifrada (para el plan Ghidra de último recurso; la APK completa re-descargable, ver §3).
+- `auditorias/apk/ppcinees.apk` — la APK COMPLETA del app (57MB, respaldada aquí por si el link de descarga muere; extraer con `unzip`). Contiene: `lib/arm64-v8a/libpp_hls.so` (la lib nativa para el plan Ghidra de último recurso), `assets/pp_hlsProtected.dat` (su config cifrada), `AndroidManifest.xml` y `resources.arsc` (también sueltos en `auditorias/apk/`).
 
 - (El resto del repo = Huddle mismo: server, 3 pestañas, players, etc.)
 
