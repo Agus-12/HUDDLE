@@ -22,6 +22,45 @@
 
 ## 2. ESTADO DEL PROYECTO (17 sep 2026)
 
+### 📡 CAMBIO DE MÉTODO OBLIGATORIO (19 sep): **EL PROXY DE WiFi NO SIRVE — el app lo ignora**
+
+Confirmado por el amigo: **con el proxy de WiFi puesto, el app Movie reproducía video
+normal.** Es decir, el app hace sus peticiones por un camino que **ignora el proxy del
+sistema**. Por eso en las **tres** capturas con mitmproxy cayó siempre lo mismo: una sola
+llamada (`POST /api/public/upgrade`, respuesta `code:10000`) y nunca el `info_new`.
+
+Las 3 capturas (18-sep 07:33, 07:34 y 07:46) son idénticas en eso. El proxy de WiFi queda
+**DESCARTADO** para atrapar el `info_new`. No volver a intentarlo.
+
+**✅ Lo que sí quedó confirmado cuatro veces:** la fórmula de las cabeceras reproduce la
+firma real de las cuatro capturas hechas hasta ahora:
+
+| fecha (UTC) | sign real | `MD5('47Q8tBqO4YqrMHf4'+dev+ts).upper()` |
+|---|---|---|
+| 15-sep 23:44:24 | `A526BDCB05C2CD7AE5EF38D96E56687F` | coincide |
+| 18-sep 07:33:15 | `9EBD0276525BF792F7E2CB50796B779E` | coincide |
+| 18-sep 07:34:01 | `73A9C8A5AAF25B13C97A3629813BF72A` | coincide |
+| 18-sep 07:46:37 | `4815E4E9258C6B7333A2C3FB7E64081E` | coincide |
+
+**🚫 Descartado también: que la diferencia sea el `token`.** Con el `device_id`, la
+fórmula y el `token` **exactos** del teléfono (`gAAAAABqqSpPhjbhvV8e…`), `public/init`
+desde fuera sigue dando `系统出问题啦~请稍后再试` mientras al teléfono le da `code:10000`.
+Parece un filtro por origen o por huella TLS. **Consecuencia: no se puede verificar
+ninguna fórmula desde el servidor; hace falta la captura.**
+
+**➡️ Nueva vía: PCAPdroid con descifrado TLS + TCP Exporter.** Captura a nivel de VPN, así
+que ve el tráfico aunque el app ignore el proxy. Es el método que ya funcionó en ese
+teléfono (de ahí salió el PCAP de 636 MB con los manifests). Receta completa:
+**`auditorias/captura-pcapdroid-RECESTA.md`**. El recibidor es `recibidor-pcap.js`
+(modo `tcp`, puerto 8080). **OJO:** usar `PCAP_OUT=/home/ubuntu/captura-sign.pcap` para
+NO pisar el PCAP viejo de 636 MB.
+
+**Estado del rastreador:** la API web (`albd.h4c5.com/api/vod/info_web_get`) también está
+dando el error chino, así que el rastreador se dejó APAGADO a propósito: con la API caída
+no guarda nada (exige `vod_name` o `vod_collection`, línea 135 de `catalogo-movie.js`, así
+que **el catálogo no se contaminó**: 0 fichas sin nombre ni sin portada). Revivirlo solo
+cuando `verificar_api.py` dé luz verde. Último avance real: **28 463 fichas, id 65 272**.
+
 ### 🎯🎯🎯 CORRECCIÓN MAYOR (18 sep, madrugada del 19): **EL 3er TROZO DEL SIGN NO ES `ck`, ES `device_encrypt_key` = `Zox882LYjEn4Rqpa`**
 
 Todo lo anterior que decía *"sign = md5(device_id + ts + ck)"* estaba **MAL**. El error: se
