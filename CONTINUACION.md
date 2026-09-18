@@ -91,6 +91,22 @@ Después **verificar con `grep -c` que las ediciones nuevas siguen en el archivo
 dar por hecho que están: en esta sesión se perdieron dos veces ediciones ya hechas.
 Nunca `push` sin comprobar antes que el remoto es ancestro del HEAD local.
 
+**🧰 HERRAMIENTAS NUEVAS (18 sep, ya probadas):**
+- **`auditorias/crack/resolver_sign.py`** — el que abre el candado. Con UNA terna real
+  `(device_id, cur_time, sign)` prueba en local todas las combinaciones de secreto, orden y
+  hash hasta reproducir ese sign exacto. Lee directo el `~/captura-sign.jsonl` de la captura.
+  Uso: `python3 resolver_sign.py --jsonl ~/captura-sign.jsonl`
+  (o `--dev/--ts/--sign` a mano; `--extra-secreto` para candidatos nuevos).
+  Probado con 4 casos: ck conocido en minúsculas ✔, en mayúsculas ✔, ck desconocido →
+  falla limpio y explica el siguiente paso ✔, ck pasado por `--extra-secreto` → resuelve ✔.
+  También probado leyendo un JSONL sintético con registros basura (ignora los que no son
+  `info_new` y los incompletos sin caerse) ✔.
+- **`auditorias/crack/verificar_api.py`** — ¿el backend está vivo? Manda `public/init` con un
+  sign que SABEMOS correcto y solo da luz verde si vuelve `code:10000`. Sale con código 1 si
+  está caído. **Correrlo SIEMPRE antes de probar fórmulas.** Al cierre de la sesión: caído en
+  los 6 hosts (3 dan el error chino, 3 dan 403). Con `--probar` corre la batería de fórmulas,
+  pero solo si antes dio ✅. Su AES es el mismo código verificado que el del addon.
+
 **Rastreador del catálogo:** `node catalogo-movie.js` (reanudable, checkpoint en
 `auditorias/catalogo-web/checkpoint.json`). Al cierre: **27 160 fichas**, siguiente id 62 295
 de 650 000. Se muere con cada rollback del sandbox: revivirlo y seguir.
