@@ -104,8 +104,8 @@ pégame lo que dijo `actualizar.sh`.
 > 3. Ahora el proxy: Ajustes → WiFi → tu red → el engranaje →
 >    **Configuración de proxy** → **Manual**
 >    Servidor: `129.80.212.92`   Puerto: `8080`
->    Y donde dice **"Omitir proxy para"** (o "Bypass") escribe exactamente esto:
->    `localhost, 127.0.0.1, 10.*, 192.168.*`
+>    Y en **"Omitir proxy para"** (o "Bypass") escribe exactamente esto:
+>    `127.0.0.1,localhost`
 >    → Guardar
 > 4. Abre el app **Movie** → busca una película o novela →
 >    **ABRE su ficha y quédate ahí 20 segundos** mirando la portada y la sinopsis.
@@ -123,14 +123,31 @@ pégame lo que dijo `actualizar.sh`.
 ## PASO 3 — Tú, otra vez en Oracle: recolectar
 
 ```bash
-grep -c '>>>' ~/captura-sesion.txt
-tail -c 200000 ~/captura-sign.jsonl | tail -40
+echo "capturadas: $(grep -c '>>>' ~/captura-sesion.txt)"
+ls -lh ~/captura-sign.jsonl 2>/dev/null || echo "todavia no hay captura"
+python3 - <<'EOF'
+import json, os
+p = os.path.expanduser('~/captura-sign.jsonl')
+if not os.path.exists(p):
+    print('no hay archivo de captura'); raise SystemExit
+lineas = open(p, encoding='utf-8', errors='replace').read().splitlines()
+print('registros:', len(lineas))
+for l in lineas[-40:]:
+    try:
+        r = json.loads(l)
+    except Exception:
+        continue
+    h = r.get('cabeceras_req', {})
+    print('----------------------------------------')
+    print('URL     :', r.get('metodo'), r.get('url'))
+    print('POST    :', (r.get('cuerpo_req') or '')[:500])
+    print('sign H  :', h.get('sign'), '| cur_time:', h.get('cur_time'), '| device:', h.get('device_id'))
+    print('RESP    :', (r.get('resp_descifrada') or r.get('cuerpo_resp') or '')[:400])
+EOF
 ```
 
-Pégame **toda** la salida del segundo comando (aunque salga feo). Ahí viene la firma
-real y con eso termino el candado.
-
-Si el primer comando dice `0`, el amigo no llegó a reproducir: que repita el paso 4.
+Pegarme **toda** la salida, aunque salga feo. Ahí viene la firma real.
+Si `capturadas:` dice `0`, el amigo no llegó a abrir ninguna ficha → que repita el paso 4.
 
 ---
 
