@@ -22,6 +22,39 @@
 
 ## 2. ESTADO DEL PROYECTO (17 sep 2026)
 
+### 🩺 CAPTURA (18 sep, noche): **POR QUÉ LA CAPTURA DEL AMIGO SALIÓ VACÍA — el proxy se saturaba solo**
+El amigo hizo la prueba completa (proxy manual + abrir fichas) y el resultado fue
+`capturadas: 0` / `no hay archivo de captura`. Diagnóstico en vivo desde el servidor:
+```
+PID mitmdump: 119076 | limite de archivos: 1024 | abiertos ahora: 1024
+sockets: 1019 | conexiones colgadas al 8080: 349
+OSError: [Errno 24] Too many open files   (en sock.accept(), asyncio selector_events.py:178)
+```
+**Causa raíz:** `mitmdump` arranca con el límite de descriptores del shell (**1024**). Con
+`block_global=false` el 8080 está abierto a todo internet y los bots que escanean puertos
+abren cientos de conexiones que quedan colgadas; en minutos el proxy llega al tope y
+**deja de aceptar conexiones nuevas** — el teléfono nunca pudo conectar. No fue culpa del
+addon ni del teléfono.
+**Arreglos (ambos ya en el repo, verificados):**
+1. Arrancar con `ulimit -n 65536` (bloque corregido en `auditorias/captura-sign-RECESTA.md`).
+   Tras el cambio: `Max open files 65536` y `proxy -> 200` desde dentro y desde internet.
+2. Hook `client_connected` en `captura_sign.py`: cierra de inmediato toda conexión cuyo SNI
+   no coincida con los dominios del app, así los bots no consumen descriptores. Probado con
+   7 casos (4 dominios del app → se conservan; 2 ajenos → se cierran; sin SNI → se conserva).
+**Otros dos bugs propios encontrados y arreglados al probar el addon de verdad:**
+- La primera versión descifraba lanzando un `openssl enc` por respuesta (`subprocess.run`):
+  ahora el AES-128-CBC va en Python puro.
+- La S-box estaba **tipeada a mano y tenía un byte mal** (`0x9e` donde va `0xc9`) → descifraba
+  basura sin avisar. Ahora se **calcula** desde la definición del AES (`_make_sbox`); verificada
+  contra la tabla FIPS de referencia y contra el vector ECB de FIPS-197.
+- `_guardar` no reintentaba si la primera apertura del JSONL fallaba → el addon se quedaba
+  mudo toda la sesión. Ahora reintenta en cada llamada.
+**Batería de pruebas del addon (5/5 OK):** filtro de bots · guarda el cuerpo del POST ·
+descifra el formato real del app · se recupera tras fallo de disco · 2000 peticiones con
+fuga de descriptores = 1 (el handle del JSONL).
+**Lección:** el proxy se prueba ANTES de llamar al amigo (`curl -x ...8080` debe dar 200),
+no después.
+
 ### ✅ CRACK (18 sep): **FÓRMULA DE LAS CABECERAS VERIFICADA CONTRA UNA CAPTURA REAL — coincidencia exacta**
 El usuario pegó el resultado de una captura mitmproxy anterior (`~/captura-sesion.txt` en Oracle). Petición real del teléfono:
 ```

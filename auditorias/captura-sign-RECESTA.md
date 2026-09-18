@@ -37,6 +37,31 @@ LC_ALL=C grep -a -o -E '.{0,120}(info_new|vod_id=[0-9]+&[^"]{0,160}|sign=[0-9a-f
 - Si salen líneas con `info_new` o `sign=<32 hex>` → **pegármelas tal cual**, se acabó.
 - Si todo da `0` → en esa sesión no se llegó a abrir ninguna ficha → PASO 1.
 
+### ⚠️ EL `ulimit -n 65536` ES OBLIGATORIO, NO OPCIONAL
+
+Comprobado en vivo el 18-sep: con el límite por defecto (**1024**) el proxy se satura en
+minutos y **deja de aceptar conexiones**. El teléfono del amigo hizo toda la prueba y no
+se capturó NADA (`capturadas: 0`) porque el proxy ya estaba tapado antes de empezar.
+El diagnóstico dio exactamente esto:
+
+```
+limite de archivos: 1024
+abiertos ahora   : 1024          ← tope alcanzado
+cuantos son sockets: 1019
+conexiones colgadas al 8080: 349
+OSError: [Errno 24] Too many open files   (en sock.accept())
+```
+
+Causa: con `block_global=false` el puerto 8080 queda abierto a todo internet y los bots
+que escanean puertos abren cientos de conexiones que se quedan colgadas. Dos defensas:
+
+1. `ulimit -n 65536` al arrancar (el bloque de arriba ya lo trae).
+2. `captura_sign.py` cierra de inmediato cualquier conexión cuyo SNI no sea del app
+   Movie (hook `client_connected`), así los bots no gastan descriptores.
+
+**Antes de llamar al amigo, comprobar SIEMPRE que salga `proxy -> 200`.** Si da 502 con
+"Too many open files", el proxy está tapado y la captura va a salir vacía otra vez.
+
 ---
 
 ## Qué salió mal la vez pasada (leído de la captura real)
@@ -69,12 +94,15 @@ bash actualizar.sh
 cp ~/huddle/auditorias/captura_sign.py ~/captura_sign.py
 ls -l ~/captura_sign.py ~/.mitmproxy/mitmproxy-ca-cert.pem
 cp ~/.mitmproxy/mitmproxy-ca-cert.pem ~/huddle/public/mitm.crt
-pkill -f mitmdump; sleep 1
-nohup ~/.local/bin/mitmdump -s ~/captura_sign.py --listen-host 0.0.0.0 --listen-port 8080 --set block_global=false > ~/captura-sesion.txt 2>&1 &
+pkill -f mitmdump; sleep 2
+rm -f ~/captura-sign.jsonl
+cd ~/huddle
+nohup bash -c 'ulimit -n 65536; exec ~/.local/bin/mitmdump -s ~/captura_sign.py --listen-host 0.0.0.0 --listen-port 8080 --set block_global=false' > ~/captura-sesion.txt 2>&1 &
 sleep 4
-pgrep -af mitmdump
-tail -3 ~/captura-sesion.txt
+PID=$(pgrep -f mitmdump | head -1)
+cat /proc/$PID/limits | grep 'open files'
 curl -s -o /dev/null -w "cert en la web: %{http_code}\n" http://127.0.0.1:3000/mitm.crt
+curl -s -m 20 -x http://127.0.0.1:8080 http://example.com -o /dev/null -w "proxy -> %{http_code}\n"
 ```
 
 **Qué tiene que salir, en orden:**

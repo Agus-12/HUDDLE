@@ -192,11 +192,14 @@ def _aes_dec(txt):
 def _guardar(obj):
     global _FH
     try:
-        if _FH is None:
+        # Se reintenta en cada llamada: si la primera apertura falla, el addon NO debe
+        # quedarse mudo para el resto de la sesion (bug encontrado en prueba).
+        if _FH is None or _FH.closed:
             _FH = open(SALIDA, "a", encoding="utf-8")
         _FH.write(json.dumps(obj, ensure_ascii=False) + "\n")
         _FH.flush()
     except Exception as e:  # nunca tumbar el proxy por un disco raro
+        _FH = None
         print(">>> ERROR guardando:", e)
 
 
@@ -211,6 +214,28 @@ def _texto(req):
 
 
 # --------------------------------------------------------------------- hook
+# Con block_global=false el puerto 8080 queda abierto a TODO internet, y los bots que
+# escanean puertos abren cientos de conexiones que se quedan colgadas. Con el limite de
+# descriptores en 1024 eso saturaba el proxy y dejaba de aceptar conexiones:
+#     OSError: [Errno 24] Too many open files   (en sock.accept())
+# Comprobado en vivo el 18-sep: 1024/1024 descriptores ocupados, 1019 sockets, 349
+# colgados al 8080, y el telefono del amigo no pudo ni conectar (capturadas: 0).
+# Este filtro cierra de inmediato cualquier conexion que no sea del app Movie.
+def client_connected(client):
+    try:
+        sni = (getattr(client, "sni", "") or "").lower()
+    except Exception:
+        sni = ""
+    if not sni:
+        return  # HTTP plano o TLS sin SNI: se decide despues, en response()
+    if PATRON.search(sni):
+        return
+    try:
+        client.close()
+    except Exception:
+        pass
+
+
 def response(flow: http.HTTPFlow):
     host = flow.request.pretty_host
     url = flow.request.pretty_url
