@@ -39,10 +39,43 @@ const crypto = require('crypto');
 const { pipeline } = require('stream/promises');
 const { Transform } = require('stream');
 
+/*
+ * Libera el puerto antes de escuchar.
+ * Motivo: en el servidor quedaron procesos mitmdump colgados de sesiones anteriores que
+ * `pkill -f mitmdump` no alcanzaba, y el recibidor moría con EADDRINUSE sin dar pista.
+ * Con --matar-puerto el recibidor mata él mismo lo que ocupe su puerto.
+ */
+function matarLoQueOcupaElPuerto(puerto) {
+  const { execSync } = require('child_process');
+  let pids = [];
+  try {
+    const out = execSync(`ss -tlnpH 'sport = :${puerto}' 2>/dev/null || true`, { encoding: 'utf8' });
+    pids = [...out.matchAll(/pid=(\d+)/g)].map((m) => m[1]);
+  } catch { /* sin ss: se intenta fuser igual */ }
+  if (pids.length) {
+    log(`Puerto ${puerto} ocupado por pid ${[...new Set(pids)].join(', ')} — matándolo`);
+    for (const pid of new Set(pids)) {
+      try { process.kill(Number(pid), 'SIGKILL'); } catch {}
+    }
+  } else {
+    try { execSync(`fuser -k ${puerto}/tcp 2>/dev/null || true`); } catch {}
+  }
+  const t0 = Date.now();
+  while (Date.now() - t0 < 5000) {
+    try {
+      const out = execSync(`ss -tlnH 'sport = :${puerto}' 2>/dev/null || true`, { encoding: 'utf8' });
+      if (!out.trim()) break;
+    } catch { break; }
+    const { execSync: e2 } = require('child_process');
+    e2('sleep 0.3');
+  }
+}
+
 const MODE = String(process.env.PCAP_MODE || 'tcp').trim().toLowerCase();
 const ARCHIVO = path.resolve(process.env.PCAP_OUT || '/home/ubuntu/captura-movie.pcap');
 const STATUS_FILE = path.resolve(process.env.PCAP_STATUS_OUT || `${ARCHIVO}.status.json`);
 const PORT = Number(process.env.PCAP_PORT || 8080);
+const MATAR_PUERTO = process.argv.includes('--matar-puerto') || String(process.env.PCAP_KILL_PORT || '') === '1';
 const TOKEN = String(process.env.PCAP_TOKEN || '');
 const maxMbRaw = Number(process.env.PCAP_MAX_MB || 1024);
 const MAX_BYTES = Number.isFinite(maxMbRaw) && maxMbRaw > 0
@@ -308,6 +341,7 @@ function iniciarHttp() {
   });
 
   servidor.on('clientError', (_err, socket) => socket.end('HTTP/1.1 400 Bad Request\r\n\r\n'));
+  if (MATAR_PUERTO) matarLoQueOcupaElPuerto(PORT);
   servidor.listen(PORT, '0.0.0.0', () => {
     log(`Recibidor HTTP escuchando en 0.0.0.0:${PORT}`);
     log(`Abre http://IP-DEL-SERVIDOR:${PORT}/ para subir un PCAP · clave: ${TOKEN ? 'activada' : 'NO configurada'}`);
@@ -458,6 +492,7 @@ function iniciarTcp() {
     console.error(`Error del recibidor TCP: ${err.message}`);
     process.exitCode = 1;
   });
+  if (MATAR_PUERTO) matarLoQueOcupaElPuerto(PORT);
   servidor.listen(PORT, '0.0.0.0', () => {
     log(`Recibidor TCP (pcap-over-IP) escuchando en 0.0.0.0:${PORT}`);
     log(`En PCAPdroid usa "TCP Exporter", IP del servidor y puerto ${PORT}.`);

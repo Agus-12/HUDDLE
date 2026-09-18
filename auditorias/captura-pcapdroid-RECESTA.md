@@ -25,7 +25,7 @@ pkill -f mitmdump; sleep 2
 cd ~/huddle || exit 1
 bash actualizar.sh
 PCAP_MODE=tcp PCAP_OUT=/home/ubuntu/captura-sign.pcap PCAP_PORT=8080 PCAP_MAX_MB=1024 \
-  nohup node recibidor-pcap.js > ~/recibidor.log 2>&1 &
+  nohup node recibidor-pcap.js --matar-puerto > ~/recibidor.log 2>&1 &
 sleep 3
 pgrep -af recibidor-pcap
 tail -5 ~/recibidor.log
@@ -33,6 +33,23 @@ tail -5 ~/recibidor.log
 
 ⚠️ El `PCAP_OUT` es a propósito distinto del de siempre: **no queremos pisar
 `~/captura-movie.pcap`**, que es la captura vieja de 636 MB.
+
+⚠️ El `--matar-puerto` es obligatorio: en el servidor quedan procesos `mitmdump` colgados
+de sesiones anteriores que **`pkill -f mitmdump` no alcanza**, y sin esa bandera el
+recibidor muere con `EADDRINUSE: address already in use 0.0.0.0:8080`. Fue exactamente lo
+que pasó el 19-sep: el pid 120950 seguía ocupando el 8080 y el recibidor no arrancó dos
+veces seguidas. Con la bandera, el recibidor mata él mismo al ocupante antes de escuchar.
+
+Comprobar que arrancó de verdad:
+
+```bash
+sleep 3
+pgrep -af recibidor-pcap || echo "NO ARRANCÓ"
+cat ~/recibidor.log
+ss -tlnp | grep 8080
+```
+
+La última línea debe decir `recibidor-pcap` (o `node`), **no `mitmdump`**.
 
 Debe listar el proceso y algo como escuchando en el 8080.
 
