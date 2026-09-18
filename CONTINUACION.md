@@ -22,6 +22,35 @@
 
 ## 2. ESTADO DEL PROYECTO (17 sep 2026)
 
+### 🚨 ROMPIMIENTO DEL MURO DE IP (19 sep ~12:40) — cambia todo
+
+El "error chino" desde el sandbox **NO era filtro por origen sino por HUELLA TLS**.
+Con `pip install tls_client` y `Session(client_identifier='okhttp4_android_13')`:
+
+- `public/init` → **code 10000** + token nuevo propio ✔
+- `public/upgrade` → 10000 ✔ (con huella; sin ella, error chino)
+- `channel/get_list`, `type/get_list`, `channel/get_info`, `get_sys_conf` → 10000 ✔
+- **`vod/info_new` SIGUE en error chino** incluso con huella okhttp, identidad propia
+  nueva (dev aleatorio + su token), y 40+ fórmulas de sign ⇒ su rechazo es por el
+  SECRETO vivo de cfg[0x38], que difiere del default `Zox882LYjEn4Rqpa` del binario.
+  MD5 verificado estándar (IV 67452301… y tabla K en 0x2323f0/0x229af0 idénticos).
+  **No se puede invertir MD5: hace falta UNA terna real (dev, ts, sign) del teléfono.**
+  Con ella, `resolver_sign.py` prueba los 12 candidatos en segundos.
+
+sys_conf vivo (init propio): `api_url2`=misma surfclick; `local_app_domain` agrega
+`surfclick.g8w6.com`; `pic_domain=https://*.j5t2n.com/`; `vod_domain=http://*.j5t2n.com/`;
+`ck` en p2p_config igual al default; **sin** device_encrypt_key ni resource_md5_prefix
+vivos. APK nueva: `https://app.r2c7a0.com/version/movievn/movievn_sh_1000-V4.0.0.apk`.
+
+Catálogo: `search/result` página 2 = vacío (paginación rota); `channel/get_info` da
+banners con `vod_info` completo (data_id=vod id) pero no lista paginada. La API web
+(albd.h4c5.com) SIGUE caída ⇒ rastreador sigue apagado.
+
+**Única tarea humana pendiente (2 min, cuando el amigo pueda):** proxy de WiFi
+(129.80.212.92:8080, bypass 127.0.0.1,localhost) + **ABRIR 3 FICHAS hasta la sinopsis**.
+`captura_sign.py` guarda el cuerpo de info_new en `~/captura-sign.jsonl`; después:
+`python3 auditorias/crack/resolver_sign.py --jsonl ~/captura-sign.jsonl` en Oracle.
+
 ### 🧭 ESTADO PARA REANUDAR EN CHAT NUEVO (19 sep ~12:15)
 
 **Qué se logró hoy (19 sep):**
