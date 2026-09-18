@@ -24,7 +24,7 @@ Apaga el mitmproxy (ya no lo necesitamos y ocupa el puerto 8080) y enciende el r
 pkill -f mitmdump; sleep 2
 cd ~/huddle || exit 1
 bash actualizar.sh
-PCAP_MODE=tcp PCAP_OUT=/home/ubuntu/captura-sign.pcap PCAP_PORT=8080 PCAP_MAX_MB=1024 \
+PCAP_MODE=tcp PCAP_OUT=/home/ubuntu/captura-sign.pcap PCAP_PORT=47823 PCAP_MAX_MB=1024 \
   nohup node recibidor-pcap.js --matar-puerto > ~/recibidor.log 2>&1 &
 sleep 3
 pgrep -af recibidor-pcap
@@ -45,11 +45,30 @@ Comprobar que arrancó de verdad:
 ```bash
 sleep 3
 pgrep -af recibidor-pcap || echo "NO ARRANCÓ"
-cat ~/recibidor.log
-ss -tlnp | grep 8080
+tail -5 ~/recibidor.log
+ss -tlnp | grep 47823
 ```
 
-La última línea debe decir `recibidor-pcap` (o `node`), **no `mitmdump`**.
+La última línea debe decir `node`. Si dice `mitmdump`, algo falló.
+
+### Por qué el puerto 47823 y no el 8080
+
+El 8080 lo prueban los escáneres de internet constantemente. El 19-sep eso provocó dos
+problemas seguidos: primero un `mitmdump` colgado lo tenía ocupado (`EADDRINUSE`) y luego,
+ya libre, **decenas de bots por segundo** se conectaban y el log se llenó de
+`TCP rechazado de 91.148.245.43… / ya hay una captura en curso`.
+
+Aparte se corrigió un fallo real del recibidor: asignaba el lugar de captura (`activo`)
+**antes** de comprobar que los primeros 4 bytes fueran una cabecera PCAP válida. Con el
+bombardeo de bots el lugar quedaba ocupado casi todo el tiempo, así que una conexión
+legítima caía en «ya hay una captura en curso». Ahora `activo` se asigna **después** de
+validar la cabecera.
+
+Probado: con 150 conexiones de basura simultáneas, el cliente legítimo conecta y guarda
+19.6 KiB (`/tmp/bots.pcap`). Antes no podía.
+
+Opcional, si aun así molestan: `PCAP_ALLOW_IP=<IP-del-telefono>` descarta en silencio todo
+lo que no venga de esa IP (el log deja de llenarse).
 
 Debe listar el proceso y algo como escuchando en el 8080.
 
@@ -67,7 +86,7 @@ Debe listar el proceso y algo como escuchando en el 8080.
 > 4. Otra vez en el menú → **"Volcado PCAP"** → **"Exportador TCP"**
 >    (en inglés: *TCP Exporter*). Ahí escribe:
 >    - IP / destino: `129.80.212.92`
->    - Puerto: `8080`
+>    - Puerto: `47823`
 >    → Guardar / activar
 > 5. En la pantalla principal, si te deja **filtrar por app**, elige solo **Movie**.
 >    (Si no te deja, no importa, dale igual.)

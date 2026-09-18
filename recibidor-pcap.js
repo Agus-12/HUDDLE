@@ -76,6 +76,15 @@ const ARCHIVO = path.resolve(process.env.PCAP_OUT || '/home/ubuntu/captura-movie
 const STATUS_FILE = path.resolve(process.env.PCAP_STATUS_OUT || `${ARCHIVO}.status.json`);
 const PORT = Number(process.env.PCAP_PORT || 8080);
 const MATAR_PUERTO = process.argv.includes('--matar-puerto') || String(process.env.PCAP_KILL_PORT || '') === '1';
+/* IP(s) permitidas, separadas por coma. Vacío = aceptar de cualquiera (solo conviene con
+ * un puerto raro). Con esto puesto, los bots de internet ni se registran en el log. */
+const PERMITIDAS = String(process.env.PCAP_ALLOW_IP || '')
+  .split(',').map((x) => x.trim()).filter(Boolean).map(normalizarIp);
+
+function normalizarIp(direcc) {
+  const d = String(direcc || '');
+  return d.startsWith('::ffff:') ? d.slice(7) : d;
+}
 const TOKEN = String(process.env.PCAP_TOKEN || '');
 const maxMbRaw = Number(process.env.PCAP_MAX_MB || 1024);
 const MAX_BYTES = Number.isFinite(maxMbRaw) && maxMbRaw > 0
@@ -354,6 +363,10 @@ function iniciarTcp() {
 
   servidor = net.createServer((socket) => {
     const remoto = `${socket.remoteAddress || '?'}:${socket.remotePort || '?'}`;
+    if (PERMITIDAS.length && !PERMITIDAS.includes(normalizarIp(socket.remoteAddress))) {
+      socket.destroy(); /* ni se registra: no hay que llenar el log con bots */
+      return;
+    }
     if (activo) {
       log(`TCP rechazado de ${remoto}: ya hay una captura en curso`);
       socket.destroy();
@@ -431,18 +444,23 @@ function iniciarTcp() {
     /* TCP puede partir los primeros cuatro bytes en paquetes separados.
      * Acumulamos solo esa cabecera antes de decidir si es PCAP válido. */
     let inicio = Buffer.alloc(0);
-    activo = socket; /* también bloquea conexiones incompletas simultáneas */
+    /* IMPORTANTE: `activo` se asigna SOLO después de validar la cabecera PCAP.
+     * Antes se asignaba aquí, y con el puerto expuesto a internet decenas de bots por
+     * segundo lo mantenían ocupado permanentemente: cualquier conexión legítima caía en
+     * «ya hay una captura en curso». Fue exactamente el bloqueo del 19-sep.
+     * Las conexiones que todavía están leyendo sus primeros 4 bytes se cuentan aparte
+     * (`leyendoCabecera`) y no bloquean a nadie. */
     const recibirInicio = (chunk) => {
       inicio = inicio.length ? Buffer.concat([inicio, chunk]) : chunk;
       if (inicio.length < 4) return;
       socket.removeListener('data', recibirInicio);
       if (!esPcap(inicio)) {
-        activo = null;
         cerrado = true;
         log(`TCP rechazado de ${remoto}: no empieza como PCAP/PCAPNG`);
         socket.destroy();
         return;
       }
+      activo = socket;
 
       esperandoCabecera = false;
       socket.setTimeout(IDLE_MS);
