@@ -146,3 +146,18 @@ pkill -f recibidor-pcap
   origen/huella TLS. Por eso hace falta la captura.
 - **El PCAP NO se sube al repo** (es público y el archivo pesa cientos de MB).
 - `cosechar-pcap-movie.js` ya existe y funcionó sobre el PCAP anterior (link type 101).
+
+## PASO 0 — El addon NO está en la Play Store (descubierto el 19-sep)
+
+El addon de descifrado **no aparece en la Play Store** (solo salen PCAPdroid y USB WiFi
+Monitor al buscar el autor). Se instala por APK directo de GitHub:
+
+- **v2.4 (arm64, la recomendada):**
+  `https://github.com/emanuele-f/PCAPdroid-mitm/releases/download/v2.4/PCAPdroid-mitm_v2.4_arm64-v8a.apk`
+- **v1.4 (respaldo; incluye armeabi-v7a para teléfonos viejos):**
+  `https://github.com/emanuele-f/PCAPdroid-mitm/releases/download/v1.4/PCAPdroid-mitm_v1.4_arm64-v8a.apk`
+  `https://github.com/emanuele-f/PCAPdroid-mitm/releases/download/v1.4/PCAPdroid-mitm_v1.4_armeabi-v7a.apk`
+
+En el teléfono: abrir el enlace en Chrome → descargar → tocar la notificación → Instalar
+(aceptar "instalar apps desconocidas" si lo pide). Con el addon instalado, en
+Ajustes → Inspección de tráfico aparecen "Decodificación TLS" y "Certificado CA".
