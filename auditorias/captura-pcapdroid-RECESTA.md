@@ -205,3 +205,14 @@ head -40 ~/volcado-http.txt
 Si `surfclick` da 0: el app Movie no pasó por el mitm del addon para su cliente de la
 API ⇒ ir al plan del proxy de WiFi con fichas abiertas (ver CONTINUACION.md, bloque
 "ESTADO PARA REANUDAR").
+
+## Revivir el proxy de WiFi + buscar api_url2 (bloque único)
+
+```bash
+pkill -f recibidor-pcap; pkill -f mitmdump; sleep 2
+nohup bash -c 'ulimit -n 65536; exec ~/.local/bin/mitmdump -s ~/captura_sign.py --listen-host 0.0.0.0 --listen-port 8080 --set block_global=false' > ~/captura-sesion.txt 2>&1 &
+sleep 4
+curl -s -m 20 -x http://127.0.0.1:8080 http://example.com -o /dev/null -w "proxy -> %{http_code}\n"
+grep -o -E "http://[a-zA-Z0-9./_?=&-]+" ~/captura-sign.jsonl | sort | uniq -c | sort -rn | head -20
+grep -o -E "api_url[0-9]?[^,}]{0,90}" ~/captura-sign.jsonl | sort -u | head -10
+```

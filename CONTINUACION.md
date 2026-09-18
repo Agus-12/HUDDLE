@@ -70,6 +70,16 @@
 4. Rastreador sigue APAGADO (la API web da el error chino desde IPs que no sean el
    teléfono). Revivir solo con luz verde de `verificar_api.py`.
 
+**Puntas pendientes al reanudar:**
+- Extraer de `~/captura-sign.jsonl` (Oracle) todas las urls `http://` planas y el campo
+  `api_url2` del `public/init` descifrado: si la API tiene una entrada HTTP plana, se
+  puede consultar sin TLS ni CA y destraba el catálogo sin el amigo.
+- El bloque de comando para eso y para revivir el proxy de WiFi está en el chat (y en
+  `captura-pcapdroid-RECESTA.md`, sección siguiente).
+- wsSecret: 15 120 combos probados con las ternas exactas de tshark, sin suerte; la
+  carpeta de 12 hex NO es hash del id del catálogo. Sigue pendiente el brute-force en
+  Oracle leyendo `peticiones-movievn.txt`.
+
 **Reglas nuevas aprendidas:**
 - El addon de descifrado de PCAPdroid NO está en Play Store: APK directo de GitHub
   (v2.4 arm64). Sin addon, el renglón "Descifrado TLS" ni aparece en Ajustes.
