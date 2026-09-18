@@ -22,6 +22,80 @@
 
 ## 2. ESTADO DEL PROYECTO (17 sep 2026)
 
+### 📸 FOTO FIJA — 18 sep, fin de sesión (leer esto primero si llegas de otro chat)
+
+**Dónde estamos:** el catálogo está rastreado (≈27 000 fichas de 650 000 ids recorridos,
+en curso) pero **ninguna tiene URL de video**: la API devuelve un placeholder. Lo único que
+da las URLs reales es el `sign` del POST `/api/vod/info_new`, que firma el código nativo.
+Ese es EL candado y todo lo demás es secundario.
+
+**Lo que está CERRADO y probado (no volver a dudar de esto):**
+1. **Fórmula de las cabeceras de la API — verificada contra una captura real del teléfono:**
+   `sign = MD5('47Q8tBqO4YqrMHf4' + device_id + cur_time)` en **mayúsculas**.
+   Prueba: `MD5('47Q8tBqO4YqrMHf4'+'3736e27f0823b1ba'+'1789515864447').upper()`
+   = `A526BDCB05C2CD7AE5EF38D96E56687F` = el `sign` real capturado. Coincidencia exacta.
+2. **Descifrado de respuestas:** base64 → AES-128-CBC, key `0123456789123456`, IV `2015030120123456`.
+3. **Cifrado de las libs:** RC4 con PRGA no estándar (`i+=2`, `j=S[i]+j+1`, `k=S[(a+b)&0xff]`),
+   S-box capturado en `auditorias/crack/rc4_sbox_1.bin`. Formato `u32 LE (tamaño final) || zlib`.
+   Sirve igual para `libjiagu` y para `libpp_hls`.
+4. **Dentro del módulo de `libpp_hls` hay un ELF AArch64 completo** en el offset `0x50429`
+   → `auditorias/crack/pphls_elf_interno.so`. Ahí está el servidor de control del SDK.
+
+**Lo que NO está resuelto (el candado):**
+- El `sign` del **cuerpo** del POST `info_new` lo calcula el nativo. Del código se lee
+  `sprintf("%s%s%s", device_id, ts, cfg[0x38])` → hash → hex de 16 bytes, pero **el valor de
+  `cfg[0x38]` (el `ck`) no se pudo confirmar** y la fórmula no se pudo verificar en vivo.
+- **Motivo: el backend del app está CAÍDO.** `POST /api/public/init` con sign correcto y
+  verificado devuelve `系统出问题啦~请稍后再试` en `surfclick.vd7au6.com`,
+  `movievn.z3azky.com` y `albd.h4c5.com`; los demás hosts dan 403. Comprobado de nuevo al
+  cierre de esta sesión (18 sep, noche).
+- **Regla: si `public/init` con sign conocido no devuelve `code:10000`, NINGUNA prueba de
+  fórmula significa nada.** Las 440 variantes probadas el 18-sep NO están descartadas.
+- Candidatos a `ck` ya listados (ninguno confirmado): `92b991dfcf878f362f6044f3d6e013255c0726617e4d17858890ecdab1d291c7`
+  (leído de `p2p_config` en una respuesta real de `public/init`), `87c2cb7ff568d602d5f806c473345600`,
+  `47Q8tBqO4YqrMHf4`, `de304f03fe653f329edfea08ea2046c4`, `1be0ac56`,
+  `6A21635498FB7F1E13648270050E1346E`, `6BE2FB29B23E42031B1900D85E0756B75` (esta última
+  encontrada en `classes7.dex`, sin probar).
+
+**🔴 ACCIÓN PENDIENTE, bloqueada en el usuario:**
+Capturar **un `info_new` real** del teléfono del amigo. El `sign` viaja en el **cuerpo del
+POST**, que sí es tráfico de internet y sí se descifra (el app Android acepta CAs de usuario;
+el iOS tiene pinning y no sirve; el emulador Android lo detecta jiagu y se cierra).
+- Receta completa y al día: **`auditorias/captura-sign-RECESTA.md`** (paso 1 Oracle,
+  paso 2 mensaje de WhatsApp, paso 3 recolección, paso 4 apagar).
+- Capturador: **`auditorias/captura_sign.py`** — guarda cada flujo a `~/captura-sign.jsonl`
+  **incluido el cuerpo del POST**, que es donde vive el `sign`. (El capturador viejo
+  `captura_ss.py` NO lo guardaba; por eso la captura del 15-sep no sirvió.)
+- **El proxy DEBE arrancarse con `ulimit -n 65536`** o se satura solo con bots de internet
+  y la captura sale vacía (pasó el 18-sep, `capturadas: 0`). Detalles en la receta.
+- **Con una sola terna `(device_id, cur_time, sign)` real** se resuelve el `ck` por fuerza
+  bruta local en segundos y se valida la fórmula. Y de la misma captura caen las URLs de
+  video reales, sin depender del candado.
+
+**Estado del servidor del usuario (129.80.212.92):**
+- Huddle en `:3000` → 200 ✔. Novelas externas ocultas (v208). Lacartoons arreglado (v209).
+- Proxy mitmproxy en `:8080` con el capturador nuevo y `ulimit 65536` → `proxy -> 200` ✔
+  (comprobado desde fuera al cierre de la sesión).
+- `~/captura-sign.jsonl` **aún no existe**: el amigo hizo una prueba pero el proxy estaba
+  saturado y no se capturó nada. Hay que repetirla.
+- El cert mitmproxy del teléfono del amigo es del 15-sep y sigue siendo el mismo que sirve
+  el server → no necesita reinstalarlo.
+
+**⚠️ ROLLBACKS DEL SANDBOX (van 15).** El patrón es siempre el mismo y ya no debe asustar:
+`git log` muestra un HEAD viejo (típicamente `244e3b5`) y `git status` lleno de cambios, pero
+**el remoto tiene todo y los archivos del working tree sobreviven**. Receta fija:
+```bash
+cd ~/huddle && git fetch -q "https://{PAT}@github.com/Agus-12/HUDDLE.git" main && git reset --hard FETCH_HEAD
+```
+Después **verificar con `grep -c` que las ediciones nuevas siguen en el archivo** antes de
+dar por hecho que están: en esta sesión se perdieron dos veces ediciones ya hechas.
+Nunca `push` sin comprobar antes que el remoto es ancestro del HEAD local.
+
+**Rastreador del catálogo:** `node catalogo-movie.js` (reanudable, checkpoint en
+`auditorias/catalogo-web/checkpoint.json`). Al cierre: **27 160 fichas**, siguiente id 62 295
+de 650 000. Se muere con cada rollback del sandbox: revivirlo y seguir.
+
+
 ### 🩺 CAPTURA (18 sep, noche): **POR QUÉ LA CAPTURA DEL AMIGO SALIÓ VACÍA — el proxy se saturaba solo**
 El amigo hizo la prueba completa (proxy manual + abrir fichas) y el resultado fue
 `capturadas: 0` / `no hay archivo de captura`. Diagnóstico en vivo desde el servidor:
