@@ -8267,6 +8267,31 @@ const imgProxyCache = new Map(); /* v67: imágenes de animes proxyadas, url → 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   try {
+    /* v210: subida de UNA VEZ del sslkeylogfile.txt desde el navegador (el scp y el
+       puerto 47823 fallaron). GET = pagina minima; POST = guarda el cuerpo en
+       ~/sslkeylogfile.txt. Sin clave a proposito: un solo uso, contenido inerte solo. */
+    if (url.pathname === '/api/subir-llaves') {
+      if (req.method === 'POST') {
+        const chunks = []; let n = 0;
+        for await (const c of req) {
+          n += c.length;
+          if (n > 3 * 1024 * 1024) { res.writeHead(413, { 'Content-Type': 'text/plain' }); res.end('demasiado grande'); return; }
+          chunks.push(c);
+        }
+        fs.writeFileSync(path.join(os.homedir(), 'sslkeylogfile.txt'), Buffer.concat(chunks));
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Listo: ' + n + ' bytes guardados en el servidor.');
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end('<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;text-align:center;margin-top:60px">' +
+        '<h2>Subir el archivo de llaves</h2><p>Elige <b>sslkeylogfile.txt</b> y toca Subir.</p>' +
+        '<input type="file" id="f"><br><br><button onclick="s()" style="font-size:18px;padding:8px 24px">Subir</button>' +
+        '<div id="r" style="margin-top:16px;font-weight:bold"></div>' +
+        '<script>async function s(){var f=document.getElementById("f").files[0];if(!f){document.getElementById("r").innerText="Elige el archivo primero";return;}document.getElementById("r").innerText="Subiendo...";var r=await fetch("/api/subir-llaves",{method:"POST",body:f});document.getElementById("r").innerText=await r.text();}</script>' +
+        '</body></html>');
+      return;
+    }
     if (url.pathname === '/api/events') return handleEvents(req, res, url);
     if (url.pathname === '/api/action') {
       // POST (normal) o GET (fallback para proxies que bloquean POST)
