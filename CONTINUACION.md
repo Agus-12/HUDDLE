@@ -46,6 +46,15 @@ Catálogo: `search/result` página 2 = vacío (paginación rota); `channel/get_i
 banners con `vod_info` completo (data_id=vod id) pero no lista paginada. La API web
 (albd.h4c5.com) SIGUE caída ⇒ rastreador sigue apagado.
 
+**APK V4.0.0 analizada (19 sep 13:55):** descargada de `app.r2c7a0.com` (la recomienda
+el propio sys_conf). `libpp_hls.so` nuevo desinflado con el MISMO S-box
+(`auditorias/crack/v4hls__inflado.bin`, commit incluido): la config por defecto trae
+**la misma** `device_encrypt_key=Zox882LYjEn4Rqpa` en el mismo offset 0x31f093. Conclusión:
+el secreto SÍ es Zox… y entonces el fallo de mis 40+ fórmulas de info_new está en otro
+detalle (truncado a 16 hex minúsculas probado, ts seg/ms probado, dev±vod probado).
+**Una firma real del teléfono sigue siendo el único oráculo.** `resolver_sign.py` con la
+terna lo resuelve en segundos (prueba 12 candidatos × 6 órdenes × 7 formatos).
+
 **Única tarea humana pendiente (2 min, cuando el amigo pueda):** proxy de WiFi
 (129.80.212.92:8080, bypass 127.0.0.1,localhost) + **ABRIR 3 FICHAS hasta la sinopsis**.
 `captura_sign.py` guarda el cuerpo de info_new en `~/captura-sign.jsonl`; después:
