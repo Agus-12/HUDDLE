@@ -236,9 +236,18 @@ def client_connected(client):
         pass
 
 
+_HOSTS_VISTOS = set()
+
+
 def response(flow: http.HTTPFlow):
     host = flow.request.pretty_host
     url = flow.request.pretty_url
+
+    # Anotar TODOS los hosts que pasan, aunque no sean del app: sirve para saber que el
+    # telefono si esta conectado y para descubrir hosts nuevos del app.
+    if host and host not in _HOSTS_VISTOS:
+        _HOSTS_VISTOS.add(host)
+        print(">>> (host nuevo) %s" % host)
 
     if not PATRON.search(host) and not PATRON.search(url):
         return
