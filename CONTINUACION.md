@@ -52,8 +52,12 @@
 - `~/pcapchunks/` = la misma en partes de 5M. `~/captura-sintls.pcap` = la de 210 MB.
 
 **Siguiente paso planeado (en orden):**
-1. Mirar qué hay en `~/volcado-http.txt` (hosts/rutas descifradas) — el comando está en
-   la receta.
+1. ✅ Hecho: el volcado descifrado contiene **18 peticiones HTTP PLANO a
+   `movievn.j5t2n.com`** (puerto 80, IP 13.226.204.85) + el CDN. `surfclick` = 0 (ese
+   cliente TLS no se descifró). **`movievn.j5t2n.com` es el host de API que SÍ viaja en
+   claro** ⇒ extraer sus peticiones/cuerpos con tshark (comando en la receta, sección
+   "Análisis del volcado"): `-Y 'http.host contains "j5t2n"' -T fields …`. Ahí puede
+   estar el mapeo vod_id→carpeta y/o el sign del cuerpo.
 2. Si el app se resistió al mitm del addon: **volver al proxy de WiFi** (mitmdump normal
    con `captura_sign.py` en el 8080) pero esta vez con instrucción EXPLÍCITA de que el
    amigo ABRA FICHAS (pantalla de sinopsis) y dé play — las veces anteriores solo abrió
