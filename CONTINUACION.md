@@ -22,6 +22,24 @@
 
 ## 2. ESTADO DEL PROYECTO (17 sep 2026)
 
+### 🔑 Firmas de CDN descifradas del PCAP de 301 MB (19 sep ~10:20)
+
+Los GET del CDN ahora llegan **firmados con Wangsu**: `wsSecret=<md5>&wsTime=<hex>`.
+Desensamblado el firmador en `pphls_elf_interno.so` (función en `0xcc4a4`, switch por tipo
+de CDN en `0xcc5a4`):
+
+- Wangsu, clave de longitud == 16 (rama `0xcca1c`): entrada MD5 = `'%s%s%x'` %
+  (clave, path-sin-query, wsTime-hex); salida `wsSecret=%s&wsTime=%x`.
+- Wangsu, clave != 16 (rama `0xcc650`): entrada `'%s%s%u'`, salida `%u` (decimal).
+- Las capturas muestran wsTime **hex** ⇒ **la clave viva mide exactamente 16 caracteres**.
+- Candidata estrella de 16 chars: `Zox882LYjEn4Rqpa` (device_encrypt_key). El default
+  `resource_md5_prefix=null` (4 chars) no puede ser el que produjo esas firmas.
+- path = la URL cortada en el primer `?` (instrucción en `0xcc520-0xcc52c`).
+- Aliyun `auth_key=%d-%d-%d-%s` ← 0xcc7b8; CloudFront policy JSON ← 0xcc91c.
+
+Brute-force listo: `/tmp/ws_brute.py` (espera los trios completos del PCAP; pedir al
+usuario: `grep -a -o -E "GET /vod/[0-9/a-f]{20,40}...(ts|m3u8)\?wsSecret=...&wsTime=..."`).
+
 ### 🔐 FALTABA EL ADDON de descifrado (19 sep, ~09:00)
 
 La captura de 210 MB por PCAPdroid **llegó completa** (`uploads: 1`, puerto 8080 con el
