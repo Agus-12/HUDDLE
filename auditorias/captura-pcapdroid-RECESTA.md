@@ -161,3 +161,31 @@ Monitor al buscar el autor). Se instala por APK directo de GitHub:
 En el teléfono: abrir el enlace en Chrome → descargar → tocar la notificación → Instalar
 (aceptar "instalar apps desconocidas" si lo pide). Con el addon instalado, en
 Ajustes → Inspección de tráfico aparecen "Decodificación TLS" y "Certificado CA".
+
+##  VÍA B (LA BUENA, 19-sep ~09:15): SOCKS5 hacia el mitmproxy del servidor
+
+El usuario ejecutó por su cuenta el bloque viejo de `mitmdump --mode socks5` en el 8080
+(y mató al recibidor de paso). Probado desde el sandbox: `socks5h://129.80.212.92:8080`
+da 200 en http y https. **Esta vía es mejor que el addon:**
+
+- El MITM lo hace el mitmproxy del SERVIDOR, donde ya corre `captura_sign.py`
+  (el addon probado que descifra y guarda en `~/captura-sign.jsonl`).
+- El teléfono ya confía en esa CA desde el 15-sep. No hay que instalar nada nuevo.
+- PCAPdroid fuerza TODO el tráfico del app por el túnel (nivel VPN), así se acaba el
+  problema de "el app ignora el proxy".
+- No hacen falta ni el addon `PCAPdroid-mitm`, ni el recibidor, ni el exportador TCP.
+
+Configuración en el teléfono:
+1. PCAPdroid → Ajustes → **SOCKS5** → activar → host `129.80.212.92`, puerto `8080`.
+2. En **Volcado PCAP** quitar el Exportador TCP (elegir archivo local o nada): el 8080 ya
+   no es el recibidor, es el SOCKS5.
+3. "Decodificación TLS" NO se activa (sin addon). El descifrado ocurre en el servidor.
+4. INICIAR → usar Movie (2 fichas, 1 min de reproducción) → DETENER.
+
+Resultado esperado: nuevas líneas con `info_new` en `~/captura-sign.jsonl` del servidor.
+
+Comando de arranque (ya corriendo, pid 122606):
+
+```bash
+nohup bash -c 'ulimit -n 65536; exec ~/.local/bin/mitmdump --mode socks5 -s ~/captura_sign.py --listen-host 0.0.0.0 --listen-port 8080 --set block_global=false' > ~/captura-sesion.txt 2>&1 &
+```
