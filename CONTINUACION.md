@@ -22,6 +22,46 @@
 
 ## 2. ESTADO DEL PROYECTO (17 sep 2026)
 
+### 🔐 FALTABA EL ADDON de descifrado (19 sep, ~09:00)
+
+La captura de 210 MB por PCAPdroid **llegó completa** (`uploads: 1`, puerto 8080 con el
+recibidor arreglado). Escaneo completo: `info_new`=0, `sign=`=0, `okhttp`=0, `POST /api`=0.
+**Pero** sí hay texto plano del CDN (`GET /vod/...`, `Host:`). Conclusión: el descifrado
+TLS de PCAPdroid **no estaba funcionando**.
+
+Causa exacta (capturas de pantalla de sus Ajustes): en "Inspección de trafico" **no
+existen** los renglones "Decodificación TLS" ni "Certificado CA". Según la doc oficial
+(emanuele-f.github.io/PCAPdroid/tls_decryption.html), esos renglones aparecen **solo si
+está instalado el addon `PCAPdroid mitm`** (Play Store, mismo autor, gratis). Sin addon,
+PCAPdroid captura pero no descifra HTTPS.
+
+➡️ Siguiente paso: instalar el addon, activar "Decodificación TLS", instalar su CA, elegir
+Movie como app a descifrar, y repetir la captura (el recibidor sigue vivo en el 8080; el
+PCAP viejo quedó renombrado a `captura-sintls.pcap`).
+
+Riesgo conocido: si el cliente HTTP de la API no confía en CAs de usuario, el descifrado
+romperá la reproducción y lo veremos al instante (el app fallará al cargar). El okhttp
+principal del app SÍ confió en la CA de usuario del proxy de WiFi (descifró
+`public/upgrade`), así que hay buena base.
+
+### 🎁 Regalo de la captura sin descifrar: 3 carpetas nuevas reproducibles
+
+El tráfico del CDN va por **HTTP plano**, así que se vio sin descifrar. El amigo
+reprodujo 3 videos el 18-sep ~08:30-08:50 UTC:
+
+- `http://147.124.216.142/vod/1/2026-09-17/8b23b06b5b7a/index5.m3u8` (subida AYER)
+- `http://147.124.216.142/vod/1/2024-03-05/e1545ba5be10/index5.m3u8`
+- `http://147.124.216.142/vod/1/2023-12-15/eb42c052823c/index5.m3u8`
+
+Probadas desde el sandbox: **403** — incluso la carpeta conocida `6cc422af11b8` da 403
+ahora. O sea que el origen directo quedó bloqueado para IPs que no sean el teléfono
+(mismo patrón que la API: solo responde al teléfono). Siguen siendo rutas válidas para el
+app; la pieza que falta es el mapeo vod_id→carpeta, que lo da `info_new` descifrado.
+
+Hosts vistos en el PCAP (SNI/DNS): `movievn.j5t2n.com` (35), `surfclick.vd7au6.com` (22),
+`sdkapi-ga.smallyy.com` (38) + mucho ruido de anuncios (applovin, moloco, vungle…).
+`movievn.j5t2n.com` es otro host de la API a agregar a los candidatos del capturador.
+
 ### 📡 CAMBIO DE MÉTODO OBLIGATORIO (19 sep): **EL PROXY DE WiFi NO SIRVE — el app lo ignora**
 
 Confirmado por el amigo: **con el proxy de WiFi puesto, el app Movie reproducía video
