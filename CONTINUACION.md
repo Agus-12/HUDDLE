@@ -58,11 +58,13 @@
    claro** ⇒ extraer sus peticiones/cuerpos con tshark (comando en la receta, sección
    "Análisis del volcado"): `-Y 'http.host contains "j5t2n"' -T fields …`. Ahí puede
    estar el mapeo vod_id→carpeta y/o el sign del cuerpo.
-2. Si el app se resistió al mitm del addon: **volver al proxy de WiFi** (mitmdump normal
-   con `captura_sign.py` en el 8080) pero esta vez con instrucción EXPLÍCITA de que el
-   amigo ABRA FICHAS (pantalla de sinopsis) y dé play — las veces anteriores solo abrió
-   el app y por eso solo cayó `public/upgrade`. El okhttp principal del app SÍ respeta
-   el proxy y SÍ confía en la CA de usuario (probado).
+2. ✅ Decidido: las 18 peticiones "descifradas" eran solo CDN por **HTTP plano**
+   (puerto 80) — la keylog no descifró nada nuevo; el cliente TLS de la API
+   (surfclick) **no acepta el mitm** (pinning o TLS propio). **Volver al proxy de WiFi**
+   (mitmdump normal con `captura_sign.py` en el 8080) con instrucción EXPLÍCITA de que
+   el amigo ABRA FICHAS (pantalla de sinopsis) — nunca lo hizo con el proxy puesto. El
+   okhttp principal SÍ respeta el proxy y SÍ confió en la CA (probado con
+   public/upgrade).
 3. Brute-force `wsSecret` EN ORACLE (script de la receta) — nunca transcribir ternas a
    mano: falló por typos. Con la clave Wangsu se firman URLs del CDN desde cualquier IP.
 4. Rastreador sigue APAGADO (la API web da el error chino desde IPs que no sean el
