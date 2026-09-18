@@ -22,6 +22,58 @@
 
 ## 2. ESTADO DEL PROYECTO (17 sep 2026)
 
+### 🧭 ESTADO PARA REANUDAR EN CHAT NUEVO (19 sep ~12:15)
+
+**Qué se logró hoy (19 sep):**
+1. El proxy de WiFi quedó descartado con prueba: el app lo ignora (reproducía normal
+   con el proxy puesto).
+2. PCAPdroid + addon `PCAPdroid-mitm` (APK de GitHub, NO Play Store) + "Descifrado TLS"
+   activado + payload completo + app destino Movie. Dos capturas llegaron al recibidor
+   (210 MB y 149 MB, ya particionadas en `~/pcapchunks` de Oracle).
+3. **PCAPdroid exportó `sslkeylogfile.txt` al terminar** (llaves TLS 1.3, 6641 líneas).
+   Ya está en `~/sslkeylogfile.txt` de Oracle (subido por el usuario vía la ruta nueva
+   `/api/subir-llaves` del puerto 3000, commit v210) y copia en
+   `auditorias/descifrado/sslkeylogfile.txt` de este repo… NO: solo en el workspace del
+   chat viejo; en el repo NO se sube (es material sensible). En Oracle SÍ está.
+4. `tshark` instalado en Oracle (4.2.2). Con la keylog descifró **442 KB de HTTPS**
+   (`~/volcado-http.txt`) ⇒ la keylog SÍ sirve y el descifrado funciona.
+   **Pero `info_new` = 0 en lo descifrado** ⇒ las llamadas de la API del app Movie NO
+   fueron descifradas (el app no pasó por el mitm del addon, o no confió en su CA para
+   ese cliente). Pendiente ver qué hosts/rutas SÍ salieron en los 442 KB (comando al
+   final de `captura-pcapdroid-RECESTA.md`).
+
+**Estado de puertos/servicios en Oracle (19 sep 12:15):**
+- 3000: Huddle (con `/api/subir-llaves`). Funciona desde fuera ✔
+- 8080: ESTADO DESCONOCIDO (pasaron por ahí recibidor, socks5, mitmdump… revisar con
+  `ss -tlnp | grep 8080` antes de usar).
+- 47823: el firewall de Oracle NO deja entrar desde fuera (solo responde a localhost).
+  No volver a usarlo para nada externo.
+- `~/captura-sign.pcap` = 149 MB (la última captura con descifrado).
+- `~/pcapchunks/` = la misma en partes de 5M. `~/captura-sintls.pcap` = la de 210 MB.
+
+**Siguiente paso planeado (en orden):**
+1. Mirar qué hay en `~/volcado-http.txt` (hosts/rutas descifradas) — el comando está en
+   la receta.
+2. Si el app se resistió al mitm del addon: **volver al proxy de WiFi** (mitmdump normal
+   con `captura_sign.py` en el 8080) pero esta vez con instrucción EXPLÍCITA de que el
+   amigo ABRA FICHAS (pantalla de sinopsis) y dé play — las veces anteriores solo abrió
+   el app y por eso solo cayó `public/upgrade`. El okhttp principal del app SÍ respeta
+   el proxy y SÍ confía en la CA de usuario (probado).
+3. Brute-force `wsSecret` EN ORACLE (script de la receta) — nunca transcribir ternas a
+   mano: falló por typos. Con la clave Wangsu se firman URLs del CDN desde cualquier IP.
+4. Rastreador sigue APAGADO (la API web da el error chino desde IPs que no sean el
+   teléfono). Revivir solo con luz verde de `verificar_api.py`.
+
+**Reglas nuevas aprendidas:**
+- El addon de descifrado de PCAPdroid NO está en Play Store: APK directo de GitHub
+  (v2.4 arm64). Sin addon, el renglón "Descifrado TLS" ni aparece en Ajustes.
+- Las "Reglas de descifrado" (menú lateral) son obligatorias: sin regla no descifra nada.
+- PCAPdroid exporta `sslkeylogfile.txt` al detener la captura: con eso tshark descifra el
+  PCAP sin needing CA. Es LA vía.
+- El puerto 47823 de Oracle no entra desde fuera; solo 3000 y 8080.
+- `actualizar.sh` = la única forma de que Oracle baje cambios; el usuario no debe usar
+  scp ni terminales nuevas.
+
 ### 🔑 Firmas de CDN descifradas del PCAP de 301 MB (19 sep ~10:20)
 
 Los GET del CDN ahora llegan **firmados con Wangsu**: `wsSecret=<md5>&wsTime=<hex>`.

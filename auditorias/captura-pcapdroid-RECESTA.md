@@ -189,3 +189,19 @@ Comando de arranque (ya corriendo, pid 122606):
 ```bash
 nohup bash -c 'ulimit -n 65536; exec ~/.local/bin/mitmdump --mode socks5 -s ~/captura_sign.py --listen-host 0.0.0.0 --listen-port 8080 --set block_global=false' > ~/captura-sesion.txt 2>&1 &
 ```
+
+## Análisis del volcado descifrado (pendiente al reanudar)
+
+```bash
+echo "--- hosts descifrados ---"
+grep -a -iE "authority|Host:" ~/volcado-http.txt | sort | uniq -c | sort -rn | head -15
+echo "--- rutas ---"
+grep -a -oE "(GET|POST) /[a-zA-Z0-9_/.?=-]{2,70}" ~/volcado-http.txt | sort | uniq -c | sort -rn | head -25
+echo "--- algo de surfclick? ---"
+grep -a -c "surfclick" ~/volcado-http.txt
+head -40 ~/volcado-http.txt
+```
+
+Si `surfclick` da 0: el app Movie no pasó por el mitm del addon para su cliente de la
+API ⇒ ir al plan del proxy de WiFi con fichas abiertas (ver CONTINUACION.md, bloque
+"ESTADO PARA REANUDAR").
