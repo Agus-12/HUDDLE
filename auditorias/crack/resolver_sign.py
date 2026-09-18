@@ -35,7 +35,17 @@ import urllib.parse
 # Secretos candidatos, con su procedencia. Ninguno confirmado todavía para el sign
 # del cuerpo; el primero es el `ck` leído de una respuesta real de public/init.
 CANDIDATOS = [
-    ("ck de p2p_config (public/init)", "92b991dfcf878f362f6044f3d6e013255c0726617e4d17858890ecdab1d291c7"),
+    # ★ EL CANDIDATO PRINCIPAL. El handler verify hace sprintf("%s%s%s", device_id, ts,
+    #   cfg[0x38]) y la función que IMPRIME la config (0xb55f4) revela el mapa de campos:
+    #   [cfg+0x38] se imprime como 'device_encrypt_key :%s'  ← ESTE es el 3er trozo
+    #   [cfg+0x40] se imprime como 'ck                 :%s'  ← ck es OTRO campo
+    #   El valor sale de la config por defecto embebida en texto plano dentro del módulo
+    #   de libpp_hls (pphls_mips_inflado.bin, offset 0x31efd9..0x31f6c5):
+    #       device_encrypt_key=Zox882LYjEn4Rqpa
+    #   Corroboración del mapa: el 'ck' de esa config por defecto es idéntico al que
+    #   llegó vivo en public/init (92b991...d291c7), así que los offsets están bien leídos.
+    ("device_encrypt_key (cfg+0x38) ★", "Zox882LYjEn4Rqpa"),
+    ("ck (cfg+0x40, NO es el del sign)", "92b991dfcf878f362f6044f3d6e013255c0726617e4d17858890ecdab1d291c7"),
     ("key de com.pp.hls.load",         "87c2cb7ff568d602d5f806c473345600"),
     ("salt de las cabeceras",          "47Q8tBqO4YqrMHf4"),
     ("salt de las cabeceras, min",     "47q8tbqo4yqrmhf4"),

@@ -22,6 +22,58 @@
 
 ## 2. ESTADO DEL PROYECTO (17 sep 2026)
 
+### 🎯🎯🎯 CORRECCIÓN MAYOR (18 sep, madrugada del 19): **EL 3er TROZO DEL SIGN NO ES `ck`, ES `device_encrypt_key` = `Zox882LYjEn4Rqpa`**
+
+Todo lo anterior que decía *"sign = md5(device_id + ts + ck)"* estaba **MAL**. El error: se
+leyó `ldr x2,[x2,#0x38]` en el handler `verify` y se asumió que `0x38` era el `ck`. No lo es.
+
+**Cómo se corrigió (evidencia, no suposición):** dentro del módulo hay una función que
+**IMPRIME la config campo por campo** (`0xb55f4`, formatos en `.rodata` `0x22ba48`–`0x22bd30`).
+Sus `ldr x2,[x21,#N]` emparejados con cada formato dan el mapa real de la struct:
+
+| offset | campo | formato |
+|---|---|---|
+| `[cfg+0x00]` | `player_listen_port` | `%lld` |
+| **`[cfg+0x38]`** | **`device_encrypt_key`** | **`%s`** ← el que usa el sign |
+| `[cfg+0x40]` | `ck` | `%s` |
+| `[cfg+0x48]` | `ck_t` | `%lld` |
+| `[cfg+0x50]` | `ck_p` | `%lld` |
+| `[cfg+0x68]` | `ck_tt` | `%lld` |
+| `[cfg+0x70]` | `cci` | `%lld` |
+| `[cfg+0xa0]` | `cellular_net_upload_enable` | `%lld` |
+| `[cfg+0xa8]` | `backup_domain` | `%s` |
+| `[cfg+0xb0]` | `resource_md5_prefix` | `%s` |
+
+Y el **valor**, encontrado en texto plano: el módulo de `libpp_hls` trae **toda la config por
+defecto embebida** en `auditorias/crack/pphls_mips_inflado.bin`, offsets **`0x31efd9`–`0x31f6c5`**
+(1772 bytes, formato `clave=valor\n`, secciones `[BASE]` y `[P2P]`). Entre otras cosas:
+```
+player_listen_port=7000
+device_encrypt_key=Zox882LYjEn4Rqpa          ← EL TERCER TROZO DEL SIGN
+ck=92b991dfcf878f362f6044f3d6e013255c0726617e4d17858890ecdab1d291c7
+ck_t=1  ck_p=0  ck_e=10  ck_tf=16  ck_tt=999  cci=-1
+nurl=http://fxuo.386m1.com/nft/get_info
+p2p_tracker_addr=138.113.22.150:7202
+p2p_stunserver_addr=stun.syncthing.net
+disk_cache_size_max=9663676416
+```
+**Corroboración de que el mapa está bien leído:** el `ck` de esta config por defecto es
+**idéntico** al que llegó vivo en `public/init` → `sys_conf.p2p_config`
+(`92b991…d291c7`). Si los offsets estuvieran corridos, no coincidiría.
+
+⇒ **Fórmula probable del sign del cuerpo, ahora con el secreto correcto:**
+```
+sign = md5( device_id ‖ cur_time ‖ "Zox882LYjEn4Rqpa" )   → hex, 32 caracteres
+```
+**Sigue sin poder verificarse en vivo** porque el backend está caído (ver bloque ⛔). Es el
+primer candidato en `resolver_sign.py`; en cuanto la API responda o llegue la captura, se
+confirma en segundos. Esto **explica por qué fallaron las 440 variantes**: todas usaban `ck`
+u otros secretos, ninguna usaba `Zox882LYjEn4Rqpa` (que no se conocía).
+
+**Lección:** cuando un binario tiene una función que *imprime* su propia configuración, esa
+función ES el mapa de la struct. Buscarla antes que adivinar offsets. Y nunca afirmar un
+offset sin una segunda fuente que lo corrobore.
+
 ### 📸 FOTO FIJA — 18 sep, fin de sesión (leer esto primero si llegas de otro chat)
 
 **Dónde estamos:** el catálogo está rastreado (≈27 000 fichas de 650 000 ids recorridos,
