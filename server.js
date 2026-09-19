@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v224'; // 224: fija fuga de memoria (cosecha cacheada 10s) + pip PEP668
+const UI_VERSION = 'v227'; // 227: llave CDN visible en panel + estado (pide espejo + firma al vuelo)
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -9758,7 +9758,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
       return res.end(panelHtml());
     }
-    if (url.pathname === '/api/estado') { /* v205.4: todo el estado en un JSON para el panel; v223: + cosecha */
+    if (url.pathname === '/api/estado') { /* v205.4: todo el estado en un JSON para el panel; v223: + cosecha; v227: + llave CDN */
       const SITIOS2 = { dani: 'Caricaturas', mm: 'Caricaturas', lct: 'Cartoons', la: 'Anime', af: 'AnimeFLV', cv: 'Cuevana' };
       const muestra = Object.entries(INTROS).slice(0, 60).map(([k, v]) => {
         const p = k.split(':');
@@ -9773,6 +9773,9 @@ const server = http.createServer(async (req, res) => {
         memoriaMb: Math.round(mem.rss / 1048576),
         salasActivas: rooms.size,
         usuarios: users.size,
+        llaveCdn: !!movieCdnKey(),
+        espejos: MOVIE_ESPEJOS,
+        espejoPreferido: movieEspejoPreferido() || null,
         intros: { analizados: CRAWL.hechas || 0, total: CRAWL.total || 0, enCola: CRAWL.pend.length, aprendidas: Object.keys(INTROS).length, sinIntro: (CRAWL.sinIntro || []).length, muestra },
         moderacion: { animesMuertos: LA_MUERTAS_SET.size, animesCastDup: LA_OCULTAS_SET.size, gopelis: GP_OCULTAS_SET.size, pelisxd: PXD_OCULTAS.size, animeflv: AF_OCULTAS.size, cuevana: CV_OCULTAS_RT.size, novelas: NV_OCULTAS.size, protegidas: CV_PROTEGIDAS.size, epsOcultos: EPS_MUERTOS.size, fallosEnCurso: [FALLOS_GP, FALLOS_PXD, FALLOS_AF, FALLOS_CV, FALLOS_NV, EPS_FALLOS].reduce((a2, mm2) => a2 + [...mm2.values()].filter((x2) => x2.f >= 1 && !x2.h).length, 0) },
         catalogos: { caricaturas: cariFeedCache.items.length, cartoons: cariFeedCache.toons.length, liveaction: cariFeedCache.live.length, danimados: DANI_CAT.size, animes: LA_TODOS.size, novelas: nvdCache.items.length },
@@ -10098,7 +10101,7 @@ function panelHtml() {
     document.getElementById('cosechaBarra').style.width = pctCo + '%';
     document.getElementById('cosechaTxt').textContent = totCo ? totCo.toLocaleString('es') + ' títulos encontrados' : (hitsCo ? hitsCo + ' títulos' : 'aún sin datos');
     document.getElementById('cosechaPct').textContent = posCo ? 'id ' + posCo.toLocaleString('es') + ' / 70k · ' + pctCo + '%' : '';
-    document.getElementById('cosechaChips').innerHTML = co.archivo ? chip('ok', 'Catálogo', totCo) + chip('', 'Hit', hitsCo || totCo) + chip('', 'Pos', posCo || '—') : chip('warn', 'En curso', '1000→70000');
+    document.getElementById('cosechaChips').innerHTML = (co.archivo ? chip('ok', 'Catálogo', totCo) + chip('', 'Hit', hitsCo || totCo) + chip('', 'Pos', posCo || '—') : chip('warn', 'En curso', '1000→70000')) + (d.llaveCdn ? chip('ok', 'Llave CDN', 'SÍ ✓') : chip('bad', 'Llave CDN', 'NO')) + chip('', 'Espejo', d.espejoPreferido || (d.espejos && d.espejos[0]) || '—');
     document.getElementById('cosechaRuta').textContent = co.archivo ? (co.archivo.ruta + ' · ' + (co.archivo.bytes/1024).toFixed(1) + ' KB · ' + (co.log || '')) : (co.nota || '');
     const mo = d.moderacion;
     document.getElementById('modChips').innerHTML =
