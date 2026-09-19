@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v222'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v223'; // 223: cosecha en /api/intros+estado y intros auto al entrar a serie
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1187,6 +1187,63 @@ function movieDispResumen() {
   return r;
 }
 movieDispCargar(); /* v222: mediciones guardadas del escaneo anterior */
+/* v223: estado de la cosecha masiva info_new 1000→70000 — lee lo que haya (app nativa, checkpoint, catálogo) */
+const MOVIE_COSECHA_RUTAS = [
+  path.join(carpetaArchivos(), 'movie-cosecha-app.json'),
+  path.join(carpetaArchivos(), 'catalogo-70k.json'),
+  '/tmp/catalogo-70k.json',
+  path.join(DATA_DIR, 'movie-cosecha.json'),
+  path.join(DATA_DIR, 'catalogo-70k.json'),
+  '/home/ubuntu/movie-cosecha-app.json',
+  '/home/ubuntu/catalogo-70k.json',
+  path.join(os.homedir(), 'movie-cosecha-app.json'),
+  path.join(os.homedir(), 'catalogo-70k.json'),
+];
+const MOVIE_COSECHA_META = [
+  path.join(carpetaArchivos(), 'catalogo-70k.json.checkpoint.json'),
+  '/tmp/catalogo-70k.json.checkpoint.json',
+  path.join(carpetaArchivos(), 'catalogo-70k.checkpoint.json'),
+  '/tmp/catalogo-70k.checkpoint.json',
+  path.join(DATA_DIR, 'catalogo-70k.checkpoint.json'),
+];
+function movieCosechaEstado() {
+  let mejor = null, mejorMtime = 0;
+  for (const ruta of MOVIE_COSECHA_RUTAS) {
+    try {
+      const st = fs.statSync(ruta);
+      if (!st || st.size < 2) continue;
+      if (st.mtimeMs <= mejorMtime) continue;
+      const j = JSON.parse(fs.readFileSync(ruta, 'utf8'));
+      const arr = Array.isArray(j) ? j : (Array.isArray(j.items) ? j.items : (Array.isArray(j.result) ? j.result : null));
+      let n = 0, ejemplo = [];
+      if (arr) { n = arr.length; ejemplo = arr.slice(0, 2).map((x) => x && (x.vod_name || x.title || x.titulo || '')).filter(Boolean); }
+      else if (j && typeof j === 'object') {
+        const keys = Object.keys(j).filter((k) => /^\d+$/.test(k));
+        if (keys.length) { n = keys.length; ejemplo = keys.slice(0, 2).map((k) => j[k] && (j[k].nombre || j[k].vod_name || '')).filter(Boolean); }
+        else if (typeof j.total === 'number') n = j.total;
+      }
+      mejor = { ruta, bytes: st.size, mtime: st.mtime.toISOString(), total: n, ejemplo };
+      mejorMtime = st.mtimeMs;
+    } catch {}
+  }
+  let meta = null;
+  for (const ruta of MOVIE_COSECHA_META) {
+    try {
+      const j = JSON.parse(fs.readFileSync(ruta, 'utf8'));
+      if (j && typeof j.pos === 'number') { meta = { pos: j.pos, hits: j.hits || 0, ruta }; break; }
+      if (j && typeof j.nextId === 'number') { meta = { pos: j.nextId, hits: j.hits || j.encontrados || 0, ruta }; break; }
+      if (j && typeof j.siguiente === 'number') { meta = { pos: j.siguiente, hits: j.hits || j.total || 0, ruta }; break; }
+    } catch {}
+  }
+  // también intenta leer el log de la cosecha si existe
+  let log = null;
+  try {
+    const txt = fs.readFileSync('/tmp/cosecha.log', 'utf8');
+    const lineas = txt.trim().split('\n').slice(-1)[0] || '';
+    if (lineas) log = lineas.slice(0, 180);
+  } catch {}
+  return { archivo: mejor, meta, log, rango: '1000→70000', nota: mejor ? 'cosecha en curso (info_new secuencial)' : 'aún sin archivo — la cosecha arranca en bg' };
+}
 function movieCargarCaidas() {
   try {
     const st = fs.statSync(MOVIE_CAIDAS_RUTA);
@@ -1853,6 +1910,7 @@ async function daniLista(slug) {
   eps.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep);
   DANI_FEEDS.set(slug, { at: Date.now(), eps });
   console.log('[dani] ' + slug + ': ' + eps.length + ' episodios en ' + (partes.length - 1) + ' temporadas (HTTP)');
+  try { if (eps.length) precargarIntroDeSerie(eps.map((e) => ({ url: e.url }))); } catch {} // v223
   return eps;
 }
 function htmlDecode(s) { return String(s || '').replace(/&#(\d+);/g, (m2, d2) => String.fromCharCode(+d2)).replace(/&amp;/g, '&').replace(/&#215;/g, '×').trim(); }
@@ -2176,6 +2234,7 @@ async function refrescarSerieCuevana(slug) {
     };
     serieCache.set(slug, { at: Date.now(), d: out });
     cacheGuardar('serieCache', () => [...serieCache.entries()]); /* v111: a disco */
+    try { if (out.episodios && out.episodios.length) precargarIntroDeSerie(out.episodios.map((e) => ({ url: e.url }))); } catch {} // v223: auto-intro al entrar
     return out;
   } catch { return null; }
 }
@@ -2244,6 +2303,7 @@ async function datosAnimeLatanime(slug) {
     };
     serieCache.set('latanime:' + slug, { at: Date.now(), d: outL });
     cacheGuardar('serieCache', () => [...serieCache.entries()]); /* v111: a disco */
+    try { if (outL.episodios && outL.episodios.length) precargarIntroDeSerie(outL.episodios.map((e) => ({ url: e.url }))); } catch {} // v223
     return outL;
   } catch { return null; }
 }
@@ -2390,7 +2450,17 @@ async function serieCtxFromUrl(u) {
     return null;
   } catch { return null; }
 }
-
+// v223: cada vez que alguien entra a una serie (serieCtx), disparar intro al instante (mejor intro posible, casi al momento)
+const _serieCtxFromUrl_orig = serieCtxFromUrl;
+serieCtxFromUrl = async function(u) {
+  const sc = await _serieCtxFromUrl_orig(u);
+  if (sc && sc.eps && sc.eps.length) {
+    try { precargarIntroDeSerie(sc.eps); } catch {}
+    // también para la barra de estado /api/intros más viva
+    try { const urlS = String(u||''); if (urlS) dispararDeteccionIntroSiToca(urlS); } catch {}
+  }
+  return sc;
+};
 /* v128: SALTO AUTOMÁTICO al terminar un episodio (nativo) — busca el
  * siguiente vivo (brincando hasta 3 caídos), lo deja PAUSADO con «Toca
  * para empezar» y lo anuncia en el chat. Lo dispara el «ended» del video
@@ -2915,13 +2985,31 @@ function programarPrefetchEp(room) {
 function precargarIntroDeSerie(eps) {
   try {
     const urls = (eps || []).map((e) => e && e.url).filter(Boolean);
-    if (urls.length < 2) return;
+    if (!urls.length) return;
     const ks = introKeysDe(urls[0]);
-    if (!ks.serie || (INTROS[ks.serie] && INTROS[ks.serie].by === 'auto')) return;
+    if (!ks.serie) return;
+    // v223: si ya se aprendió bien, no repetir; pero si es manual o no existe, re-detectar cada vez que alguien entra (mejor intro posible)
+    if (INTROS[ks.serie] && INTROS[ks.serie].by === 'auto' && Date.now() - (INTROS[ks.serie].at || 0) < 24 * 3600 * 1000) return;
     if (introJobAtascado(ks.serie)) INTRO_JOBS.delete(ks.serie); /* v185 */
     if (!fpcalcOk() || INTRO_JOBS.has(ks.serie)) return;
-    if (Date.now() - (INTRO_INTENTOS.get(ks.serie) || 0) < 6 * 3600 * 1000) return;
+    // v223: ventana de enfriamiento más corta cuando el usuario entra activamente (1h en vez de 6h)
+    if (Date.now() - (INTRO_INTENTOS.get(ks.serie) || 0) < 1 * 3600 * 1000) return;
     detectarIntroSerie(ks.serie, urls.slice(0, 3));
+  } catch {}
+}
+function dispararDeteccionIntroSiToca(urlEp) {
+  try {
+    const ks = introKeysDe(urlEp);
+    if (!ks.serie) return;
+    if (INTROS[ks.serie] && INTROS[ks.serie].by === 'auto' && Date.now() - (INTROS[ks.serie].at || 0) < 12 * 3600 * 1000) return;
+    if (introJobAtascado(ks.serie)) INTRO_JOBS.delete(ks.serie);
+    if (!fpcalcOk() || INTRO_JOBS.has(ks.serie)) return;
+    if (Date.now() - (INTRO_INTENTOS.get(ks.serie) || 0) < 1 * 3600 * 1000) return;
+    // toma hasta 3 episodios de la serie si los tenemos en serieCtxFromUrl
+    serieCtxFromUrl(urlEp).then((sc) => {
+      const urls = sc && sc.eps && sc.eps.length ? sc.eps.map((e) => e.url).slice(0, 3) : [urlEp];
+      detectarIntroSerie(ks.serie, urls);
+    }).catch(() => { try { detectarIntroSerie(ks.serie, [urlEp]); } catch {} });
   } catch {}
 }
 
@@ -3748,7 +3836,7 @@ async function handleAction(req, res, body) {
           });
           if (nat) {
             if (mirrors.has(room.code)) stopMirror(room).catch(() => {});
-            room.videoUrl = urlNat; programarPrefetchEp(room);
+            room.videoUrl = urlNat; programarPrefetchEp(room); try { dispararDeteccionIntroSiToca(urlNat); } catch {}
             const idYT = idYoutubeDe(urlNat); /* v164: título real del video si la instancia lo dio */
             room.videoTitle = String((idYT && YT_TITULOS.get(idYT)) || action.title || guessTitle(urlNat)).slice(0, 80);
             room.videoImg = String(action.img || '').slice(0, 400);
@@ -5665,6 +5753,7 @@ async function refrescarDatosLacartoons(lct) {
     cacheGuardar('cariDatos', () => [...cariDatos.entries()]);
     if (poster || cover) cariMeta.set(lct.slug, { at: Date.now(), titulo: out.titulo, poster, cover });
     cacheGuardar('cariMeta', () => [...cariMeta.entries()]);
+    try { if (out.episodios && out.episodios.length) precargarIntroDeSerie(out.episodios.map((e) => ({ url: e.url }))); } catch {} // v223
     return out;
   } catch { return null; }
 }
@@ -5740,6 +5829,7 @@ async function refrescarDatosCaricatura(slug) {
     cacheGuardar('cariDatos', () => [...cariDatos.entries()]); /* v111: a disco */
     if (h1 || poster) cariMeta.set(slug, { at: Date.now(), titulo: out.titulo, poster: out.poster, cover });
     cacheGuardar('cariMeta', () => [...cariMeta.entries()]); /* v111 */
+    try { if (out.episodios && out.episodios.length) precargarIntroDeSerie(out.episodios.map((e) => ({ url: e.url }))); } catch {} // v223
     return out;
   } catch { return null; }
 }
@@ -9629,12 +9719,13 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, rooms: list, srvVersion: UI_VERSION });
     }
     if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION, introCrawl: { pend: CRAWL.pend.length, hechas: CRAWL.hechas || 0, total: CRAWL.total || 0 }, laMuertas: LA_MUERTAS_SET.size, gpOcultas: GP_OCULTAS_SET.size, pxdOcultas: PXD_OCULTAS.size, afOcultas: AF_OCULTAS.size }); /* v122+190+v205.2 */
-    if (url.pathname === '/api/intros') { /* v205.3: estado del rastreador — v205.4: en navegador pinta el PANEL; ?json=1 o curl → JSON */
+    if (url.pathname === '/api/intros') { /* v205.3: estado del rastreador — v205.4: en navegador pinta el PANEL; ?json=1 o curl → JSON; v223: + cosecha Movie */
       const SITIOS = { dani: 'Caricaturas', mm: 'Caricaturas', lct: 'Cartoons', la: 'Anime', af: 'AnimeFLV', cv: 'Cuevana' };
       const muestra = Object.entries(INTROS).slice(0, 40).map(([k, v]) => {
         const p = k.split(':');
         return { sitio: SITIOS[p[0]] || p[0], serie: (p[1] || '').replace(/-/g, ' ').replace(/\b[a-z]/g, (c) => c.toUpperCase()).slice(0, 40), temporada: p[2] || '?', inicio: v.start, fin: v.end, via: v.by || 'auto' };
       });
+      const cosecha = movieCosechaEstado();
       const datos = {
         ok: true,
         episodiosAnalizados: CRAWL.hechas || 0,
@@ -9643,18 +9734,22 @@ const server = http.createServer(async (req, res) => {
         introsAprendidas: Object.keys(INTROS).length,
         seriesSinIntro: (CRAWL.sinIntro || []).length,
         muestra,
+        cosecha,
+        titulosEncontrados: cosecha && cosecha.archivo ? cosecha.archivo.total : 0,
+        titulosCheckpoint: cosecha && cosecha.meta ? cosecha.meta.hits : 0,
       };
       if (!/text\/html/i.test(req.headers.accept || '') || url.searchParams.get('json') === '1') return json(res, 200, datos);
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
       return res.end(panelHtml());
     }
-    if (url.pathname === '/api/estado') { /* v205.4: todo el estado en un JSON para el panel */
+    if (url.pathname === '/api/estado') { /* v205.4: todo el estado en un JSON para el panel; v223: + cosecha */
       const SITIOS2 = { dani: 'Caricaturas', mm: 'Caricaturas', lct: 'Cartoons', la: 'Anime', af: 'AnimeFLV', cv: 'Cuevana' };
       const muestra = Object.entries(INTROS).slice(0, 60).map(([k, v]) => {
         const p = k.split(':');
         return { sitio: SITIOS2[p[0]] || p[0], serie: (p[1] || '').replace(/-/g, ' ').replace(/\b[a-z]/g, (c) => c.toUpperCase()).slice(0, 40), temporada: p[2] || '?', inicio: v.start, fin: v.end };
       });
       const mem = process.memoryUsage();
+      const cosecha = movieCosechaEstado();
       return json(res, 200, {
         ok: true,
         version: UI_VERSION,
@@ -9665,6 +9760,7 @@ const server = http.createServer(async (req, res) => {
         intros: { analizados: CRAWL.hechas || 0, total: CRAWL.total || 0, enCola: CRAWL.pend.length, aprendidas: Object.keys(INTROS).length, sinIntro: (CRAWL.sinIntro || []).length, muestra },
         moderacion: { animesMuertos: LA_MUERTAS_SET.size, animesCastDup: LA_OCULTAS_SET.size, gopelis: GP_OCULTAS_SET.size, pelisxd: PXD_OCULTAS.size, animeflv: AF_OCULTAS.size, cuevana: CV_OCULTAS_RT.size, novelas: NV_OCULTAS.size, protegidas: CV_PROTEGIDAS.size, epsOcultos: EPS_MUERTOS.size, fallosEnCurso: [FALLOS_GP, FALLOS_PXD, FALLOS_AF, FALLOS_CV, FALLOS_NV, EPS_FALLOS].reduce((a2, mm2) => a2 + [...mm2.values()].filter((x2) => x2.f >= 1 && !x2.h).length, 0) },
         catalogos: { caricaturas: cariFeedCache.items.length, cartoons: cariFeedCache.toons.length, liveaction: cariFeedCache.live.length, danimados: DANI_CAT.size, animes: LA_TODOS.size, novelas: nvdCache.items.length },
+        cosecha,
         movie: (() => { /* v207: estado del mapa local del app Movie */
           movieRecargar();
           const seriesM = [...MOVIE.series.values()].map((s) => ({
@@ -9932,6 +10028,14 @@ function panelHtml() {
 
   <div class="grid" id="cards"></div>
 
+  <h2><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38e08a" stroke-width="2" stroke-linecap="round"><path d="m2 12a10 10 0 0 0 10 10M22 12a10 10 0 0 1-10 10"/><circle cx="12" cy="12" r="3"/></svg> Cosecha Movie (catálogo real · info_new)</h2>
+  <div class="card">
+    <div class="barra"><i id="cosechaBarra" style="width:0%"></i></div>
+    <div class="barra-txt"><span id="cosechaTxt"></span><span id="cosechaPct"></span></div>
+    <div class="chips" id="cosechaChips"></div>
+    <div style="color:#9d93b5;font-size:11px;margin-top:8px" id="cosechaRuta"></div>
+  </div>
+
   <h2><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38e08a" stroke-width="2" stroke-linecap="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3Z"/></svg> Rastreador de intros</h2>
   <div class="card">
     <div class="barra"><i id="introBarra" style="width:0%"></i></div>
@@ -9970,6 +10074,16 @@ function panelHtml() {
     document.getElementById('introPct').textContent = pct + '%';
     document.getElementById('introChips').innerHTML =
       chip('ok', 'Intros aprendidas', ii.aprendidas) + chip('warn', 'Series sin intro', ii.sinIntro) + chip('', 'En cola', ii.enCola);
+    const co = d.cosecha || {};
+    const totCo = co.archivo ? co.archivo.total : 0;
+    const posCo = co.meta ? co.meta.pos : 0;
+    const hitsCo = co.meta ? co.meta.hits : 0;
+    const pctCo = posCo ? Math.min(100, Math.round((posCo - 1000) / 69000 * 100)) : 0;
+    document.getElementById('cosechaBarra').style.width = pctCo + '%';
+    document.getElementById('cosechaTxt').textContent = totCo ? totCo.toLocaleString('es') + ' títulos encontrados' : (hitsCo ? hitsCo + ' títulos' : 'aún sin datos');
+    document.getElementById('cosechaPct').textContent = posCo ? 'id ' + posCo.toLocaleString('es') + ' / 70k · ' + pctCo + '%' : '';
+    document.getElementById('cosechaChips').innerHTML = co.archivo ? chip('ok', 'Catálogo', totCo) + chip('', 'Hit', hitsCo || totCo) + chip('', 'Pos', posCo || '—') : chip('warn', 'En curso', '1000→70000');
+    document.getElementById('cosechaRuta').textContent = co.archivo ? (co.archivo.ruta + ' · ' + (co.archivo.bytes/1024).toFixed(1) + ' KB · ' + (co.log || '')) : (co.nota || '');
     const mo = d.moderacion;
     document.getElementById('modChips').innerHTML =
       chip('bad', 'Animes muertos', mo.animesMuertos) + chip('warn', 'Animes cast/dup', mo.animesCastDup) +
