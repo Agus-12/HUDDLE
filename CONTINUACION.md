@@ -5,6 +5,30 @@
 > las herramientas del repo, lo descartado (para no repetirlo) y el plan que sigue.
 > Este archivo sigue siendo la bitácora cronológica.
 
+## ACTUALIZACIÓN — 19 SEP 2026 (v230): Vía A instrumentada y bloque listo para Oracle
+
+**Hecho en este chat (v230, sin pedirte nada técnico):**
+- Verificado que tu repo sigue en **c2bd48c (v229)** y que el otro chat no subió nada nuevo. Todo al día.
+- Leídos completos: CONTINUACION.md (1.569 líneas) + los 5 informes de auditorías.
+- **Módulo del SDK re-generado y verificado** (3.391.425 B, 18.996 textos): plantillas en 0x27f311/0x27f319 y sim_md5 en 0x07a92d ya visibles en /tmp/pphls_inflado.bin. Comprobado que el intérprete 0xeff80–0xf2300 decodifica 2.272 instrucciones ARM64 (no es el módulo, es la VM).
+- **Nueva herramienta Vía A: `auditorias/crack/instrumentar-interprete.py`** — el "interceptor del hash" que pide PLAN-LLAVE-CDN.md §5:
+  - `--demo` (ya probado aquí): simula el hook de sim_md5 y verifica cualquier llave contra las 8 muestras reales con las 13 formas de firma. Con la llave correcta, el hook capturará `llave+ruta+wsTime` tal cual y su MD5 coincidirá con el wsSecret capturado.
+  - `--vivo` (con Unicorn, probado con budget 10 y 80): carga libpp_hls.so, corre JNI_OnLoad, hookea el intérprete 0xeff80–0xf2300 y cada ffi_call (0xf5088/0xf4764). Confirma que la VM corre (862 opcodes, strings A101S...), descifra textos, pero se frena en "métodos nativos registrados: 0" por JNIEnv incompleto — justo donde el hook debe volcar el buffer firmado. El script deja el pseudocódigo del hook y lanza emu_hls.py para demostrarlo.
+  - `--oraculo`: arma la URL firmada para un pedacito frío y te dice el curl exacto para PROBAR la llave en Oracle (PLAN §7: 200 = llave buena, 403 = mala).
+- **Probado aquí sin Oracle:** `python3 auditorias/crack/instrumentar-interprete.py --demo` → ninguna de las llaves fijas es la del CDN (ya sabido). Con una llave falsa de prueba, el buffer y su MD5 se vuelcan correctamente. El modo --vivo encuentra el intérprete y las plantillas sin error.
+
+**Qué sigue (en este orden, como pediste):**
+1. **Llave CDN (Vía A, ahora):** corre el hook vivo con el JNIEnv completo y, cuando capture un buffer, verifícalo con --demo y con el oráculo frío.
+2. **Envoltorio SHOK:** necesitamos el cuerpo crudo de UNA petición get_sys_conf de tu captura. Ya no hace falta molestar al amigo ni usar el puerto 8080: usa lo que ya tienes en Oracle (4 .pcap + ~/sslkeylogfile.txt).
+3. Catálogo grande (485 únicos medidos, techo de invitado), medir completitud y solo entonces presentar reproducción completa.
+
+**BLOQUE PARA ORACLE (pega tal cual, en Oracle):**
+```bash
+cd ~/huddle && python3 scripts/ver-llamadas-app.py ~/captura-sign.pcap --paths=get_sys_conf
+```
+Copia TODA la salida (donde pone ENVIA y RECIBE) y pégala aquí. Esa salida trae el bloque SHOK que necesitamos para descifrar el envoltorio. Si ~/captura-sign.pcap no es la que tiene la llamada, prueba con las otras tres (~/captura-movie.pcap, ~/captura-sintls.pcap, ~/captura-nueva.pcap) — misma orden, cambia solo el nombre del .pcap.
+
+
 ## URGENTE — 19 SEP 2026 (noche, v227): EL CATÁLOGO GRANDE SE ABRE POR GÉNEROS
 
 Se leyó en la captura descifrada **el cuerpo real que la app manda a `search/screen`**:
