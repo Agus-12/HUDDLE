@@ -5,6 +5,21 @@
 > las herramientas del repo, lo descartado (para no repetirlo) y el plan que sigue.
 > Este archivo sigue siendo la bitácora cronológica.
 
+## ACTUALIZACIÓN — 19 SEP 2026 (v233): Catálogo medido en vivo — 485 títulos (techo de invitado)
+
+**Hecho en este chat (v233, con API viva y Unicorn instalado):**
+- Releído todo el repo (441 de `channel/get_info` vs 485 de `search/screen`).
+- Instalado `unicorn 2.1.4 + pyelftools + capstone` y verificado que `emu_hls.py` carga `libpp_hls.so` y corre el intérprete `0xeff80–0xf2300` (862 opcodes, strings A101S...), se frena en "métodos nativos 0" por JNIEnv incompleto — el hook de Vía A queda listo para volcar `sim_md5`.
+- **Cosecha del catálogo en vivo (invitado, sin cuenta):**
+  - `python3 auditorias/crack/cosechar-generos.py` (barrido 38 géneros + 8 áreas + cruce género×área, `psize=20`, `is_random=1`)
+  - `type_id=1` → **236 títulos** (140 iniciales + 96 nuevos por género/área)
+  - `type_id=2` → **485 títulos únicos totales** (219 de tipo 1 + 266 de tipo 2, deduplicados por `id`)
+  - Segunda pasada `género×área` ya no aporta (0 nuevos) → **techo de invitado confirmado**.
+  - Guardado en `auditorias/catalogo-generos-485.json` (100 KB, 485 fichas con `vod_name`, `vod_year`, `vod_pic`, `vod_tag`) y en `~/catalogo-generos.json` para el siguiente chat.
+- **Conclusión honesta (regla del repo):** con invitado no salen los 70.000. Para el catálogo grande hace falta **token de cuenta** (`--token TOKEN_DEL_AMIGO` en el mismo script) o la captura real del amigo navegando el catálogo (PCAPdroid + `sslkeylogfile.txt` → `ver-llamadas-app.py` muestra el `type`/`area` real que usa la app). Sin ese token/captura, no se promete catálogo completo.
+- Todo queda en GitHub para que el siguiente chat no repita el barrido.
+
+
 ## ACTUALIZACIÓN — 19 SEP 2026 (v232): SHOK descifrado — era AES con la llave de la API
 
 **Hecho en este chat (v232, con tu captura):**
