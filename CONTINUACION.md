@@ -21,9 +21,15 @@ Se leyó en la captura descifrada **el cuerpo real que la app manda a `search/sc
   El bloque 1 es **el mismo en toda la sesión** (84 caracteres base64 = **61 bytes binarios**;
   no es múltiplo de 16 ⇒ **no es AES**, parece firma/identificador de sesión). El bloque 2 solo
   aparece en algunas claves (`p2p_config`) y es más largo. Pedir esos nombres **en claro**
-  (`conf_key1`, `conf_key2`, `m3u8_key`, `hls_key`, `wsSecret`, `cdn_key`, `secret`, `sign_key`,
+  (conf_key1, conf_key2, m3u8_key, hls_key, wsSecret, cdn_key, secret, sign_key,
   `device_encrypt_key`, `resource_md5_prefix`…) devuelve **vacío**: solo `vod_tags`, `ad_appid`
   y `p2p_config` traen datos. Pendiente: descifrar el bloque 2.
+  **Comprobado el 19-sep (v228.1): la marca `SHOK` no está escrita en el APK.** Se barrió todo:
+  12 `classes*.dex`, todas las `lib/*/*.so` (incluidas `libpp_hls.so` y `libjiagu_sdk_pp_hlsProtected.so`),
+  `assets/*` (`pp_hlsProtected.dat`) y los recursos; ni `SHOK` literal, ni en minúsculas, ni tras
+  probar XOR de una tecla. Tampoco aparece `conf_key` dentro de los `.so` (solo en `classes2/7/8.dex`).
+  ⇒ El envoltorio lo arma el SDK nativo con su **tabla de textos cifrada**; el camino no es `strings`
+  sino **volcar esa tabla** (la misma vía que ya usaba `emu_hls.py`).
 - **`vod_tags` = la lista de géneros de la app** (`conf_key=vod_tags` → `动作,喜剧,恐怖`).
   El cosechador de catálogo debe iterar esos nombres exactos (español con acentos + chino).
 - **Manual de la llave (video completo): `auditorias/PLAN-LLAVE-CDN.md`** — estado, evidencia,

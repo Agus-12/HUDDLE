@@ -199,6 +199,12 @@ en un Android con root) y la Vía C (puente: reusar los pases capturados, que du
   `conf_key=<nombre>SHOK<bloque1>SHOK<bloque2>`. El bloque 1 es constante por sesión (61 bytes,
   no es AES: parece firma de sesión); el 2 solo aparece en `p2p_config`. Pedir esos nombres en claro
   devuelve vacío (solo `vod_tags`, `ad_appid` y `p2p_config` traen datos).
+  **Comprobado el 19-sep: la marca `SHOK` NO está escrita en ninguna parte del APK** (barrido
+  completo: 12 dex, todas las `lib/*/*.so`, `assets/*` incluido `pp_hlsProtected.dat`; ni literal,
+  ni en minúsculas, ni con XOR de una tecla). Tampoco aparece `conf_key` dentro de los `.so`, solo
+  en `classes2/7/8.dex`. ⇒ El envoltorio lo construye (o lo interpreta) el SDK nativo con su tabla
+  de textos cifrada (`libpp_hls.so`); para descifrar el bloque 2 hay que **volcar esa tabla de textos**
+  (misma vía que `emu_hls.py`), no buscar la marca con `strings`.
 - **`conf_key=vod_tags`** devuelve la **lista de géneros de la app** (chino: `动作,喜剧,恐怖`):
   el cosechador de catálogo debe iterar esos nombres exactos.
 
