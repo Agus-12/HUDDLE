@@ -1693,6 +1693,7 @@ const CATALOGOS = {
   caricaturas: { titulo: 'Caricaturas', color: 'var(--cyan)', d: '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/>' },
   cartoons: { titulo: 'Cartoons', color: 'var(--amber)', d: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>' },
   liveaction: { titulo: 'Live Action', color: 'var(--green)', d: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
+  movie: { titulo: 'Movie (catálogo completo)', color: 'var(--pink)', d: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="m17 2-5 5-5-5"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/>' }, /* v221: apartados reales de la app */
   novelas: { titulo: 'Movie', color: 'var(--pink)', d: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="m17 2-5 5-5-5"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/>' }, /* v206 · v213: renombrado — aquí vive el catálogo Movie */
   danimados: { titulo: 'Caricaturas', color: 'var(--cyan)', d: '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/>' },
 };

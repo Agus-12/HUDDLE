@@ -1,6 +1,36 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
-## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (madrugada, 2ª): v220.1 — BÚSQUEDA DE LLAVE CON MÁS FÓRMULAS
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (madrugada, 3ª): v221 — EL CATÁLOGO COMPLETO EN HUDDLE
+
+**Los apartados reales de la app (medidos contra la API viva):**
+`type/get_list` da 2 tipos (1 Películas, 2 Novela) y `channel/get_list` da los canales
+225 Inicio, 230 Telenovela, 226 Películas, 227 Series, 228 Animación. Juntando
+`channel/get_info` de 226/230/227/228 se obtienen **441 títulos distintos** (Películas
+159, Telenovelas 86, Series 94, Animación 102) — muy lejos de las 24 tarjetas del home.
+La **paginación de la API sigue ignorándose** (probados 10 nombres de parámetro:
+page, page_no, pageNo, p, offset, start, limit, page_num, pageindex, last_id — todos
+devuelven los mismos 20). Por eso el catálogo infinito aún no es posible; lo que sí
+hay es lo que la app muestra en sus filas.
+
+**v221:** `/api/movie/catalogo` (diagnóstico por apartado) y `/api/catalogo/movie`
+(el catálogo de 441 títulos con **paginación propia de 24** en el servidor, caché de
+10 min). El botón «Ver todo» de la fila Movie ahora abre ese catálogo y cada tarjeta
+trae su apartado en el subtítulo («Películas · 2026»). Probado con navegador real:
+441 títulos, al bajar carga la página 2 (24 → 48), y una tarjeta abre su ficha con
+«Parte 1 · Latino».
+
+**Reproducibilidad por apartado hoy (muestra de 12 títulos por apartado):**
+Películas 50 %, Series 25 %, Animación 17 %, Telenovelas 8 %. Depende de la caché del
+borde; con la llave Wangsu pasa a ~100 % de todo.
+
+**Otra vía probada y descartada:** pedir el mismo título a **otros bordes de
+CloudFront** con el nombre correcto (`--resolve movievn.j5t2n.com:80:<IP>`, 60 IPs de
+`ip-ranges.json`) — ningún borde ajeno tiene los títulos fríos. La caché es de ESE
+borde (el que usa la app como respaldo).
+
+---
+
+## ACTUALIZACIÓN ANTERIOR — 19 SEP 2026 (madrugada, 2ª): v220.1 — BÚSQUEDA DE LLAVE CON MÁS FÓRMULAS
 
 El cazador de texto ahora prueba **muchas más formas** de armar la firma: 6 órdenes
 (llave+ruta+tiempo y sus permutaciones), 7 formas de la parte de la ruta (ruta pelada,

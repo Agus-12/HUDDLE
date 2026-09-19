@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v220'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v221'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1087,6 +1087,45 @@ async function mapiTarjetasHome() {
   } catch { return []; }
 }
 
+/* v221: EL CATÁLOGO COMPLETO DE MOVIE, POR APARTADOS (como en la app):
+   Películas, Telenovelas, Series y Animación. La API los entrega en
+   /api/channel/get_info (channel_id); se juntan, se deduplican y se cachean
+   10 minutos. OJO: la paginación de la API sigue sin resolverse, así que esto
+   es lo que la app muestra en sus filas (cientos de títulos), no el catálogo
+   infinito. */
+const MOVIE_SECCIONES = { canales: [[226, 'Películas'], [230, 'Telenovelas'], [227, 'Series'], [228, 'Animación']], datos: null, at: 0 };
+async function mapiSecciones() {
+  if (MOVIE_SECCIONES.datos && Date.now() - MOVIE_SECCIONES.at < 10 * 60 * 1000) return MOVIE_SECCIONES.datos;
+  const out = []; const vistos = new Set();
+  for (const [canal, nombre] of MOVIE_SECCIONES.canales) {
+    const j = await mapiLista('/api/channel/get_info', 'channel_id=' + canal).catch(() => null);
+    const items = [];
+    const visitar = (nodo) => {
+      if (!nodo || typeof nodo !== 'object') return;
+      if (Array.isArray(nodo)) { nodo.forEach(visitar); return; }
+      const vi = nodo.vod_info || nodo;
+      const vid = vi && (vi.id || vi.vod_id);
+      if (vi && vi.vod_name && vid) {
+        const k = String(vid);
+        if (!vistos.has(k)) {
+          vistos.add(k);
+          items.push({
+            title: String(vi.vod_name), url: 'https://movie.huddle/v/' + k,
+            img: vi.vod_pic || '/carita.png', site: 'Movie',
+            extra: nombre + (vi.vod_year ? ' · ' + vi.vod_year : ''),
+          });
+        }
+      }
+      if (nodo.block_list) visitar(nodo.block_list);
+      for (const k2 of ['vod_list', 'banner_list', 'list']) if (nodo[k2]) visitar(nodo[k2]);
+    };
+    visitar((j && j.result) || null);
+    out.push({ canal, nombre, items });
+  }
+  MOVIE_SECCIONES.datos = out; MOVIE_SECCIONES.at = Date.now();
+  console.log('[movie] catálogo por apartados: ' + out.map((x) => x.nombre + ' ' + x.items.length).join(' | '));
+  return out;
+}
 function movieCargarCaidas() {
   try {
     const st = fs.statSync(MOVIE_CAIDAS_RUTA);
@@ -8734,6 +8773,14 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(rr.status, { 'Content-Type': esTs ? 'video/MP2T' : (ct || 'application/octet-stream'), 'Cache-Control': 'public, max-age=3600' });
         return res.end(buf);
       }
+      if (url.pathname === '/api/movie/catalogo') { /* v221: apartados reales de la app */
+        const secs = await mapiSecciones();
+        return json(res, 200, {
+          ok: true,
+          total: secs.reduce((a, s2) => a + s2.items.length, 0),
+          secciones: secs.map((s2) => ({ canal: s2.canal, nombre: s2.nombre, n: s2.items.length, ejemplo: s2.items.slice(0, 5).map((x) => ({ titulo: x.title, vod: x.url.split('/').pop(), poster: !!x.img })) })),
+        });
+      }
       if (url.pathname === '/api/movie/espejos') { /* v217: ¿qué espejo responde DESDE Oracle? */
         const muestras = ['/vod/1/2026/09/11/9db1ede34113/index5.m3u8', '/vod/1/2023/10/27/30b34531976d/index5.m3u8', '/vod/1/2026/08/21/04bb8c7acbe2/index5.m3u8', '/vod/1/2025/09/05/3f3d30681b1b/index5.m3u8'];
         const medir = async (href) => {
@@ -8863,6 +8910,13 @@ const server = http.createServer(async (req, res) => {
         return { ok: true, pag, por, total: items.length, mas: ini + por < items.length, items: items.slice(ini, ini + por) };
       };
       try {
+        if (tipo === 'movie' || /^movie-\d+$/.test(tipo)) { /* v221: catálogo completo Movie por apartados */
+          const secs = await mapiSecciones();
+          const elegidas = /^movie-(\d+)$/.test(tipo) ? secs.filter((x) => String(x.canal) === tipo.slice(6)) : secs;
+          const items = [];
+          for (const sec of elegidas) for (const it of sec.items) items.push(it);
+          return json(res, 200, Object.assign(trozo(items), { secciones: secs.map((x) => ({ canal: x.canal, nombre: x.nombre, n: x.items.length })) }));
+        }
         if (tipo === 'pelis') { const r = await catCv('movies', pag); return json(res, 200, { ok: true, pag, por: 20, items: r.items, mas: r.mas }); }
         if (tipo === 'series') { const r = await catCv('series', pag); return json(res, 200, { ok: true, pag, por: 20, items: r.items, mas: r.mas }); }
         if (tipo === 'animes') { const r = await catAnimes(pag); return json(res, 200, { ok: true, pag, por: 24, items: r.items, mas: r.mas }); }
