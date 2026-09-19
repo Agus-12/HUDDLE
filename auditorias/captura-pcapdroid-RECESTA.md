@@ -226,3 +226,11 @@ el descifrado es EN VIVO y el PCAP plano que exporta el Exportador TCP ya lleva 
 payload descifrado. Vía final confirmada: addon + Reglas de descifrado (app Movie) +
 Exportador TCP → recibidor 47823 (probado desde el sandbox: acepta y libera ✔) +
 Bloquear QUIC=Siempre. Recibidor corriendo (pid 135097).
+
+
+## 19 sep ~02:10 — el 47823 bloqueado en la red del amigo; recibidor movido al 443
+
+El teléfono del amigo no pudo conectar a 47823 ("failed to connect"), aunque desde el
+sandbox el puerto SÍ acepta (probado 2 veces). Bloqueo de salida en la red del amigo.
+Recibidor reiniciado con PCAP_PORT=443 (salida casi nunca bloqueada). El amigo cambia
+"Puerto del colector" a 443.
