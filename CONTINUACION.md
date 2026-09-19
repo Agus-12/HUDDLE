@@ -115,6 +115,26 @@ Probado: extrae y valida bien (Zox correctamente rechazada como llave CDN).
 COMANDO ÚNICO PARA EL USUARIO: `cd ~/huddle && bash actualizar.sh && bash scripts/buscar-llave-cdn.sh`
 Si dice "LLAVE ENCONTRADA": reproducción completa inmediata de todo el catálogo Movie.
 Si dice "sin llave": queda el RE MIPS (gp-rel) como única vía.
+### 📺 v213+v214 (19 sep ~12:30–13:00) — PESTAÑA "Movie" Y FILA ARRIBA DEL HOME
+
+v213: pestaña del catálogo renombrada de "Novelas" a "Movie" (CATALOGOS.novelas.titulo).
+v214: la fila `#nvdBox` (movieApi + novelas) SE MUEVE en index.html a justo después de
+"Continuar viendo" (antes quedaba enterrada bajo series/caricaturas y el usuario nunca
+la veía sin scrollear) y su encabezado del home también dice "Movie". UI_VERSION=v214.
+Verificado desde sandbox: Oracle sirve app.js con `titulo: 'Movie'` y /api/trending con
+movieApi (24 portadas reales). El usuario no la veía por caché del navegador + fila
+enterrada; con v214 aparece PRIMERO en el home. Push 9916eea.
+
+**Cacería de la llave CDN — CERRADA por vías baratas (19 sep ~12:40):** la llave Wangsu
+NO está en el PCAP (sin resource_md5_prefix; el app no usó p2p en esa sesión), NO viene
+por HTTP (mapa completo del volcado = solo rutas conocidas), NO está en dex/MIPS/ELF
+(RE agotado), sin espejos sin firma (subdominios j5t2n 403; 4j4damaqa muerto; sha1/sha256
+negativos). El m3u8 firmado trae segmentos RELATIVOS sin firmar → el app firma cada .ts
+al vuelo en el teléfono. Única vía restante: mini-captura nueva del amigo (addon ya
+instalado) cazando el canal que entrega el prefijo (probable: UDP plano del tracker
+47.253.51.203:7202), o RE MIPS con angr/unicorn (coste alto). Diario completo en
+`auditorias/captura-pcapdroid-RECESTA.md`.
+
 ### 🧭 ESTADO PARA REANUDAR EN CHAT NUEVO (19 sep ~12:15)
 
 **Qué se logró hoy (19 sep):**
