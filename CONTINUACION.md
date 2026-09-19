@@ -60,6 +60,36 @@ terna lo resuelve en segundos (prueba 12 candidatos × 6 órdenes × 7 formatos)
 `captura_sign.py` guarda el cuerpo de info_new en `~/captura-sign.jsonl`; después:
 `python3 auditorias/crack/resolver_sign.py --jsonl ~/captura-sign.jsonl` en Oracle.
 
+### 🏆 19 SEP ~09:30 — CANDADO TOTAL ABIERTO (content-type) + v211 en server.js
+
+EL ERROR CHINO NO ERA HUELLA TLS NI SECRETO: era la AUSENCIA de la cabecera
+`content-type: application/x-www-form-urlencoded`. Con ella, TODA la API responde
+desde cualquier cliente/IP (urllib y node probados SIN huella okhttp).
+
+Fórmulas finales (verificadas contra 3 firmas reales del amigo):
+- sign body: `MD5("Zox882LYjEn4Rqpa" + device_id + vod_id + cur_time_ms).upper()`
+- sign cabecera: `MD5("47Q8tBqO4YqrMHf4" + device_id + cur_time_ms).upper()`
+- token: `POST /api/public/init` → `result.user_info.token`
+- respuesta: base64 → AES-128-CBC (key 0123456789123456 / iv 2015030120123456)
+- video: `result.vod_collection[].vod_url` = m3u8 CDN plano (type 2=doblaje latino, 1=sub)
+
+Script verificado: `auditorias/crack/info_new_vivo.py`.
+
+**v211 en server.js** (rutas nuevas, probadas en sandbox contra API viva):
+- `/api/movie/v-ficha?vod=ID` → ficha completa + partes + video por proxy
+- `/api/movie/v-populares` → hot_search (40 títulos con vod_id)
+- `/api/movie/v-lista?type=N` → search/screen (primera vitrina; paginación PENDIENTE)
+- `/api/movie/v-vid?url=` → proxy CDN (allowlist *.j5t2n.com; reescribe m3u8; propaga errores)
+PENDIENTE: (a) búsqueda por texto — parámetros de /api/search/result desconocidos
+(grep 'search' en ~/http2-descifrado.txt de Oracle los revelaría si el amigo buscó);
+(b) paginación del catálogo (jadx no la resolvió; probar cursores last_id/vod_id);
+(c) UI del tab que consuma v-ficha/v-populares; (d) comprobar que el CDN j5t2n
+responde 200 DESDE ORACLE (el sandbox recibe 403; Oracle por verificar).
+
+Cadena que lo logró (guardada en auditorias/captura-pcapdroid-RECESTA.md):
+PCAPdroid (addon mitm) + Exportador TCP→8080 (recibidor) = PCAP 111 MB +
+PCAPdroid entregó sslkeylogfile.txt (TLS1.3) → tshark `-Y http2` con keylog →
+3 POST info_new reales → fórmula derivada.
 ### 🧭 ESTADO PARA REANUDAR EN CHAT NUEVO (19 sep ~12:15)
 
 **Qué se logró hoy (19 sep):**

@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v207'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v211'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -967,6 +967,64 @@ const MOVIE_ORIGEN = (process.env.MOVIE_ORIGEN || 'http://147.124.216.142').repl
 const MOVIE_MAPA_RUTA = process.env.MOVIE_MAPA || path.join(os.homedir(), 'movie-mapa-secuencias.json');
 const MOVIE_CAIDAS_RUTA = process.env.MOVIE_CAIDAS || path.join(os.homedir(), 'movie-rutas-caidas.json');
 const MOVIE = { mtimeMs: 0, cargado: false, series: new Map(), porEp: new Map(), caidas: new Map(), caidasMs: 0, avisoFalta: false };
+
+/* ================= v211: MOVIE API EN VIVO — candado abierto (19 sep 2026) =========
+ * El "error chino" NO era huella TLS ni llave secreta: era la ausencia de la cabecera
+ * `content-type: application/x-www-form-urlencoded`. Con ella puesta, la API completa
+ * responde desde cualquier cliente/IP (probado con urllib y con node).
+ *   sign de cabecera: MD5("47Q8tBqO4YqrMHf4" + dev + ts).upper()
+ *   sign del body   : MD5("Zox882LYjEn4Rqpa" + dev + vod_id + ts).upper()
+ *   token           : POST /api/public/init -> result.user_info.token
+ *   respuesta       : base64 -> AES-128-CBC (key 0123456789123456, iv 2015030120123456)
+ *   video           : result.vod_collection[].vod_url (m3u8 CDN plano);
+ *                     type 2 = doblaje latino (regla de la casa: preferir 2, luego 1). */
+const MAPI_HOST = 'https://surfclick.vd7au6.com';
+const MAPI_DEV = '687564646c653031'; /* "huddle01" en hex: identidad fija de este servidor */
+const MAPI_SEC = 'Zox882LYjEn4Rqpa';
+const MAPI = { tok: '', tokMs: 0 };
+function mapiDesc(txt) {
+  try {
+    const raw = Buffer.from(txt, 'base64');
+    const d = crypto.createDecipheriv('aes-128-cbc', Buffer.from('0123456789123456'), Buffer.from('2015030120123456'));
+    return JSON.parse(Buffer.concat([d.update(raw), d.final()]).toString('utf8'));
+  } catch { return null; }
+}
+async function mapiPedir(ruta, body) {
+  const ts = String(Date.now());
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 20000);
+  try {
+    const r = await fetch(MAPI_HOST + ruta, {
+      method: 'POST', body, signal: ctl.signal,
+      headers: {
+        'app_id': 'movievn', 'version': '40000', 'sys_platform': '2', 'device_id': MAPI_DEV,
+        'channel_code': 'movievn_sh_1000', 'cur_time': ts,
+        'sign': crypto.createHash('md5').update('47Q8tBqO4YqrMHf4' + MAPI_DEV + ts).digest('hex').toUpperCase(),
+        'token': MAPI.tok, 'user-agent': 'okhttp/4.12.0',
+        'content-type': 'application/x-www-form-urlencoded',
+      },
+    });
+    return mapiDesc(await r.text());
+  } catch { return null; } finally { clearTimeout(t); }
+}
+async function mapiToken() {
+  if (MAPI.tok && Date.now() - MAPI.tokMs < 6 * 3600e3) return MAPI.tok;
+  const j = await mapiPedir('/api/public/init', 'device_id=' + MAPI_DEV + '&channel_code=movievn_sh_1000');
+  const tok = j && j.result && j.result.user_info && j.result.user_info.token;
+  if (tok) { MAPI.tok = tok; MAPI.tokMs = Date.now(); }
+  return MAPI.tok || '';
+}
+async function mapiFicha(vodId) {
+  await mapiToken();
+  const ts = String(Date.now());
+  const sign = crypto.createHash('md5').update(MAPI_SEC + MAPI_DEV + vodId + ts).digest('hex').toUpperCase();
+  return mapiPedir('/api/vod/info_new', 'vod_id=' + vodId + '&cur_time=' + ts + '&sign=' + sign + '&audio_type=0');
+}
+async function mapiLista(ruta, body) { await mapiToken(); return mapiPedir(ruta, body); }
+function mapiUrlLatina(col) {
+  col = Array.isArray(col) ? col : [];
+  for (const t of [2, 1]) for (const c of col) if (c && c.type === t && c.vod_url) return { url: c.vod_url, type: t };
+  return col[0] && col[0].vod_url ? { url: col[0].vod_url, type: col[0].type } : null;
+}
 
 function movieCargarCaidas() {
   try {
@@ -8392,6 +8450,61 @@ const server = http.createServer(async (req, res) => {
       d.episodios = epsVivos(d.episodios); /* v205.5 */
       return json(res, 200, d);
     }
+      if (url.pathname === '/api/movie/v-ficha') { /* v211: ficha EN VIVO de la API Movie (catalogo completo) */
+        const vod = (url.searchParams.get('vod') || '').replace(/[^0-9]/g, '');
+        if (!vod) return json(res, 400, { ok: false, error: 'Falta vod' });
+        const j = await mapiFicha(vod);
+        if (!j || j.code !== 10000 || !j.result) return json(res, 502, { ok: false, error: 'La API Movie no respondió — intenta luego' });
+        const r = j.result;
+        const col = (r.vod_collection || []).map((c) => ({
+          titulo: String(c.title || ''), tipo: c.type, duracion: c.duration || '',
+          url: '/api/movie/v-vid?url=' + encodeURIComponent(c.vod_url || ''),
+        }));
+        const lat = mapiUrlLatina(r.vod_collection);
+        return json(res, 200, {
+          ok: true, vod: r.id, titulo: r.vod_name, poster: r.vod_pic || '/carita.png',
+          sinopsis: r.vod_blurb || '', anno: r.vod_year || '', idioma: r.vod_lang || '',
+          tags: r.vod_tag || '', score: r.vod_douban_score || 0, actores: r.vod_actor || '',
+          video: lat ? '/api/movie/v-vid?url=' + encodeURIComponent(lat.url) : '',
+          partes: col,
+        });
+      }
+      if (url.pathname === '/api/movie/v-populares') { /* v211: lo más visto en la app Movie */
+        const j = await mapiLista('/api/search/hot_search', '');
+        const lista = (j && j.code === 10000 && Array.isArray(j.result)) ? j.result : [];
+        return json(res, 200, { ok: true, items: lista.slice(0, 40).map((x) => ({ vod: x.vod_id, titulo: x.vod_name, poster: x.pic || '', anno: x.vod_year || '', clicks: x.click_count || 0 })) });
+      }
+      if (url.pathname === '/api/movie/v-lista') { /* v211: vitrina por tipo (1=pelis, 2=series, 230 telenovela…) */
+        const tipo = (url.searchParams.get('type') || '1').replace(/[^0-9]/g, '');
+        const j = await mapiLista('/api/search/screen', 'type_id=' + tipo);
+        const lista = (j && j.code === 10000 && Array.isArray(j.result)) ? j.result : [];
+        return json(res, 200, { ok: true, items: lista.slice(0, 40).map((x) => ({ vod: x.vod_id || x.id, titulo: x.vod_name, poster: x.vod_pic || '', anno: x.vod_year || '' })) });
+      }
+      if (url.pathname === '/api/movie/v-vid') { /* v211: proxy del CDN plano de Movie (allowlist j5t2n) */
+        const u = url.searchParams.get('url') || '';
+        let pu; try { pu = new URL(u); } catch { return json(res, 400, { ok: false, error: 'url inválida' }); }
+        if (!/\.j5t2n\.com$/.test(pu.hostname)) return json(res, 403, { ok: false, error: 'dominio no permitido' });
+        const ctl = new AbortController(); const tt = setTimeout(() => ctl.abort(), 30000);
+        let rr;
+        try { rr = await fetch(u, { headers: { 'User-Agent': FETCH_UA }, signal: ctl.signal }); }
+        catch { clearTimeout(tt); return json(res, 502, { ok: false, error: 'CDN no respondió' }); }
+        const ct = (rr.headers.get('content-type') || '').toLowerCase();
+        const buf = Buffer.from(await rr.arrayBuffer()); clearTimeout(tt);
+        if (rr.status !== 200 && rr.status !== 206) return json(res, 502, { ok: false, error: 'CDN dijo ' + rr.status });
+        if (ct.includes('mpegurl') || /index5?\.m3u8/i.test(pu.pathname)) {
+          const base = u.slice(0, u.lastIndexOf('/') + 1);
+          const out = buf.toString('utf8').split('\n').map((ln) => {
+            const l = ln.trim();
+            if (!l || l.startsWith('#')) return ln;
+            const abs = /^https?:/i.test(l) ? l : base + l;
+            return '/api/movie/v-vid?url=' + encodeURIComponent(abs);
+          }).join('\n');
+          res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl', 'Cache-Control': 'no-store' });
+          return res.end(out);
+        }
+        res.writeHead(rr.status, { 'Content-Type': ct || 'video/mp2t', 'Cache-Control': 'public, max-age=3600' });
+        return res.end(buf);
+      }
       if (url.pathname === '/api/movie/probar') { /* v207: diagnóstico — comprueba m3u8 + primer .ts de cada ruta activa contra el origen */
         movieRecargar();
         const probarUno = async (u, conRango) => {
