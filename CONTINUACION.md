@@ -17,8 +17,18 @@ Se leyó en la captura descifrada **el cuerpo real que la app manda a `search/sc
 - Géneros que responden (español): Acción, Comedia, Terror/Choque, Drama, Suspenso, Animación,
   Aventura, Fantasía, Guerra, Familia, Historia, Deportes. En chino: 恐怖, 科幻, 犯罪, 纪录片,
   奇幻, 悬疑, 剧情, 惊悚, 音乐 (varios en español dan 0: probar su variante china).
-- Pendiente: envoltorio `SHOK` de `get_sys_conf` (los cuerpos llegan como
-  `valorSHOK<base64>SHOK<base64>`; descifrarlo puede esconder material de llave).
+- **Hallazgo `SHOK`** (noche del 19-sep): la app manda `conf_key=<nombre>SHOK<bloque1>SHOK<bloque2>`.
+  El bloque 1 es **el mismo en toda la sesión** (84 caracteres base64 = **61 bytes binarios**;
+  no es múltiplo de 16 ⇒ **no es AES**, parece firma/identificador de sesión). El bloque 2 solo
+  aparece en algunas claves (`p2p_config`) y es más largo. Pedir esos nombres **en claro**
+  (`conf_key1`, `conf_key2`, `m3u8_key`, `hls_key`, `wsSecret`, `cdn_key`, `secret`, `sign_key`,
+  `device_encrypt_key`, `resource_md5_prefix`…) devuelve **vacío**: solo `vod_tags`, `ad_appid`
+  y `p2p_config` traen datos. Pendiente: descifrar el bloque 2.
+- **`vod_tags` = la lista de géneros de la app** (`conf_key=vod_tags` → `动作,喜剧,恐怖`).
+  El cosechador de catálogo debe iterar esos nombres exactos (español con acentos + chino).
+- **Manual de la llave (video completo): `auditorias/PLAN-LLAVE-CDN.md`** — estado, evidencia,
+  muestras reales, el oráculo de pedacito frío, la Vía A (emulador + interceptar el hash),
+  la Vía B (Frida) y la Vía C (puente con los pases capturados, que duran días y son por archivo).
 - **Medición real**: barrido completo → **485 títulos únicos** (236 de tipo 1 + 266 de tipo 2)
   contra 441 de los canales. **Techo del invitado ~ unos cientos**; solo type_id 1 y 2 responden.
   Para los 70k hace falta **cuenta** (`--token` en el cosechador) o una vía nueva.
