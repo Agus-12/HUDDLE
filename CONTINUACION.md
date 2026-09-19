@@ -1,6 +1,27 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
-## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (noche, 2ª): v219 — EL BUG DEL PLAY ERA DE HUDDLE, NO DEL CDN
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (noche, 3ª): v219.2 — BUG DEL CAZADOR ARREGLADO
+
+**El cazador de bytes leía 0 paquetes**: mi lector solo entendía enlace tipo 1
+(Ethernet) y las capturas de PCAPdroid son **tipo 101 (IP cruda)** — ya soporta
+101/12/14/228 (IP cruda), 1 (Ethernet) y 113/276 (Linux cooked), con olfateo si el
+tipo es raro. Ahora hace tres fases: UDP del rastreador → resto del UDP → **barrido
+exhaustivo de TODO el archivo** (cubre TCP/TLS/cualquier cosa). Medido: 40 MB sin
+llave = ~90 s; con la llave = instantáneo. Probado con capturas sintéticas de los
+dos formatos (positiva cruda y negativa).
+
+**Lo que dijo la captura del amigo (39.5 MB):** 7 ternas firmadas reales, `.ts`
+mencionado 366 veces, **25 paquetes del rastreador 47.253.51.203** (¡por fin hay
+tráfico del rastreador, antes 0!), y `resource_md5_prefix: 0` como texto. La llave
+no apareció en la búsqueda de texto: la de bytes es la que falta correr con la
+versión nueva.
+
+**Pendiente humano (una línea en Oracle):**
+`bash scripts/buscar-llave-cdn.sh ~/captura-nueva.pcap`
+
+---
+
+## ACTUALIZACIÓN ANTERIOR — 19 SEP 2026 (noche, 2ª): v219 — EL BUG DEL PLAY ERA DE HUDDLE, NO DEL CDN
 
 **Los dos errores que veía el usuario, reproducidos y arreglados (v219):**
 1. En **Solo** salía «URL no válida»: `/api/solo` exigía URL absoluta
