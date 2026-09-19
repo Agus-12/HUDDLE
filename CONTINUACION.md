@@ -39,7 +39,51 @@ Después de resolver reproducción: audio siempre latino, comprobar por ASR o es
 
 ---
 
-## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (día): DENTRO DE LA FIRMA (v223.3-v223.6)
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (tarde, v223.7-v223.9): FIRMAS NUEVAS Y MINERO DE CAPTURAS
+
+**El usuario consiguió (gracias):**
+- Oracle tiene **4 capturas**: `captura-movie.pcap` (667 MB), `captura-sign.pcap` (116 MB),
+  `captura-sintls.pcap` (220 MB), `captura-nueva.pcap` (41 MB, ya minada).
+- Hay **`~/sslkeylogfile.txt`** en Oracle.
+- `scripts/ver-urls-cdn.py` sobre `captura-nueva.pcap`: **7 URLs firmadas** de la carpeta
+  `65328ba10998` (18-sep), todas con respuesta 200 → el teléfono SÍ reproduce ese título.
+
+**Probador offline con las 8 muestras reales** (`auditorias/crack/probar_wssecret_multi.py`):
+- 222 822 candidatas (todas las cadenas del APK + módulos + constantes del proyecto) ×
+  3 formas de ruta × 12 plantillas → **sin resultado**. La llave no está como texto en el APK.
+- `probar_wssecret.py` (1 muestra) y `barrido_llave.c` (tramos de bytes: 605 millones de
+  pruebas) ya habían fallado antes.
+
+**Hallazgos nuevos del desensamblado:**
+- `m3u8_key` **no es configuración**: es una RUTA del servidor interno del reproductor
+  (`request 'm3u8_key' missing param 'resource'`), igual que `control` (`verify`, `up_ck`,
+  `download_info`), `resource.m3u8` y `ts`. Es decir: la llave vive dentro del SDK y se
+  consulta en el propio teléfono.
+- Fórmula confirmada por las plantillas: el texto firmado es `A + B + wsTime` (`%s%s%x`),
+  con MD5 disponible dentro del módulo (tabla en 0x229af0, IVs en 0x2323f0).
+
+**Sonda del backend arreglada:** `verificar_api.py` daba «backend CAÍDO» en falso porque no
+mandaba la **cabecera `sign`**. Con ella: `surfclick.vd7au6.com` → code 10000 ✅ VIVO.
+
+**Nuevo minero:** `scripts/minar-capturas.sh <capturas...>` — saca TODAS las URLs firmadas de
+cada captura (por trozos, sin cargar 667 MB en memoria), cuenta los rastros del servidor
+interno (`127.0.0.1`, `msg=verify`, `m3u8_key`, `resource.m3u8`) y guarda
+`~/muestras-wssecret.json` para el probador offline.
+
+**Emulador del otro chat (`emu_hls.py`):** corre con Unicorn (instalar `pyelftools`,
+`capstone`, `unicorn`) pero termina en **«metodos nativos registrados: 0»**: la VM ejecuta
+bytecode y descifra textos (se ven nombres tipo `A101S9v63mXfa`), pero no llega a
+`RegisterNatives`. Falta completar el JNIEnv de juguete. **Aparcado** hasta tener más
+material. La lib original se extrae a `/home/user/apk-trabajo/lib/` (no se sube al repo).
+
+**Otras vías cerradas hoy:** los frontales de otras marcas (`idbbu`, `phbbu`, `frbbu`,
+`ptbbu`) responden con el mismo marcador `https://www.freecine.cn/` en `info_web_get`
+(la vía web sigue muerta); `c=getts` sobre el CDN devuelve el mismo m3u8 (no hay endpoint
+de tiempo que firme).
+
+---
+
+## ACTUALIZACIÓN ANTERIOR — 19 SEP 2026 (día): DENTRO DE LA FIRMA (v223.3-v223.6)
 
 **Lo que el otro chat dejó y sirve:** `auditorias/INFORME-TECNICO-APK-Y-CATALOGO.md`,
 `auditorias/crack/` con su **emulador Unicorn** (`emu_hls.py`, `emu_jiagu.py`), las
