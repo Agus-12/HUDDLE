@@ -1,6 +1,35 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
-## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (madrugada, 3ª): v221 — EL CATÁLOGO COMPLETO EN HUDDLE
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (madrugada, 4ª): QUÉ BUSCAMOS Y CÓMO SE PROBARÍA
+
+**Lo que la API NO da (probado ahora, para no repetirlo):**
+- `/vod/info_new` con `is_down`, `down`, `is_download`, `need_sign`, `sign_type`, `type`,
+  `quality` → **siempre la misma URL sin firmar**.
+- Endpoints `vod/get_down_url`, `vod/down_url`, `vod/get_play_url`, `vod/get_url`,
+  `vod/play_url`, `vod/get_collection`, `vod/info`, `vod/get_vod_url` → **error1**
+  (no existen). Conclusión: **el CDN NO entrega enlaces firmados por la API; la firma la
+  hace el teléfono**. La llave vive en el APK.
+
+**El APK nuevo (V4.0.0) ya está descargado y desempacado aquí:**
+- `assets/pp_hlsProtected.dat` (27 KB, 1981-01-01) empieza con el magic
+  `*#*#0123456789ES9876543210#*#*` seguido de bloques de 8 caracteres aparentemente
+  cifrados (no hay texto legible salvo el magic). Ahí puede estar la config VIVA.
+- `lib/arm64-v8a/libpp_hls.so` (2.9 MB) **no tiene ni una cadena en claro**
+  (`device_encrypt_key`, `wsSecret`, `resource_md5_prefix` → 0 menciones): sigue
+  protegida. Descifrar `pp_hlsProtected.dat` es el siguiente camino real.
+
+**Oráculo de llave (útil, ya montado):** firmar un pedacito **FRÍO** y pedirlo:
+si el CDN contesta 200, la llave es correcta. OJO con elegir bien qué está frío:
+`/vod/1/2026/09/02/4acbae6998e7/0010.ts` (The Runner) sigue 403 y sirve de control;
+el 0020 NO sirve (ya está en caché).
+
+**Caché dinámica (observado):** `ea2934872d4b` (Sin senos no hay paraíso) daba 403 hace
+un rato y ahora da 200, y el m3u8 de «Buddy» ya sale ⇒ el borde se va llenando con lo
+que otros ven en la app. Por eso la cobertura por título **cambia con el tiempo**.
+
+---
+
+## ACTUALIZACIÓN ANTERIOR — 19 SEP 2026 (madrugada, 3ª): v221 — EL CATÁLOGO COMPLETO EN HUDDLE
 
 **Los apartados reales de la app (medidos contra la API viva):**
 `type/get_list` da 2 tipos (1 Películas, 2 Novela) y `channel/get_list` da los canales
