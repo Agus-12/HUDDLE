@@ -5,6 +5,21 @@
 > las herramientas del repo, lo descartado (para no repetirlo) y el plan que sigue.
 > Este archivo sigue siendo la bitácora cronológica.
 
+## ACTUALIZACIÓN — 19 SEP 2026 (v232): SHOK descifrado — era AES con la llave de la API
+
+**Hecho en este chat (v232, con tu captura):**
+- **SHOK DESCIFRADO.** No era caja negra: es **AES-128-CBC con la misma llave de la API `0123456789123456`** y `iv = últimos 16 del header`. Estructura: `raw = base64_decode(bloque)`, `header = raw[:H]` (H=45 para p2p de 285 B, H=29 para conf_key1 de 61 B), `payload = raw[H:]` (múltiplo de 16), `iv = header[-16:]`. Probado en vivo con tus 3 bloques:
+  - `conf_key1` (84 b64 → 61 raw, H=45) → `": []}`  (el JSON vacío que devuelve el server para esa clave)
+  - `p2p_config` (380 b64 → 285 raw, H=45) → `": "[BASE]^backup_domain=http://147.124.216.142^sec_domain=null^ck_t=1^ck_tt=1^ck_p=0^ck=92b991dfcf878f362f6044f3d6e013255c0726617e4d17858890ecdab1d291c7^[P2P]^p2p_tracker_addr=47.253.51.203:7202^p2p_stunserver_addr=stun.l.google.com^"}` — **es EXACTAMENTE el p2p_config que ya conocíamos**, ahora descifrado del propio SHOK que mandó la app.
+- Eso confirma: **SHOK no trae la llave del CDN.** El SHOK es el envoltorio de la respuesta `get_sys_conf` que el cliente manda ya cifrado (el servidor solo lo valida). Por eso `ad_appid` va en claro y los demás van con SHOK.
+- **Herramienta nueva/actualizada:** `auditorias/crack/descifrar-shok.py` ahora descifra cualquier bloque SHOK automáticamente (prueba H=45/29/61, iv=header[-16:], key=012345...). Probado: `python3 auditorias/crack/descifrar-shok.py --b64 <bloque>` y `--envia "p2p_configSHOK...SHOK..."` ya sacan el p2p_config limpio.
+- **Siguiente paso real (sigue siendo la llave CDN, Vía A):** con SHOK ya entendido, el muro sigue siendo `wsSecret`. El hook del intérprete `0xeff80–0xf2300` + `sim_md5` (`auditorias/crack/instrumentar-interprete.py`) es el que debe volcar el `llave+ruta+wsTime` que aún no tenemos.
+
+**Qué sigue (en orden):**
+1. **Llave CDN (Vía A):** instrumentar intérprete y volcar buffer firmado → verificar con `instrumentar-interprete.py --demo` y oráculo frío (PLAN §7).
+2. **Catálogo grande:** con el p2p_config ya descifrado no hace falta pedir más SHOK; el catálogo sigue en 485 únicos con `cosechar-generos.py` hasta que tengas cuenta/token.
+3. **Medir y solo entonces presentar reproducción completa.**
+
 ## ACTUALIZACIÓN — 19 SEP 2026 (v230): Vía A instrumentada y bloque listo para Oracle
 
 **Hecho en este chat (v230, sin pedirte nada técnico):**
