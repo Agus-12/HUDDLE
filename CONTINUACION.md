@@ -1,6 +1,30 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
-## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (madrugada, 5ª): v222 — «SE VEN AHORA» + LO QUE FALTA PARA LOS 70K
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (madrugada, 6ª): DENTRO DEL APK (sin emulador)
+
+Desarmé el APK en el taller (el código Java SÍ se puede leer; solo el reproductor está
+protegido). Hallazgos:
+- La app es **com.movievn.cinevi** («Movie», v4.0.0).
+- Reproductor: **Wangsu PPHLS** (`com.pp.hls` con `load(...)` y `exec(...)` nativos) y
+  **P2P activado** (`is_p2p=1` en la API) ⇒ el teléfono saca los pedacitos también
+  entre pares, no solo del CDN.
+- `com.jiagu.sdk.pp_hlsProtected` es un **candado de textos**: `a(0)` devuelve el nombre
+  de la librería a cargar (`System.loadLibrary(...)`) y el archivo
+  `assets/pp_hlsProtected.dat` (27 KB, magic `*#*#0123456789ES9876543210#*#*`) es esa
+  **tabla de textos cifrados** — lo que el teléfono lee al arrancar.
+- **Los dominios del servicio NO están escritos en el APK** (buscados en todos los dex y
+  assets: no aparecen) ⇒ se arman en tiempo de ejecución o vienen dentro de esa tabla
+  cifrada. Igual la firma de los enlaces.
+- Nuevo script `scripts/ver-urls-cdn.py`: mira en una captura **qué URLs pidió el
+  teléfono** (ruta + parámetros), no llaves. Probado con captura sintética.
+
+**Nota del usuario (importante):** en OTRO chat ya logró avanzar montando un emulador de
+Android («androide de juguete») y diseccionando la app. Pedir lo que haya sacado (llave,
+enlace firmado o archivo) y verificarlo con el oráculo antes de repetir trabajo.
+
+---
+
+## ACTUALIZACIÓN ANTERIOR — 19 SEP 2026 (madrugada, 5ª): v222 — «SE VEN AHORA» + LO QUE FALTA PARA LOS 70K
 
 **v222 (nuevo):** Huddle mide DE VERDAD qué títulos se ven ahora (pide la lista de
 pedacitos y prueba inicio/mitad/final). Barra en el catálogo: «Se ven ahora: N completas,
