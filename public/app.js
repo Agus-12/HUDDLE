@@ -525,13 +525,20 @@ function montarNativo(porProxy) {
     if (!S.nativo) return;
     const hlsOk = !S.nativo.mp4 && okHls && window.Hls && window.Hls.isSupported();
     if (hlsOk) {
-      const hls = new window.Hls({ maxBufferLength: 30 });
+      const hls = new window.Hls(cfgHls(src));
       S.nativo.hls = hls;
       prefiereEspanol(v, hls); /* v94: audio español si lo hay */
+      hls.on(window.Hls.Events.FRAG_LOADED, () => { S.nativo && (S.nativo.saltosMovie = 0); }); /* v220 */
       /* v92: si el directo no sirve (CORS del origen), re-servimos por
        * el proxy — igual que el modo Solo */
       hls.on(window.Hls.Events.ERROR, (ev, data) => {
         if (!S.nativo || !data || !data.fatal) return;
+        /* v220: Movie — el pedacito que el CDN no tiene guardado: se salta y sigue */
+        if (esFlujoMovie(src)) {
+          if (saltarHuecoMovie(hls, v, S.nativo)) return;
+          toast('Ese tramo todavía no está guardado en el CDN — el resto de la peli sí se ve');
+          return;
+        }
         if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) {
           /* v99: se invierte el camino (directo↔proxy), con tope — igual
            * que el modo Solo: a veces goodstream raciona al servidor y el
@@ -565,6 +572,28 @@ function montarNativo(porProxy) {
     v.addEventListener('loadeddata', alListo, { once: true });
     setTimeout(alListo, 1500);
   });
+}
+/* v220: los títulos de Movie se sirven por nuestro proxy (/api/movie/…) y el
+ * CDN no tiene guardados TODOS los pedacitos: los que faltan dan 502. Antes eso
+ * tiraba el video y volvía al inicio; ahora se SALTA el hueco (30 s) y sigue. */
+function esFlujoMovie(url) { return /^\/api\/movie\//.test(String(url || '')); }
+function cfgHls(src) {
+  return esFlujoMovie(src)
+    ? { maxBufferLength: 30, fragLoadingMaxRetry: 2, fragLoadingRetryDelay: 500, manifestLoadingMaxRetry: 3 }
+    : { maxBufferLength: 30 };
+}
+function saltarHuecoMovie(hls, video, estado, aviso) {
+  const saltos = (estado.saltosMovie || 0) + 1;
+  estado.saltosMovie = saltos;
+  if (saltos > 8) return false; /* ya insistimos bastante: decide quien llamó */
+  const destino = Math.max(0, (video.currentTime || 0)) + 30;
+  toast(aviso || 'Ese pedacito no está guardado — salto 30 segundos');
+  try { clearTimeout(estado.tSaltoMovie); } catch {}
+  estado.tSaltoMovie = setTimeout(() => {
+    try { video.currentTime = destino; } catch {}
+    try { hls.startLoad(destino); } catch {}
+  }, 700);
+  return true;
 }
 function sincronizarNativo() {
   const v = $('#roomVideo');
@@ -3485,15 +3514,23 @@ function montarSolo(d, viaProxy) {
         if (SOLO && !SOLO.cerrado) { toast('Se cortó el video — vuelve a abrirlo'); cerrarSolo(); }
       }, { once: true });
     } else if (hlsOk) {
-      const hls = new window.Hls({ maxBufferLength: 30 });
+      const hls = new window.Hls(cfgHls(src));
       SOLO.hls = hls;
       prefiereEspanol(video, hls); /* v94: audio español si lo hay */
+      hls.on(window.Hls.Events.FRAG_LOADED, () => { if (SOLO) SOLO.saltosMovie = 0; }); /* v220 */
       /* v83: cuando llega el manifest sabemos qué calidades hay */
       hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
         try { $('#soloQ').textContent = 'Auto'; cerrarQMenuSolo(); pintarQMenuSolo(); } catch {}
       });
       hls.on(window.Hls.Events.ERROR, (ev, data) => {
         if (!SOLO || !data || !data.fatal) return;
+        /* v220: Movie — salta el pedacito que el CDN no tiene guardado */
+        if (esFlujoMovie(src)) {
+          if (saltarHuecoMovie(hls, video, SOLO, 'Ese pedacito no está guardado — salto 30 segundos')) return;
+          toast('Ese tramo todavía no está guardado en el CDN — el resto sí se ve');
+          try { hls.destroy(); } catch {}
+          return;
+        }
         /* v99: fallo de RED → se invierte el camino (directo↔proxy): el
          * token de goodstream puede venir amarrado a la IP del servidor
          * (el directo del usuario no sirve)… o al revés, goodstream anda

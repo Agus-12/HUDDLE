@@ -1,6 +1,31 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
-## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (noche, 3ª): v219.2 — BUG DEL CAZADOR ARREGLADO
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (madrugada): v220 — ADELANTAR YA NO REINICIA
+
+El usuario reportó: al adelantar una peli sale «Reconectando…» y **vuelve al inicio**
+(le pasa en The Runner; en Zona Cero no, y esa se ve excelente). **Causa medida:**
+el espejo solo entrega lo que tiene en caché (`x-cache: Hit`); si el pedacito pedido
+está frío, el borde responde 403 y nuestro proxy 502. Zona Cero: **30/30 primeros
+segmentos + 0100/0200/0300/0400 = 200** (completa). The Runner: **21/30** y el 0060,
+0200 → 403 (parcial, con huecos). El reproductor trataba ese 502 como error fatal y
+reiniciaba.
+
+**v220 (app.js):** en los dos reproductores (sala y Solo), si el flujo es nuestro
+(`/api/movie/…`) y un fragmento falla, **se salta el hueco 30 s y sigue** (hasta 8
+saltos, contador que se limpia cada vez que un fragmento carga). Ya no hay reinicio al
+inicio; si se agotan los saltos, avisa en claro que ese tramo no está guardado en el
+CDN. Además hls.js usa `fragLoadingMaxRetry: 2` para pelis de Movie (el salto es más
+rápido). Probado con navegador real: adelanto a 1:40 de The Runner → saltó los huecos
+y siguió reproduciendo en 4:26 sin reiniciar (15 segmentos 502 absorbidos).
+
+**Ojo:** esto NO arregla la falta de contenido — pone el comportamiento honesto y
+usable. La reproducción COMPLETA de un título depende de que sus segmentos estén en
+caché en el borde (los que el usuario probó completos: Zona Cero, y la mayoría de las
+24 tarjetas del inicio).
+
+---
+
+## ACTUALIZACIÓN ANTERIOR — 19 SEP 2026 (noche, 3ª): v219.2 — BUG DEL CAZADOR ARREGLADO
 
 **El cazador de bytes leía 0 paquetes**: mi lector solo entendía enlace tipo 1
 (Ethernet) y las capturas de PCAPdroid son **tipo 101 (IP cruda)** — ya soporta
