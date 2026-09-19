@@ -1,5 +1,11 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
+## INFORME TÉCNICO COMPLETO — 19 SEP 2026
+
+El detalle técnico público de la APK, el protocolo, el método de obtención del catálogo y la diferencia entre los **441 títulos comprobados** y las **70 000 todavía no obtenidas** está en `auditorias/INFORME-TECNICO-APK-Y-CATALOGO.md`. No afirmar que ya se descargaron 70 000: la API invitada solo entregó 441 y el catálogo grande requiere una captura real del teléfono, una cuenta con más contenido o el resultado verificable del otro chat con emulador.
+
+---
+
 ## CORTE PARA EL PRÓXIMO CHAT — 19 SEP 2026
 
 El repositorio ya contiene el historial técnico hasta `dc6eddb` (v223.1). Antes de repetir una cacería, revisar este corte y `auditorias/PROMPT-PARA-NUEVO-CHAT.md`.
