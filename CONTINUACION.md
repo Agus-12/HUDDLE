@@ -1,5 +1,44 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
+## INFORME TÉCNICO COMPLETO — 19 SEP 2026
+
+El detalle técnico público de la APK, el protocolo, el método de obtención del catálogo y la diferencia entre los **441 títulos comprobados** y las **70 000 todavía no obtenidas** está en `auditorias/INFORME-TECNICO-APK-Y-CATALOGO.md`. No afirmar que ya se descargaron 70 000: la API invitada solo entregó 441 y el catálogo grande requiere una captura real del teléfono, una cuenta con más contenido o el resultado verificable del otro chat con emulador.
+
+---
+
+## CORTE PARA EL PRÓXIMO CHAT — 19 SEP 2026
+
+El repositorio ya contiene el historial técnico hasta `dc6eddb` (v223.1). Antes de repetir una cacería, revisar este corte y `auditorias/PROMPT-PARA-NUEVO-CHAT.md`.
+
+### Estado que debe tomar como verdadero
+
+- El otro chat avanzó con un emulador de Android («androide de juguete»). El próximo chat debe pedir primero qué llave, enlace firmado, archivo o resultado obtuvo y validarlo con el oráculo. No repetir ingeniería inversa sin revisar ese material.
+- Oracle fue comprobado sirviendo `app.js?v=v222`; el repo tiene trabajo posterior v223/v223.1 que el usuario puede desplegar con `bash ~/huddle/actualizar.sh` desde Oracle.
+- v221 dejó 441 títulos medidos y paginación propia; v222 mide títulos completos, parciales y no disponibles. Sin llave Wangsu, algunos objetos funcionan solo cuando están en caché del espejo. Eso no equivale a catálogo completo.
+- El catálogo grande de unos 70 000 títulos y la búsqueda real siguen pendientes. La vía propuesta es capturar al amigo navegando el catálogo con Descifrado TLS y subir el PCAP junto con `sslkeylogfile.txt`.
+
+### Captura del amigo sin puerto 8080
+
+El error de PCAPdroid con 8080 pertenece a métodos antiguos. Para la captura nueva: apagar SOCKS5, proxy externo y Exportador TCP; elegir archivo local; no configurar `129.80.212.92:8080`; no hace falta desinstalar el addon.
+
+Hay dos objetivos distintos:
+
+1. **Catálogo grande:** si el addon ya está instalado, activar Descifrado TLS y la regla para Movie; iniciar captura; navegar varias pantallas del catálogo durante unos 2 minutos; detener; subir el PCAP a `http://129.80.212.92:3000/captura` y `sslkeylogfile.txt` a `http://129.80.212.92:3000/llaves`.
+2. **Llave del CDN:** iniciar captura normal sin 8080; abrir Movie; reproducir un video durante 2 minutos; detener; subir el `.pcap` a `/captura`. En Oracle ejecutar:
+
+```bash
+cd ~/huddle || exit 1
+bash scripts/buscar-llave-cdn.sh ~/captura-nueva.pcap
+```
+
+Las páginas `/captura` y `/llaves` son aliases de las rutas de subida. No subir PCAP, keylog, tokens, identificadores ni APK al repositorio público.
+
+### Audio y reglas permanentes
+
+Después de resolver reproducción: audio siempre latino, comprobar por ASR o escucha cuando haya duda, no integrar `Amar y Cuidar` ni `feec4d1e85fe`, conservar portadas del origen y usar `/carita.png` si fallan. Cada avance actualiza este archivo, se confirma con commit y se sube a `main`.
+
+---
+
 ## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (madrugada, 6ª): DENTRO DEL APK (sin emulador)
 
 Desarmé el APK en el taller (el código Java SÍ se puede leer; solo el reproductor está
