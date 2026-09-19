@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v221'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v222'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1126,6 +1126,67 @@ async function mapiSecciones() {
   console.log('[movie] catálogo por apartados: ' + out.map((x) => x.nombre + ' ' + x.items.length).join(' | '));
   return out;
 }
+/* v222: ¿este título se ve AHORA (y qué tan completo)? Se mide de verdad:
+   se pide su lista de pedacitos y se prueban 3 puntos (inicio, mitad, final).
+   3/3 = completa · 1-2 = parcial · 0 = todavía no. Resultado cacheado 30 min y
+   guardado en disco para que el escaneo se pueda reanudar. */
+const MOVIE_DISP = new Map();
+let movieDispArchivo = '';
+let movieDispCola = [], movieDispCorriendo = false, movieDispAt = 0;
+function movieDispRuta() { return path.join(carpetaArchivos(), 'movie-disponibles.json'); }
+function movieDispGuardar() {
+  try { fs.writeFileSync(movieDispRuta(), JSON.stringify({ at: Date.now(), items: [...MOVIE_DISP] })); } catch {}
+}
+function movieDispCargar() {
+  try {
+    const d = JSON.parse(fs.readFileSync(movieDispRuta(), 'utf8'));
+    for (const [k, v] of (d.items || [])) MOVIE_DISP.set(String(k), v);
+    movieDispAt = d.at || 0;
+  } catch {}
+}
+async function movieDispProbar(vod) {
+  const j = await mapiFicha(vod).catch(() => null);
+  const col = (j && j.result && j.result.vod_collection) || [];
+  const lat = mapiUrlLatina(col);
+  if (!lat) return { e: 'sin-video', at: Date.now() };
+  let pu; try { pu = new URL(lat.url); } catch { return { e: 'fria', at: Date.now() }; }
+  const base = pu.pathname.replace(/index5\.m3u8$/i, '');
+  const txt = await fetch('http://' + MOVIE_ESPEJOS[0] + base + 'index5.m3u8', { headers: { 'User-Agent': FETCH_UA } }).then((r) => (r.ok ? r.text() : '')).catch(() => '');
+  const segs = txt.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+  if (!segs.length) return { e: 'fria', at: Date.now() };
+  const n = segs.length;
+  const idxs = [0, Math.floor(n / 2), Math.max(0, n - 2)];
+  let ok = 0;
+  for (const i of idxs) {
+    const st = await fetch('http://' + MOVIE_ESPEJOS[0] + base + segs[i].split('?')[0], { headers: { 'User-Agent': FETCH_UA, Range: 'bytes=0-2047' } }).then((r) => r.status).catch(() => 0);
+    if (st === 200 || st === 206) ok++;
+  }
+  return { e: ok === 3 ? 'completa' : ok ? 'parcial' : 'fria', ok, de: 3, n, at: Date.now() };
+}
+async function movieDispTrabajador() {
+  if (movieDispCorriendo) return;
+  movieDispCorriendo = true;
+  try {
+    while (movieDispCola.length) {
+      const vod = String(movieDispCola.shift());
+      const viejo = MOVIE_DISP.get(vod);
+      if (viejo && Date.now() - viejo.at < 30 * 60 * 1000) continue;
+      const r = await movieDispProbar(vod).catch(() => ({ e: 'fria', at: Date.now() }));
+      MOVIE_DISP.set(vod, r);
+      if (movieDispCola.length % 10 === 0) movieDispGuardar();
+      await new Promise((z) => setTimeout(z, 250));
+    }
+  } finally {
+    movieDispCorriendo = false; movieDispAt = Date.now(); movieDispGuardar();
+    console.log('[movie] escaneo de disponibilidad terminado: ' + MOVIE_DISP.size + ' títulos medidos');
+  }
+}
+function movieDispResumen() {
+  const r = { completa: 0, parcial: 0, fria: 0, 'sin-video': 0 };
+  for (const v of MOVIE_DISP.values()) r[v.e] = (r[v.e] || 0) + 1;
+  return r;
+}
+movieDispCargar(); /* v222: mediciones guardadas del escaneo anterior */
 function movieCargarCaidas() {
   try {
     const st = fs.statSync(MOVIE_CAIDAS_RUTA);
@@ -8773,6 +8834,20 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(rr.status, { 'Content-Type': esTs ? 'video/MP2T' : (ct || 'application/octet-stream'), 'Cache-Control': 'public, max-age=3600' });
         return res.end(buf);
       }
+      if (url.pathname === '/api/movie/disponibles') { /* v222: qué se ve ahora (medido, no prometido) */
+        if (url.searchParams.get('escanear')) {
+          const secs = await mapiSecciones();
+          const ya = new Set(MOVIE_DISP.keys());
+          let puestos = 0;
+          for (const sec of secs) for (const it of sec.items) {
+            const v = String(it.url.split('/').pop());
+            if (!ya.has(v) && !movieDispCola.includes(v)) { movieDispCola.push(v); puestos++; }
+          }
+          movieDispTrabajador().catch(() => {});
+          return json(res, 200, { ok: true, encolados: puestos, enCola: movieDispCola.length, enCurso: movieDispCorriendo, resumen: movieDispResumen(), items: Object.fromEntries(MOVIE_DISP) });
+        }
+        return json(res, 200, { ok: true, medidos: MOVIE_DISP.size, enCurso: movieDispCorriendo, enCola: movieDispCola.length, actualizado: movieDispAt, resumen: movieDispResumen(), items: Object.fromEntries(MOVIE_DISP) });
+      }
       if (url.pathname === '/api/movie/catalogo') { /* v221: apartados reales de la app */
         const secs = await mapiSecciones();
         return json(res, 200, {
@@ -8911,6 +8986,18 @@ const server = http.createServer(async (req, res) => {
       };
       try {
         if (tipo === 'movie' || /^movie-\d+$/.test(tipo)) { /* v221: catálogo completo Movie por apartados */
+          /* v222: si las mediciones tienen más de 6 h, se re-escanea solo por detrás */
+          if (Date.now() - movieDispAt > 6 * 60 * 60 * 1000 && !movieDispCorriendo) {
+            mapiSecciones().then((secs) => {
+              const ya = new Set(MOVIE_DISP.keys());
+              let p2 = 0;
+              for (const sec of secs) for (const it of sec.items) {
+                const v = String(it.url.split('/').pop());
+                if (!ya.has(v) && !movieDispCola.includes(v)) { movieDispCola.push(v); p2++; }
+              }
+              if (p2) movieDispTrabajador().catch(() => {});
+            }).catch(() => {});
+          }
           const secs = await mapiSecciones();
           const elegidas = /^movie-(\d+)$/.test(tipo) ? secs.filter((x) => String(x.canal) === tipo.slice(6)) : secs;
           const items = [];

@@ -1,6 +1,39 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
-## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (madrugada, 4ª): QUÉ BUSCAMOS Y CÓMO SE PROBARÍA
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (madrugada, 5ª): v222 — «SE VEN AHORA» + LO QUE FALTA PARA LOS 70K
+
+**v222 (nuevo):** Huddle mide DE VERDAD qué títulos se ven ahora (pide la lista de
+pedacitos y prueba inicio/mitad/final). Barra en el catálogo: «Se ven ahora: N completas,
+M a medias de X medidos», etiqueta en cada tarjeta (✓ se ve / ~ a medias / ✗ aún no) y
+botón «Comprobar cuáles se ven». El escaneo se reanuda solo (6 h) y guarda resultados en
+`~/movie-disponibles.json`. Medición real en curso: de 99 medidos, 4 completas y 37 a
+medias (cambia con el tiempo porque la caché del borde se llena).
+
+**Sobre los 70 000 títulos del usuario: tiene razón, y sabemos por qué no los vemos.**
+Con la API de invitado (sin cuenta) TODAS las vías devuelven conjuntos fijos:
+`search/screen` type_id=1 → 20; type_id=2 → 20; `hot_search` → 10; `recommend` → 20;
+`channel/get_info` de los 5 canales → 441 únicos. Se probaron 10 nombres de parámetro de
+página, `class_id` (0-24), `area`, `year`, `sort`, `limit`, `key/wd/keyword/search_key/
+story/name/q` como término de búsqueda: **nada cambia la lista ni pagina** (la búsqueda
+ignora el texto). El catálogo grande sale con la CUENTA (la del amigo) o por un endpoint
+que no conocemos. **Vía propuesta:** captura de 2 min con el amigo NAVEGANDO el catálogo
+(sin reproducir) con Descifrado TLS + exportar `sslkeylogfile.txt`, y subir AMBOS archivos
+(páginas `/captura` y `/llaves` ya existen). Con la keylog se descifra la llamada real y
+se replica el endpoint exacto.
+
+**Llave Wangsu — lo descartado hoy (para no repetir):**
+- Oráculo montado y probado: firmar un pedacito FRÍO; si da 200, la llave es buena
+  (control: un pedacito en caché da 200 hasta con firma falsa). Fríos útiles:
+  `4acbae6998e7/0010.ts`, `548e12c6671a/index5.m3u8`.
+- 16 llaves conocidas del proyecto × 6 fórmulas × 2 hosts = **204 combinaciones: ninguna**.
+- Cabeceras del reproductor (Badci, Referer, Origin, UA, X-Forwarded-For) y firmas falsas:
+  **nada** (403 siempre en frío) ⇒ la firma se valida de verdad.
+- HTTPS al CDN: igual (403). `get_sys_conf`: 500 (conf_key inválido).
+- La API **no** entrega enlaces firmados (8 endpoints + 8 variantes de info_new: error1).
+
+---
+
+## ACTUALIZACIÓN ANTERIOR — 19 SEP 2026 (madrugada, 4ª): QUÉ BUSCAMOS Y CÓMO SE PROBARÍA
 
 **Lo que la API NO da (probado ahora, para no repetirlo):**
 - `/vod/info_new` con `is_down`, `down`, `is_download`, `need_sign`, `sign_type`, `type`,

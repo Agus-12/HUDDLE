@@ -12,6 +12,15 @@
 <link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#0a0713">
 <link rel="stylesheet" href="/style.css?v=122">
+<style>
+.cat-disp{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:6px 12px;font-size:12px;color:#cfd8dc;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.08)}
+.cat-disp.hidden{display:none}
+.disp-badge{position:absolute;top:6px;left:6px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;background:#111;color:#fff}
+.disp-completa{background:#1b5e20;color:#c8e6c9}
+.disp-parcial{background:#7a5c00;color:#ffe082}
+.disp-fria{background:#4e342e;color:#ffccbc}
+.sr-card{position:relative}
+</style>
 </head>
 <body>
 
@@ -245,6 +254,10 @@
               </button>
               <div id="catTitulo" class="cat-titulo"></div>
               <span id="catTotal" class="cat-total"></span>
+            </div>
+            <div id="catDisp" class="cat-disp hidden">
+              <span id="catDispTexto"></span>
+              <button id="catDispBtn" class="btn small ghost" type="button">Comprobar cuáles se ven</button>
             </div>
           </div>
           <div id="catScroll" class="sp-results">

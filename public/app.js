@@ -1714,9 +1714,61 @@ function abrirCatalogo(tipo, nombre) {
   $('#catScroll').querySelectorAll('.cat-loader').forEach((x) => x.remove());
   $('#catPage').classList.remove('hidden');
   $('#catScroll').scrollTop = 0;
+  const cajaDisp = document.querySelector('#catDisp');
+  if (cajaDisp) cajaDisp.classList.toggle('hidden', tipo !== 'movie');
+  if (tipo === 'movie') { cargarDisp(false); catDispVigilar(); } else { clearInterval(catDispTimer); }
   cargarCatPag();
 }
+/* v222: el botón «Comprobar» lanza la medición real en el servidor */
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#catDispBtn')) return;
+  toast('Comprobando cuáles se ven… puede tardar unos minutos');
+  cargarDisp(true).then(() => catDispVigilar());
+});
 
+/* v222: qué títulos se ven AHORA, medido por el servidor (no prometido) */
+let catDisp = null, catDispTimer = null, catDispTipo = '';
+async function cargarDisp(escanear) {
+  try {
+    const r = await fetch('/api/movie/disponibles' + (escanear ? '?escanear=1' : ''));
+    const d = await r.json();
+    if (!d || !d.ok) return;
+    catDisp = d;
+    pintarDisp();
+  } catch {}
+}
+function pintarDisp() {
+  const caja = document.querySelector('#catDisp');
+  const txt = document.querySelector('#catDispTexto');
+  const btn = document.querySelector('#catDispBtn');
+  if (!caja || !txt) return;
+  if (!catEstado || catEstado.tipo !== 'movie') { caja.classList.add('hidden'); return; }
+  caja.classList.remove('hidden');
+  const res = (catDisp && catDisp.resumen) || {};
+  const medidos = (catDisp && catDisp.medidos) || 0;
+  const enCurso = catDisp && (catDisp.enCurso || catDisp.enCola);
+  txt.textContent = medidos
+    ? ('Se ven ahora: ' + (res.completa || 0) + ' completas, ' + (res.parcial || 0) + ' a medias de ' + medidos + ' medidos' + (enCurso ? ' — comprobando…' : ''))
+    : 'Todavía no sabemos cuáles se ven.';
+  if (btn) btn.textContent = medidos ? (enCurso ? 'Comprobando…' : 'Volver a comprobar') : 'Comprobar cuáles se ven';
+  /* pintar las tarjetas que ya tengamos medidas */
+  const items = (catDisp && catDisp.items) || {};
+  document.querySelectorAll('#catGrid .sr-card').forEach((c) => {
+    const m = /\/v\/(\d+)$/.exec(c.dataset.url || '');
+    if (!m) return;
+    const info = items[m[1]];
+    c.querySelectorAll('.disp-badge').forEach((x) => x.remove());
+    if (!info) return;
+    const b = document.createElement('span');
+    b.className = 'disp-badge disp-' + info.e;
+    b.textContent = info.e === 'completa' ? '✓ se ve' : info.e === 'parcial' ? '~ a medias' : '✗ aún no';
+    if (!/^\/api\//.test(c.dataset.url || '')) c.appendChild(b);
+  });
+}
+function catDispVigilar() {
+  clearInterval(catDispTimer);
+  catDispTimer = setInterval(() => { if (catEstado && catEstado.tipo === 'movie') cargarDisp(false); else clearInterval(catDispTimer); }, 12000);
+}
 async function cargarCatPag() {
   const es = catEstado;
   if (!es || es.cargando || !es.hayMas) return;
@@ -1746,6 +1798,7 @@ async function cargarCatPag() {
         tocarFeedResultado(res);
       }));
     }
+    if (es.tipo === 'movie') pintarDisp(); /* v222: estado medido en cada tarjeta nueva */
   } else {
     es.hayMas = false;
     if (es.pag === 1) $('#catGrid').innerHTML = '<div class="sr-info">No pude cargar el catálogo — inténtalo luego</div>';
