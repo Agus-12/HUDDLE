@@ -3957,6 +3957,7 @@ async function cargarPopulares() {
     const filaNv = document.querySelector('#nvdRow');
     if (wrapNv && filaNv && d.movieApi && d.movieApi.length) { /* v212: vitrina viva de la API Movie al principio de la fila */
       d.movieApi.forEach((res) => filaNv.appendChild(crearTarjetaResultado(res, alTocar(res))));
+      wrapNv.classList.remove('hidden'); /* v215: mostrar la caja aunque el catálogo externo de novelas esté apagado */
     }
     if (wrapNv && filaNv && d.novelas && d.novelas.length) {
       d.novelas.forEach((res) => filaNv.appendChild(crearTarjetaResultado(res, alTocar(res))));
