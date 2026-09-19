@@ -263,3 +263,13 @@ Randoms del PCAP (f444dffc…, e3763b29…) presentes en el keylog ✔. 8087 paq
 tshark sin quejas pero 0 `http`: porque OkHttp negocia **h2** → el filtro correcto es
 `-Y http2`. (Nota: server.js corre como ROOT en Oracle: os.homedir()=/root; el POST de
 subir-llaves escribe a /root/sslkeylogfile.txt — hubo que copiarlo a ~/.)
+
+
+## 🎉🎉 19 sep ~09:10 — TLS DESCIFRADO: 3 POST info_new REALES EN MANO
+
+Filtro correcto `-Y http2`. Cayeron 3 fichas abiertas por el amigo:
+- vod_id=2106611381 cur_time=1789807525714
+- vod_id=562930699  cur_time=1789807580826
+- vod_id=1309804053 cur_time=1789807640588
+Falta extraer el `Form item: "sign"` y el `Header: device_id` (bloque grep siguiente).
+Con la terna → resolver_sign.py deriva fórmula+secreto → verificar en vivo con tls_client.
