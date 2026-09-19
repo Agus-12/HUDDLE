@@ -140,6 +140,12 @@ Fantasía, Musical, Misterio, Thriller, Anime dieron 0: **probar las variantes c
 Números de género en chino ya verificados que dan títulos: 恐怖 (terror), 科幻 (ciencia ficción),
 犯罪 (crimen), 纪录片 (documental), 奇幻 (fantasía), 悬疑, 剧情 (drama), 惊悚, 音乐 (música).
 
+**Medición hecha (19-sep, taller):** barrido completo de la lista de géneros → **236** (type_id=1) +
+**266** (type_id=2) = **485 títulos únicos**, contra los 441 de los canales. Es un avance real pero
+**moderado**: el techo del invitado está en unos cientos. Solo los `type_id` 1 y 2 responden a la
+búsqueda (3, 4, 5… dan 0). Para pasar de ahí hace falta **cuenta** (el token del amigo, que el
+cosechador acepta con `--token`).
+
 **Camino recomendado para el catálogo completo:**
 1. Sacar la lista de géneros de la propia app: `get_sys_conf` devuelve `vod_tags` (chino) y la
    app usa etiquetas en español; ampliar la lista con variantes (con acento / sin / chino).

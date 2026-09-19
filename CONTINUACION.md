@@ -19,6 +19,9 @@ Se leyó en la captura descifrada **el cuerpo real que la app manda a `search/sc
   奇幻, 悬疑, 剧情, 惊悚, 音乐 (varios en español dan 0: probar su variante china).
 - Pendiente: envoltorio `SHOK` de `get_sys_conf` (los cuerpos llegan como
   `valorSHOK<base64>SHOK<base64>`; descifrarlo puede esconder material de llave).
+- **Medición real**: barrido completo → **485 títulos únicos** (236 de tipo 1 + 266 de tipo 2)
+  contra 441 de los canales. **Techo del invitado ~ unos cientos**; solo type_id 1 y 2 responden.
+  Para los 70k hace falta **cuenta** (`--token` en el cosechador) o una vía nueva.
 
 ## CÓMO SE TRABAJÓ DESDE v217 (resumen para el siguiente chat)
 
