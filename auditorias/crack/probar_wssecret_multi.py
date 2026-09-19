@@ -90,35 +90,51 @@ def formas(k, p, t, ti):
     yield ("md5(p+k)", hashlib.md5(p.encode() + kb).hexdigest())
     yield ("md5(k+p+t+sz)", hashlib.md5(kb + p.encode() + t.encode() + b"0").hexdigest())
 
+def probar_candidata(k, muestras, variantes):
+    for i, (ruta, t, obj) in enumerate(muestras):
+        ti = int(t, 16)
+        for p in variantes[i]:
+            for nom, val in formas(k, p, t, ti):
+                if val == obj:
+                    print("\n*** LLAVE ENCONTRADA ***")
+                    print("  llave:", repr(k), "| forma:", nom, "| muestra:", ruta, t)
+                    return True
+    return False
+
 def main():
     global MUESTRAS
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    tope = 24
+    tope = 6
     for a in sys.argv:
         if a.startswith("--max="): tope = int(a.split("=")[1])
     usar_derivadas = "--derivadas" in sys.argv
     if args:
         datos = json.load(open(args[0]))
         MUESTRAS = [(m["ruta"], m["t"], m["s"]) if isinstance(m, dict) else tuple(m) for m in datos]
-        # si una llave funciona, funciona para todas: basta probar unas cuantas
-        vistas = set(); cortas = []
-        for m in MUESTRAS:
-            if m[0] not in vistas:
-                vistas.add(m[0]); cortas.append(m)
-        MUESTRAS = cortas[:tope]
-        print(f"muestras distintas usadas: {len(MUESTRAS)} (de {len(datos)})")
-    variantes = [[r, r[1:], r.split("?")[0]] for r, t, s in MUESTRAS]
+
+    # 1) claves sacadas de la propia direccion, probadas contra SU muestra
+    if usar_derivadas:
+        n = 0
+        for ruta, t, obj in MUESTRAS:
+            for k in derivadas(ruta):
+                n += 1
+                if probar_candidata(k, [(ruta, t, obj)], [[ruta, ruta[1:], ruta.split("?")[0]]]):
+                    return
+        print(f"claves derivadas de la direccion: {n} pruebas -> sin resultado")
+
+    # 2) claves del APK y del proyecto, contra unas cuantas muestras distintas
+    vistas = set(); cortas = []
+    for m in MUESTRAS:
+        if m[0] not in vistas:
+            vistas.add(m[0]); cortas.append(m)
+    cortas = cortas[:tope]
+    variantes = [[r, r[1:], r.split("?")[0]] for r, t, s in cortas]
+    print(f"muestras distintas usadas: {len(cortas)} de {len(MUESTRAS)}")
     n = 0
-    for k in candidatas(usar_derivadas):
+    for k in candidatas(False):
         n += 1
-        for i, (ruta, t, obj) in enumerate(MUESTRAS):
-            ti = int(t, 16)
-            for p in variantes[i]:
-                for nom, val in formas(k, p, t, ti):
-                    if val == obj:
-                        print("\n*** LLAVE ENCONTRADA ***")
-                        print("  llave:", repr(k), "| forma:", nom, "| muestra:", ruta, t)
-                        return
-    print(f"probadas {n} candidatas x {len(MUESTRAS)} muestras x 3 rutas x 13 formas -> sin resultado")
+        if probar_candidata(k, cortas, variantes):
+            return
+    print(f"probadas {n} candidatas x {len(cortas)} muestras x 3 rutas x 13 formas -> sin resultado")
 
 main()
