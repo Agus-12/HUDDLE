@@ -20,7 +20,6 @@ dónde, qué está descartado (para no repetirlo) y qué sigue.
    - `CONTINUACION.md` (últimas actualizaciones: cabecera y las 3-4 secciones de arriba).
    - `auditorias/INFORME-TECNICO-APK-Y-CATALOGO.md` (informe del otro chat).
    - `auditorias/REANUDACION-CHAT-CAPTURA-Y-AUDIO.md` (receta de captura y audio).
-   - `auditorias/PLAN-LLAVE-CDN.md` (**manual de la llave del CDN**: la reproducción completa).
 3. Verificar el estado del servidor en Oracle con el bloque 1 de la sección «Bloques típicos».
 4. Mirar la sección «Qué sigue» (al final) antes de inventar plan nuevo.
 
@@ -141,12 +140,6 @@ Fantasía, Musical, Misterio, Thriller, Anime dieron 0: **probar las variantes c
 Números de género en chino ya verificados que dan títulos: 恐怖 (terror), 科幻 (ciencia ficción),
 犯罪 (crimen), 纪录片 (documental), 奇幻 (fantasía), 悬疑, 剧情 (drama), 惊悚, 音乐 (música).
 
-**Medición hecha (19-sep, taller):** barrido completo de la lista de géneros → **236** (type_id=1) +
-**266** (type_id=2) = **485 títulos únicos**, contra los 441 de los canales. Es un avance real pero
-**moderado**: el techo del invitado está en unos cientos. Solo los `type_id` 1 y 2 responden a la
-búsqueda (3, 4, 5… dan 0). Para pasar de ahí hace falta **cuenta** (el token del amigo, que el
-cosechador acepta con `--token`).
-
 **Camino recomendado para el catálogo completo:**
 1. Sacar la lista de géneros de la propia app: `get_sys_conf` devuelve `vod_tags` (chino) y la
    app usa etiquetas en español; ampliar la lista con variantes (con acento / sin / chino).
@@ -188,25 +181,6 @@ adaptativo y las de CloudFront).
 - Los 8 endpoints de la API: ninguno entrega enlace firmado (`error1`).
 ⇒ **La llave no está en el APK como texto ni se deriva de nada conocido: es aleatoria y vive dentro
 del motor interno del SDK (entra por un servicio de configuración en tiempo de ejecución).**
-
-**Manual completo: `auditorias/PLAN-LLAVE-CDN.md`** — evidencia, muestras reales, el oráculo de
-pedacito frío, la Vía A (terminar el emulador con el truco de interceptar el hash), la Vía B (Frida
-en un Android con root) y la Vía C (puente: reusar los pases capturados, que duran **días** y son
-**por archivo**, para reproducir completo lo ya firmado).
-
-**Hallazgos de la noche del 19-sep:**
-- La app envuelve algunas configuraciones con el formato **`SHOK`**:
-  `conf_key=<nombre>SHOK<bloque1>SHOK<bloque2>`. El bloque 1 es constante por sesión (61 bytes,
-  no es AES: parece firma de sesión); el 2 solo aparece en `p2p_config`. Pedir esos nombres en claro
-  devuelve vacío (solo `vod_tags`, `ad_appid` y `p2p_config` traen datos).
-  **Comprobado el 19-sep: la marca `SHOK` NO está escrita en ninguna parte del APK** (barrido
-  completo: 12 dex, todas las `lib/*/*.so`, `assets/*` incluido `pp_hlsProtected.dat`; ni literal,
-  ni en minúsculas, ni con XOR de una tecla). Tampoco aparece `conf_key` dentro de los `.so`, solo
-  en `classes2/7/8.dex`. ⇒ El envoltorio lo construye (o lo interpreta) el SDK nativo con su tabla
-  de textos cifrada (`libpp_hls.so`); para descifrar el bloque 2 hay que **volcar esa tabla de textos**
-  (misma vía que `emu_hls.py`), no buscar la marca con `strings`.
-- **`conf_key=vod_tags`** devuelve la **lista de géneros de la app** (chino: `动作,喜剧,恐怖`):
-  el cosechador de catálogo debe iterar esos nombres exactos.
 
 **Lo que falta por probar (en orden de valor):**
 1. **Descifrar la captura y ver si `get_sys_conf`/`vod_share` traen material de llave** (herramienta lista).
@@ -332,7 +306,8 @@ Los archivos del repo y `~/apk-trabajo/` sí sobreviven. Si algo falla con «no 
    sospechar de la herramienta primero (pasó: faltaba la cabecera `sign`, y el `content-type`).
 4. **Enmascarar secretos** en todo lo que se imprime o sube (pases, tokens, device ids). Los PCAP y
    el keylog **nunca** van al repo.
-5. **Medir en serie** contra el espejo; en paralelo da falsos negativos.
+5. **Medir en serie** contra el espejo; en paralelo da falsos negativos. El espejo responde **206**
+   a las peticiones por rango (medir con `range: bytes=0-0` cuesta 1 byte por pedacito).
 6. **Escritura de archivos**: usar herramientas de archivo (no scripts embebidos con comillas) para
    textos largos; así se evitan los errores de escapado que ya rompieron un script.
 7. **Cada avance**: `CONTINUACION.md` + commit + `git push origin HEAD:main`. Si el push es rechazado,

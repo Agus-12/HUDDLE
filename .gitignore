@@ -33,3 +33,11 @@ auditorias/crack/pphls_mips_descifrado.bin
 auditorias/crack/pphls_mips_inflado.bin
 auditorias/crack/__pycache__/
 barrido_llave
+
+# volcados del modulo del SDK: se regeneran con auditorias/crack/descifrar-modulo-hls.py
+# (uno de ellos llevaba dentro la clave privada RSA del SDK: no se suben)
+auditorias/crack/pphls_elf_interno.so
+auditorias/crack/v4hls__inflado.bin
+auditorias/crack/v4hls_inflado.bin
+auditorias/crack/pphls_inflado.bin
+auditorias/crack/pphls_descifrado.bin

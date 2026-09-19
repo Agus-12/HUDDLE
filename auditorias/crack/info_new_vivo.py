@@ -31,7 +31,7 @@ Uso:  python3 info_new_vivo.py 711142488
 import sys, time, json, hashlib, base64, urllib.request
 
 HOST = 'https://surfclick.vd7au6.com'
-DEV  = 'bddd070962dc473e'          # device propio de este sandbox; puede ser cualquiera
+DEV  = 'PON_TU_DEVICE_ID'          # device propio de este sandbox; puede ser cualquiera
 SEC  = 'Zox882LYjEn4Rqpa'          # device_encrypt_key por defecto = el vivo
 AES_KEY, AES_IV = b'0123456789123456', b'2015030120123456'
 

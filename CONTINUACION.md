@@ -30,6 +30,36 @@ Se leyó en la captura descifrada **el cuerpo real que la app manda a `search/sc
   probar XOR de una tecla. Tampoco aparece `conf_key` dentro de los `.so` (solo en `classes2/7/8.dex`).
   ⇒ El envoltorio lo arma el SDK nativo con su **tabla de textos cifrada**; el camino no es `strings`
   sino **volcar esa tabla** (la misma vía que ya usaba `emu_hls.py`).
+- **v229 (19-sep, siguiente paso ya hecho) — dos correcciones y una medición:**
+  1. **El módulo inflado NO es código ARM64** (solo 2 pares ADRP+ADD en 3,4 MB): es el **programa de
+     la VM** del SDK. ⇒ La firma no se lee desensamblando ese módulo; hay que **instrumentar el
+     intérprete** del `.text` (`0xeff80–0xf2300`) en Unicorn. Herramienta para repetir la
+     comprobación: `auditorias/crack/xrefs-modulo-hls.py`.
+  2. **El «firmador 0xcc300–0xcca20» era un falso positivo**: ese tramo son ~35 funciones enanas con
+     canario (`mrs x8, tpidr_el0` → `bl 0x6d140` → `ret`; 456 instrucciones, 35 `ret`). No hay firma
+     ahí. (Corregido también en `PLAN-LLAVE-CDN.md` §2 y §6b del informe del módulo.)
+  3. **El espejo medido de verdad** con el medidor nuevo `scripts/medir-completo-espejo.py`: el
+     espejo **no pide llave pero solo da lo cacheado**, y responde **206** a las peticiones por rango
+     (medir cuesta 1 byte por pedacito). Hoy: `65328ba10998` → **54/366 = 14,8 %**;
+     `4acbae6998e7` → **98/396 = 24,7 %**; `3605f6781343` → no está. ⇒ **El espejo NO da
+     reproducción completa.** Informe: `auditorias/ESPEJO-Y-COMPLETITUD.md`.
+- **EL MÓDULO REAL DEL REPRODUCTOR, DESCIFRADO Y LEÍDO (v228.3, 19-sep madrugada).**
+  Todo el código y los textos del SDK estaban cifrados en la sección `.mips` de `libpp_hls.so`
+  (offset `0x1507d0`, 1.532.446 B). Se descifró (RC4 no estándar de jiagu con `rc4_sbox_1.bin`)
+  + `zlib` → **3.391.425 B de módulo legible** (`pphls_inflado.bin`), y se volcó su tabla de textos
+  (**18.996 cadenas**, en `auditorias/crack/hls-textos-sdk.txt`). Dentro está:
+  los nombres de sus funciones (`sim_md5`, `sim_buffer_encrypt/decrypt`, `sim_rc4_encrypt`,
+  `hls_config_*`, `hls_disk_*`, `hls_p2p_*`), las plantillas de firma (`%s%s%x` en `0x27f311`,
+  `wsSecret=%s&wsTime=%x` en `0x27f319`), la medida de cortes (`sz=`, `m8=`), la **config por
+  defecto completa** `[BASE]`/`[P2P]` —con `device_encrypt_key=Zox882LYjEn4Rqpa`, `ck=<64 hex>`,
+  `player_listen_port=7000` (su servidor local), tracker por defecto `138.113.22.150:7202`— y una
+  **clave RSA privada PEM** (1.670 B, NO va al repo). Comando único:
+  `python3 auditorias/crack/descifrar-modulo-hls.py`. **Informe: `auditorias/MODULO-SDK-DESCIFRADO.md`.**
+  Ojo: la palabra `SHOK` **no está** en el módulo ni en el APK.
+- **Probado y DESCARTADO ese mismo día** (no repetir): los 51.904 textos del módulo como llave del
+  CDN (13 formas + HMAC-MD5 + MD5 dobles) → sin coincidencia; los **67 nombres de config REALES**
+  del SDK pedidos en vivo uno por uno → todos vacíos salvo `vod_tags`/`ad_appid`/`p2p_config`; la
+  tabla de 64 hashes del módulo → no es llave ni `md5(nombre)`.
 - **`vod_tags` = la lista de géneros de la app** (`conf_key=vod_tags` → `动作,喜剧,恐怖`).
   El cosechador de catálogo debe iterar esos nombres exactos (español con acentos + chino).
 - **Manual de la llave (video completo): `auditorias/PLAN-LLAVE-CDN.md`** — estado, evidencia,

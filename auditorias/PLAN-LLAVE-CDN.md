@@ -26,6 +26,14 @@ por probabilidad, con comandos exactos.
 
 ## 2) QUÉ SE SABE DE LA LLAVE (evidencia)
 
+> **CORRECCIÓN v229 (19-sep, comprobada):** el «firmador en `0xcc300–0xcca20`» que se anotó antes
+> **no es la función de firma**: ese tramo son ~35 funciones diminutas con comprobación de canario
+> (`mrs x8, tpidr_el0` / `bl 0x6d140` / `ret`), 456 instrucciones y 35 `ret`. Además, el **módulo
+> inflado NO es código ARM64** (solo 2 pares ADRP+ADD en 3,4 MB): es el **programa/ datos de la VM**.
+> ⇒ La firma la construye **bytecode** ejecutado por el intérprete del `.text`. Para verla hay que
+> **instrumentar el intérprete** (Vía A), no desensamblar el módulo inflado.
+
+
 - **No está escrita en el APK**: se probaron 605 millones de tramos de bytes de los módulos
   (`barrido_llave.c`) y ~700 000 cadenas de dex/assets/módulos (`probar_wssecret_multi.py`) contra
   8 muestras reales y luego contra 252: **nada**.
@@ -187,7 +195,22 @@ la misma candidata).
 - La app usa **HTTP/2** para la API; el filtro `http2` de tshark 4.2 no acepta algunos campos:
   usar `scripts/ver-llamadas-app.py` (se adapta solo).
 
-## 10) CRITERIOS DE ÉXITO
+## 10) LA «COMPLETITUD» MEDIDA (v229, 19-sep-2026) — y por qué el espejo NO alcanza
+
+Medido con `scripts/medir-completo-espejo.py` (nuevo; el espejo da **206** a las peticiones por
+rango, y **solo** entrega lo que tiene en caché):
+
+| Título | Pedacitos en caché | Veredicto |
+|---|---|---|
+| `65328ba10998` (2026/09/18) | **54/366 = 14,8 %** | parcial |
+| `4acbae6998e7` (2026/09/02) | **98/396 = 24,7 %** | parcial |
+| `3605f6781343` | 0 | no está en las fechas probadas |
+
+⇒ El espejo sirve para tramos y para probar el reproductor, **no** para ver un título completo.
+La película completa sigue dependiendo de la llave (o de una caché que coincida al 100 %).
+Detalles y recetas: `auditorias/ESPEJO-Y-COMPLETITUD.md`.
+
+## 10b) CRITERIOS DE ÉXITO
 
 - **Llave conseguida** = 200 en frío con la fórmula de la sección 7 usando la llave nueva.
 - **Reproducción completa** = el título se ve de inicio a fin sin saltos: comprobar pidiendo
