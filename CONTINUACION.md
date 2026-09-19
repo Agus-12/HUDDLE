@@ -1,6 +1,56 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
-## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026: ERROR DEL PUERTO 8080 DEL AMIGO
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (tarde): v217 — EL CDN SÍ SIRVE SIN LLAVE (ESPEJOS) + SUBIDA POR PARTES
+
+**Hallazgo grande de esta sesión (medido, no supuesto):** el CDN de Movie es
+CloudFront y la protección (`wsSecret`) la aplica una **función de borde**. Si el
+objeto está **en la caché del borde**, CloudFront lo entrega **200 SIN firma**
+(«X-Cache: Hit from cloudfront»). Si el borde está frío, contesta
+`403` con «X-Cache: FunctionGeneratedResponse from cloudfront».
+
+Medido desde este sandbox el 19-sep ~13:00 UTC contra el borde `147.124.216.142`:
+- **10 de 12** carpetas de prueba (de `hot_search`) bajaron **playlist + primer
+  segmento .ts reales** (2–4 MB, sync 0x47). Fallan solo `ea2934872d4b` y
+  `3f3d30681b1b` (esas dos: sin caché en ese borde).
+- El **mismo camino por el hostname** `movievn.j5t2n.com` (18.172.170.x) da
+  403 SIEMPRE, y desde Oracle igual ⇒ **la diferencia es el borde, no el token**.
+- Ojo con el falso positivo: `147.124.216.140` y `.161` también «dan 200» pero son
+  un IIS de otro cliente (45 bytes, no video). Solo `.142` sirve el CDN.
+
+**Lo que trae la v217 (server.js, ya probado en local):**
+- `/api/movie/v-vid`: prueba primero los **espejos** (`MOVIE_ESPEJOS`, por defecto
+  `147.124.216.142`, o sea el mismo path en la IP con caché), y si todos fallan
+  cae al host original con la firma Wangsu si existe la llave. Reescribe el m3u8
+  apuntando al host que SÍ sirvió y normaliza el content-type de los .ts
+  (el origen manda «text/vnd.trolltech.linguist»).
+- `/api/movie/espejos`: diagnóstico — mide 4 rutas conocidas contra cada espejo y
+  contra j5t2n **desde Oracle** y devuelve códigos y bytes.
+- `/api/subir-captura`: **subida por partes de 4 MB** con progreso, reintentos y
+  reanudación (el PCAP puede pesar cientos de MB). Sigue guardando en
+  `~/captura-nueva.pcap`; ahora hasta 2 GB.
+- `/api/captura-estado`: dice si el archivo llegó, cuántos MB y si su cabecera es
+  pcap o pcapng (para no depender de SSH).
+- `scripts/buscar-llave-cdn.sh` + `scripts/buscar-llave-cdn.py`: **el cazador ya no
+  necesita tshark**: saca de la propia captura las ternas reales
+  (ruta + wsSecret + wsTime), junta candidatos y solo canta victoria si reproduce
+  TODAS las ternas. Probado con una captura sintética (encuentra la llave) y con
+  una sin llave (dice «sin llave», código 1).
+
+**Subida del amigo — aclaración del error «demasiado grande»:** el PCAP **no va a
+GitHub** (el repo es público y GitHub corta a 100 MB). Va SOLO a
+`http://129.80.212.92:3000/api/subir-captura` (página del teléfono; la de
+`/api/subir-llaves` es solo para el sslkeylogfile de 3 MB). Con la v217 esa página
+sube por partes y se puede reanudar.
+
+**Estado de la misión:** la fila Movie del home (24 tarjetas con portada),
+`/api/movie/ficha/v<vod>` («Parte 1 · Latino») y la cadena playlist→segmento
+funcionan **por el espejo**. Falta confirmar desde Oracle con
+`/api/movie/espejos`; si Oracle ve el espejo frío, la llave Wangsu (captura nueva)
+sigue siendo el camino para las carpetas sin caché.
+
+---
+
+## ACTUALIZACIÓN ANTERIOR — 19 SEP 2026: ERROR DEL PUERTO 8080 DEL AMIGO
 
 La guía vigente para la captura nueva está en `auditorias/REANUDACION-CHAT-CAPTURA-Y-AUDIO.md`.
 **No usar el puerto 8080 para esta captura.** Ese puerto pertenece a métodos viejos (proxy WiFi, SOCKS5, mitmproxy o Exportador TCP). Si PCAPdroid dice que 8080 no funciona, apagar SOCKS5, proxy externo y Exportador TCP; elegir guardar el PCAP localmente en el teléfono. No hace falta desinstalar el addon ni comprar PCAPNG. Iniciar captura normal, abrir Movie, reproducir 2 minutos, detener, exportar `.pcap` y subir desde el navegador a `http://129.80.212.92:3000/api/subir-captura`.
@@ -21,6 +71,7 @@ El servidor Oracle fue verificado sirviendo `app.js?v=v216`. El commit público 
 3. **Trabaja SIEMPRE dentro del clone del repo** (`~/huddle`). EL REPO ES EL WORKSPACE OFICIAL del proyecto — nada de trabajo importante fuera de él. Así el contexto del chat no se satura: el estado REAL siempre está aquí, en archivos.
 4. La **acción pendiente de este momento** está en §2 "📋 SIGUIENTE PASO" (al día: la integración de las 5 rutas latinas en Huddle YA está hecha en el server (v207) — falta que el usuario corra `actualizar.sh` + genere el mapa + pegue la salida de `/api/movie/probar`).
 5. **Después de CADA avance o cambio** (sin excepción): actualiza este archivo (estado, hallazgos, dead ends) → `git add -A` → `git commit -m "..."` → `git push origin HEAD:main`. El usuario recibe los cambios en su servidor con `bash actualizar.sh`.
+5b. **Comprobar el CDN sin llave (v217):** `curl -s http://127.0.0.1:3000/api/movie/espejos` en Oracle dice qué espejo responde desde ahí. Si el espejo da 200, se reproduce ya (playlist + segmentos); la llave Wangsu solo hace falta para las carpetas que no están en caché.
 6. Si el sandbox se resetea a media sesión (pasa: borra .git, node_modules, paquetes, archivos grandes): re-clona o recupera con `git init + git fetch origin + git reset --hard origin/main`, reinstala lo que falte y SIGUE. Nunca empieces de cero: todo lo importante vive aquí.
 
 > **PARA EL CHAT QUE RECIBA ESTE ARCHIVO:** Este archivo es la memoria del proyecto: el chat anterior lo dejó actualizado y TÚ debes dejarlo más actualizado aún. **Regla de oro 1: después de cada avance, actualiza este archivo y súbelo al repo. Regla de oro 2: el repo es el workspace — trabaja desde el clone, no desde archivos sueltos. El workspace del chat NO persiste; el repo SÍ.**

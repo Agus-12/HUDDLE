@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v216'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v217'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1033,6 +1033,22 @@ function movieCdnKey() {
   _cdnKeyMs = Date.now();
   try { _cdnKey = fs.readFileSync(MOVIE_CDN_KEY_RUTA, 'utf8').trim() || null; } catch { _cdnKey = null; }
   return _cdnKey;
+}
+/* v217: ESPEJOS del CDN Movie. Comprobado desde fuera (19 sep): el borde de CloudFront
+   que tiene la carpeta en CACHÉ entrega el /vod/ SIN la firma Wangsu (200, bytes
+   reales). El borde frío responde 403 generado por función («FunctionGeneratedResponse»).
+   Probamos los espejos primero y, si todos fallan, el host original (con o sin firma).
+   Config: MOVIE_ESPEJOS="147.124.216.142,otra-ip-o-host" */
+const MOVIE_ESPEJOS = (process.env.MOVIE_ESPEJOS || '147.124.216.142')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+let _espejoBueno = '', _espejoBuenoMs = 0;
+function movieEspejoPreferido() {
+  if (Date.now() - _espejoBuenoMs > 10 * 60 * 1000) { _espejoBueno = ''; _espejoBuenoMs = Date.now(); }
+  return _espejoBueno;
+}
+function movieMarcarEspejo(host) { _espejoBueno = host; _espejoBuenoMs = Date.now(); }
+function movieEsHostPermitido(h) {
+  return /(^|\.)j5t2n\.com$/i.test(h) || MOVIE_ESPEJOS.includes(h);
 }
 /* v212: tarjetas del catálogo vivo (portadas reales) para la pestaña Novelas/Movie */
 async function mapiTarjetasHome() {
@@ -8356,6 +8372,17 @@ async function proxearHls(req, res, target) {
 }
 /* =================== fin v81: modo individual =================== */
 
+/* v217: estado del PCAP que subió el teléfono (para confirmar que llegó completo
+   sin entrar por SSH: GET /api/captura-estado) */
+function capturaEstado() {
+  const destino = path.join(os.homedir(), 'captura-nueva.pcap');
+  try {
+    const s = fs.statSync(destino);
+    let cab = ''; try { const fd = fs.openSync(destino, 'r'); const b = Buffer.alloc(4); fs.readSync(fd, b, 0, 4, 0); fs.closeSync(fd); cab = b.toString('hex'); } catch {}
+    const tipo = (cab === 'd4c3b2a1' || cab === 'a1b2c3d4') ? 'pcap' : (cab === '0a0d0d0a') ? 'pcapng' : 'desconocido';
+    return { ok: true, existe: true, bytes: s.size, mb: +(s.size / 1048576).toFixed(1), cabecera: cab, tipo, modificado: s.mtime.toISOString() };
+  } catch { return { ok: true, existe: false, bytes: 0, mb: 0, tipo: 'no hay archivo todavía' }; }
+}
 const imgProxyCache = new Map(); /* v67: imágenes de animes proxyadas, url → {buf, ct, at} */
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
@@ -8385,37 +8412,84 @@ const server = http.createServer(async (req, res) => {
         '</body></html>');
       return;
     }
-    /* v216: subida del PCAP nuevo desde el teléfono del amigo (cacería de la
-       llave CDN). GET = página mínima; POST = guarda el cuerpo en
-       ~/captura-nueva.pcap (tope 400 MB, escrito a disco sin cargar RAM). */
+    /* v217: subida del PCAP desde el teléfono del amigo (cacería de la llave CDN).
+       - GET  /api/subir-captura → página que sube POR PARTES de 4 MB, con progreso,
+         reintentos y reanudación si se corta (el PCAP puede pesar cientos de MB).
+       - POST /api/subir-captura?parte=<bytes-totales-en-servidor>&total=<bytes>
+         escribe ese trozo al final de ~/captura-nueva.pcap. Sin ?parte = archivo
+         entero de una vez (compatible con la página vieja).
+       - GET  /api/captura-estado → tamaño y cabecera del archivo que hay en Oracle.
+       El PCAP vive SOLO en Oracle: nunca va a GitHub (límite 100 MB y es privado). */
+    if (url.pathname === '/api/captura-estado') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(JSON.stringify(capturaEstado()));
+    }
     if (url.pathname === '/api/subir-captura') {
+      const destino = path.join(os.homedir(), 'captura-nueva.pcap');
+      const TOPE = 2 * 1024 * 1024 * 1024;
       if (req.method === 'POST') {
-        const dest = path.join(os.homedir(), 'captura-nueva.pcap');
-        let n = 0; let demasiado = false;
+        const parte = url.searchParams.get('parte');
+        const total = +(url.searchParams.get('total') || 0);
+        const ini = parte === null ? 0 : Math.max(0, parseInt(parte, 10) || 0);
+        let ya = 0; try { ya = fs.statSync(destino).size; } catch {}
+        if (total && total > TOPE) return json(res, 413, { ok: false, error: 'Más de 2 GB: exporta el PCAP en pedazos.' });
+        if (parte !== null && ini > 0 && ini !== ya) return json(res, 409, { ok: false, error: 'reanudar', bytes: ya });
+        let n = ini > 0 ? ya : 0;
+        let demasiado = false;
         await new Promise((done) => {
-          const w = fs.createWriteStream(dest);
+          const w = fs.createWriteStream(destino, { flags: ini > 0 ? 'a' : 'w' });
           const fin = () => { try { w.destroy(); } catch {} done(); };
           w.on('error', fin); req.on('error', fin);
           w.on('drain', () => req.resume());
           req.on('data', (c) => {
             n += c.length;
-            if (n > 400 * 1024 * 1024) { demasiado = true; req.removeAllListeners('data'); req.resume(); w.end(); return; }
+            if (n > TOPE) { demasiado = true; req.removeAllListeners('data'); req.resume(); w.end(); return; }
             if (!w.write(c)) req.pause();
           });
           req.on('end', () => w.end(() => done()));
         });
-        if (demasiado) { try { fs.unlinkSync(dest); } catch {} res.writeHead(413, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Demasiado grande (máximo 400 MB).'); return; }
+        if (demasiado) { try { fs.unlinkSync(destino); } catch {} return json(res, 413, { ok: false, error: 'Demasiado grande (máximo 2 GB).' }); }
+        if (parte !== null) {
+          let sz = 0; try { sz = fs.statSync(destino).size; } catch {}
+          return json(res, 200, { ok: true, bytes: sz, mb: +(sz / 1048576).toFixed(1) });
+        }
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('Listo: ' + n + ' bytes guardados como captura-nueva.pcap en el servidor.');
-        return;
+        return res.end('Listo: ' + n + ' bytes guardados como captura-nueva.pcap en el servidor.');
       }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end('<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;text-align:center;margin-top:60px">' +
-        '<h2>Subir la captura PCAP</h2><p>Elige el archivo <b>.pcap</b> exportado por PCAPdroid y toca Subir.</p>' +
-        '<input type="file" id="f"><br><br><button onclick="s()" style="font-size:18px;padding:8px 24px">Subir</button>' +
-        '<div id="r" style="margin-top:16px;font-weight:bold"></div>' +
-        '<script>async function s(){var f=document.getElementById("f").files[0];if(!f){document.getElementById("r").innerText="Elige el archivo primero";return;}document.getElementById("r").innerText="Subiendo...";var r=await fetch("/api/subir-captura",{method:"POST",body:f});document.getElementById("r").innerText=await r.text();}</script>' +
-        '</body></html>');
+      res.end('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+        + '<body style="font-family:sans-serif;text-align:center;margin:32px 16px">'
+        + '<h2>Subir la captura PCAP</h2>'
+        + '<p>Elige el archivo <b>.pcap</b> que exportó PCAPdroid.<br>Se sube por partes y puede tardar un rato: <b>no cierres esta página</b>.</p>'
+        + '<input type="file" id="f"><br><br>'
+        + '<button id="b" onclick="s()" style="font-size:18px;padding:10px 28px">Subir</button>'
+        + '<div id="r" style="margin-top:16px;font-weight:bold;line-height:1.5"></div>'
+        + '<script>'
+        + 'var CH=4*1024*1024;'
+        + 'function est(){return fetch("/api/captura-estado").then(function(x){return x.json()}).catch(function(){return null})}'
+        + 'async function s(){'
+        + 'var f=document.getElementById("f").files[0],r=document.getElementById("r"),b=document.getElementById("b");'
+        + 'if(!f){r.innerText="Elige el archivo primero";return;}'
+        + 'b.disabled=true;'
+        + 'var e=await est();var off=(e&&e.existe&&e.bytes<f.size)?e.bytes:0;'
+        + 'if(off>0)r.innerText="Reanudando desde "+(off/1048576).toFixed(1)+" MB…";'
+        + 'while(off<f.size){'
+        + 'var t=f.slice(off,Math.min(off+CH,f.size)),ok=false,int=0;'
+        + 'while(!ok&&int<6){try{'
+        + 'var resp=await fetch("/api/subir-captura?parte="+off+"&total="+f.size,{method:"POST",body:t});'
+        + 'var txt=await resp.text(),j=null;try{j=JSON.parse(txt)}catch(e2){}'
+        + 'if(resp.ok&&j&&j.ok){off=j.bytes;ok=true;break;}'
+        + 'if(resp.status===409&&j&&typeof j.bytes==="number"){off=j.bytes;ok=true;break;}'
+        + 'r.innerText="Intento "+(int+1)+" falló: "+String(txt).slice(0,90);'
+        + '}catch(e3){r.innerText="Se cortó la conexión (intento "+(int+1)+" de 6)…";}'
+        + 'int++;await new Promise(function(z){setTimeout(z,1500*int)});}'
+        + 'if(!ok){r.innerText="Se interrumpió la subida. Toca Subir otra vez: continúa donde quedó.";b.disabled=false;return;}'
+        + 'r.innerText="Subiendo… "+Math.round(off/f.size*100)+"%  ("+(off/1048576).toFixed(1)+" de "+(f.size/1048576).toFixed(1)+" MB)";'
+        + '}'
+        + 'var e2=await est();'
+        + 'r.innerText="Listo: "+((e2&&e2.bytes||f.size)/1048576).toFixed(1)+" MB guardados en el servidor. Avisa al chat.";b.disabled=false;'
+        + '}'
+        + '</script></body></html>');
       return;
     }
     if (url.pathname === '/api/events') return handleEvents(req, res, url);
@@ -8549,27 +8623,48 @@ const server = http.createServer(async (req, res) => {
         const lista = (j && j.code === 10000 && Array.isArray(j.result)) ? j.result : [];
         return json(res, 200, { ok: true, items: lista.slice(0, 40).map((x) => ({ vod: x.vod_id || x.id, titulo: x.vod_name, poster: x.vod_pic || '', anno: x.vod_year || '' })) });
       }
-      if (url.pathname === '/api/movie/v-vid') { /* v211: proxy del CDN plano de Movie (allowlist j5t2n) */
+      if (url.pathname === '/api/movie/v-vid') { /* v211: proxy del CDN plano de Movie · v217: espejo con caché (sin llave) */
         const u = url.searchParams.get('url') || '';
         let pu; try { pu = new URL(u); } catch { return json(res, 400, { ok: false, error: 'url inválida' }); }
-        if (!/\.j5t2n\.com$/.test(pu.hostname)) return json(res, 403, { ok: false, error: 'dominio no permitido' });
-        /* v212.1: si existe ~/movie-cdn-key.txt, firmamos Wangsu al vuelo */
-        let uFinal = u;
+        if (!movieEsHostPermitido(pu.hostname)) return json(res, 403, { ok: false, error: 'dominio no permitido' });
+        /* v212.1: si existe ~/movie-cdn-key.txt, firmamos Wangsu al vuelo (solo el host original) */
         const wkey = movieCdnKey();
-        if (wkey && !u.includes('wsSecret=')) {
+        const firmado = (href) => {
+          if (!wkey || href.includes('wsSecret=')) return href;
           const wt = Math.floor(Date.now() / 1000).toString(16);
-          const ws = crypto.createHash('md5').update(wkey + pu.pathname + wt).digest('hex');
-          uFinal = u + '?wsSecret=' + ws + '&wsTime=' + wt;
+          const ws = crypto.createHash('md5').update(wkey + new URL(href).pathname + wt).digest('hex');
+          return href + (href.includes('?') ? '&' : '?') + 'wsSecret=' + ws + '&wsTime=' + wt;
+        };
+        /* v217: orden de intentos — espejo preferido, resto de espejos, y al final el original */
+        const yaEspejo = MOVIE_ESPEJOS.includes(pu.hostname);
+        const intentos = [];
+        if (!yaEspejo) {
+          const pref = movieEspejoPreferido();
+          const orden = (pref && MOVIE_ESPEJOS.includes(pref)) ? [pref, ...MOVIE_ESPEJOS.filter((x) => x !== pref)] : MOVIE_ESPEJOS;
+          for (const ip of orden) intentos.push('http://' + ip + pu.pathname + pu.search);
+          intentos.push(firmado(u));
+        } else {
+          /* ya venimos del espejo: si ese objeto no está en su caché, probamos el host real */
+          intentos.push(u);
+          intentos.push(firmado('http://movievn.j5t2n.com' + pu.pathname + pu.search));
         }
-        const ctl = new AbortController(); const tt = setTimeout(() => ctl.abort(), 30000);
-        let rr;
-        try { rr = await fetch(uFinal, { headers: { 'User-Agent': FETCH_UA }, signal: ctl.signal }); }
-        catch { clearTimeout(tt); return json(res, 502, { ok: false, error: 'CDN no respondió' }); }
+        let rr = null, usado = '', ultimo = 0;
+        for (const cand of intentos) {
+          const ctl = new AbortController(); const tt = setTimeout(() => ctl.abort(), 25000);
+          try {
+            const r = await fetch(cand, { headers: { 'User-Agent': FETCH_UA }, signal: ctl.signal });
+            clearTimeout(tt);
+            if (r.status === 200 || r.status === 206) { rr = r; usado = cand; break; }
+            ultimo = r.status;
+            try { r.body && r.body.cancel(); } catch {}
+          } catch { clearTimeout(tt); ultimo = ultimo || 0; }
+        }
+        if (!rr) return json(res, 502, { ok: false, error: 'CDN dijo ' + (ultimo || 'sin respuesta') });
+        try { movieMarcarEspejo(new URL(usado).hostname); } catch {}
         const ct = (rr.headers.get('content-type') || '').toLowerCase();
-        const buf = Buffer.from(await rr.arrayBuffer()); clearTimeout(tt);
-        if (rr.status !== 200 && rr.status !== 206) return json(res, 502, { ok: false, error: 'CDN dijo ' + rr.status });
+        const buf = Buffer.from(await rr.arrayBuffer());
         if (ct.includes('mpegurl') || /index5?\.m3u8/i.test(pu.pathname)) {
-          const base = u.slice(0, u.lastIndexOf('/') + 1);
+          const base = usado.slice(0, usado.lastIndexOf('/') + 1);
           const out = buf.toString('utf8').split('\n').map((ln) => {
             const l = ln.trim();
             if (!l || l.startsWith('#')) return ln;
@@ -8579,8 +8674,32 @@ const server = http.createServer(async (req, res) => {
           res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl', 'Cache-Control': 'no-store' });
           return res.end(out);
         }
-        res.writeHead(rr.status, { 'Content-Type': ct || 'video/mp2t', 'Cache-Control': 'public, max-age=3600' });
+        /* v217: el origen a veces manda un content-type raro para los .ts
+           («text/vnd.trolltech.linguist»): se normaliza para que el reproductor
+           no se confunda */
+        const esTs = /\.ts$/i.test(pu.pathname);
+        res.writeHead(rr.status, { 'Content-Type': esTs ? 'video/MP2T' : (ct || 'application/octet-stream'), 'Cache-Control': 'public, max-age=3600' });
         return res.end(buf);
+      }
+      if (url.pathname === '/api/movie/espejos') { /* v217: ¿qué espejo responde DESDE Oracle? */
+        const muestras = ['/vod/1/2026/09/11/9db1ede34113/index5.m3u8', '/vod/1/2023/10/27/30b34531976d/index5.m3u8', '/vod/1/2026/08/21/04bb8c7acbe2/index5.m3u8', '/vod/1/2025/09/05/3f3d30681b1b/index5.m3u8'];
+        const medir = async (href) => {
+          const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 12000);
+          try {
+            const r = await fetch(href, { headers: { 'User-Agent': FETCH_UA }, signal: ctl.signal });
+            const n = +(r.headers.get('content-length') || 0);
+            try { r.body && r.body.cancel(); } catch {}
+            clearTimeout(t);
+            return { code: r.status, bytes: n };
+          } catch { clearTimeout(t); return { code: 0, bytes: 0 }; }
+        };
+        const hosts = [];
+        for (const base of [...MOVIE_ESPEJOS.map((ip) => 'http://' + ip), 'http://movievn.j5t2n.com']) {
+          const filas = [];
+          for (const p of muestras) filas.push({ ruta: p, ...(await medir(base + p)) });
+          hosts.push({ host: base.replace('http://', ''), ok: filas.filter((f) => f.code === 200).length, filas });
+        }
+        return json(res, 200, { ok: true, espejos: MOVIE_ESPEJOS, preferido: movieEspejoPreferido() || null, llaveCdn: !!movieCdnKey(), hosts });
       }
       if (url.pathname === '/api/movie/probar') { /* v207: diagnóstico — comprueba m3u8 + primer .ts de cada ruta activa contra el origen */
         movieRecargar();
