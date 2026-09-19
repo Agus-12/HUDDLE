@@ -39,7 +39,20 @@ Después de resolver reproducción: audio siempre latino, comprobar por ASR o es
 
 ---
 
-## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (noche, v226): EL HTTPS DEL TELEFONO YA SE ABRE
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (noche, v226.1): LECTOR DE LLAMADAS LISTO
+
+`scripts/ver-llamadas-app.py` reescrito y PROBADO (con una captura HTTP/2 real y con una
+respuesta cifrada de prueba): junta cada llamada por conexión y flujo, muestra **lo que la
+app ENVÍA** y **lo que RECIBE** (descifrando base64 → AES-128-CBC con las llaves de la app)
+con la estructura y los datos útiles. Se adapta solo a la versión de tshark (verifica qué
+campos existen) para que no vuelva a fallar en Oracle, y enmascara tokens/firmas.
+Comando: `python3 scripts/ver-llamadas-app.py ~/captura-sign.pcap --paths=info_new,screen,channel`
+
+(La versión anterior falló en Oracle porque pedía un campo que tshark 4.2 no tiene.)
+
+---
+
+## ACTUALIZACIÓN ANTERIOR — 19 SEP 2026 (noche, v226): EL HTTPS DEL TELEFONO YA SE ABRE
 
 **¡ROTO EL MURO!** El `sslkeylogfile.txt` del usuario descifra la captura. Salida real de
 `scripts/descifrar-https.sh ~/captura-sign.pcap` (Oracle):
