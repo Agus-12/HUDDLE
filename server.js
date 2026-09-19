@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v215'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v216'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -8382,6 +8382,39 @@ const server = http.createServer(async (req, res) => {
         '<input type="file" id="f"><br><br><button onclick="s()" style="font-size:18px;padding:8px 24px">Subir</button>' +
         '<div id="r" style="margin-top:16px;font-weight:bold"></div>' +
         '<script>async function s(){var f=document.getElementById("f").files[0];if(!f){document.getElementById("r").innerText="Elige el archivo primero";return;}document.getElementById("r").innerText="Subiendo...";var r=await fetch("/api/subir-llaves",{method:"POST",body:f});document.getElementById("r").innerText=await r.text();}</script>' +
+        '</body></html>');
+      return;
+    }
+    /* v216: subida del PCAP nuevo desde el teléfono del amigo (cacería de la
+       llave CDN). GET = página mínima; POST = guarda el cuerpo en
+       ~/captura-nueva.pcap (tope 400 MB, escrito a disco sin cargar RAM). */
+    if (url.pathname === '/api/subir-captura') {
+      if (req.method === 'POST') {
+        const dest = path.join(os.homedir(), 'captura-nueva.pcap');
+        let n = 0; let demasiado = false;
+        await new Promise((done) => {
+          const w = fs.createWriteStream(dest);
+          const fin = () => { try { w.destroy(); } catch {} done(); };
+          w.on('error', fin); req.on('error', fin);
+          w.on('drain', () => req.resume());
+          req.on('data', (c) => {
+            n += c.length;
+            if (n > 400 * 1024 * 1024) { demasiado = true; req.removeAllListeners('data'); req.resume(); w.end(); return; }
+            if (!w.write(c)) req.pause();
+          });
+          req.on('end', () => w.end(() => done()));
+        });
+        if (demasiado) { try { fs.unlinkSync(dest); } catch {} res.writeHead(413, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Demasiado grande (máximo 400 MB).'); return; }
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('Listo: ' + n + ' bytes guardados como captura-nueva.pcap en el servidor.');
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end('<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;text-align:center;margin-top:60px">' +
+        '<h2>Subir la captura PCAP</h2><p>Elige el archivo <b>.pcap</b> exportado por PCAPdroid y toca Subir.</p>' +
+        '<input type="file" id="f"><br><br><button onclick="s()" style="font-size:18px;padding:8px 24px">Subir</button>' +
+        '<div id="r" style="margin-top:16px;font-weight:bold"></div>' +
+        '<script>async function s(){var f=document.getElementById("f").files[0];if(!f){document.getElementById("r").innerText="Elige el archivo primero";return;}document.getElementById("r").innerText="Subiendo...";var r=await fetch("/api/subir-captura",{method:"POST",body:f});document.getElementById("r").innerText=await r.text();}</script>' +
         '</body></html>');
       return;
     }
