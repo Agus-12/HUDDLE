@@ -273,3 +273,12 @@ Filtro correcto `-Y http2`. Cayeron 3 fichas abiertas por el amigo:
 - vod_id=1309804053 cur_time=1789807640588
 Falta extraer el `Form item: "sign"` y el `Header: device_id` (bloque grep siguiente).
 Con la terna → resolver_sign.py deriva fórmula+secreto → verificar en vivo con tls_client.
+
+
+## 19 sep ~09:25 — FÓRMULA DEL SIGN RESUELTA Y VERIFICADA
+
+`sign = MD5( "Zox882LYjEn4Rqpa" + device_id + vod_id + cur_time_ms ).upper()`
+reproduce las 3 firmas reales del amigo. PERO el servidor sigue devolviendo el error
+chino desde el sandbox incluso con token propio válido (result.user_info.token).
+Hipótesis restante: cabecera(s) extra del teléfono o binding device→algo. Siguiente:
+extraer TODAS las cabeceras del POST real del amigo desde ~/http2-descifrado.txt.
