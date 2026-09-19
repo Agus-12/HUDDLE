@@ -28,6 +28,37 @@ cd ~/huddle && python3 scripts/ver-llamadas-app.py ~/captura-sign.pcap --paths=g
 ```
 Copia TODA la salida (donde pone ENVIA y RECIBE) y pégala aquí. Esa salida trae el bloque SHOK que necesitamos para descifrar el envoltorio. Si ~/captura-sign.pcap no es la que tiene la llamada, prueba con las otras tres (~/captura-movie.pcap, ~/captura-sintls.pcap, ~/captura-nueva.pcap) — misma orden, cambia solo el nombre del .pcap.
 
+## ACTUALIZACIÓN — 19 SEP 2026 (v231): SHOK capturado — falta el bloque largo completo
+
+**Lo que trajiste (gracias, 22:30 UTC, Oracle):**
+- `~/captura-sign.pcap` con `~/sslkeylogfile.txt` → 235 frames HTTP/2, 88 llamadas
+- `get_sys_conf` con SHOK **confirmado en vivo**:
+  - `conf_key=ad_appid` (sin SHOK — único que va en claro)
+  - `conf_key=conf_key1SHOK<84>SHOK<84>` donde **bloque1 == bloque2 == 5119ocG2i+z/LCGkhlj0fmSBSi+lQiy4yV4Ky8k0oHLX6NCwRYRLxkCDx7gBDBgIA0OuOo5DSRGCDS9wpA==** (84 b64 → 61 bytes, entropía 5.73, no múltiplo de 16)
+  - `conf_key=p2p_configSHOK<84>SHOK<277b64_truncado>` donde bloque1 es el mismo común y bloque2 es LARGO (>277 b64, pero ver-llamadas-app.py lo cortó a 300 chars en ENVIA). Ese bloque largo es el que trae el `p2p_config` real (ck, tracker, backup_domain).
+
+**Análisis hecho aquí (sin pedirte más):**
+- Bloque común 61 B no se abre con AES-128-CBC (llaves 012345..., Zox..., ck), ni RC4 jiagu (sbox 3,5), ni XOR, ni zlib — es firma/identificador de sesión, no payload.
+- Para `conf_key1` los dos bloques son idénticos → confirma que bloque1 es de sesión y bloque2 para esa clave es dummy.
+- Para `p2p_config` el bloque2 largo es el que importa y **se cortó**: el script actual hace `tapar(txt)[:300]`, así que tu salida se quedó a medias (277 b64 truncado, no múltiplo de 4 → base64 inválido). Sin el bloque completo no se puede descifrar.
+
+**Herramientas nuevas (v231):**
+- `auditorias/crack/descifrar-shok.py` — prueba bloque1/bloque2 contra AES/RC4/XOR/zlib y verifica si sale JSON de p2p_config. Ya probado con tu bloque común (61 B, sin descifrado, como esperado).
+- `scripts/extraer-shok-completo.py` — saca el ENVIA **sin recortar** (usa tshark directo y guarda en /tmp/shok_full.txt).
+
+**BLOQUE NUEVO PARA ORACLE (pega tal cual, para traer el SHOK completo sin cortes):**
+```bash
+cd ~/huddle && python3 scripts/extraer-shok-completo.py ~/captura-sign.pcap
+cat /tmp/shok_full.txt
+```
+Si `extraer-shok-completo.py` no muestra el p2p_config largo, prueba igual con:
+```bash
+cd ~/huddle && python3 scripts/extraer-shok-completo.py ~/captura-movie.pcap; cat /tmp/shok_full.txt
+cd ~/huddle && python3 scripts/extraer-shok-completo.py ~/captura-sintls.pcap; cat /tmp/shok_full.txt
+```
+Pega aquí el contenido de `/tmp/shok_full.txt` (esa es la versión sin `...`).
+
+
 
 ## URGENTE — 19 SEP 2026 (noche, v227): EL CATÁLOGO GRANDE SE ABRE POR GÉNEROS
 
