@@ -299,3 +299,10 @@ diccionarios/ordenes/ck: negativo. RE del signer MIPS/ARM64: la cadena wsSecret 
 existe en el modulo MIPS y sin xrefs directas (gp-rel) — costoso. Via barata: el tracker
 p2p (47.253.51.203:7202, UDP plano) podria traer resource_md5_prefix; grep en
 ~/captura-sign.pcap y strings de /tmp/tracker.pcap (bloque entregado al usuario).
+
+
+## 19 sep ~11:00 — brute ck SIN ruta/tiempo: negativo. Quedan 2 vias
+
+(1) grep resource_md5_prefix/strings en trafico tracker del PCAP (bloque en manos del
+usuario, 4a entrega); (2) RE del signer MIPS (gp-rel, costoso) si (1) falla.
+Prueba extra en el mismo bloque: dominio 4j4damaqa.com sin firma desde Oracle.
