@@ -1025,6 +1025,15 @@ function mapiUrlLatina(col) {
   for (const t of [2, 1]) for (const c of col) if (c && c.type === t && c.vod_url) return { url: c.vod_url, type: t };
   return col[0] && col[0].vod_url ? { url: col[0].vod_url, type: col[0].type } : null;
 }
+/* v212.1: llave Wangsu viva — la deposita scripts/buscar-llave-cdn.sh y v-vid firma al vuelo */
+const MOVIE_CDN_KEY_RUTA = process.env.MOVIE_CDN_KEY || '/home/ubuntu/movie-cdn-key.txt';
+let _cdnKey = null, _cdnKeyMs = 0;
+function movieCdnKey() {
+  if (Date.now() - _cdnKeyMs < 30000) return _cdnKey;
+  _cdnKeyMs = Date.now();
+  try { _cdnKey = fs.readFileSync(MOVIE_CDN_KEY_RUTA, 'utf8').trim() || null; } catch { _cdnKey = null; }
+  return _cdnKey;
+}
 /* v212: tarjetas del catálogo vivo (portadas reales) para la pestaña Novelas/Movie */
 async function mapiTarjetasHome() {
   try {
@@ -8511,9 +8520,17 @@ const server = http.createServer(async (req, res) => {
         const u = url.searchParams.get('url') || '';
         let pu; try { pu = new URL(u); } catch { return json(res, 400, { ok: false, error: 'url inválida' }); }
         if (!/\.j5t2n\.com$/.test(pu.hostname)) return json(res, 403, { ok: false, error: 'dominio no permitido' });
+        /* v212.1: si existe ~/movie-cdn-key.txt, firmamos Wangsu al vuelo */
+        let uFinal = u;
+        const wkey = movieCdnKey();
+        if (wkey && !u.includes('wsSecret=')) {
+          const wt = Math.floor(Date.now() / 1000).toString(16);
+          const ws = crypto.createHash('md5').update(wkey + pu.pathname + wt).digest('hex');
+          uFinal = u + '?wsSecret=' + ws + '&wsTime=' + wt;
+        }
         const ctl = new AbortController(); const tt = setTimeout(() => ctl.abort(), 30000);
         let rr;
-        try { rr = await fetch(u, { headers: { 'User-Agent': FETCH_UA }, signal: ctl.signal }); }
+        try { rr = await fetch(uFinal, { headers: { 'User-Agent': FETCH_UA }, signal: ctl.signal }); }
         catch { clearTimeout(tt); return json(res, 502, { ok: false, error: 'CDN no respondió' }); }
         const ct = (rr.headers.get('content-type') || '').toLowerCase();
         const buf = Buffer.from(await rr.arrayBuffer()); clearTimeout(tt);

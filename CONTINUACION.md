@@ -104,6 +104,17 @@ UA/Referer no ayudan; brute de llaves agotado; dex/ELF/MIPS sin llave).
 (47.253.51.203) dentro de ~/captura-sign.pcap — bloque grep/strings entregado al
 usuario (pendiente de pegar). URLs firmadas del amigo siguen vigentes algunas horas
 (para prueba puntual, no producción).
+### 🔑 v212.1 (19 sep ~11:20) — FIRMA AL VUELO + CAZADOR DE LLAVE LISTOS
+
+server.js v-vid: si existe `/home/ubuntu/movie-cdn-key.txt` (env MOVIE_CDN_KEY), firma
+cada URL Wangsu al vuelo: `wsSecret=md5(llave+pathname+wsTimeHex)&wsTime=hex(now)`.
+`scripts/buscar-llave-cdn.sh [pcap]`: extrae tráfico tracker, saca candidatos
+(resource_md5_prefix=…, hex 16-64, imprimibles), los valida contra 2 ternas limpias
+del PCAP del amigo y si acierta ESCRIBE la llave (server la toma en ≤30 s).
+Probado: extrae y valida bien (Zox correctamente rechazada como llave CDN).
+COMANDO ÚNICO PARA EL USUARIO: `cd ~/huddle && bash actualizar.sh && bash scripts/buscar-llave-cdn.sh`
+Si dice "LLAVE ENCONTRADA": reproducción completa inmediata de todo el catálogo Movie.
+Si dice "sin llave": queda el RE MIPS (gp-rel) como única vía.
 ### 🧭 ESTADO PARA REANUDAR EN CHAT NUEVO (19 sep ~12:15)
 
 **Qué se logró hoy (19 sep):**
