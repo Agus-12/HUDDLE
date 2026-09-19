@@ -128,6 +128,15 @@ v215 (bug REAL encontrado con captura del usuario): el `#nvdBox` solo salía de 
 dentro del `if (d.novelas.length)`; como /api/trending devuelve `novelas: 0` (fuente
 externa apagada) y `movieApi: 24`, la caja quedaba oculta aunque hubiera tarjetas.
 Ahora `classList.remove('hidden')` también corre cuando movieApi pinta. Push f13dfc3.
+v216: (a) el picker pedía `/api/movie/ficha/<vod>` SIN la `v` (la regex de slugM se la
+comía) y el server espera `v<vod>` → "No encontré episodios"; ahora antepone `v` si la
+url es `movie.huddle/v/`. (b) ruta nueva `/api/subir-captura` (POST hasta 400 MB,
+escrito a disco en ~/captura-nueva.pcap; probada en sandbox con 100 KB reales) para que
+el amigo suba el PCAP nuevo directo desde su teléfono. Push 01fd92e.
+**Captura nueva (procedimiento entregado al usuario):** PCAPdroid SIN addon/mitm esta
+vez (el tracker va en UDP plano), capturar mientras reproduce 2 min en el app Movie,
+exportar PCAP y subirlo a :3000/api/subir-captura. Luego en Oracle:
+`bash ~/huddle/scripts/buscar-llave-cdn.sh ~/captura-nueva.pcap`.
 
 **Cacería de la llave CDN — CERRADA por vías baratas (19 sep ~12:40):** la llave Wangsu
 NO está en el PCAP (sin resource_md5_prefix; el app no usó p2p en esa sesión), NO viene
