@@ -90,6 +90,20 @@ Cadena que lo logró (guardada en auditorias/captura-pcapdroid-RECESTA.md):
 PCAPdroid (addon mitm) + Exportador TCP→8080 (recibidor) = PCAP 111 MB +
 PCAPdroid entregó sslkeylogfile.txt (TLS1.3) → tshark `-Y http2` con keylog →
 3 POST info_new reales → fórmula derivada.
+### 📺 v212 (19 sep ~10:30) — UI DEL CATÁLOGO VIVO LISTA, probada en sandbox
+
+server.js: mapiTarjetasHome() (canales 225/226/227/228/230, dedupe, ≤24 portadas reales)
+inyectado en /api/trending como `movieApi` y en /api/catalogo?tipo=novelas al frente.
+app.js: elegirTitulo y abrirSeriePicker aceptan `movie.huddle/v/<vod>`; la ficha
+`/api/movie/ficha/v<vod>` mapea vod_collection→episodios (Parte N · Latino).
+Probado local: trending.movieApi con portadas; ficha v562930699 = El conjuro ✔.
+**El video aún NO reproduce desde Oracle**: el CDN Wangsu exige wsSecret firmado
+(llave de 16 chars desconocida; CDN 403 sin firma desde cualquier datacenter;
+UA/Referer no ayudan; brute de llaves agotado; dex/ELF/MIPS sin llave).
+ÚNICA VÍA RESTANTE: `resource_md5_prefix` viaja en plano por UDP del tracker
+(47.253.51.203) dentro de ~/captura-sign.pcap — bloque grep/strings entregado al
+usuario (pendiente de pegar). URLs firmadas del amigo siguen vigentes algunas horas
+(para prueba puntual, no producción).
 ### 🧭 ESTADO PARA REANUDAR EN CHAT NUEVO (19 sep ~12:15)
 
 **Qué se logró hoy (19 sep):**

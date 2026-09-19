@@ -1462,8 +1462,8 @@ function imgPorProxy(src) {
 function abrirSeriePicker(res, enSala, esAnime, esGp) {
   const esNv = /novelas360\.com\/categories\//i.test(res.url || ''); /* v206 */
   const esEnp = /enpantallatv\.com\//i.test(res.url || ''); /* v206.2 */
-  const esMovie = /movie\.huddle\/serie\//i.test(res.url || ''); /* v207: app Movie */
-  const slugM = esGp ? (/series\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esMovie ? (/movie\.huddle\/serie\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esNv ? (/categories\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esEnp ? (/enpantallatv\.com\/([a-z0-9-]+)/i.exec(res.url || '') || []) : (/(?:serie|anime)\/([a-z0-9-]+)/i.exec(res.url || '') || []);
+  const esMovie = /movie\.huddle\/(?:serie|v)\//i.test(res.url || ''); /* v207: app Movie · v212: v = catálogo vivo */
+  const slugM = esGp ? (/series\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esMovie ? (/movie\.huddle\/(?:serie|v)\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esNv ? (/categories\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esEnp ? (/enpantallatv\.com\/([a-z0-9-]+)/i.exec(res.url || '') || []) : (/(?:serie|anime)\/([a-z0-9-]+)/i.exec(res.url || '') || []);
   if (!slugM || !slugM[1]) { toast('No pude leer esa serie'); return; }
   const slug = slugM[1];
   const esLat = /latanime\./i.test(res.url || ''); /* v63: anime de Latanime */
@@ -1757,7 +1757,7 @@ async function abrirGopelisPeli(res, enSala) {
 }
 
 function elegirTitulo(res, enSala) {
-  if (/movie\.huddle\/serie\//i.test(res.url || '')) { abrirSeriePicker(res, enSala); return true; } /* v207: novelas del app Movie (mapa local) */
+  if (/movie\.huddle\/(?:serie|v)\//i.test(res.url || '')) { abrirSeriePicker(res, enSala); return true; } /* v207: novelas del app Movie (mapa local) · v212: catálogo vivo API */
   if (/gopelis\.com\/peliculas\//i.test(res.url || '')) { abrirGopelisPeli(res, enSala); return true; } /* v199: película de GoPelis (latino) */
   if (/gopelis\.com\/series\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, false, true); return true; } /* v198: GoPelis (latino) */
   if (/lacartoons\.com\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v112: antes que el genérico /serie/ (sus urls también lo traen) */
@@ -3955,6 +3955,9 @@ async function cargarPopulares() {
     /* v206: NOVELAS — telenovelas por capítulos (Novelas360) */
     const wrapNv = document.querySelector('#nvdBox');
     const filaNv = document.querySelector('#nvdRow');
+    if (wrapNv && filaNv && d.movieApi && d.movieApi.length) { /* v212: vitrina viva de la API Movie al principio de la fila */
+      d.movieApi.forEach((res) => filaNv.appendChild(crearTarjetaResultado(res, alTocar(res))));
+    }
     if (wrapNv && filaNv && d.novelas && d.novelas.length) {
       d.novelas.forEach((res) => filaNv.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrapNv.classList.remove('hidden');

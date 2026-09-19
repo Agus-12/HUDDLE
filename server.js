@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v211'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v212'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1024,6 +1024,32 @@ function mapiUrlLatina(col) {
   col = Array.isArray(col) ? col : [];
   for (const t of [2, 1]) for (const c of col) if (c && c.type === t && c.vod_url) return { url: c.vod_url, type: t };
   return col[0] && col[0].vod_url ? { url: col[0].vod_url, type: col[0].type } : null;
+}
+/* v212: tarjetas del catálogo vivo (portadas reales) para la pestaña Novelas/Movie */
+async function mapiTarjetasHome() {
+  try {
+    const out = []; const vistos = new Set();
+    const visitar = (nodo) => {
+      if (!nodo || typeof nodo !== 'object' || out.length >= 24) return;
+      if (Array.isArray(nodo)) { nodo.forEach(visitar); return; }
+      const vi = nodo.vod_info || nodo;
+      const vid = vi && (vi.id || vi.vod_id);
+      if (vi && vi.vod_name && vid && !vistos.has(vid)) { vistos.add(vid);
+        out.push({
+          title: String(vi.vod_name), url: 'https://movie.huddle/v/' + (vi.id || vi.vod_id),
+          img: vi.vod_pic || '/carita.png', site: 'Movie',
+          extra: 'Latino · ' + (vi.vod_year || 'API'),
+        });
+      }
+      if (nodo.block_list) visitar(nodo.block_list);
+    };
+    for (const ch of [226, 225, 227, 230, 228]) { /* Películas, Inicio, Series, Telenovela, Animación */
+      if (out.length >= 24) break;
+      const j = await mapiLista('/api/channel/get_info', 'channel_id=' + ch);
+      if (j && j.code === 10000 && Array.isArray(j.result)) visitar(j.result);
+    }
+    return out;
+  } catch { return []; }
 }
 
 function movieCargarCaidas() {
@@ -8429,6 +8455,7 @@ const server = http.createServer(async (req, res) => {
         cartoons: cari.cartoons || [], /* v119: apartado propio de Lacartoons */
         liveaction: cari.liveaction || [], /* v205: iCarly, Drake & Josh, Power Rangers… */
         novelas: NOVELAS_EXTERNAS_ON ? (() => { const a2 = nv.filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url) || [])[1])); const b2 = nv2RecientesCache.items || []; const mez = []; for (let i2 = 0; i2 < Math.max(a2.length, b2.length) && mez.length < 18; i2++) { if (a2[i2]) mez.push(a2[i2]); if (b2[i2]) mez.push(b2[i2]); } return [...movieTarjetas(), ...mez]; })() : movieTarjetas(), /* v208: solo Movie */ /* v206.2: 360 + enpantalla intercaladas — v207: las del app Movie abren la fila */
+        movieApi: await mapiTarjetasHome(), /* v212: vitrina viva de la API Movie (portadas reales) */
         generos: (generos || []).map((g) => ({ slug: g.slug, nombre: g.nombre, items: fCV(g.items) })).filter((g) => g.items.length),
       });
     }
@@ -8537,6 +8564,20 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname.startsWith('/api/movie/ficha/')) { /* v207: ficha de una novela del app Movie (mapa local) */
         const clave = decodeURIComponent(url.pathname.split('/')[4] || '').toLowerCase();
         if (!/^[a-z0-9-]{3,90}$/.test(clave)) return json(res, 400, { ok: false, error: 'Serie inválida' });
+        const mvApi = /^v([0-9]{3,12})$/.exec(clave); /* v212: ficha del catálogo VIVO de la API */
+        if (mvApi) {
+          const j = await mapiFicha(mvApi[1]);
+          if (!j || j.code !== 10000 || !j.result) return json(res, 502, { ok: false, error: 'La API Movie no respondió — intenta luego' });
+          const r = j.result; const col = Array.isArray(r.vod_collection) ? r.vod_collection : [];
+          let eps = col.filter((c) => c && c.vod_url).map((c, i) => ({
+            temporada: 1, ep: i + 1,
+            titulo: 'Parte ' + (c.title || i + 1) + (c.type === 2 ? ' · Latino' : c.type === 1 ? ' · Subtítulos' : ''),
+            url: '/api/movie/v-vid?url=' + encodeURIComponent(c.vod_url), img: '',
+          }));
+          if (!eps.length) { const l = mapiUrlLatina(col); if (l) eps = [{ temporada: 1, ep: 1, titulo: 'Ver', url: '/api/movie/v-vid?url=' + encodeURIComponent(l.url), img: '' }]; }
+          if (!eps.length) return json(res, 404, { ok: false, error: 'Este título aún no tiene video disponible' });
+          return json(res, 200, { ok: true, titulo: r.vod_name, poster: r.vod_pic || '/carita.png', episodios: eps });
+        }
         const s = movieSerieActiva(clave);
         if (!s) return json(res, 404, { ok: false, error: 'Esa novela no está disponible en Movie ahora' });
         return json(res, 200, {
@@ -8604,7 +8645,7 @@ const server = http.createServer(async (req, res) => {
         if (tipo === 'series') { const r = await catCv('series', pag); return json(res, 200, { ok: true, pag, por: 20, items: r.items, mas: r.mas }); }
         if (tipo === 'animes') { const r = await catAnimes(pag); return json(res, 200, { ok: true, pag, por: 24, items: r.items, mas: r.mas }); }
         if (tipo === 'caricaturas') return json(res, 200, trozo(await catCaricaturas()));
-        if (tipo === 'novelas') { if (!NOVELAS_EXTERNAS_ON) return json(res, 200, trozo(movieTarjetas())); /* v208: solo Movie */ const a2 = (await nvCatalogo()).filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url) || [])[1])); const b2 = await nv2Recientes(); const mez = []; for (let i2 = 0; i2 < Math.max(a2.length, b2.length); i2++) { if (a2[i2]) mez.push(a2[i2]); if (b2[i2]) mez.push(b2[i2]); } return json(res, 200, trozo(mez)); } /* v206.2: 360 + enpantalla */
+        if (tipo === 'novelas') { const api = await mapiTarjetasHome(); /* v212: vitrina viva primero */ if (!NOVELAS_EXTERNAS_ON) return json(res, 200, trozo([...api, ...movieTarjetas()])); /* v208: solo Movie */ const a2 = (await nvCatalogo()).filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url) || [])[1])); const b2 = await nv2Recientes(); const mez = []; for (let i2 = 0; i2 < Math.max(a2.length, b2.length); i2++) { if (a2[i2]) mez.push(a2[i2]); if (b2[i2]) mez.push(b2[i2]); } return json(res, 200, trozo([...api, ...mez])); } /* v206.2: 360 + enpantalla */
         if (tipo === 'cartoons' || tipo === 'liveaction') {
           const vivo = tipo === 'liveaction';
           let items = lctConCovers().filter((x) => esLctLive(x._slug) === vivo);
