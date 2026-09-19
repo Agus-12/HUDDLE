@@ -39,7 +39,34 @@ Después de resolver reproducción: audio siempre latino, comprobar por ASR o es
 
 ---
 
-## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (noche, v224-v225): 252 FIRMAS Y DESCIFRADO DE HTTPS
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (noche, v226): EL HTTPS DEL TELEFONO YA SE ABRE
+
+**¡ROTO EL MURO!** El `sslkeylogfile.txt` del usuario descifra la captura. Salida real de
+`scripts/descifrar-https.sh ~/captura-sign.pcap` (Oracle):
+- **HTTP/1.1 (video):** los pedacitos salen con `wsSecret`/`wsTime` hacia `movievn.j5t2n.com`
+  **y también hacia el espejo `147.124.216.142`** (el player firma igual para ambos).
+- **HTTP/2 (API, antes invisible):** `/api/vod/info_new` (3), `/api/public/get_sys_conf` (3),
+  `/api/search/screen` (2), `/api/channel/get_info` (2), `/api/channel/get_list`,
+  `/api/search/recommend`, `/api/search/hot_search`, `/api/user_vod/get_list` (2),
+  `/api/user_history/add` (3), `/api/invited/vod_share` (3), `/api/user/info`,
+  `/api/public/upgrade`, `/api/data/action`, `/api/ad/get_list`, `/api/discuss/get_list_new`,
+  `/api/barrage/get_list`, `/api/log/ad` (38), `/api/public/feedback` (13).
+- La app **también pide el servicio por HTTP/2** (`h2`), no solo HTTP/1.1.
+
+**Herramienta nueva: `scripts/ver-llamadas-app.py`** (probada con tshark simulado):
+muestra, por llamada, **lo que la app ENVÍA** (cuerpos de formulario) y **lo que RECIBE**
+(descifra base64 -> AES-128-CBC con las llaves de la app y resume la estructura: listas,
+`vod_url`, totales, cursores). Enmascara tokens y firmas.
+Uso: `python3 scripts/ver-llamadas-app.py ~/captura-sign.pcap --paths=info_new,channel,screen`
+
+**Por qué importa:** con esto veremos 1) el **cuerpo real** de `search/screen` y
+`channel/get_info` (para resolver la **paginacion** del catalogo, que es lo que falta para
+los 70k), 2) qué devuelve `info_new` al teléfono, 3) si `get_sys_conf`/`vod_share` traen
+material de llave.
+
+---
+
+## ACTUALIZACIÓN ANTERIOR — 19 SEP 2026 (noche, v224-v225): 252 FIRMAS Y DESCIFRADO DE HTTPS
 
 **El usuario minó sus capturas (gracias):** 193 + 21 + 31 + 7 = **252 firmas reales** de
 muchas carpetas (2023→2026) y el archivo `~/sslkeylogfile.txt` (641 sesiones TLS).
