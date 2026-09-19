@@ -255,3 +255,11 @@ vivo desaparece.
 - Siguiente paso: `tshark -r captura-sign.pcap -o tls.keylog_file:~/sslkeylogfile.txt`
   en Oracle y grep de info_new. El PCAP salió SIN descifrar (grep info_new = 0 en crudo),
   o sea que el descifrado del addon no aplicó al app Movie — pero con el keylog da igual.
+
+
+## 19 sep ~09:05 — keylog SÍ corresponde al PCAP; el fallo era `-Y http` (el app usa HTTP/2)
+
+Randoms del PCAP (f444dffc…, e3763b29…) presentes en el keylog ✔. 8087 paquetes TLS a 443.
+tshark sin quejas pero 0 `http`: porque OkHttp negocia **h2** → el filtro correcto es
+`-Y http2`. (Nota: server.js corre como ROOT en Oracle: os.homedir()=/root; el POST de
+subir-llaves escribe a /root/sslkeylogfile.txt — hubo que copiarlo a ~/.)
