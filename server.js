@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v223'; // 223: cosecha en /api/intros+estado y intros auto al entrar a serie
+const UI_VERSION = 'v224'; // 224: fija fuga de memoria (cosecha cacheada 10s) + pip PEP668
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1206,14 +1206,24 @@ const MOVIE_COSECHA_META = [
   '/tmp/catalogo-70k.checkpoint.json',
   path.join(DATA_DIR, 'catalogo-70k.checkpoint.json'),
 ];
+let _cosechaCache = { at: 0, mtime: 0, data: null };
 function movieCosechaEstado() {
+  // v224: cache 10s y solo re-parsea si el archivo cambió (antes cada /api/estado leía + parseaba el JSON de 100KB-10MB cada 5s → GC y RSS subían)
+  if (Date.now() - _cosechaCache.at < 10000 && _cosechaCache.data) return _cosechaCache.data;
   let mejor = null, mejorMtime = 0;
   for (const ruta of MOVIE_COSECHA_RUTAS) {
     try {
       const st = fs.statSync(ruta);
       if (!st || st.size < 2) continue;
       if (st.mtimeMs <= mejorMtime) continue;
-      const j = JSON.parse(fs.readFileSync(ruta, 'utf8'));
+      // si el mtime no cambió desde el cache, reutiliza el parseo anterior
+      if (_cosechaCache.data && _cosechaCache.data.archivo && _cosechaCache.data.archivo.ruta === ruta && st.mtimeMs === _cosechaCache.mtime) {
+        mejor = _cosechaCache.data.archivo;
+        mejorMtime = st.mtimeMs;
+        continue;
+      }
+      const txt = fs.readFileSync(ruta, 'utf8');
+      const j = JSON.parse(txt);
       const arr = Array.isArray(j) ? j : (Array.isArray(j.items) ? j.items : (Array.isArray(j.result) ? j.result : null));
       let n = 0, ejemplo = [];
       if (arr) { n = arr.length; ejemplo = arr.slice(0, 2).map((x) => x && (x.vod_name || x.title || x.titulo || '')).filter(Boolean); }
@@ -1235,14 +1245,20 @@ function movieCosechaEstado() {
       if (j && typeof j.siguiente === 'number') { meta = { pos: j.siguiente, hits: j.hits || j.total || 0, ruta }; break; }
     } catch {}
   }
-  // también intenta leer el log de la cosecha si existe
   let log = null;
   try {
-    const txt = fs.readFileSync('/tmp/cosecha.log', 'utf8');
-    const lineas = txt.trim().split('\n').slice(-1)[0] || '';
+    const fd = fs.openSync('/tmp/cosecha.log', 'r');
+    const stat = fs.fstatSync(fd);
+    const len = Math.min(stat.size, 4000);
+    const buf = Buffer.alloc(len);
+    fs.readSync(fd, buf, 0, len, Math.max(0, stat.size - len));
+    fs.closeSync(fd);
+    const lineas = buf.toString('utf8').trim().split('\n').slice(-1)[0] || '';
     if (lineas) log = lineas.slice(0, 180);
   } catch {}
-  return { archivo: mejor, meta, log, rango: '1000→70000', nota: mejor ? 'cosecha en curso (info_new secuencial)' : 'aún sin archivo — la cosecha arranca en bg' };
+  const out = { archivo: mejor, meta, log, rango: '1000→70000', nota: mejor ? 'cosecha en curso (info_new secuencial)' : 'aún sin archivo — la cosecha arranca en bg' };
+  _cosechaCache = { at: Date.now(), mtime: mejorMtime, data: out };
+  return out;
 }
 function movieCargarCaidas() {
   try {

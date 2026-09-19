@@ -271,6 +271,59 @@ class Host:
 
     fmodf = fmod
 
+    # --- anti-emulador: devolver "no existe" para las 22 rutas que usa sub_b71c ---
+    EMU_MARKERS = [b"qemu_pipe", b"vbox", b"droid4x", b"nox", b"ttVM", b"bluestacks", b"genyd", b"qemu", b"edxposed", b"yiwan"]
+
+    def _is_emu_path(self, p):
+        if isinstance(p, bytes):
+            s=p
+        else:
+            s=p.encode(errors="ignore")
+        return any(m in s for m in self.EMU_MARKERS)
+
+    def access(self, path_a, mode):
+        self.calls['access'] += 1
+        try:
+            p=self.rstr(path_a)
+        except Exception:
+            p=b""
+        if self._is_emu_path(p):
+            log(f'    [access "{p.decode(errors="ignore")}" -> -1 (emu fake)]')
+            return -1  # no existe -> no es emulador
+        log(f'    [access "{p.decode(errors="ignore")}" -> -1]')
+        return -1
+
+    def stat(self, path_a, buf):
+        self.calls['stat'] += 1
+        try:
+            p=self.rstr(path_a)
+        except Exception:
+            p=b""
+        log(f'    [stat "{p.decode(errors="ignore")}" -> -1]')
+        return -1
+
+    def __xstat(self, ver, path_a, buf):
+        self.calls['__xstat'] += 1
+        return self.stat(path_a, buf)
+
+    def open(self, path_a, flags, mode=0):
+        self.calls['open'] += 1
+        try:
+            p=self.rstr(path_a)
+        except Exception:
+            p=b""
+        if self._is_emu_path(p):
+            log(f'    [open "{p.decode(errors="ignore")}" -> -1 (emu fake)]')
+            return -1
+        if p in [b"/proc/self/maps", b"/proc/self/status", b"/proc/self/cmdline"]:
+            return 0  # dejar que fopen lo maneje
+        log(f'    [open "{p.decode(errors="ignore")}" -> -1]')
+        return -1
+
+    def openat(self, dirfd, path_a, flags, mode=0):
+        self.calls['openat'] += 1
+        return self.open(path_a, flags, mode)
+
     # -- dl / señales --
     def dlopen(self, p_a, mode):
         self.calls['dlopen'] += 1
@@ -352,6 +405,7 @@ HOOK_TABLE_NAMES = {
     'strlen': 'strlen', 'strcmp': 'strcmp', 'strncmp': 'strncmp',
     'strncpy': 'strncpy', 'strstr': 'strstr', 'strchr': 'stub', 'strrchr': 'stub',
     'isspace': 'isspace', 'fmod': 'fmod', 'fmodf': 'fmodf',
+    'access': 'access', 'stat': 'stat', '__xstat': '__xstat', 'open': 'open', 'openat': 'openat',
     'dlopen': 'dlopen', 'dlsym': 'dlsym', 'dl_iterate_phdr': 'dl_iterate_phdr',
     'dladdr': 'dladdr', 'sigaction': 'sigaction', 'abort': 'abort',
     '__stack_chk_fail': 'stack_chk_fail', '__cxa_finalize': 'cxa_finalize',
