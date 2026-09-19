@@ -320,3 +320,9 @@ nueva del amigo (el addon ya queda instalado en su telefono).
 
 el volcado descifrado ~/http2-descifrado.txt podria contener llamadas get_sys_conf con el
 conf_key correcto y su respuesta con resource_md5_prefix. Bloque grep entregado al usuario.
+
+
+## 19 sep ~12:20 — get_sys_conf barrido: solo p2p_config devuelve datos (sin prefix).
+
+Siguiente: mapa de endpoints REALES usados por el app en el volcado (bloque grep :path
+entregado al usuario) para hallar llamadas no documentadas (posible entrega de prefix).
