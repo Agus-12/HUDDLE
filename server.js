@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v218'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v219'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -1034,6 +1034,9 @@ function movieCdnKey() {
   try { _cdnKey = fs.readFileSync(MOVIE_CDN_KEY_RUTA, 'utf8').trim() || null; } catch { _cdnKey = null; }
   return _cdnKey;
 }
+/* v219: ¿es una ruta de reproduccion del PROPIO Huddle? (catálogo vivo de Movie y
+   compañía). Estos flujos ya vienen resueltos: se reproducen NATIVOS, sin navegador. */
+function esStreamPropioUS(u) { return /^\/api\/(movie\/v-vid|movie\/hls|hls|xd)\b/.test(String(u || '')); }
 /* v217: ESPEJOS del CDN Movie. Comprobado desde fuera (19 sep): el borde de CloudFront
    que tiene la carpeta en CACHÉ entrega el /vod/ SIN la firma Wangsu (200, bytes
    reales). El borde frío responde 403 generado por función («FunctionGeneratedResponse»).
@@ -1888,6 +1891,9 @@ async function ponerDaniNativo(room, urlEp, userId) {
 }
 
 async function resolverNativoInterno(url) {
+  /* v219: el catálogo vivo de Movie entrega su playlist YA por nuestro proxy
+     (/api/movie/v-vid?url=…): se reproduce nativo, tal cual, sin resolver nada */
+  if (esStreamPropioUS(url)) return { m3u8: url, mp4: false, proxy: false, subs: [] };
   if (new RegExp(MOVIE_HOST_VIRTUAL.replace(/\./g, '\\.') + '\\/ver\\/', 'i').test(url)) return resolverMovie(url); /* v207: Movie nativo en sala (playlist local) */
   if (/latanime\.org\/ver\//i.test(url)) return resolverAnime(url);
   if (/pelisxd\.com\/pelicula\//i.test(url)) return resolverPelisxd(url); /* v98 */
@@ -3622,7 +3628,11 @@ async function handleAction(req, res, body) {
          * se puede, caemos al espejo de siempre. */
         let urlNat = String(action.url || '').trim();
         if (/danimados\.cc/i.test(urlNat)) { try { urlNat = 'https://danimados.cc' + new URL(urlNat).pathname; } catch {} } /* v172 */
-        if (/^https?:\/\//i.test(urlNat)) {
+        /* v219: los flujos del propio Huddle (Movie del catálogo vivo) llegan como
+           ruta relativa; antes esto se saltaba el camino nativo y caía al navegador
+           remoto (—«No se pudo espejar: no se pudo lanzar Chrome»). Ahora se
+           reproducen nativo, igual que un anime resuelto. */
+        if (/^https?:\/\//i.test(urlNat) || esStreamPropioUS(urlNat)) {
           let errNat = '';
           const nat = await resolverNativo(urlNat).catch((e) => {
             errNat = String(e.message || e).slice(0, 140);
@@ -9247,6 +9257,10 @@ const server = http.createServer(async (req, res) => {
       const urec = users.get(name.toLowerCase());
       if (!name || !urec || urec.token !== tok) return json(res, 403, { ok: false, error: 'Perfil no válido' });
       const target = url.searchParams.get('url') || '';
+      /* v219: el catálogo vivo de Movie manda una ruta de NUESTRO proxy
+         (/api/movie/v-vid?url=…). Antes el guardia de URL absoluta la tumbaba
+         con «URL no válida» y la película no arrancaba en el modo Solo. */
+      if (esStreamPropioUS(target)) return json(res, 200, { ok: true, m3u8: target, subs: [], mp4: false, proxy: false });
       if (!/^https?:\/\/[a-z0-9.-]+/i.test(target)) return json(res, 400, { ok: false, error: 'URL no válida' });
       try {
         /* v90: episodio de Latanime → resolver de animes (mp4 directo) */
