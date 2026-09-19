@@ -1,5 +1,20 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026: ERROR DEL PUERTO 8080 DEL AMIGO
+
+La guía vigente para la captura nueva está en `auditorias/REANUDACION-CHAT-CAPTURA-Y-AUDIO.md`.
+**No usar el puerto 8080 para esta captura.** Ese puerto pertenece a métodos viejos (proxy WiFi, SOCKS5, mitmproxy o Exportador TCP). Si PCAPdroid dice que 8080 no funciona, apagar SOCKS5, proxy externo y Exportador TCP; elegir guardar el PCAP localmente en el teléfono. No hace falta desinstalar el addon ni comprar PCAPNG. Iniciar captura normal, abrir Movie, reproducir 2 minutos, detener, exportar `.pcap` y subir desde el navegador a `http://129.80.212.92:3000/api/subir-captura`.
+
+Después, en **Oracle** (no en la Mac):
+```bash
+cd ~/huddle || exit 1
+bash scripts/buscar-llave-cdn.sh ~/captura-nueva.pcap
+```
+
+El servidor Oracle fue verificado sirviendo `app.js?v=v216`. El commit público más reciente es `1c7b633`. No subir al repositorio PAT, `sslkeylogfile.txt`, PCAP, tokens ni identificadores del teléfono. El resumen corto de captura, CDN, búsqueda y audio está en `auditorias/REANUDACION-CHAT-CAPTURA-Y-AUDIO.md`.
+
+---
+
 ## 🚀 EMPIEZA AQUÍ (nuevo chat: haz esto EN ORDEN, sin saltar nada)
 1. **Clona el repo** (el PAT te lo da el usuario en el chat, NUNCA está en este archivo porque el repo es público): `git clone https://{PAT}@github.com/Agus-12/HUDDLE.git ~/huddle`
 2. **Lee ESTE archivo completo** + `auditorias/hallazgos-cdn.md` + `auditorias/RESUMEN-COSECHA-PCAP.md` (el mapa con carpetas por novela/episodio).
