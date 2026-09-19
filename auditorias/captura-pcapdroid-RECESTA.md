@@ -216,3 +216,13 @@ curl -s -m 20 -x http://127.0.0.1:8080 http://example.com -o /dev/null -w "proxy
 grep -o -E "http://[a-zA-Z0-9./_?=&-]+" ~/captura-sign.jsonl | sort | uniq -c | sort -rn | head -20
 grep -o -E "api_url[0-9]?[^,}]{0,90}" ~/captura-sign.jsonl | sort -u | head -10
 ```
+
+
+## ⚠️ 19 sep ~02:00 — PCAPNG ES DE PAGA en la versión Play Store del amigo
+
+Captura del amigo: "Formato Pcapng" aparece en "Funciones de pago" ($75). **NO se compra.**
+No hace falta: con "Descifrado TLS" del addon (ya instalado y ACTIVADO en su teléfono)
+el descifrado es EN VIVO y el PCAP plano que exporta el Exportador TCP ya lleva el
+payload descifrado. Vía final confirmada: addon + Reglas de descifrado (app Movie) +
+Exportador TCP → recibidor 47823 (probado desde el sandbox: acepta y libera ✔) +
+Bloquear QUIC=Siempre. Recibidor corriendo (pid 135097).
