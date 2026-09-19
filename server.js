@@ -1034,6 +1034,13 @@ function movieCdnKey() {
   try { _cdnKey = fs.readFileSync(MOVIE_CDN_KEY_RUTA, 'utf8').trim() || null; } catch { _cdnKey = null; }
   return _cdnKey;
 }
+/* v219.1: la llave puede venir como texto (16 caracteres) o como bytes crudos
+   («hex:…») si el cazador la encontró dentro de un mensaje binario del rastreador */
+function movieCdnKeyBytes(k) {
+  if (!k) return null;
+  if (/^hex:[0-9a-fA-F]+$/.test(k)) { const b = Buffer.from(k.slice(4), 'hex'); return b.length ? b : null; }
+  return Buffer.from(k, 'utf8');
+}
 /* v219: ¿es una ruta de reproduccion del PROPIO Huddle? (catálogo vivo de Movie y
    compañía). Estos flujos ya vienen resueltos: se reproducen NATIVOS, sin navegador. */
 function esStreamPropioUS(u) { return /^\/api\/(movie\/v-vid|movie\/hls|hls|xd)\b/.test(String(u || '')); }
@@ -8675,8 +8682,10 @@ const server = http.createServer(async (req, res) => {
         const wkey = movieCdnKey();
         const firmado = (href) => {
           if (!wkey || href.includes('wsSecret=')) return href;
+          const kb = movieCdnKeyBytes(wkey);
+          if (!kb) return href;
           const wt = Math.floor(Date.now() / 1000).toString(16);
-          const ws = crypto.createHash('md5').update(wkey + new URL(href).pathname + wt).digest('hex');
+          const ws = crypto.createHash('md5').update(Buffer.concat([kb, Buffer.from(new URL(href).pathname + wt, 'utf8')])).digest('hex');
           return href + (href.includes('?') ? '&' : '?') + 'wsSecret=' + ws + '&wsTime=' + wt;
         };
         /* v217: orden de intentos — espejo preferido, resto de espejos, y al final el original */

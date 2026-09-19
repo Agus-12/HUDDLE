@@ -29,4 +29,23 @@ if [ "$TAM" -lt 100000 ]; then
   echo "AVISO: el archivo pesa muy poco ($TAM bytes) — probablemente la subida quedó a medias."
 fi
 
+echo
+echo "== 1) llave como texto (cadenas legibles: config, tracker, etc.) =="
 python3 "$AQUI/buscar-llave-cdn.py" "$PCAP" "$OUT"
+RC1=$?
+
+echo
+echo "== 2) llave como 16 bytes crudos dentro del trafico UDP =="
+python3 "$AQUI/cazar-llave-bytes.py" "$PCAP" "$OUT"
+RC2=$?
+
+if [ -s "$OUT" ]; then
+  echo
+  echo "== LISTO: hay llave guardada en $OUT =="
+  echo "Huddle la toma sola en 30 segundos. Prueba una pelicula y una novela desde el navegador."
+else
+  echo
+  echo "== sin llave en esta captura =="
+  echo "Guarda el diagnostico de arriba y no repitas busquedas ya agotadas."
+fi
+exit $(( RC1 < RC2 ? RC1 : RC2 ))
