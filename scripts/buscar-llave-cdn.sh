@@ -6,7 +6,13 @@
 # ~/movie-cdn-key.txt y Huddle la usa sola (server.js la relee cada 30 s).
 # Nada de esto se sube a GitHub: la captura y la llave viven solo en Oracle.
 set -u
-PCAP="${1:-$HOME/captura-nueva.pcap}"
+PCAP="${1:-}"
+if [ -z "$PCAP" ]; then
+  for c in "$HOME/captura-nueva.pcap" /home/ubuntu/captura-nueva.pcap /root/captura-nueva.pcap; do
+    [ -f "$c" ] && PCAP="$c" && break
+  done
+fi
+[ -n "$PCAP" ] || PCAP="$HOME/captura-nueva.pcap"
 OUT="${MOVIE_CDN_KEY:-/home/ubuntu/movie-cdn-key.txt}"
 AQUI="$(cd "$(dirname "$0")" && pwd)"
 

@@ -8372,10 +8372,18 @@ async function proxearHls(req, res, target) {
 }
 /* =================== fin v81: modo individual =================== */
 
-/* v217: estado del PCAP que subió el teléfono (para confirmar que llegó completo
-   sin entrar por SSH: GET /api/captura-estado) */
+/* v217.1: el server corre como root en Oracle (os.homedir()=/root) y el usuario
+   trabaja como ubuntu. Los archivos que el usuario debe VER (captura y llaves)
+   se guardan en /home/ubuntu cuando existe, para que no haya que copiarlos. */
+function carpetaArchivos() {
+  if (process.env.MOVIE_ARCHIVOS_DIR) return process.env.MOVIE_ARCHIVOS_DIR;
+  try { if (fs.existsSync('/home/ubuntu')) return '/home/ubuntu'; } catch {}
+  return os.homedir();
+}
+function capturaRuta() { return path.join(carpetaArchivos(), 'captura-nueva.pcap'); }
+function llavesRuta() { return path.join(carpetaArchivos(), 'sslkeylogfile.txt'); }
 function capturaEstado() {
-  const destino = path.join(os.homedir(), 'captura-nueva.pcap');
+  const destino = capturaRuta();
   try {
     const s = fs.statSync(destino);
     let cab = ''; try { const fd = fs.openSync(destino, 'r'); const b = Buffer.alloc(4); fs.readSync(fd, b, 0, 4, 0); fs.closeSync(fd); cab = b.toString('hex'); } catch {}
@@ -8398,7 +8406,7 @@ const server = http.createServer(async (req, res) => {
           if (n > 3 * 1024 * 1024) { res.writeHead(413, { 'Content-Type': 'text/plain' }); res.end('demasiado grande'); return; }
           chunks.push(c);
         }
-        fs.writeFileSync(path.join(os.homedir(), 'sslkeylogfile.txt'), Buffer.concat(chunks));
+        fs.writeFileSync(llavesRuta(), Buffer.concat(chunks));
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end('Listo: ' + n + ' bytes guardados en el servidor.');
         return;
@@ -8425,7 +8433,7 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify(capturaEstado()));
     }
     if (url.pathname === '/api/subir-captura') {
-      const destino = path.join(os.homedir(), 'captura-nueva.pcap');
+      const destino = capturaRuta();
       const TOPE = 2 * 1024 * 1024 * 1024;
       if (req.method === 'POST') {
         const parte = url.searchParams.get('parte');
