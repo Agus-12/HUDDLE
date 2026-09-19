@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v217'; // versión de la interfaz que sirve este servidor
+const UI_VERSION = 'v218'; // versión de la interfaz que sirve este servidor
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -8395,15 +8395,37 @@ const imgProxyCache = new Map(); /* v67: imágenes de animes proxyadas, url → 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   try {
+    /* v217.2: pagina unica y simple para subir archivos — asi nadie confunde la
+       pagina del PCAP (video capturado) con la de las llaves (archivo chico) */
+    if (url.pathname === '/subir') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      return res.end('<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>'
+        + '<body style="font-family:sans-serif;text-align:center;margin:28px 16px;line-height:1.5">'
+        + '<h2>Subir un archivo</h2>'
+        + '<p style="max-width:520px;margin:0 auto 18px">Elige lo que quieres subir:</p>'
+        + '<p><a href="/captura" style="display:inline-block;font-size:20px;padding:14px 22px;background:#1b5e20;color:#fff;text-decoration:none;border-radius:10px">Subir el video capturado (.pcap)</a></p>'
+        + '<p style="max-width:520px;margin:0 auto 18px;color:#555">Es el archivo grande de la captura del teléfono. Puede pesar cientos de MB: se sube por partes y se puede reanudar.</p>'
+        + '<p><a href="/llaves" style="display:inline-block;font-size:18px;padding:12px 20px;background:#37474f;color:#fff;text-decoration:none;border-radius:10px">Subir el archivo de llaves (chico)</a></p>'
+        + '<p style="max-width:520px;margin:0 auto;color:#555">Es <b>sslkeylogfile.txt</b>, de unos cientos de KB nada más.</p>'
+        + '<div id="e" style="margin-top:22px;color:#333;font-weight:bold"></div>'
+        + '<script>fetch("/api/captura-estado").then(function(r){return r.json()}).then(function(d){'
+        + 'document.getElementById("e").innerText = d&&d.existe ? ("En el servidor ya hay una captura de "+d.mb+" MB ("+d.tipo+").") : "En el servidor todavia no hay ninguna captura.";'
+        + '}).catch(function(){});</script>'
+        + '</body></html>');
+    }
     /* v210: subida de UNA VEZ del sslkeylogfile.txt desde el navegador (el scp y el
        puerto 47823 fallaron). GET = pagina minima; POST = guarda el cuerpo en
        ~/sslkeylogfile.txt. Sin clave a proposito: un solo uso, contenido inerte solo. */
-    if (url.pathname === '/api/subir-llaves') {
+    if (url.pathname === '/api/subir-llaves' || url.pathname === '/llaves') { /* v217.2: alias corto */
       if (req.method === 'POST') {
         const chunks = []; let n = 0;
         for await (const c of req) {
           n += c.length;
-          if (n > 3 * 1024 * 1024) { res.writeHead(413, { 'Content-Type': 'text/plain' }); res.end('demasiado grande'); return; }
+          if (n > 3 * 1024 * 1024) {
+            res.writeHead(413, { 'Content-Type': 'text/plain; charset=utf-8' });
+            return res.end('Ese archivo pesa mas de 3 MB. Esta pagina es SOLO para el archivo chico de llaves.\n'
+              + 'Si es el video capturado (.pcap), va en esta otra: http://' + (req.headers.host || '129.80.212.92:3000') + '/api/subir-captura');
+          }
           chunks.push(c);
         }
         fs.writeFileSync(llavesRuta(), Buffer.concat(chunks));
@@ -8414,9 +8436,13 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end('<html><head><meta charset="utf-8"></head><body style="font-family:sans-serif;text-align:center;margin-top:60px">' +
         '<h2>Subir el archivo de llaves</h2><p>Elige <b>sslkeylogfile.txt</b> y toca Subir.</p>' +
-        '<input type="file" id="f"><br><br><button onclick="s()" style="font-size:18px;padding:8px 24px">Subir</button>' +
+        '<input type="file" id="f" onchange="av()"><br><br><button onclick="s()" style="font-size:18px;padding:8px 24px">Subir</button>' +
         '<div id="r" style="margin-top:16px;font-weight:bold"></div>' +
-        '<script>async function s(){var f=document.getElementById("f").files[0];if(!f){document.getElementById("r").innerText="Elige el archivo primero";return;}document.getElementById("r").innerText="Subiendo...";var r=await fetch("/api/subir-llaves",{method:"POST",body:f});document.getElementById("r").innerText=await r.text();}</script>' +
+        '<script>'
+        + 'function av(){var f=document.getElementById("f").files[0],r=document.getElementById("r");if(!f)return;'
+        + 'if(f.size>2*1024*1024){r.innerHTML="Ese archivo pesa "+(f.size/1048576).toFixed(1)+" MB y es el de video (captura).<br><br><a href=\"/captura\" style=\"font-size:20px\">Subirlo aqui: pagina del PCAP</a>";}else{r.innerText="";}}'
+        + 'async function s(){var f=document.getElementById("f").files[0];if(!f){document.getElementById("r").innerText="Elige el archivo primero";return;}document.getElementById("r").innerText="Subiendo...";var r=await fetch("/api/subir-llaves",{method:"POST",body:f});document.getElementById("r").innerText=await r.text();}'
+        + '</script>' +
         '</body></html>');
       return;
     }
@@ -8432,7 +8458,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
       return res.end(JSON.stringify(capturaEstado()));
     }
-    if (url.pathname === '/api/subir-captura') {
+    if (url.pathname === '/api/subir-captura' || url.pathname === '/captura' || url.pathname === '/pcap') { /* v217.2: alias cortos */
       const destino = capturaRuta();
       const TOPE = 2 * 1024 * 1024 * 1024;
       if (req.method === 'POST') {

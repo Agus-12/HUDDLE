@@ -1,6 +1,32 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
-## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (tarde): v217 — EL CDN SÍ SIRVE SIN LLAVE (ESPEJOS) + SUBIDA POR PARTES
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (noche): v218 — YA REPRODUCE DESDE ORACLE ✔
+
+**Verificado contra el Oracle en vivo (129.80.212.92:3000), no es teoría:**
+- Oracle ya corre v217 y `/api/movie/espejos` confirma desde SU red que el espejo
+  responde: `147.124.216.142 -> 3 de 4 rutas 200` (el hostname j5t2n: 0 de 4).
+- Cadena completa probada **a través de Oracle**: ficha `v249939575` (The Runner) →
+  `Parte 1 · Latino` → playlist 200 (63 460 B) → **primer segmento 200 (3 364 636 B,
+  `video/MP2T`, sync 0x47)**. O sea: **el video reproduce desde el Oracle sin llave**.
+- Cobertura medida: **20 de las 24 tarjetas del inicio** bajan por el espejo. Frías hoy:
+  `03eda0610a9a`, `3edfb180c6e2`, `548e12c6671a`, `3feb06355fe7`.
+
+**Subida del PCAP — el error que quedó claro:** el usuario intentaba subir el `.pcap`
+en `/api/subir-llaves`, que es SOLO para `sslkeylogfile.txt` (tope 3 MB) ⇒ «demasiado
+grande». El PCAP va SIEMPRE en `/api/subir-captura`.
+
+**v218 (esta):** 
+- Página única `/subir` con dos botones grandes («Subir el video capturado (.pcap)» y
+  «Subir el archivo de llaves (chico)») y el estado de la captura que ya está en el server.
+- Alias cortos: `/captura` y `/pcap` → la página del PCAP; `/llaves` → la de llaves.
+- Si en la página de llaves se elige un archivo de más de 2 MB, avisa y ofrece el enlace
+  correcto; y el POST de llaves >3 MB responde con la URL buena en el mensaje.
+- Probado en local: `/subir`, `/captura`, `/pcap`, `/llaves`, el 413 con mensaje útil y
+  la subida por partes (200 KB, md5 intacto).
+
+---
+
+## ACTUALIZACIÓN ANTERIOR — 19 SEP 2026 (tarde): v217 — EL CDN SÍ SIRVE SIN LLAVE (ESPEJOS) + SUBIDA POR PARTES
 
 **Hallazgo grande de esta sesión (medido, no supuesto):** el CDN de Movie es
 CloudFront y la protección (`wsSecret`) la aplica una **función de borde**. Si el
