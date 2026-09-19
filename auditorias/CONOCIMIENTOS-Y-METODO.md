@@ -112,14 +112,19 @@ m3u8 sin firma.
 
 ---
 
-## 4) EL CATÁLOGO GRANDE (los «70 000») — LO NUEVO Y MÁS IMPORTANTE
+## 4) EL CATÁLOGO GRANDE (los «70 000») — ACTUALIZADO 19 SEP NOCHE
 
-**Lo que ya sabíamos (y sigue siendo cierto):** con invitado, `channel/get_info` de los 4 canales
-da 441 títulos únicos (159 Películas / 86 Telenovelas / 94 Series / 102 Animación). Probar
-`page`, `offset`, `limit`, `page_no`, `pageindex`, `last_id`, etc. **no cambia nada** (10 nombres
-probados). Tampoco funciona mandar `key/wd/keyword/search_key/story/name/q` como término.
+**Historia:** con invitado, `channel/get_info` de los 4 canales da 441 únicos. Géneros por `search/screen`
+daban 485 (techo de invitado). Todo eso queda superado:
 
-**LO NUEVO (19-sep, leído del cuerpo real que manda la app en la captura descifrada):**
+**LO NUEVO (19-sep noche, VÍA ABIERTA):** `POST /api/vod/info_new` funciona desde cualquier IP con
+`content-type: application/x-www-form-urlencoded` + `sign = MD5("Zox882LYjEn4Rqpa"+device_id+vod_id+cur_time).upper()`
+y `sign` de cabecera `MD5("47Q8tBqO4YqrMHf4"+device_id+cur_time).upper()`. Con eso, **cosecha secuencial
+`vod_id=1000→70000` reanudable** (`info_new` con `audio_type=0`) entrega **4,300 títulos en una tarde** (~3.7/s, 1,600 en 7 min, checkpoint cada 100, visible en `/api/intros` y `/api/movie/espejos`). El espejo `147.124.216.142` sirve lo en caché; sin llave la reproducción es parcial (14-24% medido).
+
+**LO QUE YA SABÍAMOS (y sigue siendo cierto) para contexto:** con `channel/get_info` 441, con géneros 485. `page/offset/limit` no pagina.
+
+**LO VIEJO (19-sep tarde, cuerpo de search/screen):**
 ```
 POST /api/search/screen
 type_id=1&psize=6&is_random=1&area=94407&type=Terror%2FChoque
@@ -152,7 +157,12 @@ Números de género en chino ya verificados que dan títulos: 恐怖 (terror), �
 
 ---
 
-## 5) LA REPRODUCCIÓN (el muro de la llave) — ESTADO EXACTO
+## 5) LA REPRODUCCIÓN (el muro de la llave) — ACTUALIZADO 19 SEP NOCHE
+
+**Hallazgo 19 sep noche (reportado por el usuario):** al entrar a **cada episodio nuevo**, la app
+**pide ver un anuncio**; ese anuncio es el que **genera el `wsSecret/wsTime` para ese episodio**.
+Sin ver el anuncio, `vod_url` solo da lo en caché del espejo → se ve a pedacitos. El hueco no
+es «el anuncio que falta», es **falta de firma**: `Hit from cloudfront` vs `FunctionGeneratedResponse`.
 
 **Cómo salen los videos:** `vod_url` = `http://movievn.j5t2n.com/vod/1/{año}/{mes}/{día}/{id12}/index5.m3u8`.
 La lista trae los pedacitos con `?sz=<bytes>&m8=<8 bytes>`. El player **firma cada petición**:
@@ -172,8 +182,9 @@ adaptativo y las de CloudFront).
 - Pedir **otros bordes CloudFront** (140 IPs) no sirve: ninguno tenía pedacitos fríos.
 - `?c=getts` (ruta interna del SDK para pedir la hora) sobre el CDN devuelve el mismo m3u8: no firma.
 
-**Por qué no hemos sacado la llave (todo probado, sin resultado):**
-- **605 millones** de tramos de bytes de los módulos (C compilado, `barrido_llave.c`).
+**Por qué no hemos sacado la llave (todo probado, sin resultado hasta 19 sep noche):**
+- **162,787,488 pruebas** sobre `/tmp/pphls_inflado.bin` (3,391,425 B) con `barrido_llave.c` — 4 largos (16/8/24/32) ×12 formas contra `9db1ede34113` (6aaa532c/101d6a42…) → 0. `ck=92b991df…` en hex/binario/mitades/MD5 contra 8 muestras ×3 formas → 0. Textos del SDK (45k) ×6 muestras ×3 rutas ×13 formas → 0.
+- Previo: **605 millones** de tramos históricos (barrido anterior).
 - **480 661** cadenas del APK/módulos × 6 muestras × 3 rutas × 13 formas (`probar_wssecret_multi.py`).
 - 3 208 claves derivadas de la propia dirección; 443 derivadas de constantes (cortes de la `ck`,
   MD5 de datos conocidos); matriz MD5/SHA1/SHA256/HMAC × 13 llaves × 15 formas.
@@ -182,13 +193,10 @@ adaptativo y las de CloudFront).
 ⇒ **La llave no está en el APK como texto ni se deriva de nada conocido: es aleatoria y vive dentro
 del motor interno del SDK (entra por un servicio de configuración en tiempo de ejecución).**
 
-**Lo que falta por probar (en orden de valor):**
-1. **Descifrar la captura y ver si `get_sys_conf`/`vod_share` traen material de llave** (herramienta lista).
-2. **Terminar el emulador del otro chat** (`emu_hls.py`): corre, pero termina en «métodos nativos
-   registrados: 0». Falta completar el `JNIEnv` de juguete (`FindClass`/`GetStaticMethodID`).
-   Alternativa equivalente: **correr la función de firma del módulo con la configuración viva** y
-   ver si reproduce la firma capturada (la función está localizada: ~`0xcc1xx–0xccad4`; el hash es
-   un import de la VM; tabla K de MD5 en `0x229af0`).
+**Lo que falta por probar (actualizado):**
+1. **SHOK ya descifrado** (19 sep): `AES-128-CBC 0123456789123456`, `iv=header[-16:]` → `p2p_config` con `ck` ya extraído; no trae llave CDN.
+2. **Vía A — emulador vivo:** `emu_hls.py` + `instrumentar-interprete.py --vivo` ejecutan `JNI_OnLoad` (862 opcodes) pero aún devuelven 0 (`GetEnv` ok, no `RegisterNatives`). Interprete `0xeff80–0xf2300` (2272 instr, plantillas `0x27f311/0x27f319`) y `ffi_call` en `0xf5088/0xf4764` hookeables. Siguiente: **patch Host VFILE para `base.apk` 55M + hook heap escritura `/vod/` para volcar `llave+ruta+wsTime` y validar con oráculo frío `4acbae6998e7/0010.ts`.** 
+3. Si la VM no cede, **Frida** sobre Android con root en `/control?msg=verify` (si aparece teléfono rooteado).
 3. **Frida sobre un Android con root** en `/control?msg=verify` (si aparece un teléfono rooteado).
 
 ---
@@ -321,21 +329,14 @@ Los archivos del repo y `~/apk-trabajo/` sí sobreviven. Si algo falla con «no 
 
 ---
 
-## 11) QUÉ SIGUE (plan priorizado, 19-sep noche)
+## 11) QUÉ SIGUE (plan priorizado, 19-sep noche — ACTUALIZADO)
 
-1. **Catálogo (abierto, en curso)**: barrer géneros/áreas con `cosechar-generos.py`; ampliar la lista
-   de géneros (español con acentos + chino) y confirmar el techo del invitado. Comparar contra los
-   441 y contra el total que declare la app. Si se estanca: probar el token del amigo (cuenta).
-2. **Llave del CDN (muro)**: descifrar el envoltorio `SHOK` de `get_sys_conf` (cuerpos de la captura
-   descifrada) y completar el emulador (`JNIEnv` de juguete) o correr la función de firma con la
-   configuración viva.
-3. **Reproducción**: con la llave, firmar en Huddle (`MD5(llave+ruta+wsTime)`) y verificar
-   inicio/mitad/final de un título. Sin llave, seguir usando el espejo + salto de huecos (v220) y
-   avisar al usuario qué se ve y qué no (v222).
-4. **Audio latino**: escucha/ASR de muestras de `type 2` antes de marcarlo latino.
-5. **Portadas**: mantener las originales; `/carita.png` de respaldo.
-6. **Interfaz**: el catálogo de Huddle ya se pagina solo (24 por página) y muestra disponibilidad;
-   cuando llegue el catálogo grande, revisar el rendimiento de `mapiSecciones()`/caché.
+1. **Catálogo (ABIERTO, en curso, ya rinde):** cosecha secuencial `info_new 1000→70000` reanudable → 4,300 títulos, visible en `/api/intros` y `/api/movie/espejos`. Seguir hasta 70k; no bloquea la llave. Si `/api/intros` lo muestra, la UI ya lo consume.
+2. **Llave del CDN (PRIORIDAD 1):** Vía A — patch Host VFILE + hook heap `/vod/` en intérprete `0xeff80`; validar con oráculo frío `4acbae6998e7/0010.ts` (200=buena). SHOK ya descartado como fuente de llave.
+3. **Reproducción:** con la llave, firmar `MD5(llave+ruta+wsTime)` en Huddle y verificar 3 puntos por título. Sin llave, espejo `147.124.216.142` + salto de huecos (v220) y barra v222; cada episodio hoy requiere **ver anuncio** para obtener pase (reportado por el usuario).
+4. **Audio latino:** escucha/ASR de `type 2` antes de marcar latino.
+5. **Portadas:** originales; `/carita.png` de respaldo.
+6. **Interfaz:** catálogo ya paginado (24/pág) con disponibilidad; con catálogo grande revisar rendimiento `mapiSecciones()`/caché y barra «Se ven ahora».
 
 ---
 

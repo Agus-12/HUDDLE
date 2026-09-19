@@ -1,6 +1,21 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
 > **PARA REANUDAR EN OTRO CHAT: leer primero `auditorias/CONOCIMIENTOS-Y-METODO.md`.**
+
+## ACTUALIZACIÓN — 19 SEP 2026 (v227+): CATÁLOGO REAL EN MARCHA Y LLAVE AL DESCUBIERTO PARCIAL
+
+**Hecho en este chat (19 sep noche, v227):**
+- **Catálogo real por `info_new` secuencial (no por géneros):** con `content-type` y fórmulas `sign` ya abiertas, `POST /api/vod/info_new` funciona desde cualquier IP. Nuevo cosechador `info_new` 1000→70000 reanudable (`/tmp/cosecha.log`, checkpoint cada 100) ya va en **4,300 títulos** (2,637→4,300 en la tarde, ~3.7 ids/s, 1,600 en 7 min). Se ve en vivo en `/api/intros` y `/api/movie/espejos` (espejo 147.124.216.142 con 3/4 rutas 200). El techo de 485 por géneros queda superado.
+- **Panel v227:** `UI_VERSION=v227` expone `llaveCdn` y `espejoPreferido` en `/api/estado` y pinta chip **Llave CDN SÍ/NO** + chip Espejo en `/api/intros`. Verificado en Oracle: `sudo systemctl restart huddle` → `v227, llaveCdn:false, espejos:[147...]`.
+- **Llave CDN — 162M pruebas y ad-gating:** barrido `barrido_llave` sobre `pphls_inflado.bin` (162,787,488 pruebas, 4 largos ×12 formas) → sin match. Prueba `ck` en hex/binario y mitades, y 45k textos del SDK → nada. Confirmado: la llave no está en claro en el módulo inflado.
+- **Hallazgo del usuario (clave):** al entrar a cada episodio nuevo la app pide **ver anuncio**; ese anuncio es el que genera el `wsSecret` para ese episodio. Sin anuncio, solo caché del espejo → cortes. El hueco no es el anuncio, es falta de firma. Por eso el espejo da 14-24% y no completo.
+- **Emulador Unicorn:** `emu_hls.py` carga `libpp_hls.so`, corre `INIT_ARRAY` y `JNI_OnLoad` (862 opcodes, `GetEnv` ok) pero devuelve `0x0` en vez de `0x10006` → no llega a `RegisterNatives`. Interprete `0xeff80–0xf2300` (2,272 instr) y plantillas `wsSecret=%s&wsTime=%x` en `0x27f319` verificadas. Siguiente: instrumentar intérprete y capturar buffer `llave+ruta+wsTime` antes del MD5 (Vía A, `instrumentar-interprete.py --vivo`).
+- **SHOK ya descifrado:** AES-128-CBC `0123456789123456`, `iv=header[-16:]`, H=45/29 → `p2p_config` con `ck=92b991...` y `backup_domain` ya extraídos. No trae llave CDN.
+
+**Qué sigue (en este chat, en paralelo):**
+1. Seguir cosecha 1000→70000 hasta 70k (reanudable, no estorba).
+2. Instrumentar intérprete Vía A hasta volcar el buffer firmado → oráculo frío `4acbae6998e7/0010.ts` (200=buena, 403=mala).
+3. Todo lo aprendido queda en este repo para reanudar sin repetir.
 > Ahí está TODO junto: qué sabemos del APK y de la API, el método de trabajo del agente,
 > las herramientas del repo, lo descartado (para no repetirlo) y el plan que sigue.
 > Este archivo sigue siendo la bitácora cronológica.
