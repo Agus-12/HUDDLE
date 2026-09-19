@@ -42,6 +42,23 @@ def bloques(ruta, tam=8 * 1024 * 1024, solape=8192):
             yield previo
 
 
+def diagnostico(ruta):
+    """Qué trae la captura: hosts, tracker y cuántas peticiones firmadas hay."""
+    marca = {'j5t2n': b'j5t2n', 'surfclick': b'surfclick', 'movievn': b'movievn',
+             'wsSecret=': b'wsSecret=', 'resource_md5_prefix': b'resource_md5_prefix',
+             'tracker 47.253.51.203': b'\x2f\xfd\x33\xcb', 'm3u8': b'.m3u8', '.ts': b'.ts?sz='}
+    cuenta = {k: 0 for k in marca}
+    tam = 0
+    for buf in bloques(ruta):
+        tam += len(buf)
+        for k, v in marca.items():
+            cuenta[k] += buf.count(v)
+    print('--- diagnóstico de la captura ---')
+    for k, v in cuenta.items():
+        print('   %-24s %d' % (k + ':', v))
+    return cuenta
+
+
 def ternas(ruta):
     """Devuelve [(ruta, wsSecret, wsTime)] únicas, sacadas del propio archivo."""
     fuera = {}
@@ -108,6 +125,7 @@ def main():
     captura = sys.argv[1]
     salida = sys.argv[2] if len(sys.argv) > 2 else '/home/ubuntu/movie-cdn-key.txt'
 
+    diagnostico(captura)
     T = ternas(captura)
     print('ternas reales (ruta + wsSecret + wsTime) encontradas en la captura:', len(T))
     for r, ws, wst in T[:6]:
