@@ -326,3 +326,9 @@ conf_key correcto y su respuesta con resource_md5_prefix. Bloque grep entregado 
 
 Siguiente: mapa de endpoints REALES usados por el app en el volcado (bloque grep :path
 entregado al usuario) para hallar llamadas no documentadas (posible entrega de prefix).
+
+
+## 19 sep ~12:40 — 4j4damaqa muerto tambien desde Oracle (000). m3u8 firmado trae
+segmentos relativos SIN firma (el app firma cada .ts al vuelo). Sin llave no hay video.
+Pendiente: mapa de endpoints reales (grep :path) del volcado — ultimo espejo de alguna
+entrega del prefijo; si no, mini-captura nueva del amigo buscando la peticion que lo trae.
