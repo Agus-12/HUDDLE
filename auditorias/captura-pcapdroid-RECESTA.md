@@ -314,3 +314,9 @@ sha1/sha256 tambien negativos. Sunshine muerto. resource_md5_prefix NO viaja en 
 (grep=0; tracker.pcap vacio => el app no uso p2p en la sesion). Pendiente: prueba del
 dominio 4j4damaqa desde Oracle (bloque entregado). Si falla: unica fuente = mini-captura
 nueva del amigo (el addon ya queda instalado en su telefono).
+
+
+## 19 sep ~12:10 — subdominios j5t2n/4j4damaqa sin firma: todos 403/000. Nueva via:
+
+el volcado descifrado ~/http2-descifrado.txt podria contener llamadas get_sys_conf con el
+conf_key correcto y su respuesta con resource_md5_prefix. Bloque grep entregado al usuario.
