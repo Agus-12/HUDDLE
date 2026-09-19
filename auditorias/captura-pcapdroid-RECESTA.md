@@ -290,3 +290,12 @@ v-ficha/v-populares OK en Oracle (v211 desplegado). El m3u8 plano da 403 desde O
 (solo acepta IPs de teléfono, igual que el sandbox). Salidas: (a) probar UA okhttp/4.12.0
 y Referer contra el CDN; (b) derivar la llave Wangsu de 16 chars con las ternas
 wsSecret/wsTime LIMPIAS que están en ~/http-descifrado.txt (HTTP plano del PCAP).
+
+
+## 19 sep ~10:30 — llave Wangsu: brute ciego agotado; buscar en el trafico tracker
+
+URLs firmadas del amigo VIGENTES horas (200/206 desde sandbox). Brute de la llave con
+diccionarios/ordenes/ck: negativo. RE del signer MIPS/ARM64: la cadena wsSecret solo
+existe en el modulo MIPS y sin xrefs directas (gp-rel) — costoso. Via barata: el tracker
+p2p (47.253.51.203:7202, UDP plano) podria traer resource_md5_prefix; grep en
+~/captura-sign.pcap y strings de /tmp/tracker.pcap (bloque entregado al usuario).
