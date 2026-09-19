@@ -124,6 +124,10 @@ la veía sin scrollear) y su encabezado del home también dice "Movie". UI_VERSI
 Verificado desde sandbox: Oracle sirve app.js con `titulo: 'Movie'` y /api/trending con
 movieApi (24 portadas reales). El usuario no la veía por caché del navegador + fila
 enterrada; con v214 aparece PRIMERO en el home. Push 9916eea.
+v215 (bug REAL encontrado con captura del usuario): el `#nvdBox` solo salía de `hidden`
+dentro del `if (d.novelas.length)`; como /api/trending devuelve `novelas: 0` (fuente
+externa apagada) y `movieApi: 24`, la caja quedaba oculta aunque hubiera tarjetas.
+Ahora `classList.remove('hidden')` también corre cuando movieApi pinta. Push f13dfc3.
 
 **Cacería de la llave CDN — CERRADA por vías baratas (19 sep ~12:40):** la llave Wangsu
 NO está en el PCAP (sin resource_md5_prefix; el app no usó p2p en esa sesión), NO viene
