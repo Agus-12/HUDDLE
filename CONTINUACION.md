@@ -39,7 +39,57 @@ Después de resolver reproducción: audio siempre latino, comprobar por ASR o es
 
 ---
 
-## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (madrugada, 6ª): DENTRO DEL APK (sin emulador)
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (día): DENTRO DE LA FIRMA (v223.3-v223.6)
+
+**Lo que el otro chat dejó y sirve:** `auditorias/INFORME-TECNICO-APK-Y-CATALOGO.md`,
+`auditorias/crack/` con su **emulador Unicorn** (`emu_hls.py`, `emu_jiagu.py`), las
+librerías desempacadas (`pphls_elf_interno.so`, `jiagu_modulo_vivo.bin`) y la receta de
+la firma: `wsSecret = MD5(llave + ruta_sin_consulta + wsTime_hex)`, claves de 16.
+
+**Pruebas hechas hoy (todas sin red, contra la muestra real capturada):**
+- `auditorias/crack/probar_wssecret.py`: **1,75 millones** de cadenas del APK + módulos
+  desempacados × 12 formas de armar la firma × 4 formas del tiempo → nada.
+- `auditorias/crack/barrido_llave.c`: buscador en C (compilado) que prueba **cada tramo de
+  bytes** (largo 8/16/24/32) de los módulos como llave: **605 millones** de pruebas → nada.
+- Matriz de funciones de hash (MD5/SHA1/SHA256/HMAC) × 13 llaves conocidas × 15 formas,
+  incluyendo la **`ck` completa de 64 hex** leída EN VIVO de `sys_conf.p2p_config`
+  (`92b991dfcf878f362f6044f3d6e013255c0726617e4d178588890ecdab1d291c7`) → nada.
+- **La API está VIVA**: `verificar_api.py` da un falso «backend caído» porque su sonda no
+  manda `content-type` (el servidor devuelve el error chino sin esa cabecera). Con la
+  cabecera, `public/init` responde code 10000 y `vod/info_new` entrega `vod_url` sin firma.
+  Nuevo: `auditorias/crack/ver_sysconf.py`.
+
+**Desensamblado del módulo desempacado (lo importante):**
+- El código de firma es ARM64 NATIVO y está localizado: función en ~**0xcc1xx–0xccad4**.
+  Plantillas exactas encontradas: `%s%s%x` → `wsSecret=%s&wsTime=%x`, `%s%s%u` →
+  `wsSecret=%s&wsTime=%u`, `%s-%d-%d-%d-%s` → `auth_key=%d-%d-%d-%s` (Wangsu adaptativo),
+  CloudFront (`{"Statement":[{"Resource":"%s%s",...}]`, `Signature=%s&Expires=%u&Key-Pair-Id=%s`),
+  `%s?c=getts` (pedir la hora al servidor), `verify=%u-%s`, `m3u8_key`, `Badci: %s`.
+- La llamada al hash está en **0xcca6c → 0x9f0a0**, que es un **salto a import** (GOT en
+  0x2d5000, **vacía** en el volcado) ⇒ el hash lo provee el entorno de la VM, no el módulo.
+  Tabla K de MD5 presente en 0x229af0 e IVs en 0x2323f0 (el algoritmo soportado es MD5).
+- Herramientas nuevas: `rastrear_firma.py` (rastreador ADRP+ADD con Capstone; ojo: hay que
+  decodificar `immlo` en los bits 30-29 — sin eso no encuentra nada).
+
+**Tokens del CDN (medido hoy en vivo):**
+- El token capturado el 16-sep (`index5.m3u8` de `9db1ede34113`) **SIGUE dando 200 hoy** y
+  desde otra IP ⇒ los tokens duran **días**, no horas.
+- Están **amarrados al archivo**: el mismo token sobre `0000.ts` o `0050.ts` de la misma
+  carpeta da 403.
+- `147.124.216.142` (espejo) sirve solo lo que tiene en memoria: su caché **rota** — hoy la
+  carpeta `4acbae6998e7` (que estaba 21/30) está en 403 hasta el playlist.
+- Barrido de **140 bordes CloudFront** × 4 pedacitos con `--resolve`: 37 respondieron 403,
+  el resto ni contesta y **ninguno tenía los pedacitos fríos** ⇒ la vía «pedir a otro borde»
+  queda descartada.
+
+**Plan inmediato:** (a) sacar MÁS muestras firmadas de la captura que ya está en Oracle con
+`scripts/ver-urls-cdn.py`; (b) buscar el `sslkeylogfile.txt` que el usuario dice estar en
+Oracle y descifrar el HTTPS del teléfono; (c) seguir con el emulador para hacer correr la
+función de firma con la configuración viva y ver si reproduce la firma capturada.
+
+---
+
+## ACTUALIZACIÓN ANTERIOR — 19 SEP 2026 (madrugada, 6ª): DENTRO DEL APK (sin emulador)
 
 Desarmé el APK en el taller (el código Java SÍ se puede leer; solo el reproductor está
 protegido). Hallazgos:
