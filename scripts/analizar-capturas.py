@@ -86,6 +86,8 @@ def analizar(ruta):
         print(f"     {n:4d}x  {k}")
     print("\n  --- verificaciones con las firmas ---")
     print(f"     archivos firmados distintos: {len(firmas)}")
+    secretos = set(v[1] for v in firmas.values())
+    print(f"     pases distintos: {len(secretos)}  (si hay menos que archivos, la firma no depende del archivo)")
     if repes:
         print(f"     OJO: {sum(repes.values())} casos del MISMO archivo firmado distinto (la firma cambia por peticion)")
         for k, n in repes.most_common(5): print(f"        {n}x {k[:110]}")
