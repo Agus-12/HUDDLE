@@ -306,3 +306,11 @@ p2p (47.253.51.203:7202, UDP plano) podria traer resource_md5_prefix; grep en
 (1) grep resource_md5_prefix/strings en trafico tracker del PCAP (bloque en manos del
 usuario, 4a entrega); (2) RE del signer MIPS (gp-rel, costoso) si (1) falla.
 Prueba extra en el mismo bloque: dominio 4j4damaqa.com sin firma desde Oracle.
+
+
+## 19 sep ~11:50 — RE MIPS agotado (raw blob sin ELF, sin xrefs abs, sin prologos PIC)
+
+sha1/sha256 tambien negativos. Sunshine muerto. resource_md5_prefix NO viaja en el PCAP
+(grep=0; tracker.pcap vacio => el app no uso p2p en la sesion). Pendiente: prueba del
+dominio 4j4damaqa desde Oracle (bloque entregado). Si falla: unica fuente = mini-captura
+nueva del amigo (el addon ya queda instalado en su telefono).
