@@ -39,7 +39,38 @@ Después de resolver reproducción: audio siempre latino, comprobar por ASR o es
 
 ---
 
-## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (tarde, v223.7-v223.9): FIRMAS NUEVAS Y MINERO DE CAPTURAS
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (noche, v224-v225): 252 FIRMAS Y DESCIFRADO DE HTTPS
+
+**El usuario minó sus capturas (gracias):** 193 + 21 + 31 + 7 = **252 firmas reales** de
+muchas carpetas (2023→2026) y el archivo `~/sslkeylogfile.txt` (641 sesiones TLS).
+Datos que salen del minado:
+- **Cada archivo lleva su propio pase** (192 archivos → 192 pases distintos). Un mismo
+  archivo re-pedido lleva **pase nuevo con wsTime nuevo** → confirma `MD5(llave+ruta+tiempo)`.
+- **Servidores TLS del teléfono:** `sdkapi-ga.biggogo.com`, `sdkapi-ga.smallyy.com` (SDK de
+  anuncios de **oktdata.com**, paquete `com.yk.e` — NO es el reproductor), y muchos de anuncios.
+- El SDK de anuncios trae su propio AES (`QwEr12TyUi!@Op34AsDf#$GhJk56L%^Z`) — probado, no
+  sirve para la firma.
+
+**Probador offline (`auditorias/crack/probar_wssecret_multi.py`) — todo sin resultado:**
+- 480 661 cadenas del APK/módulos × 6 muestras × 3 rutas × 13 formas.
+- 3 208 claves derivadas de la propia dirección (carpeta, nombre, fecha).
+- 443 claves derivadas de constantes (cortes de la `ck`, MD5 de datos conocidos).
+- Antes: 605 millones de tramos de bytes (barrido_llave.c, en C).
+⇒ **La llave no está en el APK ni se deriva de nada conocido: es aleatoria/remota.**
+
+**NUEVO SENSOR — `scripts/descifrar-https.sh` (probado en el taller con una sesión TLS real):**
+Descifra una captura con el `sslkeylogfile.txt` y lista: peticiones HTTP/1.1 y HTTP/2
+(host, verbo, ruta), cuerpos POST y rastros de llaves. Comando:
+`bash scripts/descifrar-https.sh ~/captura-sign.pcap` (tarda por el tamaño).
+Es la vía para ver **exactamente** qué pidió el teléfono a la API (incluida la paginación
+del catálogo de 70k) y si alguna llamada trae material de llave.
+
+**Otras vías cerradas hoy:** los servidores del SDK (`sdkapi-ga.*`) están vivos pero piden
+credenciales; los frontales de otras marcas devuelven el mismo marcador `freecine.cn`.
+
+---
+
+## ACTUALIZACIÓN ANTERIOR — 19 SEP 2026 (tarde, v223.7-v223.9): FIRMAS NUEVAS Y MINERO DE CAPTURAS
 
 **El usuario consiguió (gracias):**
 - Oracle tiene **4 capturas**: `captura-movie.pcap` (667 MB), `captura-sign.pcap` (116 MB),

@@ -37,6 +37,45 @@ def derivadas(ruta):
             for i in range(len(s) - 15):
                 yield s[i:i+16]
 
+def derivadas_de_constantes():
+    """Llaves sacadas de las constantes conocidas: cortes de la ck, MD5 de datos, etc."""
+    base = {
+        "ck": "92b991dfcf878f362f6044f3d6e013255c0726617e4d17858890ecdab1d291c7",
+        "hls": "87c2cb7ff568d602d5f806c473345600",
+        "de": "de304f03fe653f329edfea08ea2046c4",
+        "dev": "3736e27f0823b1ba",
+        "sec": "Zox882LYjEn4Rqpa",
+        "hdr": "47Q8tBqO4YqrMHf4",
+        "badci": "c433b213c8398954d54f59210283c0",
+    }
+    for nom, h in base.items():
+        yield h
+        yield h.upper()
+        for m in (hashlib.md5(h.encode()).hexdigest(),
+                  hashlib.md5(h.upper().encode()).hexdigest(),
+                  hashlib.md5(h.encode()).hexdigest().upper()):
+            yield m
+            yield m[:16]
+            yield m[16:]
+            yield m[-16:]
+        if len(h) % 2 == 0:
+            try:
+                b = bytes.fromhex(h)
+            except ValueError:
+                continue
+            for i in range(0, len(b) - 15):
+                yield b[i:i+16]
+                yield b[i:i+16].hex()
+                yield b[i:i+16].hex().upper()
+    for ruta, t, s in MUESTRAS:
+        partes = ruta.strip("/").split("/")
+        for dato in (partes[-2], partes[-1], partes[-1].split(".")[0], "".join(partes[-5:-2])):
+            for v in (dato, dato.upper(), dato.lower()):
+                for m in (hashlib.md5(v.encode()).hexdigest(), hashlib.md5(v.encode()).hexdigest().upper()):
+                    yield m
+                    yield m[:16]
+                    yield m[16:]
+
 def candidatas(usar_derivadas=False):
     vistos = set()
     def ok(s):
@@ -75,7 +114,7 @@ def candidatas(usar_derivadas=False):
                 if ok(c): yield c
 
 def formas(k, p, t, ti):
-    kb = k.encode("latin1")
+    kb = k if isinstance(k, bytes) else k.encode("latin1")
     yield ("md5(k+p+t)", hashlib.md5(kb + p.encode() + t.encode()).hexdigest())
     yield ("md5(k+p+t)u", hashlib.md5(kb + p.encode() + t.encode()).hexdigest().upper())
     yield ("md5(p+k+t)", hashlib.md5(p.encode() + kb + t.encode()).hexdigest())
@@ -131,10 +170,15 @@ def main():
     variantes = [[r, r[1:], r.split("?")[0]] for r, t, s in cortas]
     print(f"muestras distintas usadas: {len(cortas)} de {len(MUESTRAS)}")
     n = 0
+    for k in derivadas_de_constantes():
+        n += 1
+        if probar_candidata(k, cortas, variantes):
+            return
     for k in candidatas(False):
         n += 1
         if probar_candidata(k, cortas, variantes):
             return
     print(f"probadas {n} candidatas x {len(cortas)} muestras x 3 rutas x 13 formas -> sin resultado")
 
-main()
+if __name__ == "__main__":
+    main()
