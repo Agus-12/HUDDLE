@@ -81,3 +81,20 @@ El PCAP no se sube a GitHub porque es grande y contiene tráfico privado.
 - El usuario actualiza Oracle con `bash ~/huddle/actualizar.sh`.
 - Cada avance se documenta aquí y en `CONTINUACION.md`, se confirma con commit y se sube a GitHub.
 - Al terminar la sesión, recordar revocar el PAT usado para el push.
+
+## 6. Actualización v217 (19 sep, tarde) — el CDN sí sirve sin llave por el espejo
+
+- El CDN es CloudFront. La firma `wsSecret` la aplica una **función de borde**: si el
+  objeto está **en la caché del borde**, sale **200 sin firma**; si el borde está frío,
+  sale `403` con `X-Cache: FunctionGeneratedResponse from cloudfront`.
+- Medido: contra `http://147.124.216.142` (el espejo) **20 de las 24 tarjetas del inicio**
+  bajan playlist + segmentos reales. Por `movievn.j5t2n.com` todo da 403.
+- `server.js` v217 hace la cadena completa por el espejo (prueba espejos primero y cae al
+  host original). Diagnóstico: `curl -s http://127.0.0.1:3000/api/movie/espejos`.
+- **Subida del PCAP (error «demasiado grande»)**: el archivo NO va a GitHub (público, tope
+  100 MB). Va a `http://129.80.212.92:3000/api/subir-captura`, que desde v217 sube **por
+  partes de 4 MB con progreso y reanudación** (hasta 2 GB). `/api/subir-llaves` es solo
+  para el `sslkeylogfile.txt` (3 MB).
+- Estado de la subida sin SSH: `curl -s http://127.0.0.1:3000/api/captura-estado`.
+- El cazador `scripts/buscar-llave-cdn.sh` ya no necesita tshark: saca las ternas reales de
+  la propia captura y solo canta victoria si reproduce TODAS.

@@ -42,6 +42,15 @@ GitHub** (el repo es público y GitHub corta a 100 MB). Va SOLO a
 `/api/subir-llaves` es solo para el sslkeylogfile de 3 MB). Con la v217 esa página
 sube por partes y se puede reanudar.
 
+**Medición de las 24 tarjetas del inicio (19-sep ~13:20, desde el sandbox):** 20
+responden 200 por el espejo (playlist real). Solo 4 están frías:
+`03eda0610a9a` (Tierra de amor y coraje), `3edfb180c6e2` (Tan cerca de ti),
+`548e12c6671a` (Guardián de mi vida) y `3feb06355fe7` (El Renacer de Luna).
+El control de la misma lista (`9db1ede34113`) sigue 200 ⇒ el espejo está vivo.
+***Dead end probado:*** probar IPs sueltas sacadas de `ip-ranges.json` de AWS
+(sample de 80) NO encuentra bordes cálidos: casi todas ni contestan por IP sin
+Host/SNI. El único espejo útil conocido sigue siendo `147.124.216.142`.
+
 **Estado de la misión:** la fila Movie del home (24 tarjetas con portada),
 `/api/movie/ficha/v<vod>` («Parte 1 · Latino») y la cadena playlist→segmento
 funcionan **por el espejo**. Falta confirmar desde Oracle con
