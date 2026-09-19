@@ -243,3 +243,15 @@ libre (mitmdump muerto) y —dato clave— el teléfono del amigo YA conectó a 
 pruebas del proxy de WiFi, o sea que su red NO lo bloquea. El "Broken pipe" que vio el
 amigo en Movie era PCAPdroid rompiendo conexiones por el exportador muerto; con puerto
 vivo desaparece.
+
+
+## 🎉 19 sep ~08:56 — CAPTURA DE 111 MB + KEYLOG TLS 1.3 EN MANO
+
+- Exportador TCP a 8080 FUNCIONÓ: `~/captura-sign.pcap` = 111 MiB.
+- PCAPdroid entregó al terminar `sslkeylogfile.txt` (473K, secretos TLS1.3:
+  SERVER/CLIENT_HANDSHAKE_TRAFFIC_SECRET, EXPORTER_SECRET, SERVER_TRAFFIC_SECRET_0).
+  El usuario lo adjuntó al chat como `uploads/llaves.txt`; se subió a Oracle vía
+  `POST /api/subir-llaves` (483334 bytes en ~/sslkeylogfile.txt).
+- Siguiente paso: `tshark -r captura-sign.pcap -o tls.keylog_file:~/sslkeylogfile.txt`
+  en Oracle y grep de info_new. El PCAP salió SIN descifrar (grep info_new = 0 en crudo),
+  o sea que el descifrado del addon no aplicó al app Movie — pero con el keylog da igual.
