@@ -211,3 +211,16 @@ desconocido mientras el proceso viva. Se enciende para la prueba y se apaga desp
   CAs de usuario (comprobado antes: los POST upgrade sí se descifraron). Lo que **no** se
   puede capturar es el `/control?msg=verify` local (va a 127.0.0.1 y no pasa por la VPN):
   por eso se ataca por el lado de la API, no por el del SDK.
+
+
+---
+
+## ❌ RESULTADO 2ª PRUEBA WIFI-PROXY (19 sep ~00:13) — VÍA DESCARTADA DEFINITIVAMENTE
+
+El amigo hizo la prueba completa (proxy + omitir localhost + 3 fichas). Resultado:
+`capturadas: 14` líneas = **1 sola petición: `POST /api/public/upgrade`**. Cero `info_new`,
+igual que la prueba del 18-sep. Conclusión firme: el app enruta `info_new` (y el video)
+por un stack que IGNORA el proxy del sistema; solo `upgrade` lo respeta. **El proxy de
+WiFi jamás verá la firma.** La vía que queda es PCAPdroid (nivel VPN) con SOCKS5 hacia
+el mitmdump del servidor (`--mode socks5`) — el teléfono ya tiene PCAPdroid y ya confía
+en la CA.
