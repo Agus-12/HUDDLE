@@ -1,5 +1,36 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
+> **PARA REANUDAR EN OTRO CHAT: leer primero `auditorias/CONOCIMIENTOS-Y-METODO.md`.**
+> Ahí está TODO junto: qué sabemos del APK y de la API, el método de trabajo del agente,
+> las herramientas del repo, lo descartado (para no repetirlo) y el plan que sigue.
+> Este archivo sigue siendo la bitácora cronológica.
+
+## URGENTE — 19 SEP 2026 (noche, v227): EL CATÁLOGO GRANDE SE ABRE POR GÉNEROS
+
+Se leyó en la captura descifrada **el cuerpo real que la app manda a `search/screen`**:
+`type_id=1&psize=6&is_random=1&area=94407&type=Terror%2FChoque`.
+- `psize` (tope 20 por llamada), `is_random` (siempre el mismo bloque en la práctica),
+  **`type` = género en texto** y **`area` = número**. `page` sigue sin funcionar.
+- **Barrer géneros devuelve títulos NUEVOS**: en el taller, 45 géneros → **221 títulos**;
+  con `type_id=1` y `type_id=2` + chino → **227** en 12 llamadas. Hay camino para crecer
+  más allá de los 441 (script nuevo: `auditorias/crack/cosechar-generos.py`).
+- Géneros que responden (español): Acción, Comedia, Terror/Choque, Drama, Suspenso, Animación,
+  Aventura, Fantasía, Guerra, Familia, Historia, Deportes. En chino: 恐怖, 科幻, 犯罪, 纪录片,
+  奇幻, 悬疑, 剧情, 惊悚, 音乐 (varios en español dan 0: probar su variante china).
+- Pendiente: envoltorio `SHOK` de `get_sys_conf` (los cuerpos llegan como
+  `valorSHOK<base64>SHOK<base64>`; descifrarlo puede esconder material de llave).
+
+## CÓMO SE TRABAJÓ DESDE v217 (resumen para el siguiente chat)
+
+- Se construyó y verificó: catálogo Movie por apartados (441), disponibilidad real por título
+  (solo el 10 % completo; el resto depende del espejo), salto de huecos del reproductor,
+  visor de URLs, minero de capturas, analizador de capturas, descifrador de HTTPS y lector de
+  llamadas de la app (todo probado antes de entregarlo).
+- La llave del CDN no está en el APK ni se deriva de nada conocido (más de 600 millones de
+  pruebas): vive dentro del SDK y entra en ejecución.
+- El `sslkeylogfile.txt` del usuario **sí descifra** las capturas: ya se ven las llamadas
+  HTTP/2 de la API (antes invisibles). Ese fue el avance que abrió el catálogo por géneros.
+
 ## INFORME TÉCNICO COMPLETO — 19 SEP 2026
 
 El detalle técnico público de la APK, el protocolo, el método de obtención del catálogo y la diferencia entre los **441 títulos comprobados** y las **70 000 todavía no obtenidas** está en `auditorias/INFORME-TECNICO-APK-Y-CATALOGO.md`. No afirmar que ya se descargaron 70 000: la API invitada solo entregó 441 y el catálogo grande requiere una captura real del teléfono, una cuenta con más contenido o el resultado verificable del otro chat con emulador.
@@ -39,20 +70,7 @@ Después de resolver reproducción: audio siempre latino, comprobar por ASR o es
 
 ---
 
-## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (noche, v226.1): LECTOR DE LLAMADAS LISTO
-
-`scripts/ver-llamadas-app.py` reescrito y PROBADO (con una captura HTTP/2 real y con una
-respuesta cifrada de prueba): junta cada llamada por conexión y flujo, muestra **lo que la
-app ENVÍA** y **lo que RECIBE** (descifrando base64 → AES-128-CBC con las llaves de la app)
-con la estructura y los datos útiles. Se adapta solo a la versión de tshark (verifica qué
-campos existen) para que no vuelva a fallar en Oracle, y enmascara tokens/firmas.
-Comando: `python3 scripts/ver-llamadas-app.py ~/captura-sign.pcap --paths=info_new,screen,channel`
-
-(La versión anterior falló en Oracle porque pedía un campo que tshark 4.2 no tiene.)
-
----
-
-## ACTUALIZACIÓN ANTERIOR — 19 SEP 2026 (noche, v226): EL HTTPS DEL TELEFONO YA SE ABRE
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (noche, v226): EL HTTPS DEL TELEFONO YA SE ABRE
 
 **¡ROTO EL MURO!** El `sslkeylogfile.txt` del usuario descifra la captura. Salida real de
 `scripts/descifrar-https.sh ~/captura-sign.pcap` (Oracle):
@@ -1023,7 +1041,7 @@ POST https://surfclick.vd7au6.com/api/public/upgrade
   app_id: movievn      version: 40000     sys_platform: 2
   device_id: 3736e27f0823b1ba             channel_code: movievn_sh_1000
   cur_time: 1789515864447                 (= 2026-09-15 23:44:24 UTC)
-  token: gAAAAABqqSpPhjbhvV8e08AIfhMyEJjy1TGDSPXEHr18SpQdCUFXWUPzeL6OYKNKo-JeoSCUVAz7nfMh6So7BhIRg10KQhdHLYFvDOlijjuM8GPW-T0DjTJP9sp_GmAzKW-lm0Kicp5J
+  token: gAAAAABqqSpPhj...[tapado]
   sign: A526BDCB05C2CD7AE5EF38D96E56687F
   user-agent: okhttp/4.12.0
   RESP: {"code": 10000, "message": "Success", "result": null}
