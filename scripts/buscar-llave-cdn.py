@@ -103,18 +103,53 @@ def candidatos(ruta, tope=900000, minimo=8):
     return vistos
 
 
-def reproduce(llave, ruta, ws, wst):
-    """¿md5(llave + ruta + wsTime) == wsSecret?  (con las variantes del firmador)"""
-    variantes = [ruta, ruta[1:]]
-    tiempos = [wst]
+def variantes_parte(u):
+    """Formas en que la librería podría meter la ruta en la firma."""
+    p = u
+    sin_slash = p[1:] if p.startswith('/') else p
+    con_query = p if '?' in p else p + '?sz=_&m8=_'
+    fuera = [p, sin_slash]
     try:
-        tiempos.append(str(int(wst, 16)))
+        from urllib.parse import urlsplit
+        sp = urlsplit(u if u.startswith('http') else 'http://movievn.j5t2n.com' + (p if p.startswith('/') else '/' + p))
+        fuera.append(sp.path)
+        fuera.append(sp.path + ('?' + sp.query if sp.query else ''))
+        fuera.append(sp.netloc + sp.path)
+        fuera.append(sp.scheme + '://' + sp.netloc + sp.path)
+    except Exception:
+        pass
+    fuera.append(con_query)   # la URL tal cual vino, con sus ?sz&m8
+    vistas, salida = set(), []
+    for f in fuera:
+        if f and f not in vistas:
+            vistas.add(f); salida.append(f)
+    return salida
+
+
+def variantes_tiempo(wst):
+    """El instante puede ir en hex o en decimal."""
+    salida = [wst]
+    try:
+        salida.append(str(int(wst, 16)))
     except ValueError:
         pass
-    for rr in variantes:
-        for tt in tiempos:
-            if hashlib.md5((llave + rr + tt).encode()).hexdigest() == ws:
-                return True
+    return salida
+
+
+def reproduce(llave, ruta, ws, wst, detalle=False):
+    """¿md5 combinando llave + ruta + wsTime == wsSecret? Prueba las 6 órdenes y
+    las formas habituales de armar la cadena (la firma real puede traer la URL
+    completa, o el tiempo en otro sitio de la cadena)."""
+    partes_r = variantes_parte(ruta)
+    partes_t = variantes_tiempo(wst)
+    k = llave
+    for rr in partes_r:
+        for tt in partes_t:
+            for cadena in (k + rr + tt, rr + k + tt, k + tt + rr, tt + k + rr, rr + tt + k, tt + rr + k):
+                if hashlib.md5(cadena.encode()).hexdigest() == ws:
+                    if detalle:
+                        print('   FIRMA REPRODUCIDA -> orden:', ['k+r+t','r+k+t','k+t+r','t+k+r','r+t+k','t+r+k'][0], '| cadena:', cadena)
+                    return True
     return False
 
 

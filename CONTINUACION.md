@@ -1,6 +1,29 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
-## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (madrugada): v220 — ADELANTAR YA NO REINICIA
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (madrugada, 2ª): v220.1 — BÚSQUEDA DE LLAVE CON MÁS FÓRMULAS
+
+El cazador de texto ahora prueba **muchas más formas** de armar la firma: 6 órdenes
+(llave+ruta+tiempo y sus permutaciones), 7 formas de la parte de la ruta (ruta pelada,
+sin la barra inicial, **URL completa http://host/ruta**, host+ruta, con su ?sz&m8…) y
+2 formas del tiempo (hex y decimal). Probado con dos capturas sintéticas: encuentra la
+llave tanto con la fórmula estándar como con «llave + URL completa + tiempo decimal».
+Negativa correcta. **Esto importa porque** la búsqueda previa solo probaba 4
+combinaciones; si la librería arma la cadena de otra manera, ahora sale.
+
+**Cobertura medida de las 24 tarjetas** (muestreo en 0/20/40/60/80/100 %):
+COMPLETAS en la muestra: Coyote contra Acme, Enfrentados: Marfil, Crew Girl T1.
+Parciales (5/6): La noche del demonio, El fin de Oak Street, El Juicio, Zona Cero,
+Reacher T4. Muy parciales: **The Runner 17 %** (solo el arranque), Mushoku-tensei 17 %,
+El señor de los cielos T10 33 %, Lanterns 33 %, Lovesick 33 %. Fría: Buddy.
+Sin lista: Tierra de amor y coraje, Guardián de mi vida, Tan cerca de ti, El Renacer
+de Luna.
+
+**Pendiente humano:** `bash scripts/buscar-llave-cdn.sh ~/captura-nueva.pcap` (otra vez,
+ya trae las fórmulas nuevas; tarda segundos la parte de texto).
+
+---
+
+## ACTUALIZACIÓN ANTERIOR — 19 SEP 2026 (madrugada): v220 — ADELANTAR YA NO REINICIA
 
 El usuario reportó: al adelantar una peli sale «Reconectando…» y **vuelve al inicio**
 (le pasa en The Runner; en Zona Cero no, y esa se ve excelente). **Causa medida:**
