@@ -1,6 +1,44 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
-## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (noche): v218 — YA REPRODUCE DESDE ORACLE ✔
+## ACTUALIZACIÓN MÁS RECIENTE — 19 SEP 2026 (noche, 2ª): v219 — EL BUG DEL PLAY ERA DE HUDDLE, NO DEL CDN
+
+**Los dos errores que veía el usuario, reproducidos y arreglados (v219):**
+1. En **Solo** salía «URL no válida»: `/api/solo` exigía URL absoluta
+   (`^https?://…`) y el catálogo vivo manda una ruta de NUESTRO proxy
+   (`/api/movie/v-vid?url=…`).
+2. En **sala (Juntos)** salía «No se pudo espejar: no se pudo lanzar Chrome»: el
+   bloque de la acción `mirror` solo tomaba el camino NATIVO si la URL era
+   `http(s)://`; con ruta relativa se saltaba a `startMirror` = navegador remoto
+   (y en Oracle falla porque a Chrome le falta una librería del sistema).
+**Arreglo:** `esStreamPropioUS()` reconoce `/api/movie/v-vid`, `/api/movie/hls`,
+`/api/hls`, `/api/xd` como flujos YA resueltos ⇒ se reproducen nativos en sala y
+en Solo, sin navegador. Probado con navegador real (puppeteer) contra un Huddle
+local: **play OK en los dos modos** (la burbuja dura 6413 s = la peli completa; en
+sala el video avanza ~13 s en 14 s de reloj).
+
+**Estado real del video (ojo, expectativa correcta):** el espejo solo tiene EN
+CACHÉ lo que alguien ya vio. Medido en The Runner: **21 de 30** primeros segmentos
+200; del 0150, 0300 y 0450 → 403. O sea: **arranca y se ve un rato**, pero una
+película larga se corta al llegar a la parte fría. La llave Wangsu sigue siendo la
+que hace falta para ver completo.
+
+**Captura nueva del amigo (39.5 MB, ya en Oracle) — análisis:** 7 ternas firmadas
+reales, 366 menciones de `.ts`, 25 paquetes del rastreador `47.253.51.203`, y
+`resource_md5_prefix: 0`. La carpeta que reprodujo, `65328ba10998` (18-sep), **no
+es ninguna de las 24 tarjetas** y **sí responde 200 en el espejo**. Su PCAP no trae
+la llave como texto.
+
+**v219.1 — cazador nuevo:** `scripts/cazar-llave-bytes.py` parte TODAS las ventanas
+de 16 bytes del tráfico UDP (rastreador primero) y valida contra las ternas reales
+de la propia captura; si la llave es binaria la guarda como `hex:` y el server la
+acepta igual. `buscar-llave-cdn.sh` ahora corre las DOS búsquedas (texto y bytes) y
+reporta al final. Probado con dos capturas sintéticas (positiva cruda y negativa).
+**Pendiente humano:** correr `bash scripts/buscar-llave-cdn.sh ~/captura-nueva.pcap`
+en Oracle (la captura está ahí desde las 13:14).
+
+---
+
+## ACTUALIZACIÓN ANTERIOR — 19 SEP 2026 (noche): v218 — YA REPRODUCE DESDE ORACLE ✔
 
 **Verificado contra el Oracle en vivo (129.80.212.92:3000), no es teoría:**
 - Oracle ya corre v217 y `/api/movie/espejos` confirma desde SU red que el espejo
