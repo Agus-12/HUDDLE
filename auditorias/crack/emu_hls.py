@@ -517,6 +517,11 @@ class Emu:
         self.opcodes = []
         self.dispatch = []
         self.vm_trace = []
+        self.direct_calls = []
+        self.ffi_calls = []
+        self.jni_unknown = []
+        self.jni_reads = []
+        self.getenv_env_addr = 0
 
     # -- relocalizaciones --
     def _apply_relocs(self):
@@ -1054,8 +1059,7 @@ class Emu:
         self.jni_reads = []
         self.jni_unknown = []
         self.getenv_env_addr = 0
-        self.direct_calls = []
-        self.ffi_calls = []
+        # no reiniciar direct_calls/ffi_calls: ya vienen del init para diagnóstico
         table = self.host._alloc(232 * 8)
         for i in range(232):
             a = JNI_PAGE + 0x1000 + i * 0x10
