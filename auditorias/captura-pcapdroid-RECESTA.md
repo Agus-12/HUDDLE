@@ -234,3 +234,12 @@ El teléfono del amigo no pudo conectar a 47823 ("failed to connect"), aunque de
 sandbox el puerto SÍ acepta (probado 2 veces). Bloqueo de salida en la red del amigo.
 Recibidor reiniciado con PCAP_PORT=443 (salida casi nunca bloqueada). El amigo cambia
 "Puerto del colector" a 443.
+
+
+## 19 sep ~02:15 — 443 imposible (EACCES, puerto privilegiado) → recibidor en 8080
+
+`listen EACCES 0.0.0.0:443`: ubuntu no puede ligar <1024. Vuelta a 8080: es >1024, está
+libre (mitmdump muerto) y —dato clave— el teléfono del amigo YA conectó a 8080 en las
+pruebas del proxy de WiFi, o sea que su red NO lo bloquea. El "Broken pipe" que vio el
+amigo en Movie era PCAPdroid rompiendo conexiones por el exportador muerto; con puerto
+vivo desaparece.
