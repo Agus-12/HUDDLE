@@ -282,3 +282,11 @@ reproduce las 3 firmas reales del amigo. PERO el servidor sigue devolviendo el e
 chino desde el sandbox incluso con token propio válido (result.user_info.token).
 Hipótesis restante: cabecera(s) extra del teléfono o binding device→algo. Siguiente:
 extraer TODAS las cabeceras del POST real del amigo desde ~/http2-descifrado.txt.
+
+
+## 19 sep ~10:00 — CDN j5t2n 403 también desde Oracle
+
+v-ficha/v-populares OK en Oracle (v211 desplegado). El m3u8 plano da 403 desde Oracle
+(solo acepta IPs de teléfono, igual que el sandbox). Salidas: (a) probar UA okhttp/4.12.0
+y Referer contra el CDN; (b) derivar la llave Wangsu de 16 chars con las ternas
+wsSecret/wsTime LIMPIAS que están en ~/http-descifrado.txt (HTTP plano del PCAP).
