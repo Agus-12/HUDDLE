@@ -50,9 +50,11 @@ def candidatas(usar_derivadas=False):
             for i in range(len(s) - 15):
                 if ok(s[i:i+16]): yield s[i:i+16]
     archivos = []
+    aqui = os.path.dirname(os.path.abspath(__file__))
     for pat in ["/home/user/apk-trabajo/apk.apk", "/home/user/apk-trabajo/lib/*",
-                os.path.dirname(os.path.abspath(__file__)) + "/*.bin",
-                os.path.dirname(os.path.abspath(__file__)) + "/*.so"]:
+                aqui + "/*.bin", aqui + "/*.so",
+                os.path.expanduser("~/huddle/auditorias/crack/*.bin"),
+                os.path.expanduser("~/huddle/auditorias/crack/*.so")]:
         archivos += glob.glob(pat)
     for f in archivos:
         try:
@@ -91,10 +93,20 @@ def formas(k, p, t, ti):
 def main():
     global MUESTRAS
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    tope = 24
+    for a in sys.argv:
+        if a.startswith("--max="): tope = int(a.split("=")[1])
     usar_derivadas = "--derivadas" in sys.argv
     if args:
         datos = json.load(open(args[0]))
         MUESTRAS = [(m["ruta"], m["t"], m["s"]) if isinstance(m, dict) else tuple(m) for m in datos]
+        # si una llave funciona, funciona para todas: basta probar unas cuantas
+        vistas = set(); cortas = []
+        for m in MUESTRAS:
+            if m[0] not in vistas:
+                vistas.add(m[0]); cortas.append(m)
+        MUESTRAS = cortas[:tope]
+        print(f"muestras distintas usadas: {len(MUESTRAS)} (de {len(datos)})")
     variantes = [[r, r[1:], r.split("?")[0]] for r, t, s in MUESTRAS]
     n = 0
     for k in candidatas(usar_derivadas):
