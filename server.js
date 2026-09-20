@@ -6411,7 +6411,14 @@ function buscarMovieCosecha(q) {
       if (!_cosechaItems || st.mtimeMs !== _cosechaItemsMtime) {
         const txt = fs.readFileSync(est.archivo.ruta, 'utf8');
         const j = JSON.parse(txt);
-        _cosechaItems = Array.isArray(j) ? j : (Array.isArray(j.items) ? j.items : (Array.isArray(j.result) ? j.result : []));
+        _cosechaItems = Array.isArray(j) ? j : (Array.isArray(j.items) ? j.items : (Array.isArray(j.result) ? j.result : (() => {
+          /* v228.3: el archivo de cosecha es un dict {id: {nombre, vod_id, ...}} */
+          if (j && typeof j === 'object') {
+            const keys = Object.keys(j).filter((k) => /^\d+$/.test(k));
+            if (keys.length > 100) return keys.map((k) => Object.assign({ id: +k }, j[k]));
+          }
+          return [];
+        })()));
         _cosechaItemsMtime = st.mtimeMs;
       }
       _cosechaItemsAt = now;
@@ -9173,7 +9180,14 @@ const server = http.createServer(async (req, res) => {
             try {
               const txt2 = fs.readFileSync(est.archivo.ruta, 'utf8');
               const j2 = JSON.parse(txt2);
-              cosechaArr = Array.isArray(j2) ? j2 : (Array.isArray(j2.items) ? j2.items : (Array.isArray(j2.result) ? j2.result : null));
+              cosechaArr = Array.isArray(j2) ? j2 : (Array.isArray(j2.items) ? j2.items : (Array.isArray(j2.result) ? j2.result : (() => {
+                /* v228.3: dict {id: {nombre, vod_id, ...}} */
+                if (j2 && typeof j2 === 'object') {
+                  const keys2 = Object.keys(j2).filter((k) => /^\d+$/.test(k));
+                  if (keys2.length > 100) return keys2.map((k) => Object.assign({ id: +k }, j2[k]));
+                }
+                return null;
+              })()));
             } catch {}
           }
           if (cosechaArr && cosechaArr.length > 500) {
