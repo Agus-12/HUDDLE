@@ -4648,6 +4648,166 @@ async function buscarCuevana(q) {
   })).filter((x) => x.title && x.url);
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+ *  CUEVANA.MOV — Búsqueda + Resolución (v235, 20 Sep 2026)
+ *  Fuente: https://cuevana.mov/ — 8,182 películas, 97.8% con latino
+ *  API: /wp-json/wpreact/v1/movie/{slug} → videos.latino[]
+ *  Hosts HTTP: goodstream.one (m3u8 directo), vimeos.net/hlswish.com (JS packed)
+ * ═══════════════════════════════════════════════════════════════════ */
+
+const CUEVANA_API = 'https://cuevana.mov/wp-json/wpreact/v1/movie/';
+const CUEVANA_POSTS_API = 'https://cuevana.mov/wp-json/wpreact/v1/postsapi';
+const CUEVANA_SITEMAPS = Array.from({length: 9}, (_, i) => `https://cuevana.mov/pelicula-sitemap${i ? i+1 : ''}.xml`);
+const CUEVANA_HOSTS_OK = ['goodstream.one', 'vimeos.net', 'hlswish.com', 'videoapp.zip'];
+let cuevanaIdx = { slugs: [], at: 0 };
+const CUEVANA_IDX_TTL = 24 * 3600 * 1000;
+const cuevanaMetaCache = new Map(); /* slug → {at, data} */
+
+/* Índice de Cuevana: descarga los 9 sitemaps cada 24h */
+async function cuevanaIndice() {
+  if (cuevanaIdx.slugs.length && Date.now() - cuevanaIdx.at < CUEVANA_IDX_TTL) return cuevanaIdx.slugs;
+  const slugs = [];
+  for (const url of CUEVANA_SITEMAPS) {
+    const r = await fetchSeguro(url, 15000).catch(() => null);
+    if (!r || !r.ok) continue;
+    const t = await r.text();
+    const re = /<loc>https?:\/\/cuevana\.[a-z.]+\/pelicula\/\d+\/([^<]+)<\/loc>/g;
+    let m;
+    while ((m = re.exec(t))) slugs.push(m[1].replace(/\/$/, ''));
+  }
+  cuevanaIdx = { slugs: [...new Set(slugs)], at: Date.now() };
+  console.log('[cuevana] ' + cuevanaIdx.slugs.length + ' slugs en sitemap');
+  return cuevanaIdx.slugs;
+}
+
+/* Buscar películas de Cuevana por query */
+async function buscarCuevanaMov(q) {
+  const nq = normalizarTxt(q);
+  const tokens = nq.split(/\s+/).filter(Boolean);
+  if (!tokens.length) return [];
+  const slugs = await cuevanaIndice();
+  const cand = [];
+  for (const s of slugs) {
+    let ok = true, score = 0;
+    for (const t of tokens) {
+      const i = s.indexOf(t);
+      if (i < 0) { ok = false; break; }
+      score += i === 0 ? 2 : 1;
+    }
+    if (ok) cand.push({ s, score: score - s.length / 100 });
+  }
+  cand.sort((a, b) => b.score - a.score);
+  const top = cand.slice(0, 12);
+  const hits = [];
+  for (const c of top) {
+    const meta = await cuevanaMeta(c.s);
+    if (meta) hits.push(meta);
+  }
+  return hits;
+}
+
+/* Metadata de una película de Cuevana (cache 15 min) */
+async function cuevanaMeta(slug) {
+  const c = cuevanaMetaCache.get(slug);
+  if (c && Date.now() - c.at < 15 * 60 * 1000) return c.data;
+  const r = await fetchSeguro(CUEVANA_API + encodeURIComponent(slug), 10000).catch(() => null);
+  if (!r || !r.ok) return null;
+  const d = await r.json().catch(() => null);
+  if (!d || !d.titles) return null;
+  const lat = (d.videos && d.videos.latino) || [];
+  if (!lat.length) return null;
+  const result = {
+    title: d.titles.name || slug.replace(/-/g, ' '),
+    url: 'https://cuevana.mov/pelicula/' + (d.TMDbId || '') + '/' + slug,
+    img: (d.images && d.images.poster) || '',
+    site: 'Cuevana',
+    extra: ['Latino', d.runtime ? d.runtime + 'min' : '', d.releaseDate ? d.releaseDate.slice(0, 4) : ''].filter(Boolean).join(' · '),
+  };
+  cuevanaMetaCache.set(slug, { at: Date.now(), data: result });
+  return result;
+}
+
+/* Resolver película de Cuevana → m3u8 (solo audio latino) */
+async function resolverCuevanaMov(pageUrl) {
+  const slugM = /\/pelicula\/\d+\/([^/?#]+)/i.exec(pageUrl) || /\/pelicula\/([^/?#]+)/i.exec(pageUrl);
+  if (!slugM) throw new Error('URL de Cuevana no válida: ' + pageUrl);
+  const slug = slugM[1];
+  const r = await fetchSeguro(CUEVANA_API + encodeURIComponent(slug), 12000);
+  if (!r.ok) throw new Error('API Cuevana error: ' + r.status);
+  const d = await r.json();
+  const lat = (d.videos && d.videos.latino) || [];
+  if (!lat.length) throw new Error('Cuevana: sin embeds latinos para ' + slug);
+  /* Priorizar hosts que funcionan via HTTP puro */
+  const sorted = [...lat].sort((a, b) => {
+    const ai = CUEVANA_HOSTS_OK.indexOf(new URL(a.url || 'https://x').hostname);
+    const bi = CUEVANA_HOSTS_OK.indexOf(new URL(b.url || 'https://x').hostname);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
+  for (const embed of sorted) {
+    if (!embed.url) continue;
+    const host = new URL(embed.url).hostname;
+    try {
+      let m3u8 = null;
+      if (/goodstream\.one/i.test(host)) {
+        /* m3u8 directo en HTML */
+        const er = await fetchSeguro(embed.url, 12000);
+        if (!er.ok) continue;
+        const html = await er.text();
+        const m = /file\s*[:=]\s*["'](https?:\/\/[^"']+master\.m3u8[^"']*?)["']/i.exec(html)
+          || /(https?:\/\/[^\s"'<>]+master\.m3u8[^\s"'<>]*)/i.exec(html);
+        if (m) m3u8 = m[1];
+      } else if (/vimeos\.net|hlswish\.com/i.test(host)) {
+        /* JS packed → m3u8 */
+        const er = await fetchSeguro(embed.url, 12000);
+        if (!er.ok) continue;
+        const html = await er.text();
+        const pm = /eval\(function\(p,a,c,k,e,d\)\{.+?\}\('(.+?)',(\d+),(\d+),'([^']*)'\.split/.exec(html);
+        if (pm) {
+          const pStr = pm[1], aVal = +pm[2], cVal = +pm[3], k = pm[4].split('|');
+          const toBase = (n, b) => { if (!n) return '0'; const d = []; while (n) { d.push('0123456789abcdefghijklmnopqrstuvwxyz'[n % b]); n = Math.floor(n / b); } return d.reverse().join(''); };
+          let result = pStr;
+          for (let i = cVal - 1; i >= 0; i--) {
+            const w = toBase(i, aVal);
+            if (i < k.length && k[i]) result = result.replace(new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g'), k[i]);
+          }
+          const m = /(https?:\/\/[^\s"'<>]+master\.m3u8[^\s"'<>]*)/i.exec(result);
+          if (m) m3u8 = m[1];
+        }
+      } else if (/videoapp\.zip/i.test(host)) {
+        /* videoapp.zip redirige a vimeos.net — intentar igual */
+        const er = await fetchSeguro(embed.url, 12000);
+        if (!er.ok) continue;
+        const html = await er.text();
+        const pm = /eval\(function\(p,a,c,k,e,d\)\{.+?\}\('(.+?)',(\d+),(\d+),'([^']*)'\.split/.exec(html);
+        if (pm) {
+          const pStr = pm[1], aVal = +pm[2], cVal = +pm[3], k = pm[4].split('|');
+          const toBase = (n, b) => { if (!n) return '0'; const d = []; while (n) { d.push('0123456789abcdefghijklmnopqrstuvwxyz'[n % b]); n = Math.floor(n / b); } return d.reverse().join(''); };
+          let result = pStr;
+          for (let i = cVal - 1; i >= 0; i--) {
+            const w = toBase(i, aVal);
+            if (i < k.length && k[i]) result = result.replace(new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g'), k[i]);
+          }
+          const m = /(https?:\/\/[^\s"'<>]+master\.m3u8[^\s"'<>]*)/i.exec(result);
+          if (m) m3u8 = m[1];
+        }
+      }
+      if (m3u8) {
+        /* Verificar que el m3u8 sirve */
+        const vr = await fetchSeguro(m3u8, 8000).catch(() => null);
+        if (vr && vr.ok) {
+          const txt = await vr.text().catch(() => '');
+          if (txt.includes('#EXTM3U')) {
+            const cdnHost = new URL(m3u8).hostname;
+            if (!hlsReferers[cdnHost]) hlsReferers[cdnHost] = 'https://' + host + '/';
+            return { m3u8, subs: [] };
+          }
+        }
+      }
+    } catch {}
+  }
+  throw new Error('Cuevana: ningún host resolvió m3u8 para ' + slug);
+}
+
 /* v70: fuera las búsquedas de GoPelis y AnimeFLV (código retirado) */
 const metaCache = new Map();
 const serieCache = new Map();
@@ -4866,24 +5026,56 @@ async function pelisxdPorGenero(slug) {
     return items;
   } catch { return []; }
 }
+/* v235: Cuevana películas por género */
+const PXD_CV_GENERO_MAP = {
+  accion: 'accion', animacion: 'animacion', aventura: 'aventura',
+  belica: 'belico', 'ciencia-ficcion': 'ciencia-ficcion', comedia: 'comedia',
+  crimen: 'crimen', documental: 'documental', drama: 'drama',
+  fantasia: 'fantasia', historia: 'historia', misterio: 'intriga',
+  musica: 'musical', romance: 'romance', suspense: 'suspenso', terror: 'terror',
+};
+const cuevanaGeneroCache = new Map();
+async function cuevanaPorGenero(slug) {
+  const cvSlug = PXD_CV_GENERO_MAP[slug] || slug;
+  const c = cuevanaGeneroCache.get(cvSlug);
+  if (c && Date.now() - c.at < 3 * 3600 * 1000 && c.items.length) return c.items;
+  try {
+    const r = await fetchSeguro(`https://cuevana.mov/wp-json/wpreact/v1/postsapi?per_page=15&page=1&genre=${cvSlug}`, 12000);
+    if (!r.ok) return [];
+    const d = await r.json().catch(() => ({}));
+    const items = (d.posts || []).filter(p => p.type === 'pelicula').slice(0, 12).map(p => ({
+      title: p.title || '',
+      url: 'https://cuevana.mov/pelicula/' + (p.tmdb_id || '') + '/' + p.slug,
+      img: p.featured_image || '',
+      site: 'Cuevana',
+      extra: p.year || '',
+    }));
+    if (items.length) cuevanaGeneroCache.set(cvSlug, { at: Date.now(), items });
+    return items;
+  } catch { return []; }
+}
+
 async function peliculasPorGenero(slug, pag) {
   if (pag > 1) { /* v205: páginas del catálogo — directas, sin caché */
     return (await generoPagina(slug, pag)).items.slice(0, 20);
   }
   const c = generosCache.get(slug);
   if (c && Date.now() - c.at < 60 * 60 * 1000 && c.items.length) return c.items;
-  const [cv, pxd] = await Promise.all([
+  const [cv, pxd, cvMov] = await Promise.all([
     generoPagina(slug, 1).catch(() => ({ items: [] })),
     pelisxdPorGenero(slug).catch(() => []),
+    cuevanaPorGenero(slug).catch(() => []), /* v235: cuevana.mov — 8k películas */
   ]);
-  const cvItems = (cv.items || []).slice(0, 12);
-  const pxdItems = (pxd || []).slice(0, 12);
-  /* Mezclar: alternar Cuevana y PelisXD para que se vea variado */
+  const cvItems = (cv.items || []).slice(0, 10);
+  const pxdItems = (pxd || []).slice(0, 10);
+  const cvMovItems = (cvMov || []).slice(0, 10);
+  /* Mezclar: alternar Cuevana, PelisXD y Cuevana.mov para que se vea variado */
   const mezcla = [];
-  const max = Math.max(cvItems.length, pxdItems.length);
-  for (let i = 0; i < max && mezcla.length < 24; i++) {
+  const max = Math.max(cvItems.length, pxdItems.length, cvMovItems.length);
+  for (let i = 0; i < max && mezcla.length < 30; i++) {
     if (cvItems[i]) mezcla.push(cvItems[i]);
     if (pxdItems[i]) mezcla.push(pxdItems[i]);
+    if (cvMovItems[i]) mezcla.push(cvMovItems[i]);
   }
   const items = mezcla.length ? mezcla : cvItems;
   if (items.length) generosCache.set(slug, { at: Date.now(), items });
@@ -6798,8 +6990,9 @@ function buscarMovieCosecha(q) {
 
 async function buscarEnSitios(q) {
   const nq = normalizarTxt(q);
-  const [cuevana, latanime, animeflv, pelisxd, cari, catalogo, movieCosecha] = await Promise.all([
+  const [cuevana, cuevanaMov, latanime, animeflv, pelisxd, cari, catalogo, movieCosecha] = await Promise.all([
     buscarCuevana(q).catch(() => []),
+    buscarCuevanaMov(q).catch(() => []), /* v235: cuevana.mov — 8k películas latinas */
     buscarLatanime(q).catch(() => []),
     buscarAnimeflv(q).catch(() => []), /* v97 */
     buscarPelisxd(q).catch(() => []), /* v98: el catálogo grande de pelis */
@@ -6822,6 +7015,7 @@ async function buscarEnSitios(q) {
   const todos = [
     ...lctHits,
     ...puntuar(cuevana),
+    ...puntuar(cuevanaMov), /* v235: cuevana.mov — 8k películas latinas */
     ...puntuar(pelisxd),
     ...puntuar(latanime),
     ...puntuar(animeflv),
@@ -9234,6 +9428,26 @@ async function pelisxdLatest() {
     return items;
   } catch { return pxdLatestCache.items; }
 }
+/* v235: Cuevana últimas películas para el feed */
+const cuevanaLatestCache = { at: 0, items: [] };
+async function cuevanaLatest() {
+  if (Date.now() - cuevanaLatestCache.at < 3 * 3600 * 1000 && cuevanaLatestCache.items.length) return cuevanaLatestCache.items;
+  try {
+    const r = await fetchSeguro('https://cuevana.mov/wp-json/wpreact/v1/postsapi?per_page=20&page=1', 12000);
+    if (!r.ok) return cuevanaLatestCache.items;
+    const d = await r.json().catch(() => ({}));
+    const items = (d.posts || []).filter(p => p.type === 'pelicula').slice(0, 18).map(p => ({
+      title: p.title || '',
+      url: 'https://cuevana.mov/pelicula/' + (p.tmdb_id || '') + '/' + p.slug,
+      img: p.featured_image || '',
+      site: 'Cuevana',
+      extra: p.year || '',
+    }));
+    if (items.length) { cuevanaLatestCache.at = Date.now(); cuevanaLatestCache.items = items; }
+    return items;
+  } catch { return cuevanaLatestCache.items; }
+}
+
       /* v55: populares del día + v57: series recién agregadas
        * v101: + 6 filas de género que rotan cada día
        * v102: + caricaturas (debajo de los animes) */
@@ -9269,6 +9483,7 @@ async function pelisxdLatest() {
         movieApi: await mapiTarjetasHome(), /* v212: vitrina viva de la API Movie (portadas reales) */
         generos: (generos || []).map((g) => ({ slug: g.slug, nombre: g.nombre, items: fCV(g.items) })).filter((g) => g.items.length),
         pelisxd: await pelisxdLatest().catch(() => []),
+        cuevana: await cuevanaLatest().catch(() => []), /* v235: cuevana.mov — 8k películas latinas */
       });
     }
     if (url.pathname.startsWith('/api/enp/')) { /* v206.2: ficha de novela de EnPantallaTV (por prefijo) */
@@ -10047,6 +10262,7 @@ async function pelisxdLatest() {
         /* v90: episodio de Latanime → resolver de animes (mp4 directo) */
         const esEpAnime = /latanime\.org\/ver\/|animeflv\.one\/ver\//i.test(target); /* v97: también AnimeFLV */
         const esPeliXd = /pelisxd\.com\/pelicula\//i.test(target); /* v98 */
+        const esCuevanaMov = /cuevana\.mov\/pelicula\//i.test(target); /* v235 */
         const esCari = /miscaricaturas\.com\//i.test(target); /* v102: caricaturas */
         const esLct = /lacartoons\.com\/serie\/capitulo\//i.test(target); /* v112: lacartoons */
         const esDani = /danimados\.cc\/episodios\//i.test(target); /* v179: danimados en Solo — sin esto TODO el catálogo nuevo caía al resolutor viejo de Cuevana: «Este título no tiene servidor goodstream» */
@@ -10055,7 +10271,7 @@ async function pelisxdLatest() {
         const esEnp = /enpantallatv\.com\/[a-z0-9-]*capitulo/i.test(target); /* v206.2 */
         const esMovie = new RegExp(MOVIE_HOST_VIRTUAL.replace(/\./g, '\\.') + '\\/ver\\/', 'i').test(target); /* v207: Movie (mapa local) */
         let r;
-        try { r = await (esMovie ? resolverMovie(target) : esEpAnime ? resolverAnime(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esGp ? resolverGopelis(target) : esNv ? resolverNovela(target) : esEnp ? resolverEnp(target) : resolverSolo(target)); epsPerdonar(target); } /* v205.5 + v206 + v206.2 + v207 */
+        try { r = await (esMovie ? resolverMovie(target) : esEpAnime ? resolverAnime(target) : esCuevanaMov ? resolverCuevanaMov(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esGp ? resolverGopelis(target) : esNv ? resolverNovela(target) : esEnp ? resolverEnp(target) : resolverSolo(target)); epsPerdonar(target); } /* v205.5 + v206 + v206.2 + v207 + v235 cuevana.mov */
         catch (e2r) { epsFallo(target); throw e2r; } /* v205.5: episodios muertos al contador */
         return json(res, 200, { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy });
       } catch (e) {
