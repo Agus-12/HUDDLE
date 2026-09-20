@@ -1802,3 +1802,13 @@ body.sala-girada .pd-results { max-height: 50dvw; }
 .cat-total { flex: none; color: var(--dim); font-size: 12px; }
 .cat-sent { height: 4px; }
 .cat-loader { display: flex; justify-content: center; padding: 14px 0; }
+
+/* v234: separación visual entre géneros del feed */
+#generosBox .sr-sec { 
+  padding-top: 12px; 
+  border-top: 1px solid rgba(255,255,255,0.06); 
+}
+#generosBox .sr-sec:first-child { 
+  border-top: none; 
+  padding-top: 0; 
+}

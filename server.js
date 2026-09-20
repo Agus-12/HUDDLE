@@ -4792,14 +4792,16 @@ const GENEROS_ES = [
 ];
 const generosCache = new Map(); /* slug → {at, items} */
 function generosDelDia() {
-  /* rotación diaria determinista: 6 géneros barajados por la fecha —
-   * mañana el feed se ve distinto sin tocar nada */
+  /* v234: TODOS los géneros, barajados por la fecha — el feed se ve lleno
+   * y distinto cada día. Fisher-Yates determinista. */
   const dia = Math.floor(Date.now() / 864e5);
-  return GENEROS_ES
-    .map((g, i) => ({ g, k: ((i * 2654435761 + dia * 40503) >>> 0) % 9973 }))
-    .sort((a, b) => a.k - b.k)
-    .slice(0, 6)
-    .map((x) => x.g);
+  const arr = [...GENEROS_ES];
+  let seed = dia * 2654435761;
+  for (let i = arr.length - 1; i > 0; i--) {
+    seed = ((seed * 48271 + 12345) >>> 0) % (i + 1);
+    [arr[i], arr[seed]] = [arr[seed], arr[i]];
+  }
+  return arr;
 }
 /* v205: SOLO películas en las filas/género de pelis (las series tienen su
  * área) + pag para el catálogo «Ver todo» (cine-calidad pagina de verdad) */
