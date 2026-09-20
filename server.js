@@ -4949,7 +4949,8 @@ async function extraerStreamwishPeli(pageUrl) {
 
       /* === BYSE (byseqekaho.com y similares) === */
       if (/byse|byseqekaho/i.test(host)) {
-        const code = embedUrl.replace(/.*\//, '');
+        const code = embedUrl.replace(/\/+$/, '').replace(/.*\//, '');
+        if (!code) { console.warn('[pxd] byse sin código en URL: ' + embedUrl); continue; }
         const apiUrl = 'https://' + host + '/api/videos/' + code;
         const rApi = await fetchSeguro(apiUrl, 12000, { Referer: embedUrl });
         if (!rApi.ok) { console.warn('[pxd] byse API ' + rApi.status); continue; }
