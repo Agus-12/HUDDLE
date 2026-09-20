@@ -9146,6 +9146,16 @@ const server = http.createServer(async (req, res) => {
         }
         return json(res, 200, { ok: true, espejos: MOVIE_ESPEJOS, preferido: movieEspejoPreferido() || null, llaveCdn: !!movieCdnKey(), hosts });
       }
+      if (url.pathname === '/api/movie/probar-resolver') { /* v228.7: diagnóstico remoto del resolutor nativo */
+        const u = url.searchParams.get('url') || '';
+        if (!u) return json(res, 400, { ok: false, error: 'falta url' });
+        try {
+          const nat = await resolverNativo(u);
+          return json(res, 200, { ok: true, nat: nat && { url: nat.url, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: (nat.subs || []).length } });
+        } catch (e) {
+          return json(res, 200, { ok: false, error: String(e && e.message || e).slice(0, 200) });
+        }
+      }
       if (url.pathname === '/api/movie/probar') { /* v207: diagnóstico — comprueba m3u8 + primer .ts de cada ruta activa contra el origen */
         movieRecargar();
         const probarUno = async (u, conRango) => {
