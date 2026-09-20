@@ -480,7 +480,7 @@ async function verificarByse(slug) {
 
 async function sondaPelisxd() {
   const memMB = process.memoryUsage().heapUsed / 1024 / 1024;
-  if (memMB > 500) { console.warn('[sonda] pxd saltado — memoria alta: ' + memMB.toFixed(0) + 'MB'); return; }
+  if (memMB > 350) { console.warn('[sonda] pxd saltado — memoria alta: ' + memMB.toFixed(0) + 'MB'); return; }
   const POR_CICLO = 15; /* v234: reducido para no saturar memoria */
   const t0 = Date.now();
   let nuevas_ok = 0, nuevas_fail = 0, vivas_muertas = 0, muertas_vivas = 0;
@@ -620,7 +620,7 @@ async function verificarCuevana(slug) {
 async function sondaCuevana() {
   try {
     const memMB = process.memoryUsage().heapUsed / 1024 / 1024;
-    if (memMB > 500) { console.warn('[sonda] cv saltado — memoria alta: ' + memMB.toFixed(0) + 'MB'); return; }
+    if (memMB > 350) { console.warn('[sonda] cv saltado — memoria alta: ' + memMB.toFixed(0) + 'MB'); return; }
     const sitemap = await cuevanaIndice();
     if (!sitemap.length) return;
     const start = Date.now();
