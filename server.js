@@ -4656,13 +4656,16 @@ function mismaPagina(a, b) {
 const FETCH_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'; /* v199: compartida — vimeos amarra el token a ESTA UA */
 let CDN_RELAY = ''; /* v236: Mac Mini relay para CDNs que bloquean datacenter. Set via /api/set-relay?url=... */
 async function fetchRelay(url, ms) { /* v236: fetch a través del relay cuando está disponible — el token del m3u8 se liga a la IP del relay */
-  if (!CDN_RELAY) return fetchSeguro(url, ms);
+  if (!CDN_RELAY) { console.log('[relay] no relay configurado, usando directo'); return fetchSeguro(url, ms); }
   try {
     const relayUrl = CDN_RELAY + '/?u=' + encodeURIComponent(url);
+    console.log('[relay] fetchRelay:', url.slice(0, 80), 'via', CDN_RELAY);
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), ms || 15000);
     const r = await fetch(relayUrl, { signal: ctl.signal, redirect: 'follow' });
     clearTimeout(t);
+    console.log('[relay] fetchRelay status:', r.status, 'ok:', r.ok);
+    if (!r.ok) { console.log('[relay] relay no ok, usando directo'); return fetchSeguro(url, ms); }
     return r;
   } catch (e) {
     console.warn('[relay] fetchRelay falló, usando directo:', String(e.message || e).slice(0, 60));
