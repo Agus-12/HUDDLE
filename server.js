@@ -4654,6 +4654,7 @@ function mismaPagina(a, b) {
   return quitar(a) === quitar(b);
 }
 const FETCH_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'; /* v199: compartida — vimeos amarra el token a ESTA UA */
+let CDN_RELAY = ''; /* v236: Mac Mini relay para CDNs que bloquean datacenter. Set via /api/set-relay?url=... */
 async function fetchSeguro(url, ms, extra) { /* v206: cabeceras opcionales (Referer del player de novelas) */
   const c = new AbortController();
   const t = setTimeout(() => c.abort(), ms);
@@ -9289,9 +9290,40 @@ async function proxearHls(req, res, target) {
       await new Promise((r2) => setTimeout(r2, 1500 * (intento + 1)));
     }
   }
+  /* v236: CDN relay fallback — Mac Mini con IP residencial */
+  if (!upstream && CDN_RELAY) {
+    try {
+      const relayUrl = CDN_RELAY + '/?u=' + encodeURIComponent(target);
+      const ctl2 = new AbortController();
+      const t2 = setTimeout(() => ctl2.abort(), 20000);
+      upstream = await fetch(relayUrl, { signal: ctl2.signal, redirect: 'follow' });
+      clearTimeout(t2);
+      if (upstream.ok) console.log('[hls-proxy] relay OK:', decodeURIComponent(target).slice(0, 60));
+      else { try { upstream.body && upstream.body.cancel(); } catch {} upstream = null; }
+    } catch (relayErr) {
+      console.warn('[hls-proxy] relay falló:', String(relayErr.message || relayErr).slice(0, 80));
+      upstream = null;
+    }
+  }
   if (!upstream) {
     console.warn('[hls-proxy] me rendí tras reintentos:', decodeURIComponent(target).slice(0, 90));
     return json(res, 502, { ok: false, error: 'El servidor de video no respondió' });
+  }
+  /* v236: si la CDN respondió 403/5xx, intentar por relay */
+  if (!upstream.ok && (upstream.status === 403 || upstream.status >= 500) && CDN_RELAY) {
+    try { upstream.body && upstream.body.cancel(); } catch {}
+    console.log('[hls-proxy] CDN ' + upstream.status + ', intentando relay…');
+    try {
+      const relayUrl = CDN_RELAY + '/?u=' + encodeURIComponent(target);
+      const ctl2 = new AbortController();
+      const t2 = setTimeout(() => ctl2.abort(), 20000);
+      const relayResp = await fetch(relayUrl, { signal: ctl2.signal, redirect: 'follow' });
+      clearTimeout(t2);
+      if (relayResp.ok) { upstream = relayResp; console.log('[hls-proxy] relay OK:', decodeURIComponent(target).slice(0, 60)); }
+      else { try { relayResp.body && relayResp.body.cancel(); } catch {} }
+    } catch (relayErr) {
+      console.warn('[hls-proxy] relay falló:', String(relayErr.message || relayErr).slice(0, 80));
+    }
   }
   if (!upstream.ok && upstream.status !== 404) {
     console.warn('[hls-proxy] estado ' + upstream.status + ':', decodeURIComponent(target).slice(0, 90));
@@ -10615,6 +10647,13 @@ async function cuevanaLatest() {
       return json(res, 200, { ok: true, rooms: list, srvVersion: UI_VERSION });
     }
     if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION, introCrawl: { pend: CRAWL.pend.length, hechas: CRAWL.hechas || 0, total: CRAWL.total || 0 }, laMuertas: LA_MUERTAS_SET.size, gpOcultas: GP_OCULTAS_SET.size, pxdOcultas: PXD_OCULTAS.size, afOcultas: AF_OCULTAS.size }); /* v122+190+v205.2 */
+    if (url.pathname === '/api/set-relay') { /* v236: actualizar CDN relay URL del Mac Mini */
+      const newUrl = (url.searchParams.get('url') || '').trim().replace(/\/+$/, '');
+      if (!newUrl) return json(res, 400, { ok: false, error: 'Falta ?url=' });
+      CDN_RELAY = newUrl;
+      console.log('[relay] CDN relay actualizado:', CDN_RELAY);
+      return json(res, 200, { ok: true, relay: CDN_RELAY });
+    }
     if (url.pathname === '/api/intros') { /* v205.3: estado del rastreador — v205.4: en navegador pinta el PANEL; ?json=1 o curl → JSON; v223: + cosecha Movie */
       const SITIOS = { dani: 'Caricaturas', mm: 'Caricaturas', lct: 'Cartoons', la: 'Anime', af: 'AnimeFLV', cv: 'Cuevana' };
       const muestra = Object.entries(INTROS).slice(0, 40).map(([k, v]) => {
