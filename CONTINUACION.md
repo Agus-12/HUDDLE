@@ -4,7 +4,7 @@
 
 ---
 
-## ✅ ESTADO ACTUAL — 20 SEP 2026 (commit `9d0bc71`, `UI_VERSION=v230`): MOVIE CERRADO · APP = FUENTES LATINAS QUE SÍ REPRODUCEN
+## ✅ ESTADO ACTUAL — 20 SEP 2026 (commit `9d0bc71`, `UI_VERSION=v232`): MOVIE CERRADO · APP = FUENTES LATINAS QUE SÍ REPRODUCEN
 
 ### Veredicto del capítulo "Movie" (app movievn + CDN Wangsu) — CERRADO PARA SIEMPRE
 - El contenido real de Movie vive en un CDN (`movievn.j5t2n.com`) con URLs firmadas `wsSecret=MD5(llave+pathname+wsTime)`.
@@ -65,6 +65,36 @@ App en vivo: **http://129.80.212.92:3000** · Modos **Solo** y **Juntos** (salas
 - Espejo `147.124.216.142`: **100% relleno**.
 - Parchear la VM del `.so`: aborta por autoverificación (anti-tamper).
 - `ck` de `sys_conf`: es del tracker P2P, no del CDN.
+
+---
+
+## ACTUALIZACIÓN — 20 SEP 2026 (v232): PelisXD HTTP puro — Byse AES decrypt
+
+**Problema:** PelisXD usa Byse (byseqekaho.com) como reproductor. La página es una React SPA con cifrado AES-256-GCM. Intentos previos con Puppeteer/headless Chrome fallaban o eran lentos.
+
+**Solución implementada (HTTP puro, sin navegador):**
+1. Fetch de la página de PelisXD → extrae embed URL (`byseqekaho.com/e/{code}`)
+2. API HTTP: `GET https://byseqekaho.com/api/videos/{code}` → devuelve `{title, duration_seconds, playback: {version, key_parts[], iv, payload}}`
+3. Clave AES-256-GCM: `concat(b64url_decode(key_parts[version-1]), b64url_decode(key_parts[31-version-1]))` → 32 bytes
+4. IV: `b64url_decode(playback.iv)`, payload: `b64url_decode(playback.payload)`
+5. Ciphertext = payload.slice(0, -16), Auth Tag = payload.slice(-16)
+6. `AES-256-GCM-Decrypt(ciphertext, key, iv, tag)` → JSON con `{sources: [{url: "https://cdn...master.m3u8"}]}`
+7. Resolver m3u8 master → variant playlist con segmentos HLS
+
+**Test end-to-end exitoso:**
+- PelisXD "Siniestro (2012)" → `byseqekaho.com/e/f8xacb29vg08` → API version 7, 30 key_parts
+- Descifrado → m3u8 en `edge1-madrid-sprintcdn.r66nv9ed.com`
+- Master m3u8 → variant `index-v1-a1.m3u8` → 659 segmentos (~110 min)
+
+**Cambios en server.js:**
+- `extraerStreamwishPeli()` reescrito completo: bloque Byse HTTP puro + fallback DoodStream (`pass_md5`) + fallback streamwish (regex)
+- CDN hosts se registran automáticamente en `hlsReferers` cuando se resuelve el m3u8
+- Versión: `UI_VERSION = 'v232'`
+- Sintaxis verificada: `node -c server.js` → OK
+
+**Documentación creada:** `docs/pelisxd.md`, `docs/cuevana.md`, `docs/latanime.md`, `docs/gopelis.md`, `docs/danimados.md`, `docs/animeflv.md`
+
+**Estado:** v232 listo — commit + deploy pendiente.
 
 ---
 ---

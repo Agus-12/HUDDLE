@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v230'; // 230: catálogo Movie DESACTIVADO (su llave CDN no se pudo extraer); app = fuentes latinas abiertas que sí reproducen
+const UI_VERSION = 'v232'; // 232: PelisXD HTTP puro — Byse AES decrypt, DoodStream pass_md5, sin navegador
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -4913,108 +4913,136 @@ async function buscarPelisxd(q) {
     }));
 }
 
-/* v98: abre la peli en un navegador del servidor, clic en "Opción 1",
- * insiste en darle play (el gate de captcha se abre solo) y captura el
- * CUERPO del playlist variante que pide el player. Verificado con pelis
- * de duración completa (113.6, 113.8 y 101.3 min — nada de teasers). */
+/* v98/v231: resolver PelisXD — HTTP PURO (sin navegador).
+ * 1. Descarga la página de la peli → extrae v_source (embeds en base64)
+ * 2. Por cada embed, según su dominio:
+ *    - byseqekaho.com (Byse): /api/videos/<code> → AES-256-GCM → m3u8
+ *    - DoodStream (myvidplay/playmogo): intentar extraer directo
+ *    - Otros: intentar como streamwish genérico
+ * 3. El primero que devuelva video gana */
 async function extraerStreamwishPeli(pageUrl) {
-  const t0 = Date.now(); /* v153: para medir tiempos de resolución */
-  if (!PUPPETEER) { try { PUPPETEER = require('puppeteer'); } catch { throw new Error('El navegador del servidor no está disponible'); } }
-  const browser = await getNavegador();
-  if (!browser) throw new Error('No pude abrir el navegador del servidor');
-  let page = null;
-  try {
-    page = await browser.newPage();
-    await page.setViewport({ width: 1280, height: 720 });
-    await page.setUserAgent(MIRROR_UA).catch(() => {});
-    await page.evaluateOnNewDocument(() => {
-      try { window.open = function () { return null; }; } catch {}
-      try { Object.defineProperty(navigator, 'webdriver', { get: () => false }); } catch {}
-    });
-    let cap = null;
-    page.on('response', async (r) => {
-      try {
-        const u = r.url();
-        /* v106: también cfglobalcdn — los episodios detrás del reproductor
-         * propio del sitio (player.miscaricaturas.com) usan ese CDN */
-        /* v204: sin filtro de host — pelisxd migró su player (listeamed) a otro CDN; el cuerpo (#EXTINF + .ts) ya valida que sea HLS real */
-        if (cap || !/\.m3u8(\?|$)/i.test(u)) return;
-        const body = await r.text();
-        if (/#EXTINF/.test(body) && /\.ts/i.test(body)) {
-          cap = { body, url: u, ref: (r.request().headers() || {}).referer || '' };
-        }
-      } catch {}
-    });
-    page.on('dialog', async (d) => { try { await d.dismiss(); } catch {} });
-    /* v152: si la primera carga se pasa de los 30s (sitio lento), un
-     * reintento con más calma en vez de fallar de una vez */
-    try { await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }); }
-    catch { await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 45000 }); }
-    /* v154: SECUENCIA COMPROBADA — espera de 4s (el sitio arma el player)
-     * y UN clic. v152 lo picaba 10 veces (re-navegaba, nunca cargaba) y
-     * v153 clicaba demasiado pronto (el botón estaba pero sin función).
-     * Si a los 24s no hay video, UN clic de auxilio y se sigue esperando. */
-    await new Promise((r2) => setTimeout(r2, 4000));
-    await page.evaluate(() => {
-      /* v204.2: pelisxd estrenó UI — ya no hay botón «Opción 1»: el player
-       * trae un recuadro «Haz clic para reproducir» (clic de mouse real,
-       * el sintético no dispara su montaje del iframe) */
-      const b = [...document.querySelectorAll('button')].find((x) => /opción 1/i.test(x.textContent || ''));
-      if (b) { b.click(); return 'opcion-1'; }
-      const caja = [...document.querySelectorAll('*')].filter((x) => (x.textContent || '').trim() === 'Haz clic para reproducir').pop();
-      if (caja) { const r2 = caja.getBoundingClientRect(); return { mx: r2.x + r2.width / 2, my: r2.y + r2.height / 2 }; }
-      return null;
-    }).then(async (r2) => {
-      if (r2 && r2.mx) {
-        await page.evaluate((y) => window.scrollTo(0, Math.max(0, y - 300)), r2.my).catch(() => {});
-        await new Promise((r3) => setTimeout(r3, 700));
-        const caja2 = await page.evaluate(() => {
-          const els = [...document.querySelectorAll('*')].filter((x) => (x.textContent || '').trim() === 'Haz clic para reproducir');
-          const rr = els[els.length - 1].getBoundingClientRect();
-          return { mx: rr.x + rr.width / 2, my: rr.y + rr.height / 2 };
-        }).catch(() => null);
-        if (caja2) await page.mouse.click(caja2.mx, caja2.my);
-        /* v204.3: tras montarse el iframe del player nuevo, un clic a su
-         * centro (el play interno suele requerirlo) */
-        await new Promise((r3) => setTimeout(r3, 8000));
-        const ib = await page.evaluate(() => {
-          const f = [...document.querySelectorAll('iframe')].find((i) => /listeamed|embed/i.test(i.src || '') || !i.src);
-          if (!f) return null;
-          const r3 = f.getBoundingClientRect();
-          return { mx: r3.x + r3.width / 2, my: r3.y + r3.height / 2 };
-        }).catch(() => null);
-        if (ib) await page.mouse.click(ib.mx, ib.my);
-      }
-    }).catch(() => {});
-    await new Promise((r2) => setTimeout(r2, 20000));
-    if (!cap) {
-      await page.evaluate(() => {
-        const b = [...document.querySelectorAll('button')].find((x) => /opción 1/i.test(x.textContent || ''));
-        if (b) b.click();
-      }).catch(() => {});
-    }
-    /* hasta ~60 s: el challenge se resuelve solo mientras el player cree que hay un usuario */
-    for (let i = 0; i < 20 && !cap; i++) {
-      await new Promise((r2) => setTimeout(r2, 3000));
-      for (const fr of page.frames()) {
-        const fu = fr.url();
-        if (/pelisxd\.|facebook\.|google\.|^about:/i.test(fu)) continue;
-        try {
-          await fr.evaluate(() => {
-            const b = document.querySelector('.captcha-gate__play, .jw-icon-display, button[class*="play"], [class*="play"] button');
-            if (b) b.click();
-            const v = document.querySelector('video');
-            if (v) { v.muted = true; v.play().catch(() => {}); }
-          });
-        } catch {}
-      }
-    }
-    if (!cap) throw new Error('El servidor de la peli no entregó el video (intenté con el navegador)');
-    console.log('[caricaturas] resuelto en ' + ((Date.now() - t0) / 1000).toFixed(1) + 's');
-    return cap;
-  } finally {
-    try { if (page) await page.close(); } catch {}
+  const t0 = Date.now();
+  const FETCH_UA_PXD = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+  /* Paso 1: descargar la página y extraer los v_source */
+  const r = await fetchSeguro(pageUrl, 15000);
+  if (!r.ok) throw new Error('No pude abrir la página de PelisXD (' + r.status + ')');
+  const html = await r.text();
+
+  const vSources = [];
+  const re = /v_source[^A-Za-z0-9]{0,12}([A-Za-z0-9+/=]{24,})/g;
+  let m2;
+  while ((m2 = re.exec(html))) {
+    try {
+      const url = Buffer.from(m2[1], 'base64').toString('utf8');
+      if (/^https?:\/\//i.test(url)) vSources.push(url);
+    } catch {}
   }
+  if (!vSources.length) throw new Error('PelisXD no tiene reproductores para esta peli');
+  console.log('[pxd] ' + pageUrl.slice(-30) + ' embeds: ' + vSources.map((u) => { try { return new URL(u).hostname; } catch { return '?'; } }).join(', '));
+
+  /* Paso 2: intentar cada embed */
+  for (const embedUrl of vSources) {
+    try {
+      let host = '';
+      try { host = new URL(embedUrl).hostname; } catch {}
+
+      /* === BYSE (byseqekaho.com y similares) === */
+      if (/byse|byseqekaho/i.test(host)) {
+        const code = embedUrl.replace(/.*\//, '');
+        const apiUrl = 'https://' + host + '/api/videos/' + code;
+        const rApi = await fetchSeguro(apiUrl, 12000, { Referer: embedUrl });
+        if (!rApi.ok) { console.warn('[pxd] byse API ' + rApi.status); continue; }
+        const j = await rApi.json().catch(() => null);
+        if (!j || !j.playback || !j.playback.payload) { console.warn('[pxd] byse sin playback'); continue; }
+        const pb = j.playback;
+        /* Desencriptar AES-256-GCM */
+        const n = parseInt(pb.version);
+        const indices = [n, 31 - n];
+        const b64url = (s) => { let b = s.replace(/-/g, '+').replace(/_/g, '/'); while (b.length % 4) b += '='; return Buffer.from(b, 'base64'); };
+        const keyParts = indices.filter((i) => i >= 1 && i <= pb.key_parts.length).map((i) => b64url(pb.key_parts[i - 1]));
+        const keyBuf = Buffer.concat(keyParts);
+        if (keyBuf.length !== 32) { console.warn('[pxd] byse clave inválida: ' + keyBuf.length + ' bytes'); continue; }
+        const ivBuf = b64url(pb.iv);
+        const payloadBuf = b64url(pb.payload);
+        const tag = payloadBuf.slice(-16);
+        const ciphertext = payloadBuf.slice(0, -16);
+        try {
+          const decipher = crypto.createDecipheriv('aes-256-gcm', keyBuf, ivBuf);
+          decipher.setAuthTag(tag);
+          const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+          const data = JSON.parse(decrypted);
+          const src = data.sources && data.sources[0];
+          if (src && src.url) {
+            /* Verificar que el m3u8 sirva */
+            const chk = await fetchSeguro(src.url, 10000).catch(() => null);
+            if (chk && chk.ok && (await chk.text()).includes('#EXTM3U')) {
+              console.log('[pxd] byse OK ' + host + ' → ' + src.url.slice(0, 60) + ' (' + ((Date.now() - t0) / 1000).toFixed(1) + 's)');
+              try { hlsReferers.set(new URL(src.url).hostname, 'https://' + host + '/'); } catch {}
+              return { body: await (await fetchSeguro(src.url, 10000)).text(), url: src.url, ref: 'https://' + host + '/', mp4: false };
+            }
+          }
+        } catch (e) { console.warn('[pxd] byse decrypt falló: ' + String(e.message || e).slice(0, 60)); }
+      }
+
+      /* === DOODSTREAM (myvidplay, playmogo, dood) === */
+      if (/myvidplay|playmogo|dood|do0od|ds2play/i.test(host)) {
+        /* DoodStream: la página tiene un script con /pass_md5/... */
+        const rD = await fetchSeguro(embedUrl, 15000, { Referer: pageUrl });
+        if (!rD.ok) { console.warn('[pxd] dood ' + rD.status); continue; }
+        const htmlD = await rD.text();
+        /* Buscar pass_md5 en el JS embebido */
+        const passM = /\/pass_md5\/([a-z0-9/]+)/i.exec(htmlD) || /(\$\.get\("|fetch\(")([^"]+pass_md5[^"]+)/i.exec(htmlD);
+        if (passM) {
+          const passUrl = passM[1].startsWith('/') ? 'https://' + host + passM[1] : passM[2] || passM[1];
+          const rP = await fetchSeguro(passUrl, 10000, { Referer: embedUrl });
+          if (rP.ok) {
+            const token = (await rP.text()).trim();
+            if (token && token.length > 10) {
+              /* El video URL es el token + un string aleatorio + ?token=... */
+              const finalUrl = token + 'eMJ1Wl4y52?token=' + token.split('/').pop();
+              const chk = await fetchSeguro(finalUrl, 8000, { Range: 'bytes=0-1024' }).catch(() => null);
+              if (chk && (chk.ok || chk.status === 206)) {
+                console.log('[pxd] dood OK ' + host + ' → mp4 (' + ((Date.now() - t0) / 1000).toFixed(1) + 's)');
+                try { hlsReferers.set(new URL(finalUrl).hostname, embedUrl); } catch {}
+                return { body: '', url: finalUrl, ref: embedUrl, mp4: true };
+              }
+            }
+          }
+        }
+        /* DoodStream sin pass_md5: podría tener el video embebido de otra forma */
+        const videoM = htmlD.match(/(https?:\/\/[^"'\s]+\.mp4[^"'\s]*)/i);
+        if (videoM) {
+          console.log('[pxd] dood direct mp4 (' + ((Date.now() - t0) / 1000).toFixed(1) + 's)');
+          return { body: '', url: videoM[1], ref: embedUrl, mp4: true };
+        }
+      }
+
+      /* === STREAMWISH / LISTEAMED / OTROS === */
+      const rE = await fetchSeguro(embedUrl, 15000, { Referer: pageUrl });
+      if (!rE.ok) continue;
+      const htmlE = await rE.text();
+      /* Buscar m3u8 directo en el HTML */
+      const m3u8M = htmlE.match(/(?:file|source|src)\s*[:=]\s*['"](https?:\/\/[^'"]+\.m3u8[^'"]*)['"]/i)
+        || htmlE.match(/['"](https?:\/\/[^'"]+\.m3u8[^'"]*)['"]/i);
+      if (m3u8M) {
+        const chk = await fetchSeguro(m3u8M[1], 10000).catch(() => null);
+        if (chk && chk.ok && (await chk.text()).includes('#EXTM3U')) {
+          console.log('[pxd] streamwish OK ' + host + ' (' + ((Date.now() - t0) / 1000).toFixed(1) + 's)');
+          try { hlsReferers.set(new URL(m3u8M[1]).hostname, embedUrl); } catch {}
+          return { body: await (await fetchSeguro(m3u8M[1], 10000)).text(), url: m3u8M[1], ref: embedUrl, mp4: false };
+        }
+      }
+      /* Buscar mp4 directo */
+      const mp4M = htmlE.match(/['"](https?:\/\/[^'"]+\.mp4[^'"]*)['"]/i);
+      if (mp4M) {
+        console.log('[pxd] mp4 directo ' + host + ' (' + ((Date.now() - t0) / 1000).toFixed(1) + 's)');
+        return { body: '', url: mp4M[1], ref: embedUrl, mp4: true };
+      }
+    } catch (e) { console.warn('[pxd] embed falló: ' + String(e.message || e).slice(0, 60)); }
+  }
+
+  throw new Error('Ningún reproductor entregó el video — la peli puede estar caída');
 }
 
 async function resolverPelisxd(pageUrl) {
@@ -5033,18 +5061,25 @@ async function resolverPelisxd(pageUrl) {
   /* 1) ¿tiene enlaces vivos? (falla rápido, sin abrir navegador) */
   const m = await pelisxdMeta(slug);
   if (m && !m.alive) { pxdOcultar(slug); throw new Error('Esta peli tiene los enlaces caídos en PelisXD'); } /* v205.2 */
-  if (m && /listeamed/i.test(m.dom || '')) throw new Error('Esta peli usa un reproductor no disponible para Huddle — prueba otra fuente'); /* v204.4 */
+  /* v231: ya NO bloqueamos listeamed — el navegador del server puede resolverlo */
   /* 2) el navegador resuelve el challenge y captura el playlist (~20 s la primera vez) */
   let cap;
   try { cap = await extraerStreamwishPeli('https://www.pelisxd.com/pelicula/' + slug); }
   catch (e) { pxdOcultar(slug); throw e; } /* v205.2: el espejo no entregó — fallo real */
   pxdPerdonar(slug);
   if (PXD_OCULTAS.has(slug)) { PXD_OCULTAS.delete(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt'); } /* v205.2: lázaro */
+  /* v231: DoodStream/mp4 directo — sin playlist, el video va directo al navegador */
+  if (cap.mp4) {
+    try { hlsReferers.set(new URL(cap.url).hostname, cap.ref || pageUrl); } catch {}
+    console.log('[pelisxd] ' + slug + ' → mp4 directo ' + cap.url.slice(0, 80));
+    return { m3u8: cap.url, mp4: true, proxy: true, subs: [] };
+  }
+  /* m3u8 (HLS) — cachear el cuerpo y servir por /api/xd/ */
   const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
   pelisxdStreams.set(tok, { body: cap.body, base: cap.url, ref: cap.ref || 'https://f7hyg4q.org/', slug, at: ahora });
   /* los segmentos pasan por el proxy con el Referer del espejo que sirvió */
   try {
-    hlsReferers.set(new URL(cap.url).hostname, cap.ref || 'https://f7hyg4q.org/'); /* v106: host del playlist (segmentos relativos) */
+    hlsReferers.set(new URL(cap.url).hostname, cap.ref || 'https://f7hyg4q.org/');
     for (const u of cap.body.match(/https?:\/\/[^\s"']+\.ts[^\s"']*/gi) || []) {
       try { hlsReferers.set(new URL(u).hostname, cap.ref); } catch {}
     }
