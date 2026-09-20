@@ -9241,7 +9241,8 @@ async function proxearHls(req, res, target) {
     'User-Agent': (hostUp && hlsUAs.get(hostUp)) || MIRROR_UA, /* v170 */
     'Accept-Language': (hostUp && hlsALs.get(hostUp)) || 'es-MX,es;q=0.9,en;q=0.6', /* v199: AL por host — vimeos de GoPelis exige el mismo que fetchSeguro */
   };
-  if (ref) cabUp.Referer = ref; /* v199: '' registrado = SIN cabecera Referer (una Referer vacía tumba el token) */
+  /* v235: no enviar Referer para Cuevana CDNs — el CDN lo rechaza */
+  if (ref && !/goodstream|vimeos|hlswish|videoapp/i.test(hostUp)) cabUp.Referer = ref;
   if (req.headers.range) cabUp.Range = String(req.headers.range);
   let upstream = null;
   for (let intento = 0; intento < 3; intento++) {
