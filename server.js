@@ -9146,6 +9146,19 @@ const server = http.createServer(async (req, res) => {
         }
         return json(res, 200, { ok: true, espejos: MOVIE_ESPEJOS, preferido: movieEspejoPreferido() || null, llaveCdn: !!movieCdnKey(), hosts });
       }
+      if (url.pathname === '/api/movie/cazar-llave') { /* v228.8: caza la llave Wangsu desde la captura, a control remoto */
+        if ((url.searchParams.get('k') || '') !== 'huddle2026') return json(res, 403, { ok: false, error: 'clave incorrecta' });
+        if (global._cazando) return json(res, 200, { ok: false, corriendo: true, msg: 'ya hay una caza en marcha' });
+        global._cazando = true;
+        const sh = path.join(__dirname, 'scripts', 'buscar-llave-cdn.sh');
+        execFile('bash', [sh], { timeout: 10 * 60000, maxBuffer: 8e6, cwd: __dirname }, (err, so, se) => {
+          global._cazando = false;
+          const salida = String(so || '') + (se ? '\n[stderr] ' + String(se).slice(0, 800) : '');
+          const llave = movieCdnKey();
+          json(res, 200, { ok: !err || !!llave, llave: !!llave, salida: salida.slice(-2500) });
+        });
+        return;
+      }
       if (url.pathname === '/api/movie/probar-resolver') { /* v228.7: diagnóstico remoto del resolutor nativo */
         const u = url.searchParams.get('url') || '';
         if (!u) return json(res, 400, { ok: false, error: 'falta url' });
