@@ -9237,13 +9237,11 @@ async function proxearHls(req, res, target) {
     else if (/videoapp\.zip/i.test(hostUp)) ref = 'https://videoapp.zip/';
   }
   /* v90: el mp4 de animes se adelanta/atrás por rangos — los pasamos */
-  const esCvCdn = /goodstream|vimeos|hlswish|videoapp/i.test(hostUp);
   const cabUp = {
-    'User-Agent': esCvCdn ? FETCH_UA : ((hostUp && hlsUAs.get(hostUp)) || MIRROR_UA),
+    'User-Agent': (hostUp && hlsUAs.get(hostUp)) || MIRROR_UA,
     'Accept-Language': (hostUp && hlsALs.get(hostUp)) || 'es-MX,es;q=0.9,en;q=0.6',
   };
-  /* v235: Cuevana CDNs rechazan Referer — usar mismos headers que fetchSeguro */
-  if (ref && !esCvCdn) cabUp.Referer = ref;
+  if (ref) cabUp.Referer = ref;
   if (req.headers.range) cabUp.Range = String(req.headers.range);
   let upstream = null;
   for (let intento = 0; intento < 3; intento++) {
