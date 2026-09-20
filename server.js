@@ -4900,8 +4900,8 @@ async function resolverCuevanaMov(pageUrl) {
           const txt = await vr.text().catch(() => '');
           if (txt.includes('#EXTM3U')) {
             const cdnHost = new URL(m3u8).hostname;
-            if (!hlsReferers[cdnHost]) hlsReferers[cdnHost] = 'https://' + host + '/';
-            return { m3u8, subs: [] };
+            if (!hlsReferers.has(cdnHost)) hlsReferers.set(cdnHost, 'https://' + host + '/');
+            return { m3u8, subs: [], proxy: true, mp4: false };
           }
         }
       }
