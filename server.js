@@ -9165,19 +9165,37 @@ const server = http.createServer(async (req, res) => {
         return { ok: true, pag, por, total: items.length, mas: ini + por < items.length, items: items.slice(ini, ini + por) };
       };
       try {
-        if (tipo === 'movie' || /^movie-\d+$/.test(tipo)) { /* v221: catálogo completo Movie por apartados */
-          /* v222: si las mediciones tienen más de 6 h, se re-escanea solo por detrás */
-          if (Date.now() - movieDispAt > 6 * 60 * 60 * 1000 && !movieDispCorriendo) {
-            mapiSecciones().then((secs) => {
-              const ya = new Set(MOVIE_DISP.keys());
-              let p2 = 0;
-              for (const sec of secs) for (const it of sec.items) {
-                const v = String(it.url.split('/').pop());
-                if (!ya.has(v) && !movieDispCola.includes(v)) { movieDispCola.push(v); p2++; }
-              }
-              if (p2) movieDispTrabajador().catch(() => {});
-            }).catch(() => {});
+        if (tipo === 'movie' || /^movie-\d+$/.test(tipo)) { /* v228: catálogo completo Movie — 37k cosechados */
+          /* v228: usar el catálogo cosechado (37k) en vez de las secciones de la API (442) */
+          const est = movieCosechaEstado();
+          let cosechaArr = null;
+          if (est && est.archivo && est.archivo.ruta) {
+            try {
+              const txt2 = fs.readFileSync(est.archivo.ruta, 'utf8');
+              const j2 = JSON.parse(txt2);
+              cosechaArr = Array.isArray(j2) ? j2 : (Array.isArray(j2.items) ? j2.items : (Array.isArray(j2.result) ? j2.result : null));
+            } catch {}
           }
+          if (cosechaArr && cosechaArr.length > 500) {
+            /* v228: catálogo grande — paginado con filtro por canal si aplica */
+            let items2 = cosechaArr;
+            if (/^movie-(\d+)$/.test(tipo)) {
+              const canalF = tipo.slice(6);
+              items2 = cosechaArr.filter((x) => String(x.type_pid || x.type_id || '') === canalF);
+              if (!items2.length) items2 = cosechaArr; /* si no hay filtro, mostrar todo */
+            }
+            /* ordenar por popularidad (click_count) descendente */
+            items2 = items2.slice().sort((a, b) => (b.click_count || 0) - (a.click_count || 0));
+            const mapped = items2.map((x) => ({
+              title: String(x.vod_name || x.title || ''),
+              url: 'https://movie.huddle/v/' + (x.id || x.vod_id),
+              img: x.vod_pic || '/carita.png',
+              site: 'Movie',
+              extra: (x.vod_year ? x.vod_year + ' · ' : '') + 'Latino',
+            })).filter((x) => x.title && x.url);
+            return json(res, 200, Object.assign(trozo(mapped), { secciones: [{ canal: 0, nombre: 'Todo Movie', n: mapped.length }] }));
+          }
+          /* fallback: secciones de la API (442) si no hay cosecha */
           const secs = await mapiSecciones();
           const elegidas = /^movie-(\d+)$/.test(tipo) ? secs.filter((x) => String(x.canal) === tipo.slice(6)) : secs;
           const items = [];
