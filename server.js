@@ -6396,45 +6396,72 @@ async function catCaricaturas() {
 }
 
 
-/* v228: búsqueda en el catálogo cosechado (37k+) — local, instantánea */
-let _cosechaItems = null, _cosechaItemsAt = 0, _cosechaItemsMtime = 0;
+/* v228.5: catálogo cosechado cacheado — usa el MISMO parsing que movieCosechaEstado (que sí funciona) */
+let _cosechaArr = null, _cosechaArrAt = 0, _cosechaArrMtime = 0, _cosechaArrRuta = '';
+function movieCosechaArray() {
+  const est = movieCosechaEstado();
+  if (!est || !est.archivo || !est.archivo.ruta) return [];
+  const ruta = est.archivo.ruta;
+  const now = Date.now();
+  // recargar solo si cambió el archivo (cache 60s)
+  if (_cosechaArr && now - _cosechaArrAt < 60000 && _cosechaArrRuta === ruta) return _cosechaArr;
+  try {
+    const st = fs.statSync(ruta);
+    if (_cosechaArr && st.mtimeMs === _cosechaArrMtime && _cosechaArrRuta === ruta) {
+      _cosechaArrAt = now;
+      return _cosechaArr;
+    }
+    const txt = fs.readFileSync(ruta, 'utf8');
+    const j = JSON.parse(txt);
+    let arr = null;
+    if (Array.isArray(j)) arr = j;
+    else if (Array.isArray(j.items)) arr = j.items;
+    else if (Array.isArray(j.result)) arr = j.result;
+    else if (j && typeof j === 'object') {
+      // MISMO parsing que movieCosechaEstado: dict con keys numéricas
+      const keys = Object.keys(j).filter((k) => /^\d+$/.test(k));
+      if (keys.length > 50) {
+        arr = keys.map((k) => {
+          const v = j[k];
+          if (!v || typeof v !== 'object') return null;
+          return {
+            id: +k,
+            vod_id: v.vod_id || v.id || +k,
+            vod_name: v.nombre || v.vod_name || v.title || v.titulo || '',
+            vod_pic: v.pic || v.vod_pic || v.poster || '',
+            vod_year: v.year || v.vod_year || v.anno || '',
+            type_id: v.type_id || v.type || '',
+            click_count: v.click_count || v.clicks || 0,
+          };
+        }).filter(Boolean);
+      }
+    }
+    _cosechaArr = arr || [];
+    _cosechaArrAt = now;
+    _cosechaArrMtime = st.mtimeMs;
+    _cosechaArrRuta = ruta;
+    console.log('[movie] cosecha cargada: ' + _cosechaArr.length + ' títulos de ' + ruta);
+    return _cosechaArr;
+  } catch (e) {
+    console.warn('[movie] no pude cargar cosecha:', String(e.message || e).slice(0, 100));
+    return _cosechaArr || [];
+  }
+}
 function buscarMovieCosecha(q) {
   const nq = q.toLowerCase().trim();
   if (!nq) return [];
-  const est = movieCosechaEstado();
-  if (!est || !est.archivo || !est.archivo.ruta) return [];
-  // recargar solo si el archivo cambió (cache 30s)
-  const now = Date.now();
-  if (!_cosechaItems || now - _cosechaItemsAt > 30000) {
-    try {
-      const st = fs.statSync(est.archivo.ruta);
-      if (!_cosechaItems || st.mtimeMs !== _cosechaItemsMtime) {
-        const txt = fs.readFileSync(est.archivo.ruta, 'utf8');
-        const j = JSON.parse(txt);
-        _cosechaItems = Array.isArray(j) ? j : (Array.isArray(j.items) ? j.items : (Array.isArray(j.result) ? j.result : (() => {
-          /* v228.3: el archivo de cosecha es un dict {id: {nombre, vod_id, ...}} */
-          if (j && typeof j === 'object') {
-            const keys = Object.keys(j).filter((k) => /^\d+$/.test(k));
-            if (keys.length > 100) return keys.map((k) => Object.assign({ id: +k }, j[k]));
-          }
-          return [];
-        })()));
-        _cosechaItemsMtime = st.mtimeMs;
-      }
-      _cosechaItemsAt = now;
-    } catch { return []; }
-  }
-  if (!_cosechaItems || !_cosechaItems.length) return [];
+  const arr = movieCosechaArray();
+  if (!arr.length) return [];
   const hits = [];
-  for (const x of _cosechaItems) {
-    const nombre = String(x.vod_name || x.nombre || x.title || x.titulo || '');
+  for (const x of arr) {
+    const nombre = String(x.vod_name || '');
     if (nombre.toLowerCase().includes(nq)) {
-      const vid = x.id || x.vod_id || x.vod;
+      const vid = x.vod_id || x.id;
       if (!vid) continue;
       hits.push({
         title: nombre,
         url: 'https://movie.huddle/v/' + vid,
-        img: x.vod_pic || x.pic || x.poster || '/carita.png',
+        img: x.vod_pic || '/carita.png',
         site: 'Movie',
         extra: 'Latino · ' + (x.vod_year || ''),
       });
@@ -8931,33 +8958,18 @@ const server = http.createServer(async (req, res) => {
         const lista = (j && j.code === 10000 && Array.isArray(j.result)) ? j.result : [];
         return json(res, 200, { ok: true, items: lista.slice(0, 40).map((x) => ({ vod: x.vod_id || x.id, titulo: x.vod_name, poster: x.vod_pic || '', anno: x.vod_year || '' })) });
       }
-      if (url.pathname === '/api/movie/v-buscar') { /* v228: búsqueda en el catálogo cosechado (36k+) */
+      if (url.pathname === '/api/movie/v-buscar') { /* v228.5: búsqueda en catálogo cosechado */
         const q = (url.searchParams.get('q') || '').trim().toLowerCase().slice(0, 80);
         const page = Math.max(1, parseInt(url.searchParams.get('page') || '1') || 1);
         const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') || '40') || 40));
-        const est = movieCosechaEstado();
-        let items = [];
-        if (est && est.archivo && est.archivo.ruta) {
-          try {
-            const txt = fs.readFileSync(est.archivo.ruta, 'utf8');
-            const j = JSON.parse(txt);
-            const arr = Array.isArray(j) ? j : (Array.isArray(j.items) ? j.items : (Array.isArray(j.result) ? j.result : []));
-            if (q) {
-              items = arr.filter((x) => {
-                const n = String(x.vod_name || x.nombre || x.title || x.titulo || '').toLowerCase();
-                return n.includes(q);
-              });
-            } else {
-              items = arr;
-            }
-          } catch {}
-        }
+        const arr = movieCosechaArray();
+        let items = q ? arr.filter((x) => String(x.vod_name || '').toLowerCase().includes(q)) : arr;
         const total = items.length;
         const start = (page - 1) * limit;
         const slice = items.slice(start, start + limit).map((x) => ({
-          vod: x.id || x.vod_id || x.vod, titulo: x.vod_name || x.nombre || x.title || x.titulo || '',
-          poster: x.vod_pic || x.pic || x.poster || '', anno: x.vod_year || x.year || x.anno || '',
-          tipo: x.type_id || '', score: x.vod_douban_score || 0,
+          vod: x.vod_id || x.id, titulo: x.vod_name || '',
+          poster: x.vod_pic || '', anno: x.vod_year || '',
+          tipo: x.type_id || '', score: 0,
         }));
         return json(res, 200, { ok: true, q, total, page, pages: Math.ceil(total / limit), items: slice });
       }
@@ -9172,44 +9184,26 @@ const server = http.createServer(async (req, res) => {
         return { ok: true, pag, por, total: items.length, mas: ini + por < items.length, items: items.slice(ini, ini + por) };
       };
       try {
-        if (tipo === 'movie' || /^movie-\d+$/.test(tipo)) { /* v228: catálogo completo Movie — 37k cosechados */
-          /* v228: usar el catálogo cosechado (37k) en vez de las secciones de la API (442) */
-          const est = movieCosechaEstado();
-          let cosechaArr = null;
-          if (est && est.archivo && est.archivo.ruta) {
-            try {
-              const txt2 = fs.readFileSync(est.archivo.ruta, 'utf8');
-              const j2 = JSON.parse(txt2);
-              cosechaArr = Array.isArray(j2) ? j2 : (Array.isArray(j2.items) ? j2.items : (Array.isArray(j2.result) ? j2.result : (() => {
-                /* v228.3: dict {id: {nombre, vod_id, ...}} */
-                if (j2 && typeof j2 === 'object') {
-                  const keys2 = Object.keys(j2).filter((k) => /^\d+$/.test(k));
-                  if (keys2.length > 100) return keys2.map((k) => Object.assign({ id: +k }, j2[k]));
-                }
-                return null;
-              })()));
-            } catch {}
-          }
-          if (cosechaArr && cosechaArr.length > 500) {
-            /* v228: catálogo grande — paginado con filtro por canal si aplica */
-            let items2 = cosechaArr;
+        if (tipo === 'movie' || /^movie-\d+$/.test(tipo)) { /* v228.5: catálogo completo Movie — 37k cosechados */
+          const arr = movieCosechaArray();
+          if (arr.length > 100) {
+            let items2 = arr;
             if (/^movie-(\d+)$/.test(tipo)) {
               const canalF = tipo.slice(6);
-              items2 = cosechaArr.filter((x) => String(x.type_pid || x.type_id || '') === canalF);
-              if (!items2.length) items2 = cosechaArr; /* si no hay filtro, mostrar todo */
+              const filt = arr.filter((x) => String(x.type_id || '') === canalF);
+              if (filt.length > 10) items2 = filt;
             }
-            /* ordenar por popularidad (click_count) descendente */
             items2 = items2.slice().sort((a, b) => (b.click_count || 0) - (a.click_count || 0));
             const mapped = items2.map((x) => ({
-              title: String(x.vod_name || x.title || ''),
-              url: 'https://movie.huddle/v/' + (x.id || x.vod_id),
+              title: String(x.vod_name || ''),
+              url: 'https://movie.huddle/v/' + (x.vod_id || x.id),
               img: x.vod_pic || '/carita.png',
               site: 'Movie',
               extra: (x.vod_year ? x.vod_year + ' · ' : '') + 'Latino',
-            })).filter((x) => x.title && x.url);
+            })).filter((x) => x.title);
             return json(res, 200, Object.assign(trozo(mapped), { secciones: [{ canal: 0, nombre: 'Todo Movie', n: mapped.length }] }));
           }
-          /* fallback: secciones de la API (442) si no hay cosecha */
+          /* fallback: secciones de la API si no hay cosecha */
           const secs = await mapiSecciones();
           const elegidas = /^movie-(\d+)$/.test(tipo) ? secs.filter((x) => String(x.canal) === tipo.slice(6)) : secs;
           const items = [];
