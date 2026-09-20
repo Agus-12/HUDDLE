@@ -164,6 +164,24 @@ PelisXD page → v_source (base64) → Embed URL → Resolver por host:
 
 ---
 
+## 🔴 ESTADO FINAL (v234) — 20 SEP 2026
+
+| Estado | Cantidad | % | Acción |
+|---|---|---|---|
+| ✅ **Con Byse (FUNCIONA)** | **2,490** | 52.9% | Visibles en búsqueda |
+| ❌ Solo DoodStream (MUERTO) | 1,153 | 24.5% | Ocultadas |
+| ❌ Solo Streamwish (CDN bloqueado) | 986 | 21.0% | Ocultadas |
+| ❌ Otro/Sin embeds | 74 | 1.6% | Ocultadas |
+| **TOTAL OCULTAS** | **2,174** | 46.2% | `pxd-ocultas.txt` |
+| **TOTAL VISIBLE** | **2,490** | 52.9% | Búsqueda + Resolver |
+
+### Sonda automática (cada 6h)
+- Revisa 30 películas ocultas al azar
+- Si alguna tiene Byse → la revivifica automáticamente
+- Logs en `sonda-pelisxd.log`
+
+---
+
 ## 📈 COMPARATIVA: HUDDLE vs PELISXD
 
 ### ✅ Lo que Huddle YA tiene correctamente
