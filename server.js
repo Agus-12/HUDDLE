@@ -5039,6 +5039,45 @@ async function extraerStreamwishPeli(pageUrl) {
       if (mp4M) {
         console.log('[pxd] mp4 directo ' + host + ' (' + ((Date.now() - t0) / 1000).toFixed(1) + 's)');
         return { body: '', url: mp4M[1], ref: embedUrl, mp4: true };
+      /* === STREAMWISH UNPACKER: desempacar JS para obtener m3u8 === */
+      if (/eval\(function\(p,a,c,k,e,d\)/.test(htmlE)) {
+        try {
+          const evalMatch = htmlE.match(/eval\(function\(p,a,c,k,e,d\)\{.*?\}\('(.+)',(\d+),(\d+),'(.+)'\.split\('\|'\)\)/s);
+          if (evalMatch) {
+            const [, p, aStr, cStr, kStr] = evalMatch;
+            const a = parseInt(aStr);
+            let c = parseInt(cStr);
+            const k = kStr.split('|');
+            let decoded = p;
+            const toBase = (n, base) => { const chars = '0123456789abcdefghijklmnopqrstuvwxyz'; let r = ''; do { r = chars[n % base] + r; n = Math.floor(n / base); } while (n > 0); return r; };
+            for (let i = c - 1; i >= 0; i--) {
+              const word = toBase(i, a);
+              if (k[i] && decoded.includes(word)) {
+                try { decoded = decoded.replace(new RegExp('\\b' + word + '\\b', 'g'), k[i]); }
+                catch { decoded = decoded.split(word).join(k[i]); }
+              }
+            }
+            const swM3u8 = decoded.match(/https?:\/\/[^\s"'<>\\]+\.m3u8[^\s"'<>\\]*/);
+            if (swM3u8) {
+              const refHost = host;
+              const chk = await fetchSeguro(swM3u8[0], 12000, { Referer: 'https://' + refHost + '/' }).catch(() => null);
+              if (chk && chk.ok) {
+                const body = await chk.text();
+                if (body.includes('#EXTM3U')) {
+                  console.log('[pxd] streamwish unpack OK ' + host + ' (' + ((Date.now() - t0) / 1000).toFixed(1) + 's)');
+                  try { hlsReferers.set(new URL(swM3u8[0]).hostname, 'https://' + refHost + '/'); } catch {}
+                  return { body, url: swM3u8[0], ref: 'https://' + refHost + '/', mp4: false };
+                }
+              }
+            }
+            const swMp4 = decoded.match(/https?:\/\/[^\s"'<>\\]+\.mp4[^\s"'<>\\]*/);
+            if (swMp4) {
+              console.log('[pxd] streamwish unpack mp4 ' + host + ' (' + ((Date.now() - t0) / 1000).toFixed(1) + 's)');
+              return { body: '', url: swMp4[0], ref: 'https://' + host + '/', mp4: true };
+            }
+          }
+        } catch (e) { console.warn('[pxd] streamwish unpack fall: ' + String(e.message || e).slice(0, 60)); }
+      }
       }
     } catch (e) { console.warn('[pxd] embed falló: ' + String(e.message || e).slice(0, 60)); }
   }
