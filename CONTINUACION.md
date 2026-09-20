@@ -1667,3 +1667,24 @@ POST `https://{api}/api/vod/info_new`, Content-Type form, body `vod_id={id}&cur_
 4. La integración Movie YA está hecha (v207): mapa local, reproductor nativo HLS (playlist reescrito propio), allowlist estricta, portada Movie + fallback `/carita.png`, caídas marcadas sin sustitutos. Antes de sumar otra ruta, verificar que el audio sea latino; ASR si hay duda. El estado real de cada ruta se comprueba con `/api/movie/probar` (una sola vez, marca caídas).
 5. Si más adelante hace falta una captura diferente: PCAPdroid **"Exportador TCP" / pcap-over-IP**, no "Servidor HTTP". Pero no pedirla para resolver esta tanda ya cerrada.
 6. Cualquier avance → actualiza ESTE archivo (estado, hallazgos, dead ends) → commit → push (`git push origin HEAD:main`). Recuérdale al usuario revocar el PAT al final.
+
+## 20-sep 05:20 UTC — HALLAZGO CRÍTICO: espejo con copias dañadas + fix v228.6
+
+- El espejo `147.124.216.142` NO es confiable al 100%: sirve contenido CORRECTO para
+  rutas de ciertas fechas (Mentalist 2023-10-10 → 45 min ✓; Enfrentados 2026-09-10 → 105 min ✓)
+  pero TODAS las rutas bajo `2026-01-19` devuelven el MISMO dibujo animado de 7 min
+  (33 segmentos) — copia dañada/polluted en ese folder del CDN.
+- Consecuencia: títulos como "Matilda" (1017), "La noche del demonio" (589779),
+  "Coyote contra Acme" (590955) reproducían el dibujo en vez de la peli.
+- FIX v228.6 (ya en main): `v-vid` ahora recibe `vd=<seg esperados>&t=<título>`;
+  valida que el m3u8 del espejo dure ≥50% de lo esperado; si está dañada pasa al
+  siguiente espejo/original; si TODAS fallan, `movieCopiaBuena()` busca en el
+  catálogo cosechado otra copia del mismo título (mismo inicio de nombre), pide su
+  ficha a la API y valida su m3u8 — sirve la primera copia buena.
+- Las fichas (`v-ficha` y `/api/movie/ficha/v<id>`) ya pasan `vd` y `t`.
+- Catálogo 37k: v228.5 `movieCosechaArray()` (cache 60s, parsing dict numérico con
+  campos nombre/pic/year) — `/api/catalogo/movie?pag=N` y `v-buscar` funcionan
+  (pag2 verificado: 24 items, mas=true). Búsqueda global incluye cosecha.
+- Pendiente: llave wsSecret sigue sin caer (JNI_OnLoad 0x0 en pos 2728). La
+  reproducción correcta de títulos con copia dañada depende de que exista OTRA
+  copia buena en el catálogo; si no, da error 502 honesto en vez del dibujo.
