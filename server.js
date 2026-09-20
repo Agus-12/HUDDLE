@@ -6395,15 +6395,58 @@ async function catCaricaturas() {
   return items;
 }
 
+
+/* v228: búsqueda en el catálogo cosechado (37k+) — local, instantánea */
+let _cosechaItems = null, _cosechaItemsAt = 0, _cosechaItemsMtime = 0;
+function buscarMovieCosecha(q) {
+  const nq = q.toLowerCase().trim();
+  if (!nq) return [];
+  const est = movieCosechaEstado();
+  if (!est || !est.archivo || !est.archivo.ruta) return [];
+  // recargar solo si el archivo cambió (cache 30s)
+  const now = Date.now();
+  if (!_cosechaItems || now - _cosechaItemsAt > 30000) {
+    try {
+      const st = fs.statSync(est.archivo.ruta);
+      if (!_cosechaItems || st.mtimeMs !== _cosechaItemsMtime) {
+        const txt = fs.readFileSync(est.archivo.ruta, 'utf8');
+        const j = JSON.parse(txt);
+        _cosechaItems = Array.isArray(j) ? j : (Array.isArray(j.items) ? j.items : (Array.isArray(j.result) ? j.result : []));
+        _cosechaItemsMtime = st.mtimeMs;
+      }
+      _cosechaItemsAt = now;
+    } catch { return []; }
+  }
+  if (!_cosechaItems || !_cosechaItems.length) return [];
+  const hits = [];
+  for (const x of _cosechaItems) {
+    const nombre = String(x.vod_name || x.title || x.titulo || '');
+    if (nombre.toLowerCase().includes(nq)) {
+      const vid = x.id || x.vod_id || x.vod;
+      if (!vid) continue;
+      hits.push({
+        title: nombre,
+        url: 'https://movie.huddle/v/' + vid,
+        img: x.vod_pic || x.pic || '/carita.png',
+        site: 'Movie',
+        extra: 'Latino · ' + (x.vod_year || ''),
+      });
+      if (hits.length >= 30) break;
+    }
+  }
+  return hits;
+}
+
 async function buscarEnSitios(q) {
   const nq = normalizarTxt(q);
-  const [cuevana, latanime, animeflv, pelisxd, cari, catalogo] = await Promise.all([
+  const [cuevana, latanime, animeflv, pelisxd, cari, catalogo, movieCosecha] = await Promise.all([
     buscarCuevana(q).catch(() => []),
     buscarLatanime(q).catch(() => []),
     buscarAnimeflv(q).catch(() => []), /* v97 */
     buscarPelisxd(q).catch(() => []), /* v98: el catálogo grande de pelis */
     buscarMiscaricaturas(q).catch(() => []), /* v102: caricaturas nick/CN */
     catalogoLocal().catch(() => []), /* v121 */
+    Promise.resolve(buscarMovieCosecha(q)), /* v228: catálogo cosechado 37k */
   ]);
   /* v121: Cartoons (Lacartoons) entra a la búsqueda — se filtra LOCAL del
    * catálogo. Todo se puntúa por parecido y queda en UNA sola lista
@@ -6426,6 +6469,7 @@ async function buscarEnSitios(q) {
     ...puntuar(cari),
     ...(NOVELAS_EXTERNAS_ON ? puntuar(await buscarNovelas(q).catch(() => [])) : []), /* v206 — v208: ocultas */
     ...(NOVELAS_EXTERNAS_ON ? puntuar(await nv2Buscar(q).catch(() => [])) : []), /* v206.2 — v208: ocultas */
+    ...puntuar(movieCosecha), /* v228: 37k títulos cosechados */
     ...puntuar(catalogo.filter((x) => x.site !== 'Cartoons')),
   ];
   /* v121: por NIVELES de relevancia — primero lo que se parece de verdad
