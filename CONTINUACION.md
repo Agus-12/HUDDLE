@@ -1813,3 +1813,28 @@ POST `https://{api}/api/vod/info_new`, Content-Type form, body `vod_id={id}&cur_
 - Pendiente: llave wsSecret sigue sin caer (JNI_OnLoad 0x0 en pos 2728). La
   reproducción correcta de títulos con copia dañada depende de que exista OTRA
   copia buena en el catálogo; si no, da error 502 honesto en vez del dibujo.
+
+## ACTUALIZACIÓN — 20 SEP 2026 (v234): Auditoría PelisXD + Streamwish Unpacker
+
+### Auditoría completa de PelisXD (4,703 películas)
+Escaneo de TODAS las películas del sitemap verificando tipo de embed:
+
+| Tipo | Cantidad | % | ¿Funciona? |
+|---|---|---|---|
+| Byse (byseqekaho.com) | 2,490 | 52.9% | ✅ SÍ (API + AES decrypt) |
+| Solo DoodStream | 1,153 | 24.5% | ❌ Videos eliminados ("Not Found") |
+| Solo Streamwish | 986 | 21.0% | ⚠️ JS packed, ver v234 |
+| Otro/Sin embeds | 74 | 1.6% | ❌ |
+
+### Hallazgos clave:
+1. **DoodStream está MUERTO** — todos los mirrors (dood.li, d000d.com, doodstream.com, dood.wf, dood.re) redirigen a playmogo.com → "Video not found"
+2. **Streamwish tiene videos** — pero el m3u8 está dentro de JS packed (p,a,c,k,e,d). El unpacker extrae la URL correctamente
+3. **CDN de streamwish (dramiyos-cdn.com)** — devuelve 502 al verificar m3u8. Puede ser temporal o requerir headers específicos
+
+### v234: Streamwish unpacker
+- Nuevo bloque en `extraerStreamwishPeli()` que detecta `eval(function(p,a,c,k,e,d)` y desempaca el JS
+- Extrae URLs m3u8/mp4 del JS decodificado
+- Verifica que el m3u8 funcione antes de devolverlo
+- ~986 películas adicionales podrían funcionar si el CDN coopera
+
+**Estado:** v234 pushed → pendiente deploy en Oracle y test real
