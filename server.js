@@ -448,8 +448,38 @@ async function laRevizar() { /* apelaciones: ocultadas hace <7 días, una a una 
     console.log('[podredumbre] revisión terminada: ' + vivas2 + ' revivieron de ' + cands.length);
   } finally { laReviviendo = false; }
 }
-setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando…"); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); }, 90 * 1000);
-setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); }, 6 * 3600 * 1000);
+setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); }, 90 * 1000);
+setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); }, 6 * 3600 * 1000);
+
+/* v234: SONDA PELISXD — revisa películas ocultas para ver si volvieron */
+async function sondaPelisxd() {
+  const SAMPLE = 30;
+  try {
+    const ocultas = [...PXD_OCULTAS];
+    if (!ocultas.length) return;
+    const shuffled = ocultas.sort(() => Math.random() - 0.5).slice(0, SAMPLE);
+    let revived = 0;
+    for (const slug of shuffled) {
+      try {
+        const r = await fetchSeguro('https://www.pelisxd.com/pelicula/' + slug, 12000);
+        if (!r.ok) continue;
+        const html = await r.text();
+        const re = /v_source[^A-Za-z0-9]{0,12}([A-Za-z0-9+/=]{24,})/g;
+        let m, hasByse = false;
+        while ((m = re.exec(html))) {
+          try { const url = Buffer.from(m[1], 'base64').toString('utf8'); if (/byse|byseqekaho/i.test(url)) { hasByse = true; break; } } catch {}
+        }
+        if (hasByse) {
+          PXD_OCULTAS.delete(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt');
+          pxdPerdonar(slug);
+          revived++;
+          console.log('[sonda] pxd revivió: ' + slug);
+        }
+      } catch {}
+    }
+    if (revived) console.log('[sonda] pxd: ' + revived + ' películas revivieron');
+  } catch (e) { console.warn('[sonda] pxd error: ' + String(e).slice(0, 60)); }
+}
 
 /* v205.2: PODREDUMBRE GENERAL — el mismo circuito de latanime (fallos
  * reales → ocultar; éxito → perdonar; re-chequeo periódico → revivir)
