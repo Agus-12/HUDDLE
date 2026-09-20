@@ -1,6 +1,73 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
-> **PARA REANUDAR EN OTRO CHAT: leer primero `auditorias/CONOCIMIENTOS-Y-METODO.md`.**
+> **🔴 PARA REANUDAR EN OTRO CHAT: lee PRIMERO la sección de AQUÍ ABAJO (20 SEP 2026 — es el estado ACTUAL y la hoja de ruta). Todo lo demás hacia abajo es bitácora histórica del capítulo "Movie", ya CERRADO.**
+
+---
+
+## ✅ ESTADO ACTUAL — 20 SEP 2026 (commit `9d0bc71`, `UI_VERSION=v230`): MOVIE CERRADO · APP = FUENTES LATINAS QUE SÍ REPRODUCEN
+
+### Veredicto del capítulo "Movie" (app movievn + CDN Wangsu) — CERRADO PARA SIEMPRE
+- El contenido real de Movie vive en un CDN (`movievn.j5t2n.com`) con URLs firmadas `wsSecret=MD5(llave+pathname+wsTime)`.
+- **La llave NO se pudo extraer**: se deriva dentro de una VM white-box en el `.so` nativo y **nunca** sale al tráfico de red ni a la memoria en claro. Se agotaron TODAS las vías (llaves derivadas, legibles, binarias 16/32 B, tiempo hex/decimal, variantes de ruta, 6 órdenes de concatenación; ~69M+ ventanas barridas). El espejo `147.124.216.142` es **100% relleno** (todo ~422 s/falso).
+- **Decisión del usuario: TUMBAR Movie.** `MOVIE_ENABLED = false` en `server.js` lo saca de TODO (home, "ver todo", buscador, reproducción). Sin llave, el origen da 403 y no sirve para nada.
+- 📄 **Autopsia técnica completa (toda la criptografía, métodos y por qué falló cada vía): `docs/AUTOPSIA-CDN-MOVIE.md`.** NO reintentar la extracción de la llave: está demostrado agotado.
+
+### App actual (lo que SÍ funciona y se queda)
+Catálogo latino abierto que reproduce de verdad por HTTP, vía proxy propio con UA/Referer correctos:
+**gopelis, cine-calidad, pelisxd, latanime, danimados, cuevana, animeflv, novelas, caricaturas.**
+App en vivo: **http://129.80.212.92:3000** · Modos **Solo** y **Juntos** (salas).
+
+### 🎯 LO QUE EL USUARIO QUIERE AHORA (siguiente fase, en este orden)
+1. **Cambios ESTÉTICOS / de UI** — el frontend está en `public/index.html` (39 KB) + `public/app.js` (205 KB) + `public/style.css`. Se sirve estático desde `public/`.
+2. **AGREGAR NUEVAS FUENTES** — más sitios latinos HTTP que reproduzcan.
+*(Pendientes de antes, por si el usuario los retoma: reproductor para TV Samsung `/tv` y app nativa.)*
+
+---
+
+## 🧭 CÓMO TRABAJAR CON ESTE USUARIO (reglas duras — NO violarlas)
+1. **Respuestas CORTAS, en español llano.** El usuario NO es técnico. No le pidas datos técnicos que no pueda dar.
+2. **NUNCA anuncies nada sin verificarlo antes contra el servidor EN VIVO.** (Corrección del usuario: *"traes un desmadre"* = verificar siempre antes de prometer.) Levanta el server en un puerto de prueba y pruébalo, y/o pégale al server vivo.
+3. **Sin saltos de 30 segundos** ni cortes en la reproducción.
+4. Debe funcionar en **modo Solo Y modo Juntos**.
+5. **Al picar un título, reproducir ESE título.** Contenido ajeno es inaceptable; detecta y corrige des-matches.
+6. Si un título no está en una fuente, sácalo de otra (siempre **HTTP + latino**).
+7. **No rompas lo que ya funciona** (las fuentes latinas actuales).
+8. GitHub es el workspace. Push con el PAT que el usuario da en el chat; **limpia el token de `.git/config` después y NUNCA lo commits**.
+9. El usuario despliega él mismo en Oracle con **`cd ~/huddle && bash actualizar.sh`** (hace git pull + install + restart). No le pidas comandos raros; dale ese.
+
+---
+
+## 🏗️ ARQUITECTURA (server.js ≈ 10.3k líneas, UN solo archivo, Node puro sin Express)
+- `UI_VERSION` (const, ~línea 25): súbela con cada cambio. El front avisa "recarga" si cambia.
+- Router: despacho manual por `url.pathname` (no hay `app.get`). Frontend servido de `public/`.
+- **Datos y catálogos grandes NO están en git** (viven en Oracle: `data/`, `catalogo-70k.json`, listas `public/*-ocultas.txt`, etc.). No esperes encontrarlos en el repo.
+- **Resolutores existentes** (el patrón a imitar): `resolverGopelis`, `resolverPelisxd`, `resolverNovela`, `resolverEnp`, `resolverGoodstream`, `resolverOkRu`, `resolverYoutube`, `resolverNativo`, `resolverDani`, `resolverCaricatura`, `resolverLacartoons`, `resolverAnime`, `resolverSolo`. Devuelven `{ m3u8, proxy:true, subs:[] }`.
+- **Dispatcher principal** (aquí se registra toda fuente): el condicional grande ~línea 9727 (`esMovie/esGp/esPeliXd/esCari/...`), y el dispatcher nativo ~líneas 2133-2140.
+- **Proxy HLS propio `/api/hls?u=`**: sirve el m3u8 y los segmentos con el UA/Referer correctos. Muchas CDN (vimeos, streamwish…) dan **403 sin esos headers**: SIEMPRE se sirve por el proxy, no directo.
+- Moderación/ocultas: listas `public/*-ocultas.txt` + Sets en memoria; hay auto-ocultado tras N fallos.
+- Salas (modo Juntos), mirrors, continuar-viendo, cacheo de posters/meta.
+
+## ➕ RECETA para AGREGAR UNA NUEVA FUENTE
+1. Verifica el sitio EN VIVO: que dé catálogo **y** stream HTTP latino (ojo Cloudflare duro).
+2. Escribe `resolverX(pageUrl)` → `{ m3u8, proxy:true, subs:[] }` (usa `resolverGopelis` de plantilla).
+3. Regístrala en **ambos** dispatchers (9727 y 2133).
+4. Descubrimiento de catálogo (search/list) + posters.
+5. Asegura que `esProxeable()` acepte el host de su CDN (para que el proxy la sirva).
+6. **Prueba EN VIVO extremo a extremo** (que el video cargue de verdad) antes de anunciarlo.
+
+## 🚀 DESPLIEGUE
+- Repo: `github.com/Agus-12/HUDDLE` (privado).
+- Push (con el PAT del usuario): `git push https://<PAT>@github.com/Agus-12/HUDDLE.git HEAD:main` → luego `sed -i 's#https://[^@]*@github.com#https://github.com#g' .git/config`.
+- El usuario corre `cd ~/huddle && bash actualizar.sh` y la app queda en `http://129.80.212.92:3000`.
+
+## 🚫 NO REPETIR (callejones sin salida, ya demostrados)
+- Llave `wsSecret` del CDN movievn: **no extraíble** (todo agotado). Ver `docs/AUTOPSIA-CDN-MOVIE.md`.
+- Espejo `147.124.216.142`: **100% relleno**.
+- Parchear la VM del `.so`: aborta por autoverificación (anti-tamper).
+- `ck` de `sys_conf`: es del tracker P2P, no del CDN.
+
+---
+---
 
 ## ACTUALIZACIÓN — 19 SEP 2026 (v227+): CATÁLOGO REAL EN MARCHA Y LLAVE AL DESCUBIERTO PARCIAL
 
