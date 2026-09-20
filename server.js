@@ -452,32 +452,110 @@ setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparand
 setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); }, 6 * 3600 * 1000);
 
 /* v234: SONDA PELISXD — revisa películas ocultas para ver si volvieron */
+/* v234: SONDA PELISXD COMPLETA — 3 frentes:
+ * 1. NUEVAS: slugs del sitemap no vistos → verificar si tienen Byse
+ * 2. VIVAS: muestra de películas activas → ¿siguen funcionando?
+ * 3. MUERTAS: muestra de ocultas → ¿revivieron?
+ *
+ * Cada ciclo (~6h) hace un barrido de ~60 películas total.
+ * Si una viva muere → se oculta. Si una muerta revive → se muestra.
+ * Si una nueva funciona → se marca como viva y entra al feed automáticamente.
+ */
+
+
+async function verificarByse(slug) {
+  const r = await fetchSeguro('https://www.pelisxd.com/pelicula/' + slug, 12000);
+  if (!r.ok) return { ok: false, reason: 'page_' + r.status };
+  const html = await r.text();
+  const re = /v_source[^A-Za-z0-9]{0,12}([A-Za-z0-9+/=]{24,})/g;
+  let m;
+  while ((m = re.exec(html))) {
+    try {
+      const url = Buffer.from(m[1], 'base64').toString('utf8');
+      if (/byse|byseqekaho/i.test(url)) return { ok: true };
+    } catch {}
+  }
+  return { ok: false, reason: 'no_byse' };
+}
+
 async function sondaPelisxd() {
-  const SAMPLE = 30;
+  const POR_CICLO = 20; /* por cada frente */
+  const t0 = Date.now();
+  let nuevas_ok = 0, nuevas_fail = 0, vivas_muertas = 0, muertas_vivas = 0;
   try {
-    const ocultas = [...PXD_OCULTAS];
-    if (!ocultas.length) return;
-    const shuffled = ocultas.sort(() => Math.random() - 0.5).slice(0, SAMPLE);
-    let revived = 0;
-    for (const slug of shuffled) {
-      try {
-        const r = await fetchSeguro('https://www.pelisxd.com/pelicula/' + slug, 12000);
-        if (!r.ok) continue;
-        const html = await r.text();
-        const re = /v_source[^A-Za-z0-9]{0,12}([A-Za-z0-9+/=]{24,})/g;
-        let m, hasByse = false;
-        while ((m = re.exec(html))) {
-          try { const url = Buffer.from(m[1], 'base64').toString('utf8'); if (/byse|byseqekaho/i.test(url)) { hasByse = true; break; } } catch {}
+    /* ─── 1. NUEVAS: slugs del sitemap que nunca hemos visto ─── */
+    try {
+      const sitemap = await pelisxdIndice(); /* ya cached, no descarga de nuevo */
+      const desconocidas = sitemap.filter((s) => !pxdVistas.has(s) && !PXD_OCULTAS.has(s));
+      if (desconocidas.length) {
+        const muestra = desconocidas.sort(() => Math.random() - 0.5).slice(0, POR_CICLO);
+        for (const slug of muestra) {
+          pxdVistas.add(slug); /* marcar como vista */
+          try {
+            const v = await verificarByse(slug);
+            if (v.ok) {
+              nuevas_ok++;
+              /* Ya está viva — no hay que hacer nada más, buscarPelisxd() la encontrará
+               * y los géneros la muestran desde PelisXD directamente */
+            } else {
+              /* No tiene Byse → ocultar de inmediato */
+              PXD_OCULTAS.add(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt');
+              nuevas_fail++;
+            }
+          } catch {}
         }
-        if (hasByse) {
-          PXD_OCULTAS.delete(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt');
-          pxdPerdonar(slug);
-          revived++;
-          console.log('[sonda] pxd revivió: ' + slug);
+      }
+      /* Guardar vistas (cada ciclo crece un poco) */
+      try { fs.writeFileSync(path.join(__dirname, 'public', 'pxd-vistas.txt'), [...pxdVistas].join('\n') + '\n'); } catch {}
+    } catch (e) { console.warn('[sonda] pxd nuevas error: ' + String(e).slice(0, 60)); }
+
+    /* ─── 2. VIVAS: ¿siguen funcionando? ─── */
+    try {
+      /* PelisXD tiene ~4700 slugs. Las vivas = sitemap - ocultas */
+      const sitemap = await pelisxdIndice();
+      const vivas = sitemap.filter((s) => !PXD_OCULTAS.has(s));
+      const muestraVivas = vivas.sort(() => Math.random() - 0.5).slice(0, POR_CICLO);
+      for (const slug of muestraVivas) {
+        try {
+          const v = await verificarByse(slug);
+          if (!v.ok) {
+            PXD_OCULTAS.add(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt');
+            pxdOcultar(slug); /* registrar fallo para el sistema de podredumbre */
+            vivas_muertas++;
+            console.log('[sonda] pxd MURIÓ: ' + slug);
+          }
+        } catch {}
+      }
+    } catch (e) { console.warn('[sonda] pxd vivas error: ' + String(e).slice(0, 60)); }
+
+    /* ─── 3. MUERTAS: ¿revivieron? ─── */
+    try {
+      const ocultas = [...PXD_OCULTAS];
+      if (ocultas.length) {
+        const muestraMuertas = ocultas.sort(() => Math.random() - 0.5).slice(0, POR_CICLO);
+        for (const slug of muestraMuertas) {
+          try {
+            const v = await verificarByse(slug);
+            if (v.ok) {
+              PXD_OCULTAS.delete(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt');
+              pxdPerdonar(slug);
+              muertas_vivas++;
+              console.log('[sonda] pxd REVIVIÓ: ' + slug);
+            }
+          } catch {}
         }
-      } catch {}
-    }
-    if (revived) console.log('[sonda] pxd: ' + revived + ' películas revivieron');
+      }
+    } catch (e) { console.warn('[sonda] pxd muertas error: ' + String(e).slice(0, 60)); }
+
+    /* ─── Log ─── */
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+    const parts = [];
+    if (nuevas_ok) parts.push('nuevas_ok=' + nuevas_ok);
+    if (nuevas_fail) parts.push('nuevas_fail=' + nuevas_fail);
+    if (vivas_muertas) parts.push('vivas→muertas=' + vivas_muertas);
+    if (muertas_vivas) parts.push('muertas→vivas=' + muertas_vivas);
+    if (parts.length) console.log('[sonda] pxd (' + elapsed + 's): ' + parts.join(', '));
+    else console.log('[sonda] pxd (' + elapsed + 's): sin cambios');
   } catch (e) { console.warn('[sonda] pxd error: ' + String(e).slice(0, 60)); }
 }
 
@@ -488,6 +566,9 @@ async function sondaPelisxd() {
  * ya nace filtrado y el error avisa claro). */
 const PXD_OCULTAS = new Set(), AF_OCULTAS = new Set();
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'pxd-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) PXD_OCULTAS.add(l.trim()); } catch {}
+
+const pxdVistas = new Set(); /* slugs ya verificados alguna vez */
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'pxd-vistas.txt'), 'utf8').split('\n')) if (l.trim()) pxdVistas.add(l.trim()); } catch {}
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'af-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) AF_OCULTAS.add(l.trim()); } catch {}
 const FALLOS_GP = new Map(), FALLOS_PXD = new Map(), FALLOS_AF = new Map(), FALLOS_CV = new Map();
 for (const [mapa, arch] of [[FALLOS_GP, 'fallos-gp.json'], [FALLOS_PXD, 'fallos-pxd.json'], [FALLOS_AF, 'fallos-af.json'], [FALLOS_CV, 'fallos-cv.json']]) {
