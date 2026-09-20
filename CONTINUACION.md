@@ -1867,3 +1867,22 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - `public/pxd-ocultas.txt` — 2,174 slugs ocultos
 - `sonda-pelisxd.js` — script standalone de sonda
 - `docs/AUDITORIA-PELISXD-2026-09-20.md` — auditoría completa
+
+## DOCUMENTACIÓN COMPLETA — PelisXD v234 (20 Sep 2026)
+
+### Archivos nuevos:
+- `docs/PELISXD-TECNICO.md` — Documentación técnica completa (resolver, sonda, feed, búsqueda, cachés)
+- `docs/AUDITORIA-PELISXD-2026-09-20.md` — Auditoría de 4,703 películas
+- `public/pxd-ocultas.txt` — 2,174 slugs ocultos
+- `public/pxd-vistas.txt` — Tracking de slugs verificados
+- `sonda-pelisxd.js` — Script standalone de sonda
+- `sonda-pelisxd.log` — Log de actividad (se crea al primer ciclo)
+
+### Resumen técnico:
+- **Resolver:** Byse AES-256-GCM (HTTP puro, sin navegador)
+- **Sonda:** 3 frentes automáticos cada 6h (nuevas + vivas + muertas)
+- **Feed:** PelisXD en todos los géneros + sección "PelisXD — Estrenos"
+- **Búsqueda:** Debounce 350ms + caché 5 min (max 50 queries)
+- **Memoria:** Límites en todas las cachés + batch de géneros
+- **DoodStream:** Videos eliminados, hosts redirigen a playmogo.com
+- **Streamwish:** JS packed desempacado, CDN devuelve 502
