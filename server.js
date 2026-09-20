@@ -479,7 +479,9 @@ async function verificarByse(slug) {
 }
 
 async function sondaPelisxd() {
-  const POR_CICLO = 20; /* por cada frente */
+  const memMB = process.memoryUsage().heapUsed / 1024 / 1024;
+  if (memMB > 500) { console.warn('[sonda] pxd saltado — memoria alta: ' + memMB.toFixed(0) + 'MB'); return; }
+  const POR_CICLO = 15; /* v234: reducido para no saturar memoria */
   const t0 = Date.now();
   let nuevas_ok = 0, nuevas_fail = 0, vivas_muertas = 0, muertas_vivas = 0;
   try {
@@ -554,8 +556,10 @@ async function sondaPelisxd() {
     if (nuevas_fail) parts.push('nuevas_fail=' + nuevas_fail);
     if (vivas_muertas) parts.push('vivas→muertas=' + vivas_muertas);
     if (muertas_vivas) parts.push('muertas→vivas=' + muertas_vivas);
+    const logLine = `[${new Date().toISOString()}] ${elapsed}s nuevas_ok=${nuevas_ok} nuevas_fail=${nuevas_fail} vivas→muertas=${vivas_muertas} muertas→vivas=${muertas_vivas} ocultas=${PXD_OCULTAS.size} vistas=${pxdVistas.size}\n`;
     if (parts.length) console.log('[sonda] pxd (' + elapsed + 's): ' + parts.join(', '));
     else console.log('[sonda] pxd (' + elapsed + 's): sin cambios');
+    try { fs.appendFileSync(path.join(__dirname, 'sonda-pelisxd.log'), logLine); } catch {}
   } catch (e) { console.warn('[sonda] pxd error: ' + String(e).slice(0, 60)); }
 }
 
@@ -4832,6 +4836,11 @@ const PXD_GENERO_MAP = {
   suspense: 'suspenso', terror: 'terror',
 };
 const pxdGeneroCache = new Map(); /* slug → {at, items} */
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of pxdGeneroCache) if (now - v.at > 3 * 3600 * 1000) pxdGeneroCache.delete(k);
+  for (const [k, v] of generosCache) if (now - v.at > 60 * 60 * 1000) generosCache.delete(k);
+}, 10 * 60 * 1000); /* v234: limpiar cachés de géneros cada 10 min */
 async function pelisxdPorGenero(slug) {
   const pxdSlug = PXD_GENERO_MAP[slug];
   if (!pxdSlug) return [];
@@ -4972,6 +4981,18 @@ const PELISXD_STREAM_TTL = 2 * 60 * 60 * 1000;   /* la firma de los segmentos vi
 const PELISXD_IDX_TTL = 24 * 60 * 60 * 1000;     /* sitemap: refresco diario */
 const pelisxdIdx = { slugs: [], at: 0, buscando: null };
 const pelisxdMetaCache = new Map();  /* slug → { at, d: {title, poster, year, alive} } */
+/* v234: limpiar caché de metas periódicamente (max 500 entradas) */
+setInterval(() => {
+  if (pelisxdMetaCache.size <= 500) return;
+  const now = Date.now();
+  for (const [k, v] of pelisxdMetaCache) {
+    if (now - v.at > 15 * 60 * 1000) pelisxdMetaCache.delete(k);
+  }
+  if (pelisxdMetaCache.size > 500) {
+    const entries = [...pelisxdMetaCache.entries()].sort((a, b) => a[1].at - b[1].at);
+    for (let i = 0; i < entries.length - 500; i++) pelisxdMetaCache.delete(entries[i][0]);
+  }
+}, 5 * 60 * 1000); /* cada 5 minutos */
 const pelisxdStreams = new Map();    /* token → { body, base, ref, slug, at } */
 
 async function pelisxdIndice() {
@@ -6779,6 +6800,19 @@ async function buscarEnSitios(q) {
 /* v234: caché de búsquedas recientes (5 min TTL) */
 const searchCache = new Map(); /* q → {at, data} */
 const SEARCH_CACHE_TTL = 5 * 60 * 1000;
+const SEARCH_CACHE_MAX = 50; /* v234: máximo 50 queries en caché */
+function searchCacheEvict() {
+  if (searchCache.size <= SEARCH_CACHE_MAX) return;
+  const now = Date.now();
+  for (const [k, v] of searchCache) {
+    if (now - v.at > SEARCH_CACHE_TTL) searchCache.delete(k);
+  }
+  /* si aún así está llena, borrar las más viejas */
+  if (searchCache.size > SEARCH_CACHE_MAX) {
+    const entries = [...searchCache.entries()].sort((a, b) => a[1].at - b[1].at);
+    for (let i = 0; i < entries.length - SEARCH_CACHE_MAX; i++) searchCache.delete(entries[i][0]);
+  }
+}
   const nq = normalizarTxt(q);
   const [cuevana, latanime, animeflv, pelisxd, cari, catalogo, movieCosecha] = await Promise.all([
     buscarCuevana(q).catch(() => []),
@@ -9733,8 +9767,14 @@ async function pelisxdLatest() {
       const q = (url.searchParams.get('q') || '').trim().slice(0, 120);
       if (!q) return json(res, 400, { ok: false, error: 'Escribe qué quieren ver' });
       const _sc = searchCache.get(q);
-      const r = (_sc && Date.now() - _sc.at < SEARCH_CACHE_TTL) ? _sc.data : await buscarEnSitios(q);
-      if (!_sc || Date.now() - _sc.at >= SEARCH_CACHE_TTL) searchCache.set(q, { at: Date.now(), data: r }); /* v234: caché 5 min */
+      let r;
+      try {
+        r = (_sc && Date.now() - _sc.at < SEARCH_CACHE_TTL) ? _sc.data : await buscarEnSitios(q);
+      } catch (e) {
+        console.warn('[buscar] error:', String(e).slice(0, 100));
+        return json(res, 200, { ok: true, resultados: [], sugiere: null });
+      }
+      if (!_sc || Date.now() - _sc.at >= SEARCH_CACHE_TTL) { searchCacheEvict(); searchCache.set(q, { at: Date.now(), data: r }); } /* v234: caché 5 min con límite */
       r.resultados = r.resultados.filter((x) => !cvOcultaUrl(x.url)); /* v191: sin series muertas de cine-calidad */
       /* v198: latanime en limpio — sin versiones castellanas ni duplicados;
        * AnimeFLV cede cuando latanime tiene la serie (mandan las latino) */
