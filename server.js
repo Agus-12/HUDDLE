@@ -1057,6 +1057,61 @@ function movieEspejoPreferido() {
   return _espejoBueno;
 }
 function movieMarcarEspejo(host) { _espejoBueno = host; _espejoBuenoMs = Date.now(); }
+/* v228.6: VALIDACIÓN DE DURACIÓN — el espejo a veces tiene copias dañadas
+   (p.ej. subidas del 2026-01-19 sirven un dibujo de 7 min en vez de la peli).
+   Comparamos la duración real del m3u8 contra la esperada; si no coincide,
+   buscamos OTRA copia del mismo título en el catálogo cosechado. */
+function movieParseDurHHMMSS(d) {
+  const m = String(d || '').match(/(\d+):(\d{1,2}):(\d{1,2})/);
+  return m ? (+m[1] * 3600 + +m[2] * 60 + +m[3]) : 0;
+}
+function movieDurM3u8(txt) {
+  let s = 0;
+  for (const l of String(txt || '').split('\n')) if (l.startsWith('#EXTINF:')) s += parseFloat(l.slice(8)) || 0;
+  return s;
+}
+function movieEsM3u8Valido(txt, vdSec) {
+  if (!vdSec) return true; /* sin dato esperado, no se puede validar */
+  const real = movieDurM3u8(txt);
+  if (!real) return false;
+  return real >= vdSec * 0.5; /* si dura menos de la mitad, es copia dañada */
+}
+/* v228.6: busca otra copia del mismo título en el catálogo cosechado y
+   devuelve su vod_url del espejo si pasa la validación de duración */
+async function movieCopiaBuena(titulo, vdSec, excluirPath) {
+  const arr = movieCosechaArray();
+  if (!arr.length || !titulo) return null;
+  const nq = String(titulo).toLowerCase().split(/\s*[:·-]\s*/)[0].trim();
+  if (nq.length < 3) return null;
+  const cands = [];
+  for (const x of arr) {
+    const n = String(x.vod_name || '').toLowerCase();
+    if (n.startsWith(nq) || n.includes(nq)) {
+      const vid = x.vod_id || x.id;
+      if (vid) cands.push(vid);
+      if (cands.length >= 4) break;
+    }
+  }
+  for (const vid of cands) {
+    try {
+      const j = await mapiFicha(vid);
+      if (!j || j.code !== 10000 || !j.result) continue;
+      const l = mapiUrlLatina(j.result.vod_collection || []);
+      if (!l || !l.url) continue;
+      let pu2; try { pu2 = new URL(l.url); } catch { continue; }
+      if (pu2.pathname === excluirPath) continue;
+      const cand = 'http://' + (MOVIE_ESPEJOS[0] || '147.124.216.142') + pu2.pathname;
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 12000);
+      const r = await fetch(cand, { headers: { 'User-Agent': FETCH_UA }, signal: ctl.signal });
+      clearTimeout(t);
+      if (r.status === 200) {
+        const txt = await r.text();
+        if (movieEsM3u8Valido(txt, vdSec)) return { url: l.url, m3u8: txt };
+      }
+    } catch {}
+  }
+  return null;
+}
 function movieEsHostPermitido(h) {
   return /(^|\.)j5t2n\.com$/i.test(h) || MOVIE_ESPEJOS.includes(h);
 }
@@ -8936,14 +8991,14 @@ const server = http.createServer(async (req, res) => {
         const r = j.result;
         const col = (r.vod_collection || []).map((c) => ({
           titulo: String(c.title || ''), tipo: c.type, duracion: c.duration || '',
-          url: '/api/movie/v-vid?url=' + encodeURIComponent(c.vod_url || ''),
+          url: '/api/movie/v-vid?url=' + encodeURIComponent(c.vod_url || '') + '&vd=' + movieParseDurHHMMSS(c.duration) + '&t=' + encodeURIComponent(r.vod_name || ''),
         }));
         const lat = mapiUrlLatina(r.vod_collection);
         return json(res, 200, {
           ok: true, vod: r.id, titulo: r.vod_name, poster: r.vod_pic || '/carita.png',
           sinopsis: r.vod_blurb || '', anno: r.vod_year || '', idioma: r.vod_lang || '',
           tags: r.vod_tag || '', score: r.vod_douban_score || 0, actores: r.vod_actor || '',
-          video: lat ? '/api/movie/v-vid?url=' + encodeURIComponent(lat.url) : '',
+          video: lat ? '/api/movie/v-vid?url=' + encodeURIComponent(lat.url) + '&vd=' + movieParseDurHHMMSS(lat.duration) + '&t=' + encodeURIComponent(r.vod_name || '') : '',
           partes: col,
         });
       }
@@ -9000,21 +9055,37 @@ const server = http.createServer(async (req, res) => {
           intentos.push(u);
           intentos.push(firmado('http://movievn.j5t2n.com' + pu.pathname + pu.search));
         }
-        let rr = null, usado = '', ultimo = 0;
+        /* v228.6: validación de duración — copia dañada (dibu de 7 min) se descarta */
+        const vd = +(url.searchParams.get('vd') || 0);
+        const tTit = url.searchParams.get('t') || '';
+        const esM3u8Req = /index5?\.m3u8/i.test(pu.pathname);
+        let rr = null, usado = '', ultimo = 0, bufPre = null;
         for (const cand of intentos) {
           const ctl = new AbortController(); const tt = setTimeout(() => ctl.abort(), 25000);
           try {
             const r = await fetch(cand, { headers: { 'User-Agent': FETCH_UA }, signal: ctl.signal });
             clearTimeout(tt);
-            if (r.status === 200 || r.status === 206) { rr = r; usado = cand; break; }
+            if (r.status === 200 || r.status === 206) {
+              if (vd && esM3u8Req) {
+                const txtV = await r.text();
+                if (!movieEsM3u8Valido(txtV, vd)) { ultimo = r.status; continue; } /* dañada: siguiente */
+                bufPre = Buffer.from(txtV, 'utf8');
+              }
+              rr = r; usado = cand; break;
+            }
             ultimo = r.status;
             try { r.body && r.body.cancel(); } catch {}
           } catch { clearTimeout(tt); ultimo = ultimo || 0; }
         }
+        /* v228.6: si TODAS las copias están dañadas, busca otra del mismo título */
+        if (!rr && vd && esM3u8Req && tTit) {
+          const copia = await movieCopiaBuena(tTit, vd, pu.pathname).catch(() => null);
+          if (copia) { bufPre = Buffer.from(copia.m3u8, 'utf8'); usado = copia.url; rr = { status: 200, _marca: true }; }
+        }
         if (!rr) return json(res, 502, { ok: false, error: 'CDN dijo ' + (ultimo || 'sin respuesta') });
-        try { movieMarcarEspejo(new URL(usado).hostname); } catch {}
-        const ct = (rr.headers.get('content-type') || '').toLowerCase();
-        const buf = Buffer.from(await rr.arrayBuffer());
+        try { const hN = new URL(usado).hostname; if (MOVIE_ESPEJOS.includes(hN)) movieMarcarEspejo(hN); } catch {}
+        const ct = rr._marca ? 'application/vnd.apple.mpegurl' : ((rr.headers && rr.headers.get('content-type')) || '').toLowerCase();
+        const buf = bufPre || Buffer.from(await rr.arrayBuffer());
         if (ct.includes('mpegurl') || /index5?\.m3u8/i.test(pu.pathname)) {
           const base = usado.slice(0, usado.lastIndexOf('/') + 1);
           const out = buf.toString('utf8').split('\n').map((ln) => {
@@ -9115,9 +9186,9 @@ const server = http.createServer(async (req, res) => {
           let eps = col.filter((c) => c && c.vod_url).map((c, i) => ({
             temporada: 1, ep: i + 1,
             titulo: 'Parte ' + (c.title || i + 1) + (c.type === 2 ? ' · Latino' : c.type === 1 ? ' · Subtítulos' : ''),
-            url: '/api/movie/v-vid?url=' + encodeURIComponent(c.vod_url), img: '',
+            url: '/api/movie/v-vid?url=' + encodeURIComponent(c.vod_url) + '&vd=' + movieParseDurHHMMSS(c.duration) + '&t=' + encodeURIComponent(r.vod_name || ''), img: '',
           }));
-          if (!eps.length) { const l = mapiUrlLatina(col); if (l) eps = [{ temporada: 1, ep: 1, titulo: 'Ver', url: '/api/movie/v-vid?url=' + encodeURIComponent(l.url), img: '' }]; }
+          if (!eps.length) { const l = mapiUrlLatina(col); if (l) eps = [{ temporada: 1, ep: 1, titulo: 'Ver', url: '/api/movie/v-vid?url=' + encodeURIComponent(l.url) + '&vd=' + movieParseDurHHMMSS(l.duration) + '&t=' + encodeURIComponent(r.vod_name || ''), img: '' }]; }
           if (!eps.length) return json(res, 404, { ok: false, error: 'Este título aún no tiene video disponible' });
           return json(res, 200, { ok: true, titulo: r.vod_name, poster: r.vod_pic || '/carita.png', episodios: eps });
         }
