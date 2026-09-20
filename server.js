@@ -9257,11 +9257,21 @@ async function pelisxdLatest() {
         popularesDeHoy().catch(() => []),
         seriesRecientes().catch(() => []),
         animesDelMomento().catch(() => []), /* v67: animes del momento (Latanime) */
-        Promise.all(generosDelDia().map(([slug, nombre]) =>
-          peliculasPorGenero(slug)
-            .then((items) => ({ slug, nombre, items }))
-            .catch(() => ({ slug, nombre, items: [] }))
-        )),
+        /* v234: batch de a 6 géneros para no saturar memoria */
+        (async () => {
+          const gens = generosDelDia();
+          const result = [];
+          for (let i = 0; i < gens.length; i += 6) {
+            const batch = gens.slice(i, i + 6);
+            const batchResults = await Promise.all(batch.map(([slug, nombre]) =>
+              peliculasPorGenero(slug)
+                .then((items) => ({ slug, nombre, items }))
+                .catch(() => ({ slug, nombre, items: [] }))
+            ));
+            result.push(...batchResults);
+          }
+          return result;
+        })(),
         caricaturasDestacadas().catch(() => ({ caricaturas: [], cartoons: [] })),
         nvCatalogo().catch(() => []), /* v206 */
       ]);
