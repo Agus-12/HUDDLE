@@ -96,6 +96,34 @@ App en vivo: **http://129.80.212.92:3000** · Modos **Solo** y **Juntos** (salas
 
 **Estado:** v232 listo — commit + deploy pendiente.
 
+## ACTUALIZACIÓN — 20 SEP 2026 (v233): Fix PelisXD "Siniestro" — bug de trailing slash en Byse
+
+**Problema:** PelisXD mostraba "peli caída" para Siniestro. La búsqueda encontraba la peli correctamente pero al reproducir fallaba.
+
+**Causa raíz:** Las URLs de Byse que extrae PelisXD terminan con `/` (ej: `https://byseqekaho.com/e/f8xacb29vg08/`). El código `embedUrl.replace(/.*\//, '')` extraía una cadena **vacía** porque el último carácter era `/`. Esto hacía que la API call fuera a `https://byseqekaho.com/api/videos/` (sin código) → 404.
+
+**Fix:** Se agrega `.replace(/\/+$/, '')` antes de `.replace(/.*\//, '')` para quitar la(s) barra(s) final(es):
+```javascript
+// ANTES (roto):
+const code = embedUrl.replace(/.*\//, '');
+// → ''  (vacío por el trailing slash)
+
+// DESPUÉS (fix):
+const code = embedUrl.replace(/\/+$/, '').replace(/.*\//, '');
+// → 'f8xacb29vg08'  ✅
+```
+
+**Test end-to-end confirmado:**
+- `byseqekaho.com/e/f8xacb29vg08/` → code `f8xacb29vg08` → API 200 → version 12, indices [12,19]
+- AES-256-GCM decrypt → `master.m3u8` 720p verificado OK
+- Commit: `bf0f1c5`
+
+**Cambios:**
+- `server.js` línea ~4952: fix trailing slash en `extraerStreamwishPeli()` bloque Byse
+- `UI_VERSION = 'v233'`
+
+**Estado:** v233 pushed a GitHub → pendiente pull+deploy en Oracle.
+
 ---
 ---
 
