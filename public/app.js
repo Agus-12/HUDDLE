@@ -579,20 +579,26 @@ function montarNativo(porProxy) {
 function esFlujoMovie(url) { return /^\/api\/movie\//.test(String(url || '')); }
 function cfgHls(src) {
   return esFlujoMovie(src)
-    ? { maxBufferLength: 30, fragLoadingMaxRetry: 2, fragLoadingRetryDelay: 500, manifestLoadingMaxRetry: 3 }
+    ? { maxBufferLength: 30, fragLoadingMaxRetry: 6, fragLoadingRetryDelay: 1000, fragLoadingMaxRetryTimeoutMs: 30000, manifestLoadingMaxRetry: 4, levelLoadingMaxRetry: 4 }
     : { maxBufferLength: 30 };
 }
 function saltarHuecoMovie(hls, video, estado, aviso) {
   const saltos = (estado.saltosMovie || 0) + 1;
   estado.saltosMovie = saltos;
-  if (saltos > 8) return false; /* ya insistimos bastante: decide quien llamó */
-  const destino = Math.max(0, (video.currentTime || 0)) + 30;
-  toast(aviso || 'Ese pedacito no está guardado — salto 30 segundos');
+  if (saltos > 12) return false; /* más intentos antes de rendirse */
+  /* v228: primero reintentar el mismo segmento antes de saltar */
+  if (saltos <= 3) {
+    toast('Reintentando pedacito...');
+    try { hls.startLoad(video.currentTime); } catch {}
+    return true;
+  }
+  const destino = Math.max(0, (video.currentTime || 0)) + 10; /* salto más corto: 10s en vez de 30 */
+  toast(aviso || 'Pedacito no disponible — salto 10 segundos');
   try { clearTimeout(estado.tSaltoMovie); } catch {}
   estado.tSaltoMovie = setTimeout(() => {
     try { video.currentTime = destino; } catch {}
     try { hls.startLoad(destino); } catch {}
-  }, 700);
+  }, 1200);
   return true;
 }
 function sincronizarNativo() {
