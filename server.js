@@ -5102,7 +5102,16 @@ setInterval(() => {
   const now = Date.now();
   for (const [k, v] of pxdGeneroCache) if (now - v.at > 3 * 3600 * 1000) pxdGeneroCache.delete(k);
   for (const [k, v] of generosCache) if (now - v.at > 60 * 60 * 1000) generosCache.delete(k);
-}, 10 * 60 * 1000); /* v234: limpiar cachés de géneros cada 10 min */
+  /* v235: limpiar cachés de Cuevana */
+  for (const [k, v] of cuevanaMetaCache) if (now - v.at > 15 * 60 * 1000) cuevanaMetaCache.delete(k);
+  if (cuevanaMetaCache.size > 500) {
+    const entries = [...cuevanaMetaCache.entries()].sort((a, b) => a[1].at - b[1].at);
+    for (let i = 0; i < entries.length - 500; i++) cuevanaMetaCache.delete(entries[i][0]);
+  }
+  for (const [k, v] of cuevanaGeneroCache) if (now - v.at > 3 * 3600 * 1000) cuevanaGeneroCache.delete(k);
+  /* Limitar CVM_VISTAS a 10k para no consumir memoria infinita */
+  if (CVM_VISTAS.size > 10000) { const arr = [...CVM_VISTAS]; CVM_VISTAS.clear(); arr.slice(-5000).forEach(s => CVM_VISTAS.add(s)); }
+}, 10 * 60 * 1000); /* v234: limpiar cachés de géneros cada 10 min + v235 Cuevana */
 async function pelisxdPorGenero(slug) {
   const pxdSlug = PXD_GENERO_MAP[slug];
   if (!pxdSlug) return [];
