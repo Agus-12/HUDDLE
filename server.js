@@ -9220,6 +9220,13 @@ async function proxearHls(req, res, target) {
   let hostUp = '';
   try { hostUp = new URL(target).hostname; } catch {}
   try { ref = hlsReferers.has(hostUp) ? hlsReferers.get(hostUp) : ref; } catch {} /* v199: '' guardado = SIN referer (vimeos de GoPelis) */
+  /* v235: auto-detectar Referer correcto según el CDN host */
+  if (ref === 'https://goodstream.one/' && hostUp) {
+    if (/vimeos\.(net|zip)/i.test(hostUp)) ref = 'https://vimeos.net/';
+    else if (/hlswish\.com/i.test(hostUp)) ref = 'https://hlswish.com/';
+    else if (/goodstream\.(one|uno)/i.test(hostUp)) ref = 'https://goodstream.one/';
+    else if (/videoapp\.zip/i.test(hostUp)) ref = 'https://videoapp.zip/';
+  }
   /* v90: el mp4 de animes se adelanta/atrás por rangos — los pasamos */
   const cabUp = {
     'User-Agent': (hostUp && hlsUAs.get(hostUp)) || MIRROR_UA, /* v170 */
