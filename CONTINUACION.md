@@ -1847,3 +1847,23 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   - Logs en `sonda-pelisxd.log`
   - Integrada en el ciclo de podredumbre existente
 - Archivo: `public/pxd-ocultas.txt` (2,174 slugs)
+
+## ACTUALIZACIÓN — 20 SEP 2026 (v234): Feed lleno + búsqueda rápida
+
+### Feed
+- **PelisXD mezclado en CADA género** — acción, terror, comedia, drama, etc. (hasta 24 items por género)
+- **Nueva sección "PelisXD — Estrenos"** al final del feed (16 películas recientes)
+- Los géneros alternan Cuevana y PelisXD — se ve variado y lleno
+- Terror ahora con más películas de PelisXD mezcladas
+
+### Búsqueda
+- **Búsqueda en vivo** — busca mientras escribes (350ms debounce)
+- **Caché en servidor** — búsquedas repetidas responden instantáneo (5 min TTL)
+- El dropdown de resultados aparece más rápido
+
+### Archivos modificados
+- `server.js` — pelisxdPorGenero(), pelisxdLatest(), searchCache, sondaPelisxd()
+- `public/app.js` — sección PelisXD en feed, debounceBuscar()
+- `public/pxd-ocultas.txt` — 2,174 slugs ocultos
+- `sonda-pelisxd.js` — script standalone de sonda
+- `docs/AUDITORIA-PELISXD-2026-09-20.md` — auditoría completa
