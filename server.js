@@ -9254,6 +9254,7 @@ async function proxearHls(req, res, target) {
       break; /* otros códigos (404…) se pasan tal cual */
     } catch (e) {
       clearTimeout(t);
+      console.warn('[hls-proxy] intento ' + intento + ' error:', String(e.message || e).slice(0, 100), '| host:', decodeURIComponent(target).slice(0, 60));
       upstream = null;
       if (intento === 2) return json(res, 502, { ok: false, error: 'El servidor de video no respondió' });
       await new Promise((r2) => setTimeout(r2, 1500 * (intento + 1)));
