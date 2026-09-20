@@ -4023,7 +4023,7 @@ async function cargarPopulares() {
     const d = await r.json();
     /* v69: cada sección se muestra con lo que llegue — los animes (arriba)
      * no dependen de que las películas hayan cargado */
-    const hayAlgo = (d.results && d.results.length) || (d.series && d.series.length) || (d.animes && d.animes.length) || (d.caricaturas && d.caricaturas.length) || (d.liveaction && d.liveaction.length) || (d.generos && d.generos.length) || (d.pelisxd && d.pelisxd.length);
+    const hayAlgo = (d.results && d.results.length) || (d.series && d.series.length) || (d.animes && d.animes.length) || (d.caricaturas && d.caricaturas.length) || (d.liveaction && d.liveaction.length) || (d.generos && d.generos.length) || (d.pelisxd && d.pelisxd.length) || (d.cuevana && d.cuevana.length);
     if (!d.ok || !hayAlgo) { delete wrap.dataset.cargado; return; }
     const alTocar = (res) => () => tocarFeedResultado(res); /* v205: compartido con el catálogo */
     if (d.results && d.results.length) {
@@ -4146,6 +4146,20 @@ async function cargarPopulares() {
         const filaP = sec.querySelector('.sr-fila');
         d.pelisxd.slice(0, 16).forEach((res) => filaP.appendChild(crearTarjetaResultado(res, alTocar(res))));
         wrapP.appendChild(sec);
+      }
+    }
+    /* v235: Cuevana.mov — Estrenos */
+    if (d.cuevana && d.cuevana.length) {
+      const wrapC = document.querySelector('#generosBox');
+      if (wrapC) {
+        const sec = document.createElement('div');
+        sec.className = 'sr-sec';
+        sec.innerHTML =
+          `<div class="sr-sec-titulo">${SVG('<circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16"/>', '#3498db')}<span>Cuevana — Estrenos</span></div>` +
+          '<div class="sr-fila"></div>';
+        const filaC = sec.querySelector('.sr-fila');
+        d.cuevana.slice(0, 16).forEach((res) => filaC.appendChild(crearTarjetaResultado(res, alTocar(res))));
+        wrapC.appendChild(sec);
       }
     }
   } catch {

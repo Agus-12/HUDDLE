@@ -448,8 +448,8 @@ async function laRevizar() { /* apelaciones: ocultadas hace <7 días, una a una 
     console.log('[podredumbre] revisión terminada: ' + vivas2 + ' revivieron de ' + cands.length);
   } finally { laReviviendo = false; }
 }
-setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); }, 90 * 1000);
-setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); }, 6 * 3600 * 1000);
+setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); }, 90 * 1000);
+setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); }, 6 * 3600 * 1000);
 
 /* v234: SONDA PELISXD — revisa películas ocultas para ver si volvieron */
 /* v234: SONDA PELISXD COMPLETA — 3 frentes:
@@ -561,6 +561,105 @@ async function sondaPelisxd() {
     else console.log('[sonda] pxd (' + elapsed + 's): sin cambios');
     try { fs.appendFileSync(path.join(__dirname, 'sonda-pelisxd.log'), logLine); } catch {}
   } catch (e) { console.warn('[sonda] pxd error: ' + String(e).slice(0, 60)); }
+}
+
+/* v235: SONDA CUEVANA — verifica películas de cuevana.mov
+ * Solo 3 frentes como PelisXD: NUEVAS (sitemap no vistas), VIVAS (activas), MUERTAS (ocultas)
+ * Cada frente toma 15 películas por ciclo (~6h)
+ */
+const CVM_VISTAS = new Set();
+try { for (const l of fs.readFileSync(path.join(__dirname, 'cuevana-vistas.txt'), 'utf8').split('\n')) if (l.trim()) CVM_VISTAS.add(l.trim()); } catch {}
+
+async function verificarCuevana(slug) {
+  try {
+    const r = await fetchSeguro(CUEVANA_API + encodeURIComponent(slug), 12000);
+    if (!r.ok) return { ok: false, reason: 'api_' + r.status };
+    const d = await r.json();
+    const lat = ((d.videos || {}).latino || []).filter(e => e.url);
+    if (!lat.length) return { ok: false, reason: 'no_latino' };
+    /* Probar el primer host que funcione */
+    const sorted = [...lat].sort((a, b) => {
+      const ai = CUEVANA_HOSTS_OK.indexOf(new URL(a.url || 'https://x').hostname);
+      const bi = CUEVANA_HOSTS_OK.indexOf(new URL(b.url || 'https://x').hostname);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+    for (const embed of sorted) {
+      if (!embed.url) continue;
+      const host = new URL(embed.url).hostname;
+      if (!CUEVANA_HOSTS_OK.some(h => host.includes(h))) continue;
+      try {
+        const er = await fetchSeguro(embed.url, 10000);
+        if (!er.ok) continue;
+        const html = await er.text();
+        let m3u8 = null;
+        if (/goodstream/i.test(host)) {
+          const m = /file\s*[:=]\s*["'](https?:\/\/[^"']+master\.m3u8[^"']*?)["']/i.exec(html)
+            || /(https?:\/\/[^\s"'<>]+master\.m3u8[^\s"'<>]*)/i.exec(html);
+          if (m) m3u8 = m[1];
+        } else {
+          const pm = /eval\(function\(p,a,c,k,e,d\)\{.+?\}\('(.+?)',(\d+),(\d+),'([^']*)'\.split/.exec(html);
+          if (pm) {
+            const pStr = pm[1], aVal = +pm[2], cVal = +pm[3], k = pm[4].split('|');
+            const toBase = (n, b) => { if (!n) return '0'; const d = []; while (n) { d.push('0123456789abcdefghijklmnopqrstuvwxyz'[n % b]); n = Math.floor(n / b); } return d.reverse().join(''); };
+            let result = pStr;
+            for (let i = cVal - 1; i >= 0; i--) { const w = toBase(i, aVal); if (i < k.length && k[i]) result = result.replace(new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g'), k[i]); }
+            const m = /(https?:\/\/[^\s"'<>]+master\.m3u8[^\s"'<>]*)/i.exec(result);
+            if (m) m3u8 = m[1];
+          }
+        }
+        if (m3u8) {
+          const vr = await fetchSeguro(m3u8, 8000).catch(() => null);
+          if (vr && vr.ok) { const t = await vr.text().catch(() => ''); if (t.includes('#EXTM3U')) return { ok: true }; }
+        }
+      } catch {}
+    }
+    return { ok: false, reason: 'all_failed' };
+  } catch (e) { return { ok: false, reason: 'error:' + String(e).slice(0, 30) }; }
+}
+
+async function sondaCuevana() {
+  try {
+    const memMB = process.memoryUsage().heapUsed / 1024 / 1024;
+    if (memMB > 500) { console.warn('[sonda] cv saltado — memoria alta: ' + memMB.toFixed(0) + 'MB'); return; }
+    const sitemap = await cuevanaIndice();
+    if (!sitemap.length) return;
+    const start = Date.now();
+    let nuevas_ok = 0, nuevas_fail = 0, vivas_muertas = 0, muertas_vivas = 0;
+    const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    /* Frente NUEVAS: sitemap no vistas */
+    const desconocidas = shuffle(sitemap.filter(s => !CVM_VISTAS.has(s) && !CVM_OCULTAS.has(s))).slice(0, 15);
+    for (const slug of desconocidas) {
+      const r = await verificarCuevana(slug);
+      CVM_VISTAS.add(slug);
+      if (r.ok) nuevas_ok++;
+      else { CVM_OCULTAS.add(slug); nuevas_fail++; }
+    }
+    /* Frente VIVAS: muestra de activas */
+    const vivas = shuffle(sitemap.filter(s => !CVM_OCULTAS.has(s))).slice(0, 15);
+    for (const slug of vivas) {
+      const r = await verificarCuevana(slug);
+      if (!r.ok) { CVM_OCULTAS.add(slug); vivas_muertas++; }
+    }
+    /* Frente MUERTAS: muestra de ocultas */
+    const muertas = shuffle([...CVM_OCULTAS]).slice(0, 15);
+    for (const slug of muertas) {
+      const r = await verificarCuevana(slug);
+      if (r.ok) { CVM_OCULTAS.delete(slug); muertas_vivas++; }
+    }
+    /* Persistir */
+    try { fs.writeFileSync(path.join(__dirname, 'cuevana-ocultas.txt'), [...CVM_OCULTAS].join('\n') + '\n'); } catch {}
+    try { fs.writeFileSync(path.join(__dirname, 'cuevana-vistas.txt'), [...CVM_VISTAS].join('\n') + '\n'); } catch {}
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    const parts = [];
+    if (nuevas_ok) parts.push('nuevas_ok=' + nuevas_ok);
+    if (nuevas_fail) parts.push('nuevas_fail=' + nuevas_fail);
+    if (vivas_muertas) parts.push('vivas→muertas=' + vivas_muertas);
+    if (muertas_vivas) parts.push('muertas→vivas=' + muertas_vivas);
+    const logLine = `[${new Date().toISOString()}] ${elapsed}s nuevas_ok=${nuevas_ok} nuevas_fail=${nuevas_fail} vivas→muertas=${vivas_muertas} muertas→vivas=${muertas_vivas} ocultas=${CVM_OCULTAS.size} vistas=${CVM_VISTAS.size}\n`;
+    if (parts.length) console.log('[sonda] cv (' + elapsed + 's): ' + parts.join(', '));
+    else console.log('[sonda] cv (' + elapsed + 's): sin cambios');
+    try { fs.appendFileSync(path.join(__dirname, 'sonda-cuevana.log'), logLine); } catch {}
+  } catch (e) { console.warn('[sonda] cv error: ' + String(e).slice(0, 60)); }
 }
 
 /* v205.2: PODREDUMBRE GENERAL — el mismo circuito de latanime (fallos
