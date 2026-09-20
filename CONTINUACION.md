@@ -1838,3 +1838,12 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - ~986 películas adicionales podrían funcionar si el CDN coopera
 
 **Estado:** v234 pushed → pendiente deploy en Oracle y test real
+
+### Limpieza y sonda (mismo commit v234):
+- **2,174 películas muertas ocultadas** — no aparecerán en búsqueda
+- **2,490 películas vivas** — las que tienen Byse, visibles y funcionando
+- **Sonda automática** — cada 6 horas revisa 30 ocultas al azar
+  - Si alguna revivió (Byse apareció), la saca de ocultas automáticamente
+  - Logs en `sonda-pelisxd.log`
+  - Integrada en el ciclo de podredumbre existente
+- Archivo: `public/pxd-ocultas.txt` (2,174 slugs)
