@@ -1226,7 +1226,7 @@ function movieCosechaEstado() {
       const j = JSON.parse(txt);
       const arr = Array.isArray(j) ? j : (Array.isArray(j.items) ? j.items : (Array.isArray(j.result) ? j.result : null));
       let n = 0, ejemplo = [];
-      if (arr) { n = arr.length; ejemplo = arr.slice(0, 2).map((x) => x && (x.vod_name || x.title || x.titulo || '')).filter(Boolean); }
+      if (arr) { n = arr.length; ejemplo = arr.slice(0, 2).map((x) => x && (x.vod_name || x.nombre || x.title || x.titulo || '')).filter(Boolean); }
       else if (j && typeof j === 'object') {
         const keys = Object.keys(j).filter((k) => /^\d+$/.test(k));
         if (keys.length) { n = keys.length; ejemplo = keys.slice(0, 2).map((k) => j[k] && (j[k].nombre || j[k].vod_name || '')).filter(Boolean); }
@@ -6427,14 +6427,14 @@ function buscarMovieCosecha(q) {
   if (!_cosechaItems || !_cosechaItems.length) return [];
   const hits = [];
   for (const x of _cosechaItems) {
-    const nombre = String(x.vod_name || x.title || x.titulo || '');
+    const nombre = String(x.vod_name || x.nombre || x.title || x.titulo || '');
     if (nombre.toLowerCase().includes(nq)) {
       const vid = x.id || x.vod_id || x.vod;
       if (!vid) continue;
       hits.push({
         title: nombre,
         url: 'https://movie.huddle/v/' + vid,
-        img: x.vod_pic || x.pic || '/carita.png',
+        img: x.vod_pic || x.pic || x.poster || '/carita.png',
         site: 'Movie',
         extra: 'Latino · ' + (x.vod_year || ''),
       });
@@ -8944,7 +8944,7 @@ const server = http.createServer(async (req, res) => {
             const arr = Array.isArray(j) ? j : (Array.isArray(j.items) ? j.items : (Array.isArray(j.result) ? j.result : []));
             if (q) {
               items = arr.filter((x) => {
-                const n = String(x.vod_name || x.title || x.titulo || '').toLowerCase();
+                const n = String(x.vod_name || x.nombre || x.title || x.titulo || '').toLowerCase();
                 return n.includes(q);
               });
             } else {
@@ -8955,8 +8955,8 @@ const server = http.createServer(async (req, res) => {
         const total = items.length;
         const start = (page - 1) * limit;
         const slice = items.slice(start, start + limit).map((x) => ({
-          vod: x.id || x.vod_id || x.vod, titulo: x.vod_name || x.title || x.titulo || '',
-          poster: x.vod_pic || x.pic || '', anno: x.vod_year || x.year || '',
+          vod: x.id || x.vod_id || x.vod, titulo: x.vod_name || x.nombre || x.title || x.titulo || '',
+          poster: x.vod_pic || x.pic || x.poster || '', anno: x.vod_year || x.year || x.anno || '',
           tipo: x.type_id || '', score: x.vod_douban_score || 0,
         }));
         return json(res, 200, { ok: true, q, total, page, pages: Math.ceil(total / limit), items: slice });
