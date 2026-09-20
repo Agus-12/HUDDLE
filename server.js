@@ -4739,14 +4739,61 @@ async function generoPagina(slug, pag) {
   const posts = d.posts || [];
   return { items: mapearGenero(posts), mas: posts.length >= 20 }; /* v205: mas del tamaño crudo */
 }
+/* v234: PelisXD por género — mezcla con Cuevana para feed más lleno */
+const PXD_GENERO_MAP = {
+  accion: 'accion', animacion: 'animacion-e-infantil', aventura: 'aventura',
+  belica: 'belico', 'ciencia-ficcion': 'ciencia-ficcion', comedia: 'comedia',
+  crimen: 'crimen', documental: 'documentales', drama: 'drama',
+  familia: 'familia', fantasia: 'fantasia', historia: 'historia',
+  misterio: 'intriga', musica: 'musical', romance: 'romance',
+  suspense: 'suspenso', terror: 'terror',
+};
+const pxdGeneroCache = new Map(); /* slug → {at, items} */
+async function pelisxdPorGenero(slug) {
+  const pxdSlug = PXD_GENERO_MAP[slug];
+  if (!pxdSlug) return [];
+  const c = pxdGeneroCache.get(slug);
+  if (c && Date.now() - c.at < 3 * 3600 * 1000 && c.items.length) return c.items;
+  try {
+    const r = await fetchSeguro('https://www.pelisxd.com/genero/' + pxdSlug, 12000);
+    if (!r.ok) return [];
+    const html = await r.text();
+    const items = [];
+    const re = /href="\/pelicula\/([a-z0-9-]+)"[^>]*>[\s\S]*?src="([^"]+)"[\s\S]*?<h3[^>]*>([^<]+)<\/h3>\s*<span[^>]*>(\d{4})<\/span>/g;
+    let m;
+    while ((m = re.exec(html)) && items.length < 18) {
+      items.push({
+        title: m[3].trim(),
+        url: 'https://www.pelisxd.com/pelicula/' + m[1],
+        img: (m[2].startsWith('/') ? 'https://www.pelisxd.com' : '') + m[2].replace('/w780/', '/w342/').replace('/original/', '/w342/'),
+        site: 'PelisXD',
+        extra: m[4] || '',
+      });
+    }
+    if (items.length) pxdGeneroCache.set(slug, { at: Date.now(), items });
+    return items;
+  } catch { return []; }
+}
 async function peliculasPorGenero(slug, pag) {
   if (pag > 1) { /* v205: páginas del catálogo — directas, sin caché */
     return (await generoPagina(slug, pag)).items.slice(0, 20);
   }
   const c = generosCache.get(slug);
   if (c && Date.now() - c.at < 60 * 60 * 1000 && c.items.length) return c.items;
-  const g = await generoPagina(slug, 1);
-  const items = g.items.slice(0, 18);
+  const [cv, pxd] = await Promise.all([
+    generoPagina(slug, 1).catch(() => ({ items: [] })),
+    pelisxdPorGenero(slug).catch(() => []),
+  ]);
+  const cvItems = (cv.items || []).slice(0, 12);
+  const pxdItems = (pxd || []).slice(0, 12);
+  /* Mezclar: alternar Cuevana y PelisXD para que se vea variado */
+  const mezcla = [];
+  const max = Math.max(cvItems.length, pxdItems.length);
+  for (let i = 0; i < max && mezcla.length < 24; i++) {
+    if (cvItems[i]) mezcla.push(cvItems[i]);
+    if (pxdItems[i]) mezcla.push(pxdItems[i]);
+  }
+  const items = mezcla.length ? mezcla : cvItems;
   if (items.length) generosCache.set(slug, { at: Date.now(), items });
   return items;
 }
@@ -6646,6 +6693,9 @@ function buscarMovieCosecha(q) {
 }
 
 async function buscarEnSitios(q) {
+/* v234: caché de búsquedas recientes (5 min TTL) */
+const searchCache = new Map(); /* q → {at, data} */
+const SEARCH_CACHE_TTL = 5 * 60 * 1000;
   const nq = normalizarTxt(q);
   const [cuevana, latanime, animeflv, pelisxd, cari, catalogo, movieCosecha] = await Promise.all([
     buscarCuevana(q).catch(() => []),
@@ -9058,6 +9108,31 @@ const server = http.createServer(async (req, res) => {
       }
     }
     if (url.pathname === '/api/trending' && req.method === 'GET') {
+
+/* v234: PelisXD últimas películas para el feed */
+const pxdLatestCache = { at: 0, items: [] };
+async function pelisxdLatest() {
+  if (Date.now() - pxdLatestCache.at < 3 * 3600 * 1000 && pxdLatestCache.items.length) return pxdLatestCache.items;
+  try {
+    const r = await fetchSeguro('https://www.pelisxd.com/peliculas', 12000);
+    if (!r.ok) return pxdLatestCache.items;
+    const html = await r.text();
+    const items = [];
+    const re = /href="\/pelicula\/([a-z0-9-]+)"[^>]*>[\s\S]*?src="([^"]+)"[\s\S]*?<h3[^>]*>([^<]+)<\/h3>\s*<span[^>]*>(\d{4})<\/span>/g;
+    let m;
+    while ((m = re.exec(html)) && items.length < 18) {
+      items.push({
+        title: m[3].trim(),
+        url: 'https://www.pelisxd.com/pelicula/' + m[1],
+        img: (m[2].startsWith('/') ? 'https://www.pelisxd.com' : '') + m[2],
+        site: 'PelisXD',
+        extra: m[4] || '',
+      });
+    }
+    if (items.length) { pxdLatestCache.at = Date.now(); pxdLatestCache.items = items; }
+    return items;
+  } catch { return pxdLatestCache.items; }
+}
       /* v55: populares del día + v57: series recién agregadas
        * v101: + 6 filas de género que rotan cada día
        * v102: + caricaturas (debajo de los animes) */
@@ -9082,6 +9157,7 @@ const server = http.createServer(async (req, res) => {
         novelas: NOVELAS_EXTERNAS_ON ? (() => { const a2 = nv.filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url) || [])[1])); const b2 = nv2RecientesCache.items || []; const mez = []; for (let i2 = 0; i2 < Math.max(a2.length, b2.length) && mez.length < 18; i2++) { if (a2[i2]) mez.push(a2[i2]); if (b2[i2]) mez.push(b2[i2]); } return [...movieTarjetas(), ...mez]; })() : movieTarjetas(), /* v208: solo Movie */ /* v206.2: 360 + enpantalla intercaladas — v207: las del app Movie abren la fila */
         movieApi: await mapiTarjetasHome(), /* v212: vitrina viva de la API Movie (portadas reales) */
         generos: (generos || []).map((g) => ({ slug: g.slug, nombre: g.nombre, items: fCV(g.items) })).filter((g) => g.items.length),
+        pelisxd: await pelisxdLatest().catch(() => []),
       });
     }
     if (url.pathname.startsWith('/api/enp/')) { /* v206.2: ficha de novela de EnPantallaTV (por prefijo) */
@@ -9573,7 +9649,9 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/search' && req.method === 'GET') {
       const q = (url.searchParams.get('q') || '').trim().slice(0, 120);
       if (!q) return json(res, 400, { ok: false, error: 'Escribe qué quieren ver' });
-      const r = await buscarEnSitios(q); /* v121: global + fuzzy + sugiere */
+      const _sc = searchCache.get(q);
+      const r = (_sc && Date.now() - _sc.at < SEARCH_CACHE_TTL) ? _sc.data : await buscarEnSitios(q);
+      if (!_sc || Date.now() - _sc.at >= SEARCH_CACHE_TTL) searchCache.set(q, { at: Date.now(), data: r }); /* v234: caché 5 min */
       r.resultados = r.resultados.filter((x) => !cvOcultaUrl(x.url)); /* v191: sin series muertas de cine-calidad */
       /* v198: latanime en limpio — sin versiones castellanas ni duplicados;
        * AnimeFLV cede cuando latanime tiene la serie (mandan las latino) */

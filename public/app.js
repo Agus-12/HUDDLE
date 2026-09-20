@@ -3215,7 +3215,14 @@ $('#btnHomeSearch').addEventListener('click', buscarInicio);
 $('#homeSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('#homeSearch').blur(); buscarInicio(); } });
 $('#spGo').addEventListener('click', () => abrirBuscador($('#spInput').value));
 $('#spInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); abrirBuscador($('#spInput').value); } });
-$('#spInput').addEventListener('input', () => $('#spSugiere').classList.add('hidden')); /* el chip viejo no molesta mientras escribes */
+$('#spInput').addEventListener('input', () => { $('#spSugiere').classList.add('hidden'); debounceBuscar(); }); /* v234: búsqueda en vivo con debounce */
+let _debounceBuscarTimer = null;
+function debounceBuscar() {
+  clearTimeout(_debounceBuscarTimer);
+  const q = ($('#spInput').value || '').trim();
+  if (q.length < 2) return;
+  _debounceBuscarTimer = setTimeout(() => abrirBuscador(q), 350); /* 350ms debounce */
+}
 $('#spBack').addEventListener('click', cerrarBuscador);
 
 /* v47: buscador también al preparar la sala — el resultado se ELIGE (como las
@@ -4015,7 +4022,7 @@ async function cargarPopulares() {
     const d = await r.json();
     /* v69: cada sección se muestra con lo que llegue — los animes (arriba)
      * no dependen de que las películas hayan cargado */
-    const hayAlgo = (d.results && d.results.length) || (d.series && d.series.length) || (d.animes && d.animes.length) || (d.caricaturas && d.caricaturas.length) || (d.liveaction && d.liveaction.length) || (d.generos && d.generos.length);
+    const hayAlgo = (d.results && d.results.length) || (d.series && d.series.length) || (d.animes && d.animes.length) || (d.caricaturas && d.caricaturas.length) || (d.liveaction && d.liveaction.length) || (d.generos && d.generos.length) || (d.pelisxd && d.pelisxd.length);
     if (!d.ok || !hayAlgo) { delete wrap.dataset.cargado; return; }
     const alTocar = (res) => () => tocarFeedResultado(res); /* v205: compartido con el catálogo */
     if (d.results && d.results.length) {
@@ -4125,6 +4132,20 @@ async function cargarPopulares() {
         g.items.slice(0, 16).forEach((res) => filaG.appendChild(crearTarjetaResultado(res, alTocar(res))));
         wrapG.appendChild(sec);
       });
+    }
+    /* v234: PelisXD — sección de películas recientes */
+    if (d.pelisxd && d.pelisxd.length) {
+      const wrapP = document.querySelector('#generosBox');
+      if (wrapP) {
+        const sec = document.createElement('div');
+        sec.className = 'sr-sec';
+        sec.innerHTML =
+          `<div class="sr-sec-titulo">${SVG('<rect x="2" y="2" width="20" height="20" rx="2"/><path d="M10 8l6 4-6 4z"/>', '#e74c3c')}<span>PelisXD — Estrenos</span></div>` +
+          '<div class="sr-fila"></div>';
+        const filaP = sec.querySelector('.sr-fila');
+        d.pelisxd.slice(0, 16).forEach((res) => filaP.appendChild(crearTarjetaResultado(res, alTocar(res))));
+        wrapP.appendChild(sec);
+      }
     }
   } catch {
     delete wrap.dataset.cargado; /* si falló, se reintenta la próxima vez */
