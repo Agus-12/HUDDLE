@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v234'; // 233: fix Byse trailing-slash bug (Siniestro "peli caída")
+const UI_VERSION = 'v235'; // 235: Cuevana.mov integrado + CineCalidad separado
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -568,8 +568,10 @@ async function sondaPelisxd() {
  * para GoPelis, PelisXD, AnimeFLV y Cuevana. Un capítulo puntual de
  * caricaturas NO oculta la serie (un muerto no mata una de 300; el feed
  * ya nace filtrado y el error avisa claro). */
-const PXD_OCULTAS = new Set(), AF_OCULTAS = new Set();
+const PXD_OCULTAS = new Set(), AF_OCULTAS = new Set(), CVM_OCULTAS = new Set();
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'pxd-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) PXD_OCULTAS.add(l.trim()); } catch {}
+try { for (const l of fs.readFileSync(path.join(__dirname, 'cuevana-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) CVM_OCULTAS.add(l.trim()); } catch {} /* v235: 180 Cuevana sin embeds */
+console.log('[boot] CVM_OCULTAS=' + CVM_OCULTAS.size + ' Cuevana mov ocultas');
 
 const pxdVistas = new Set(); /* slugs ya verificados alguna vez */
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'pxd-vistas.txt'), 'utf8').split('\n')) if (l.trim()) pxdVistas.add(l.trim()); } catch {}
@@ -4643,7 +4645,7 @@ async function buscarCuevana(q) {
     title: String(p.title || ''),
     url: (p.type === 'movies') ? `https://cine-calidad.mx/pelicula/${p.slug}/` : `https://cine-calidad.mx/serie/${p.slug}`, /* v87: cuevana.mov ya responde 404 — las pelis viven en cine-calidad */
     img: String(p.featured_image || '').replace('/w780/', '/w342/'),
-    site: 'Cuevana',
+    site: 'CineCalidad',
     extra: [p.year, p.duration ? `${p.duration} min` : ''].filter(Boolean).join(' · '),
   })).filter((x) => x.title && x.url);
 }
@@ -4700,6 +4702,7 @@ async function buscarCuevanaMov(q) {
   const top = cand.slice(0, 12);
   const hits = [];
   for (const c of top) {
+    if (CVM_OCULTAS.has(c.s)) continue; /* v235: sin muertas */
     const meta = await cuevanaMeta(c.s);
     if (meta) hits.push(meta);
   }
@@ -4915,7 +4918,7 @@ async function tendenciasCuevana(periodo, cache) {
     title: String(p.title || ''),
     url: (p.type === 'serie') ? `https://cine-calidad.mx/serie/${p.slug}` : `https://cine-calidad.mx/pelicula/${p.slug}/`, /* v87: fix 404 — cuevana.mov ya no sirve esas URLs */
     img: String(p.featured_image || '').replace('/w780/', '/w342/'),
-    site: 'Cuevana',
+    site: 'CineCalidad',
     extra: [p.year, p.duration ? `${p.duration} min` : ''].filter(Boolean).join(' · '),
   })).filter((x) => x.title && x.url).filter((x) => !cvOcultaUrl(x.url)); /* v191: sin series muertas */
   if (items.length) { cache.at = Date.now(); cache.items = items; }
@@ -4936,7 +4939,7 @@ async function seriesRecientes() {
      * carga) — las series abren en cine-calidad.mx, que sí renderiza */
     url: `https://cine-calidad.mx/serie/${p.slug}`,
     img: String(p.featured_image || '').replace('/w780/', '/w342/'),
-    site: 'Cuevana',
+    site: 'CineCalidad',
     extra: p.year ? String(p.year) : '',
   })).filter((x) => x.title && x.slug);
   if (items.length) { seriesCache.at = Date.now(); seriesCache.items = items; }
@@ -4973,7 +4976,7 @@ const mapearGenero = (posts) => (posts || []).filter((p) => p.type !== 'serie').
   title: String(p.title || ''),
   url: `https://cine-calidad.mx/pelicula/${p.slug}/`,
   img: String(p.featured_image || '').replace('/w780/', '/w342/'),
-  site: 'Cuevana',
+  site: 'CineCalidad',
   extra: [
     String(p.date || '').slice(0, 4),
     p.rating ? `★ ${(+p.rating).toFixed(1)}` : '',
@@ -5043,7 +5046,7 @@ async function cuevanaPorGenero(slug) {
     const r = await fetchSeguro(`https://cuevana.mov/wp-json/wpreact/v1/postsapi?per_page=15&page=1&genre=${cvSlug}`, 12000);
     if (!r.ok) return [];
     const d = await r.json().catch(() => ({}));
-    const items = (d.posts || []).filter(p => p.type === 'pelicula').slice(0, 12).map(p => ({
+    const items = (d.posts || []).filter(p => p.type === 'pelicula' && !CVM_OCULTAS.has(p.slug)).slice(0, 12).map(p => ({
       title: p.title || '',
       url: 'https://cuevana.mov/pelicula/' + (p.tmdb_id || '') + '/' + p.slug,
       img: p.featured_image || '',
@@ -6854,7 +6857,7 @@ async function catCv(kind, pag) {
     title: String(p.title || ''),
     url: kind === 'series' ? 'https://cine-calidad.mx/serie/' + p.slug : 'https://cine-calidad.mx/pelicula/' + p.slug + '/',
     img: String(p.featured_image || '').replace('/w780/', '/w342/'),
-    site: 'Cuevana',
+    site: 'CineCalidad',
     extra: [String(p.date || '').slice(0, 4), p.rating ? '★ ' + (+p.rating).toFixed(1) : ''].filter(Boolean).join(' · '),
   })).filter((x) => x.title && !cvOcultaUrl(x.url)); /* v200: ocultas fuera */
   const out = { items, mas };
@@ -7212,7 +7215,7 @@ let cvRtTimer = null;
 /* v196: series BUENAS confirmadas por el usuario — la autocuración jamás las toca */
 const CV_PROTEGIDAS = new Set(['yellowstone', 'marshals-una-historia-de-yellowstone']);
 function cvOcultaRegistrar(slug) {
-  if (!slug || CV_OCULTAS_RT.has(slug) || CV_OCULTAS.has(slug) || CV_PROTEGIDAS.has(slug)) return;
+  if (!slug || CV_OCULTAS_RT.has(slug) || CVM_OCULTAS.has(slug) || CV_PROTEGIDAS.has(slug)) return;
   CV_OCULTAS_RT.add(slug);
   console.log('[cuevana] título muerto ocultado en vivo: ' + slug);
   try { clearTimeout(cvRtTimer); } catch {}
@@ -8666,7 +8669,7 @@ const CV_PELIS_OCULTAS = new Set([
 ]);
 const cvOcultaUrl = (u) => {
   const mS = /cine-calidad\.mx\/(?:serie|pelicula)\/([a-z0-9-]+)/i.exec(u || '');
-  return !!(mS && (CV_OCULTAS.has(mS[1]) || CV_PELIS_OCULTAS.has(mS[1]) || CV_OCULTAS_RT.has(mS[1])));
+  return !!(mS && (CVM_OCULTAS.has(mS[1]) || CV_PELIS_OCULTAS.has(mS[1]) || CV_OCULTAS_RT.has(mS[1])));
 };
 
 /* ===================== v81: modo individual =====================
@@ -9436,7 +9439,7 @@ async function cuevanaLatest() {
     const r = await fetchSeguro('https://cuevana.mov/wp-json/wpreact/v1/postsapi?per_page=20&page=1', 12000);
     if (!r.ok) return cuevanaLatestCache.items;
     const d = await r.json().catch(() => ({}));
-    const items = (d.posts || []).filter(p => p.type === 'pelicula').slice(0, 18).map(p => ({
+    const items = (d.posts || []).filter(p => p.type === 'pelicula' && !CVM_OCULTAS.has(p.slug)).slice(0, 18).map(p => ({
       title: p.title || '',
       url: 'https://cuevana.mov/pelicula/' + (p.tmdb_id || '') + '/' + p.slug,
       img: p.featured_image || '',

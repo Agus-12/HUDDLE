@@ -1945,7 +1945,8 @@ let SITES = [
   /* v65: Latanime primero (predeterminado) + logos propios en /sites/
    * v68: fuera GoPelis y AnimeFLV — v70: fuera AnimeD23 también */
   { name: 'Latanime', full: 'Latanime — animes con audio latino', url: 'https://latanime.org/', logo: '/sites/latanime.png' },
-  { name: 'Cuevana', full: 'Cuevana — películas y series', url: 'https://cuevana.mov/', logo: '/sites/cuevana.png' },
+  { name: 'Cuevana', full: 'Cuevana — películas y series (8k+ latinas)', url: 'https://cuevana.mov/', logo: '/sites/cuevana.png' },
+  { name: 'CineCalidad', full: 'Cine-Calidad — películas y series', url: 'https://cine-calidad.mx/', logo: '/sites/cinecalidad.png' }, /* v235: separado de Cuevana */
   { name: 'PelisXD', full: 'PelisXD — películas en HD (catálogo grande)', url: 'https://www.pelisxd.com/', logo: '/sites/pelisxd.png' }, /* v98 */
   { name: 'Caricaturas', full: 'Mis Caricaturas + Lacartoons — clásicas de nick/CN en latino', url: 'https://miscaricaturas.com/', logo: '/sites/caricaturas.png' }, /* v102; v112: también lacartoons */
   { name: 'YouTube', full: 'YouTube — videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
@@ -2720,7 +2721,7 @@ $('#btnSwitch').addEventListener('click', () => {
 /* v32: logo del sitio espejado para la tarjeta (o null si no lo tenemos) */
 const SITE_LOGOS = {
   'cuevana.mov': '/sites/cuevana.png',
-  'cine-calidad.mx': '/sites/cuevana.png',
+  'cine-calidad.mx': '/sites/cinecalidad.png', /* v235: separado de Cuevana */
   'gopelis.com': '/sites/gopelis.png',
   'youtube.com': '/sites/youtube.png',
   'animed23.com': '/sites/animed23.png',
