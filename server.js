@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v227'; // 227: llave CDN visible en panel + estado (pide espejo + firma al vuelo)
+const UI_VERSION = 'v230'; // 230: catálogo Movie DESACTIVADO (su llave CDN no se pudo extraer); app = fuentes latinas abiertas que sí reproducen
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
@@ -963,6 +963,13 @@ async function resolverEnp(pageUrl) {
  *  - portada = la que aloja Movie (proxy propio) + fallback /carita.png.
  */
 const MOVIE_HOST_VIRTUAL = 'movie.huddle'; /* host ficticio: identidad de serie/episodio para fichas, sala y continuar-viendo */
+/* v230: EL CATÁLOGO MOVIE SE DESACTIVA (decisión 20-sep-2026): sus títulos
+ * solo reproducían con la llave wsSecret del CDN, que NO se pudo extraer (vive
+ * dentro de una VM blindada y nunca sale al tráfico). Sin llave, el origen da
+ * 403 y el espejo es 100% relleno. Así que se tumban: con false, las funciones
+ * de abajo no emiten nada de Movie y la app se queda con las fuentes latinas
+ * abiertas que SÍ reproducen (gopelis, cine-calidad, pelisxd, series…). */
+const MOVIE_ENABLED = false;
 const MOVIE_ORIGEN = (process.env.MOVIE_ORIGEN || 'http://147.124.216.142').replace(/\/+$/, ''); /* el origen pelado (sin wsSecret) */
 const MOVIE_MAPA_RUTA = process.env.MOVIE_MAPA || path.join(os.homedir(), 'movie-mapa-secuencias.json');
 const MOVIE_CAIDAS_RUTA = process.env.MOVIE_CAIDAS || path.join(os.homedir(), 'movie-rutas-caidas.json');
@@ -990,6 +997,7 @@ function mapiDesc(txt) {
   } catch { return null; }
 }
 async function mapiPedir(ruta, body) {
+  if (!MOVIE_ENABLED) return null; /* v230: Movie desactivado */
   const ts = String(Date.now());
   const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 20000);
   try {
@@ -1014,12 +1022,13 @@ async function mapiToken() {
   return MAPI.tok || '';
 }
 async function mapiFicha(vodId) {
+  if (!MOVIE_ENABLED) return null; /* v230: Movie desactivado */
   await mapiToken();
   const ts = String(Date.now());
   const sign = crypto.createHash('md5').update(MAPI_SEC + MAPI_DEV + vodId + ts).digest('hex').toUpperCase();
   return mapiPedir('/api/vod/info_new', 'vod_id=' + vodId + '&cur_time=' + ts + '&sign=' + sign + '&audio_type=0');
 }
-async function mapiLista(ruta, body) { await mapiToken(); return mapiPedir(ruta, body); }
+async function mapiLista(ruta, body) { if (!MOVIE_ENABLED) return null; /* v230 */ await mapiToken(); return mapiPedir(ruta, body); }
 function mapiUrlLatina(col) {
   col = Array.isArray(col) ? col : [];
   for (const t of [2, 1]) for (const c of col) if (c && c.type === t && c.vod_url) return { url: c.vod_url, type: t };
@@ -1117,6 +1126,7 @@ function movieEsHostPermitido(h) {
 }
 /* v212: tarjetas del catálogo vivo (portadas reales) para la pestaña Novelas/Movie */
 async function mapiTarjetasHome() {
+  if (!MOVIE_ENABLED) return []; /* v230: Movie desactivado */
   try {
     const out = []; const vistos = new Set();
     const visitar = (nodo) => {
@@ -1150,6 +1160,7 @@ async function mapiTarjetasHome() {
    infinito. */
 const MOVIE_SECCIONES = { canales: [[226, 'Películas'], [230, 'Telenovelas'], [227, 'Series'], [228, 'Animación']], datos: null, at: 0 };
 async function mapiSecciones() {
+  if (!MOVIE_ENABLED) return []; /* v230: Movie desactivado */
   if (MOVIE_SECCIONES.datos && Date.now() - MOVIE_SECCIONES.at < 10 * 60 * 1000) return MOVIE_SECCIONES.datos;
   const out = []; const vistos = new Set();
   for (const [canal, nombre] of MOVIE_SECCIONES.canales) {
@@ -1351,6 +1362,7 @@ function movieMarcarCaida(clave, epId, ep, motivo) {
 /* Lee/regenera el índice del mapa cuando el archivo cambia en disco. Si el
  * mapa se regeneró (evidencia nueva), las caídas marcadas se olvidan. */
 function movieRecargar() {
+  if (!MOVIE_ENABLED) { if (MOVIE.series.size) { MOVIE.series = new Map(); MOVIE.porEp = new Map(); } MOVIE.cargado = false; return; } /* v230: Movie desactivado */
   movieCargarCaidas();
   let st = null;
   try { st = fs.statSync(MOVIE_MAPA_RUTA); } catch {}
@@ -1528,6 +1540,7 @@ async function movieServirPoster(req, res, clave) {
 }
 /* resolución para Solo y para la sala nativa: playlist LOCAL reescrito */
 async function resolverMovie(pageUrl) {
+  if (!MOVIE_ENABLED) throw new Error('Esos títulos ya no están disponibles (catálogo Movie retirado)'); /* v230 */
   const m = /^\/ver\/([a-z0-9-]+)\/(\d+x\d+)$/i.exec((() => { try { return new URL(pageUrl).pathname; } catch { return ''; } })());
   if (!m) throw new Error('URL de Movie no válida');
   const ep = movieEpActivo(m[1], m[2]);
@@ -6454,6 +6467,7 @@ async function catCaricaturas() {
 /* v228.5: catálogo cosechado cacheado — usa el MISMO parsing que movieCosechaEstado (que sí funciona) */
 let _cosechaArr = null, _cosechaArrAt = 0, _cosechaArrMtime = 0, _cosechaArrRuta = '';
 function movieCosechaArray() {
+  if (!MOVIE_ENABLED) return []; /* v230: Movie desactivado */
   const est = movieCosechaEstado();
   if (!est || !est.archivo || !est.archivo.ruta) return [];
   const ruta = est.archivo.ruta;
