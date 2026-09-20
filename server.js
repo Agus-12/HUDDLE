@@ -4655,6 +4655,20 @@ function mismaPagina(a, b) {
 }
 const FETCH_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'; /* v199: compartida — vimeos amarra el token a ESTA UA */
 let CDN_RELAY = ''; /* v236: Mac Mini relay para CDNs que bloquean datacenter. Set via /api/set-relay?url=... */
+async function fetchRelay(url, ms) { /* v236: fetch a través del relay cuando está disponible — el token del m3u8 se liga a la IP del relay */
+  if (!CDN_RELAY) return fetchSeguro(url, ms);
+  try {
+    const relayUrl = CDN_RELAY + '/?u=' + encodeURIComponent(url);
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), ms || 15000);
+    const r = await fetch(relayUrl, { signal: ctl.signal, redirect: 'follow' });
+    clearTimeout(t);
+    return r;
+  } catch (e) {
+    console.warn('[relay] fetchRelay falló, usando directo:', String(e.message || e).slice(0, 60));
+    return fetchSeguro(url, ms);
+  }
+}
 async function fetchSeguro(url, ms, extra) { /* v206: cabeceras opcionales (Referer del player de novelas) */
   const c = new AbortController();
   const t = setTimeout(() => c.abort(), ms);
@@ -8879,7 +8893,7 @@ async function resolverGoodstream(embed, pageUrl) {
    * que SIRVA de verdad. Antes: 43 s de arranque en Fundación. */
   const pedirEmbed = async () => {
     try {
-      const em = await fetchTexto(embed, pageUrl);
+      const em = CDN_RELAY ? await (await fetchRelay(embed, 15000)).text() : await fetchTexto(embed, pageUrl);
       const files = [...em.matchAll(/file\s*:\s*["'](https?:\/\/[^"']+)["']/gi)].map((m) => m[1]);
       const m3u8 = files.find((f) => /\.m3u8/i.test(f));
       if (!m3u8) return null; /* cuerpo racionado (v93) */
@@ -8887,7 +8901,8 @@ async function resolverGoodstream(embed, pageUrl) {
       const t = setTimeout(() => ctl.abort(), 3500);
       let sirve = false;
       try {
-        const r = await fetch(m3u8, { headers: { 'User-Agent': MIRROR_UA, Referer: embed, Range: 'bytes=0-1024' }, signal: ctl.signal, redirect: 'follow' });
+        const verifUrl = CDN_RELAY ? CDN_RELAY + '/?u=' + encodeURIComponent(m3u8) : m3u8;
+        const r = await fetch(verifUrl, { headers: CDN_RELAY ? {} : { 'User-Agent': MIRROR_UA, Referer: embed, Range: 'bytes=0-1024' }, signal: ctl.signal, redirect: 'follow' });
         sirve = r.ok || r.status === 206;
       } catch {}
       clearTimeout(t);
