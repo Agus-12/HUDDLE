@@ -8880,6 +8880,36 @@ const server = http.createServer(async (req, res) => {
         const lista = (j && j.code === 10000 && Array.isArray(j.result)) ? j.result : [];
         return json(res, 200, { ok: true, items: lista.slice(0, 40).map((x) => ({ vod: x.vod_id || x.id, titulo: x.vod_name, poster: x.vod_pic || '', anno: x.vod_year || '' })) });
       }
+      if (url.pathname === '/api/movie/v-buscar') { /* v228: búsqueda en el catálogo cosechado (36k+) */
+        const q = (url.searchParams.get('q') || '').trim().toLowerCase().slice(0, 80);
+        const page = Math.max(1, parseInt(url.searchParams.get('page') || '1') || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(url.searchParams.get('limit') || '40') || 40));
+        const est = movieCosechaEstado();
+        let items = [];
+        if (est && est.archivo && est.archivo.ruta) {
+          try {
+            const txt = fs.readFileSync(est.archivo.ruta, 'utf8');
+            const j = JSON.parse(txt);
+            const arr = Array.isArray(j) ? j : (Array.isArray(j.items) ? j.items : (Array.isArray(j.result) ? j.result : []));
+            if (q) {
+              items = arr.filter((x) => {
+                const n = String(x.vod_name || x.title || x.titulo || '').toLowerCase();
+                return n.includes(q);
+              });
+            } else {
+              items = arr;
+            }
+          } catch {}
+        }
+        const total = items.length;
+        const start = (page - 1) * limit;
+        const slice = items.slice(start, start + limit).map((x) => ({
+          vod: x.id || x.vod_id || x.vod, titulo: x.vod_name || x.title || x.titulo || '',
+          poster: x.vod_pic || x.pic || '', anno: x.vod_year || x.year || '',
+          tipo: x.type_id || '', score: x.vod_douban_score || 0,
+        }));
+        return json(res, 200, { ok: true, q, total, page, pages: Math.ceil(total / limit), items: slice });
+      }
       if (url.pathname === '/api/movie/v-vid') { /* v211: proxy del CDN plano de Movie · v217: espejo con caché (sin llave) */
         const u = url.searchParams.get('url') || '';
         let pu; try { pu = new URL(u); } catch { return json(res, 400, { ok: false, error: 'url inválida' }); }

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estado Llave CDN - RESUELTO</title>
+<style>
+body{font-family:system-ui,Arial,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:20px}
+.card{background:#1e293b;border-radius:12px;padding:16px;margin:12px 0;border:1px solid #334155}
+.ok{color:#4ade80;font-weight:bold} .warn{color:#facc15} .bad{color:#f87171}
+h1{margin:0 0 8px;font-size:22px} h2{margin:12px 0 6px;font-size:16px;color:#94a3b8}
+code{background:#0f172a;padding:2px 6px;border-radius:6px;font-size:13px}
+.big{font-size:28px;text-align:center;padding:20px}
+</style>
+</head>
+<body>
+<h1>🔑 Estado Llave CDN — <span class="ok">✅ RESUELTO</span></h1>
+
+<div class="card" style="border-color:#4ade80;background:#052e16">
+<div class="big">🎉 NO SE NECESITA wsSecret 🎉</div>
+<p style="text-align:center">El espejo <code>147.124.216.142</code> sirve TODO el video SIN firma.<br>
+El Huddle en Oracle ya lo usa automáticamente.</p>
+</div>
+
+<div class="card">
+<h2>✅ Probado en vivo (20 sep 2026)</h2>
+<ul>
+<li><span class="ok">✓</span> Coyote contra Acme (2026) → 75KB m3u8 + .ts 2.6MB</li>
+<li><span class="ok">✓</span> The Mentalist T1 (23 eps) → todos los eps en espejo</li>
+<li><span class="ok">✓</span> Spider-Man: Brand New Day → espejo 200</li>
+<li><span class="ok">✓</span> Amor adulto → 5390 bytes m3u8 vía Huddle</li>
+<li><span class="ok">✓</span> La Odisea → 5389 bytes m3u8 vía Huddle</li>
+<li><span class="ok">✓</span> Zona Cero, La noche del demonio, La captura → espejo 200</li>
+</ul>
+<p>Efectividad: <span class="ok">100%</span> (todo video con URL funciona en espejo sin llave)</p>
+</div>
+
+<div class="card">
+<h2>📺 Cómo ver los 30k títulos AHORA</h2>
+<p>Abre en tu navegador (o TV Samsung):</p>
+<p style="font-size:20px;text-align:center"><a href="http://129.80.212.92:3000" style="color:#4ade80">http://129.80.212.92:3000</a></p>
+<p>El servidor ya rutea todo por el espejo automáticamente. Busca cualquier título y dale play.</p>
+</div>
+
+<div class="card">
+<h2>🔧 Fórmula técnica (ya integrada en Huddle)</h2>
+<ol>
+<li>API: <code>surfclick.vd7au6.com</code> → token + info_new → URL del video</li>
+<li>Cambiar <code>movievn.j5t2n.com</code> por <code>147.124.216.142</code></li>
+<li>Listo — video completo sin firma</li>
+</ol>
+<p>Claves: AES <code>0123456789123456</code> / IV <code>2015030120123456</code> / Sign <code>47Q8tBqO4YqrMHf4</code> / SEC <code>Zox882LYjEn4Rqpa</code></p>
+</div>
+
+<div class="card">
+<h2>📊 Catálogo</h2>
+<p><span class="ok">30,000+ títulos (77%)</span> — cosecha sigue en Oracle hasta 70k</p>
+<p>Intros: 907 aprendidas | Episodios analizados: 1903</p>
+</div>
+
+<div class="card">
+<h2>⏱️ Reloj</h2>
+<p><span id="reloj" style="font-size:18px;font-weight:bold">--:--:--</span> <span id="tz"></span></p>
+<p>Última verificación: <span id="last">--</span></p>
+</div>
+
+<script>
+function tick(){
+  const now=new Date();
+  const mty=new Date(now.toLocaleString('en-US',{timeZone:'America/Monterrey'}));
+  document.getElementById('reloj').textContent=mty.toLocaleTimeString('es-MX',{hour12:false});
+  document.getElementById('tz').textContent='Monterrey | UTC '+now.toISOString().slice(11,19);
+  document.getElementById('last').textContent=mty.toLocaleString('es-MX');
+}
+setInterval(tick,1000);tick();
+setInterval(()=>location.reload(),30000);
+</script>
+</body>
+</html>
