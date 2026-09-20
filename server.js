@@ -6797,22 +6797,6 @@ function buscarMovieCosecha(q) {
 }
 
 async function buscarEnSitios(q) {
-/* v234: caché de búsquedas recientes (5 min TTL) */
-const searchCache = new Map(); /* q → {at, data} */
-const SEARCH_CACHE_TTL = 5 * 60 * 1000;
-const SEARCH_CACHE_MAX = 50; /* v234: máximo 50 queries en caché */
-function searchCacheEvict() {
-  if (searchCache.size <= SEARCH_CACHE_MAX) return;
-  const now = Date.now();
-  for (const [k, v] of searchCache) {
-    if (now - v.at > SEARCH_CACHE_TTL) searchCache.delete(k);
-  }
-  /* si aún así está llena, borrar las más viejas */
-  if (searchCache.size > SEARCH_CACHE_MAX) {
-    const entries = [...searchCache.entries()].sort((a, b) => a[1].at - b[1].at);
-    for (let i = 0; i < entries.length - SEARCH_CACHE_MAX; i++) searchCache.delete(entries[i][0]);
-  }
-}
   const nq = normalizarTxt(q);
   const [cuevana, latanime, animeflv, pelisxd, cari, catalogo, movieCosecha] = await Promise.all([
     buscarCuevana(q).catch(() => []),
@@ -9773,18 +9757,35 @@ async function pelisxdLatest() {
       }
       return json(res, 200, out);
     }
+    /* v234: search cache at module level */
+    if (!globalThis._searchCache) {
+      globalThis._searchCache = new Map();
+      globalThis._searchCacheTTL = 5 * 60 * 1000;
+      globalThis._searchCacheMax = 50;
+      globalThis._searchCacheEvict = function() {
+        const sc = globalThis._searchCache;
+        if (sc.size <= globalThis._searchCacheMax) return;
+        const now = Date.now();
+        for (const [k, v] of sc) { if (now - v.at > globalThis._searchCacheTTL) sc.delete(k); }
+        if (sc.size > globalThis._searchCacheMax) {
+          const entries = [...sc.entries()].sort((a, b) => a[1].at - b[1].at);
+          for (let i = 0; i < entries.length - globalThis._searchCacheMax; i++) sc.delete(entries[i][0]);
+        }
+      };
+    }
     if (url.pathname === '/api/search' && req.method === 'GET') {
       const q = (url.searchParams.get('q') || '').trim().slice(0, 120);
       if (!q) return json(res, 400, { ok: false, error: 'Escribe qué quieren ver' });
-      const _sc = searchCache.get(q);
+      const _sc = globalThis._searchCache.get(q);
       let r;
       try {
-        r = (_sc && Date.now() - _sc.at < SEARCH_CACHE_TTL) ? _sc.data : await buscarEnSitios(q);
+        r = (_sc && Date.now() - _sc.at < globalThis._searchCacheTTL) ? _sc.data : await buscarEnSitios(q);
       } catch (e) {
-        console.warn('[buscar] error:', String(e).slice(0, 100));
+        console.warn('[buscar] error:', String(e.message || e).slice(0, 200));
+        console.warn('[buscar] stack:', String(e.stack || '').slice(0, 300));
         return json(res, 200, { ok: true, resultados: [], sugiere: null });
       }
-      if (!_sc || Date.now() - _sc.at >= SEARCH_CACHE_TTL) { searchCacheEvict(); searchCache.set(q, { at: Date.now(), data: r }); } /* v234: caché 5 min con límite */
+      if (!_sc || Date.now() - _sc.at >= globalThis._searchCacheTTL) { globalThis._searchCacheEvict(); globalThis._searchCache.set(q, { at: Date.now(), data: r }); } /* v234: caché 5 min con límite */
       r.resultados = r.resultados.filter((x) => !cvOcultaUrl(x.url)); /* v191: sin series muertas de cine-calidad */
       /* v198: latanime en limpio — sin versiones castellanas ni duplicados;
        * AnimeFLV cede cuando latanime tiene la serie (mandan las latino) */
