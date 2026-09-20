@@ -4820,7 +4820,7 @@ async function cuevanaMeta(slug) {
   if (!lat.length) return null;
   const result = {
     title: d.titles.name || slug.replace(/-/g, ' '),
-    url: 'https://cuevana.mov/pelicula/' + (d.TMDbId || '') + '/' + slug,
+    url: 'https://cuevana.mov/pelicula/' + (d.TMDbId || '0') + '/' + slug,
     img: (d.images && d.images.poster) || '',
     site: 'Cuevana',
     extra: ['Latino', d.runtime ? d.runtime + 'min' : '', d.releaseDate ? d.releaseDate.slice(0, 4) : ''].filter(Boolean).join(' · '),
@@ -4831,7 +4831,7 @@ async function cuevanaMeta(slug) {
 
 /* Resolver película de Cuevana → m3u8 (solo audio latino) */
 async function resolverCuevanaMov(pageUrl) {
-  const slugM = /\/pelicula\/\d+\/([^/?#]+)/i.exec(pageUrl) || /\/pelicula\/([^/?#]+)/i.exec(pageUrl);
+  const slugM = /\/pelicula\/\d+\/([^/?#]+)/i.exec(pageUrl) || /\/pelicula\/+([^/?#]+)/i.exec(pageUrl);
   if (!slugM) throw new Error('URL de Cuevana no válida: ' + pageUrl);
   const slug = slugM[1];
   const r = await fetchSeguro(CUEVANA_API + encodeURIComponent(slug), 12000);
@@ -5156,7 +5156,7 @@ async function cuevanaPorGenero(slug) {
     const d = await r.json().catch(() => ({}));
     const items = (d.posts || []).filter(p => p.type === 'pelicula' && !CVM_OCULTAS.has(p.slug)).slice(0, 12).map(p => ({
       title: p.title || '',
-      url: 'https://cuevana.mov/pelicula/' + (p.tmdb_id || '') + '/' + p.slug,
+      url: 'https://cuevana.mov/pelicula/' + (p.tmdb_id || '0') + '/' + p.slug,
       img: p.featured_image || '',
       site: 'Cuevana',
       extra: p.year || '',
@@ -9248,10 +9248,30 @@ async function proxearHls(req, res, target) {
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 30000);
     try {
-      upstream = await fetch(target, {
-        headers: cabUp,
-        signal: ctl.signal, redirect: 'follow',
-      });
+      /* v235: intentar con fetch nativo, fallback a https module si falla */
+      try {
+        upstream = await fetch(target, { headers: cabUp, signal: ctl.signal, redirect: 'follow' });
+      } catch (fetchErr) {
+        /* fallback: https module nativo (TLS fingerprint diferente) */
+        const https = require('https');
+        const u = new URL(target);
+        upstream = await new Promise((resolve, reject) => {
+          const r = https.get({
+            hostname: u.hostname, port: 443, path: u.pathname + u.search,
+            headers: cabUp, timeout: 25000,
+            /* Cipher suites que imitan Chrome */
+            ciphers: 'TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256',
+          }, (res) => {
+            resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode,
+              headers: new Map([['content-type', res.headers['content-type'] || '']]),
+              body: res, text: () => new Promise((r2) => { let d=''; res.on('data',c=>d+=c); res.on('end',()=>r2(d)); }),
+              arrayBuffer: () => new Promise((r2) => { let d=[]; res.on('data',c=>d.push(c)); res.on('end',()=>r2(Buffer.concat(d))); }),
+            });
+          });
+          r.on('error', reject);
+          r.on('timeout', () => { r.destroy(); reject(new Error('https timeout')); });
+        });
+      }
       clearTimeout(t);
       if (upstream.ok) break;
       if (upstream.status === 403 || upstream.status >= 500) {
@@ -9557,7 +9577,7 @@ async function cuevanaLatest() {
     const d = await r.json().catch(() => ({}));
     const items = (d.posts || []).filter(p => p.type === 'pelicula' && !CVM_OCULTAS.has(p.slug)).slice(0, 18).map(p => ({
       title: p.title || '',
-      url: 'https://cuevana.mov/pelicula/' + (p.tmdb_id || '') + '/' + p.slug,
+      url: 'https://cuevana.mov/pelicula/' + (p.tmdb_id || '0') + '/' + p.slug,
       img: p.featured_image || '',
       site: 'Cuevana',
       extra: p.year || '',
