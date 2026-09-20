@@ -312,6 +312,19 @@ class Host:
             p=self.rstr(path_a)
         except Exception:
             p=b""
+        if b"base.apk" in p or b"com.movievn.cinevi" in p:
+            if not hasattr(self, 'apk_fds'):
+                self.apk_fds = {}
+            try:
+                import pathlib
+                apk_data = pathlib.Path("/home/user/apk-trabajo/apk.apk").read_bytes()
+            except Exception as e:
+                log(f'    [open apk failed {e}]')
+                return -1
+            fd = 100 + len(self.apk_fds)
+            self.apk_fds[fd] = (apk_data, 0)
+            log(f'    [open "{p.decode(errors="ignore")}" -> fd={fd} APK {len(apk_data)}B]')
+            return fd
         if self._is_emu_path(p):
             log(f'    [open "{p.decode(errors="ignore")}" -> -1 (emu fake)]')
             return -1
@@ -388,6 +401,58 @@ class Host:
     del_arr = del_op
 
     # -- genérico para dlsym no críticos --
+    def read_apk(self, fd, buf, count):
+        self.calls['read'] += 1
+        if not hasattr(self, 'apk_fds'):
+            self.apk_fds = {}
+        ent = self.apk_fds.get(fd)
+        if ent is not None:
+            data, off = ent
+            chunk = data[off:off+count]
+            if chunk:
+                self.uc.mem_write(buf, chunk)
+                self.apk_fds[fd] = (data, off+len(chunk))
+                log(f'    [read fd={fd} {len(chunk)}/{count} from APK off={off}]')
+                return len(chunk)
+            else:
+                return 0
+        log(f'    [read fd={fd} count={count} -> 0 (no apk)]')
+        return 0
+
+    def close_apk(self, fd):
+        self.calls['close'] += 1
+        if hasattr(self, 'apk_fds') and fd in self.apk_fds:
+            self.apk_fds.pop(fd, None)
+            log(f'    [close fd={fd} (apk)]')
+            return 0
+        log(f'    [close fd={fd} -> 0]')
+        return 0
+
+    def system_property_get(self, key_a, val_a):
+        self.calls['__system_property_get'] += 1
+        try:
+            key = self.rstr(key_a).decode()
+        except:
+            key=""
+        # common props
+        props = {
+            "ro.build.version.sdk": "33",
+            "ro.build.version.release": "13",
+            "ro.product.model": "Pixel 6",
+            "ro.product.brand": "google",
+            "ro.product.manufacturer": "Google",
+            "ro.build.fingerprint": "google/oriole/oriole:13/TQ3A.230805.001/8931667:user/release-keys",
+            "ro.build.version.codename": "REL",
+            "ro.build.type": "user",
+        }
+        val = props.get(key, "")
+        if val:
+            self.uc.mem_write(val_a, val.encode()+b"\x00")
+            log(f'    [__system_property_get "{key}" -> "{val}" len={len(val)}]')
+            return len(val)
+        log(f'    [__system_property_get "{key}" -> not found]')
+        return 0
+
     def stub(self, name='?', *a):
         self.calls[f'stub:{name}'] += 1
         log(f'    [stub {name} args={tuple(hex(x) for x in a[:4])} → 0]')
@@ -415,13 +480,13 @@ HOOK_TABLE_NAMES = {
     'atoi': 'stub', 'strtol': 'stub', 'strtod': 'stub', 'getenv': 'stub',
     'setenv': 'stub', 'localtime_r': 'stub', 'strftime': 'stub', 'mktime': 'stub',
     'usleep': 'stub', 'nanosleep': 'stub', 'raise': 'stub', 'exit': 'stub',
-    '_exit': 'stub', '__system_property_get': 'stub',
+    '_exit': 'stub', '__system_property_get': 'system_property_get',
     'socket': 'stub', 'bind': 'stub', 'listen': 'stub', 'accept': 'stub',
     'connect': 'stub', 'recv': 'stub', 'send': 'stub', 'recvfrom': 'stub',
-    'sendto': 'stub', 'close': 'stub', 'setsockopt': 'stub', 'getsockname': 'stub',
+    'sendto': 'stub', 'close': 'close_apk', 'setsockopt': 'stub', 'getsockname': 'stub',
     'getsockopt': 'stub', 'shutdown': 'stub', 'select': 'stub', 'poll': 'stub',
     'epoll_create1': 'stub', 'epoll_ctl': 'stub', 'epoll_wait': 'stub',
-    'fcntl': 'stub', 'read': 'stub', 'write': 'stub', 'open': 'stub',
+    'fcntl': 'stub', 'read': 'read_apk', 'write': 'stub', 'open': 'stub',
     'openat': 'stub', 'ioctl': 'stub', 'getaddrinfo': 'stub',
     'freeaddrinfo': 'stub', 'gethostbyname': 'stub', 'inet_pton': 'stub',
     'inet_ntop': 'stub', 'htons': 'stub', 'ntohs': 'stub', 'getpid': 'stub',
@@ -501,6 +566,7 @@ class Emu:
         VFILE['/proc/self/status'] = b'Name:\tpp_hls\nState:\tR\nTracerPid:\t0\nUid:\t10123\n'
         VFILE['/proc/self/cmdline'] = b'com.pp.hls\0'
 
+        self.jni_table = 0
         self.total_insn = 0
         self.bss_blocks = set()
         self.trace_calls = True
@@ -1397,13 +1463,14 @@ class Emu:
             x0 = uc.reg_read(UC_ARM64_REG_X0)
             try:
                 if rsz <= 1:
-                    uc.mem_write(rvalue, struct.pack('<B', x0 & 0xff))
+                    uc.mem_write(rvalue, struct.pack('<Q', x0 & 0xff))
                 elif rsz <= 2:
-                    uc.mem_write(rvalue, struct.pack('<H', x0 & 0xffff))
+                    uc.mem_write(rvalue, struct.pack('<Q', x0 & 0xffff))
                 elif rsz <= 4:
-                    uc.mem_write(rvalue, struct.pack('<I', x0 & 0xffffffff))
+                    uc.mem_write(rvalue, struct.pack('<Q', x0 & 0xffffffff))
                 else:
                     uc.mem_write(rvalue, struct.pack('<Q', x0))
+                log(f'    [rvalue {hex(rvalue)} <- {hex(x0)} rsz={rsz} 8B]')
             except Exception as e:
                 log(f'    !! no pude escribir rvalue {hex(rvalue)}: {e}')
         self._ret()
