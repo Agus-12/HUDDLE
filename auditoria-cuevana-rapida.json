@@ -1,0 +1,434 @@
+{
+  "date": "2026-09-20T11:44:32.642Z",
+  "total": 8182,
+  "withLatino": 8002,
+  "withoutLatino": 180,
+  "apiErrors": 0,
+  "hostCounts": {
+    "vimeos.net": 7923,
+    "videoapp.zip": 7899,
+    "voe.sx": 7815,
+    "hlswish.com": 7225,
+    "goodstream.one": 7004,
+    "filemoon.sx": 6179,
+    "doodstream.com": 379,
+    "waaw.to": 72,
+    "mega.nz": 65,
+    "www.youtube.com": 60,
+    "jetload.net": 33,
+    "gounlimited.to": 33,
+    "goodstream.uno": 28,
+    "www.fembed.com": 20,
+    "streamlare.com": 16,
+    "wishonly.site": 13,
+    "swhoi.com": 11,
+    "swdyu.com": 8,
+    "drive.google.com": 7,
+    "jilliandescribecompany.com": 6,
+    "embedwish.com": 5,
+    "playerwish.com": 5,
+    "watchsb.com": 4,
+    "sbbrisk.com": 3,
+    "sbanh.com": 3,
+    "v2.zplayer.live": 3,
+    "streams3.com": 3,
+    "jodwish.com": 3,
+    "sblongvu.com": 2,
+    "sbspeed.com": 2,
+    "mikaylaarealike.com": 2,
+    "flaswish.com": 1,
+    "wishfast.top": 1,
+    "streamwish.to": 1,
+    "lvturbo.com": 1,
+    "sbhight.com": 1,
+    "unknown": 1,
+    "dood.ws": 1,
+    "asnwish.com": 1,
+    "strwish.com": 1,
+    "megaup.net": 1,
+    "1fichier.com": 1,
+    "lukesitturn.com": 1,
+    "videoapp.tel": 1
+  },
+  "langCounts": {},
+  "deadReasons": {},
+  "aliveSamples": [
+    {
+      "slug": "un-tiempo-para-recordar",
+      "title": "Un tiempo para recordar",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "dietro-la-notte",
+      "title": "Dietro la notte",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "jedine-tereza",
+      "title": "Jedině Tereza",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "la-magia-del-chocolate",
+      "title": "La Magia del Chocolate",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "muerte-y-vida-de-un-activista-politico",
+      "title": "Muerte y vida de un activista político",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "los-secretos-no-se-pueden-enterrar",
+      "title": "Los secretos no se pueden enterrar",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "lados-opuestos",
+      "title": "Lados Opuestos",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "la-unica-salida",
+      "title": "La única salida",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "el-gran-fraude",
+      "title": "El Gran Fraude",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "ecos-del-pasado",
+      "title": "Ecos del Pasado",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "cunados",
+      "title": "Cuñados",
+      "hosts": [
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 5
+    },
+    {
+      "slug": "fuera-de-la-ley",
+      "title": "Fuera de la ley",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "noche-de-paz",
+      "title": "Noche de paz",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "senora-influencer",
+      "title": "Señora Influencer",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "radical",
+      "title": "Radical",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "monsters-el-infierno-del-dragon",
+      "title": "Monsters: El infierno del dragón",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "los-viajeros",
+      "title": "Los Viajeros",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "los-segundones",
+      "title": "Los segundones",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "a-royal-recipe-for-love",
+      "title": "A Royal Recipe for Love",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    },
+    {
+      "slug": "cazadores-en-tierra-inhospita",
+      "title": "Cazadores en tierra inhóspita",
+      "hosts": [
+        "goodstream.one",
+        "hlswish.com",
+        "voe.sx",
+        "filemoon.sx",
+        "vimeos.net",
+        "videoapp.zip"
+      ],
+      "count": 6
+    }
+  ],
+  "deadSamples": [
+    {
+      "slug": "alien%c2%b3",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "el-diario-de-greg-en-navidad-atrapados-en-la-nieve",
+      "title": "El diario de Greg en Navidad: Atrapados en la nieve",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "dejar-el-mundo-atras",
+      "title": "Dejar el mundo atrás",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "silber-y-el-libro-de-los-suenos",
+      "title": "Silber y el libro de los sueños",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "mi-querido-monstruo",
+      "title": "Mi querido monstruo",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "la-tipica-navidad",
+      "title": "La típica Navidad",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "%d0%bc%d1%80%d0%b0%d0%ba",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "suzume",
+      "title": "Suzume",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "%e7%99%92%e3%81%97%e3%81%ae%e3%81%93%e3%81%93%e3%82%8d%e3%81%bf%ef%bd%9e%e8%87%aa%e5%88%86%e3%82%92%e5%a5%bd%e3%81%8d%e3%81%ab%e3%81%aa%e3%82%8b%e6%96%b9%e6%b3%95%ef%bd%9e",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "%e5%86%99%e7%9c%9f%e3%81%ae%e5%a5%b3",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "starship-troopers-invasion",
+      "title": "Starship Troopers: Invasión",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "una-buena-persona",
+      "title": "Una buena persona",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "%d0%b2%d0%bd%d0%b5-%d0%b7%d0%be%d0%bd%d1%8b-%d0%b4%d0%be%d1%81%d1%82%d1%83%d0%bf%d0%b0",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "carmen",
+      "title": "Carmen",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "triangle",
+      "title": "Triangle",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "si-tu-me-dices-lee",
+      "title": "Si tú me dices lee",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "silhouette",
+      "title": "Silhouette",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "wwe-backlash-2023",
+      "title": "WWE Backlash 2023",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "belle-y-sebastian-la-nueva-generacion",
+      "title": "Belle y Sebastián: La nueva generación",
+      "langs": [],
+      "reason": "no_latino"
+    },
+    {
+      "slug": "on-the-come-up",
+      "title": "On the Come Up",
+      "langs": [],
+      "reason": "no_latino"
+    }
+  ],
+  "elapsedMin": 5
+}

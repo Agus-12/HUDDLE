@@ -1,0 +1,95 @@
+[11:39:14] === AUDITORÍA CUEVANA — ESCANEO RÁPIDO (API only) ===
+[11:39:14] Descargando sitemaps...
+[11:39:32] Total películas únicas: 8182
+[11:39:32] Verificando API (10 concurrent, sin verificar m3u8)...
+[11:39:39] 200/8182 (2.4%) | OK: 194 | Sin lat: 6 | Err: 0 | 28.6/s
+[11:39:46] 400/8182 (4.9%) | OK: 391 | Sin lat: 9 | Err: 0 | 28.6/s
+[11:39:53] 600/8182 (7.3%) | OK: 589 | Sin lat: 11 | Err: 0 | 28.6/s
+[11:40:00] 800/8182 (9.8%) | OK: 783 | Sin lat: 17 | Err: 0 | 28.6/s
+[11:40:10] 1000/8182 (12.2%) | OK: 980 | Sin lat: 20 | Err: 0 | 26.3/s
+[11:40:17] 1200/8182 (14.7%) | OK: 1175 | Sin lat: 25 | Err: 0 | 26.7/s
+[11:40:24] 1400/8182 (17.1%) | OK: 1372 | Sin lat: 28 | Err: 0 | 26.4/s
+[11:40:32] 1600/8182 (19.6%) | OK: 1570 | Sin lat: 30 | Err: 0 | 26.7/s
+[11:40:39] 1800/8182 (22.0%) | OK: 1766 | Sin lat: 34 | Err: 0 | 26.9/s
+[11:40:46] 2000/8182 (24.4%) | OK: 1959 | Sin lat: 41 | Err: 0 | 27.0/s
+[11:40:52] 2200/8182 (26.9%) | OK: 2151 | Sin lat: 49 | Err: 0 | 27.5/s
+[11:40:59] 2400/8182 (29.3%) | OK: 2343 | Sin lat: 57 | Err: 0 | 27.6/s
+[11:41:09] 2600/8182 (31.8%) | OK: 2537 | Sin lat: 63 | Err: 0 | 26.8/s
+[11:41:16] 2800/8182 (34.2%) | OK: 2736 | Sin lat: 64 | Err: 0 | 26.9/s
+[11:41:23] 3000/8182 (36.7%) | OK: 2931 | Sin lat: 69 | Err: 0 | 27.0/s
+[11:41:30] 3200/8182 (39.1%) | OK: 3127 | Sin lat: 73 | Err: 0 | 27.1/s
+[11:41:37] 3400/8182 (41.6%) | OK: 3323 | Sin lat: 77 | Err: 0 | 27.2/s
+[11:41:44] 3600/8182 (44.0%) | OK: 3515 | Sin lat: 85 | Err: 0 | 27.3/s
+[11:41:51] 3800/8182 (46.4%) | OK: 3708 | Sin lat: 92 | Err: 0 | 27.3/s
+[11:41:58] 4000/8182 (48.9%) | OK: 3902 | Sin lat: 98 | Err: 0 | 27.4/s
+[11:42:08] 4200/8182 (51.3%) | OK: 4097 | Sin lat: 103 | Err: 0 | 26.9/s
+[11:42:16] 4400/8182 (53.8%) | OK: 4295 | Sin lat: 105 | Err: 0 | 26.8/s
+[11:42:24] 4600/8182 (56.2%) | OK: 4493 | Sin lat: 107 | Err: 0 | 26.7/s
+[11:42:31] 4800/8182 (58.7%) | OK: 4688 | Sin lat: 112 | Err: 0 | 26.8/s
+[11:42:38] 5000/8182 (61.1%) | OK: 4887 | Sin lat: 113 | Err: 0 | 26.9/s
+[11:42:45] 5200/8182 (63.6%) | OK: 5082 | Sin lat: 118 | Err: 0 | 26.9/s
+[11:42:52] 5400/8182 (66.0%) | OK: 5277 | Sin lat: 123 | Err: 0 | 27.0/s
+[11:42:59] 5600/8182 (68.4%) | OK: 5473 | Sin lat: 127 | Err: 0 | 27.1/s
+[11:43:07] 5800/8182 (70.9%) | OK: 5673 | Sin lat: 127 | Err: 0 | 27.0/s
+[11:43:15] 6000/8182 (73.3%) | OK: 5870 | Sin lat: 130 | Err: 0 | 26.9/s
+[11:43:21] 6200/8182 (75.8%) | OK: 6068 | Sin lat: 132 | Err: 0 | 27.0/s
+[11:43:28] 6400/8182 (78.2%) | OK: 6267 | Sin lat: 133 | Err: 0 | 27.1/s
+[11:43:35] 6600/8182 (80.7%) | OK: 6465 | Sin lat: 135 | Err: 0 | 27.2/s
+[11:43:42] 6800/8182 (83.1%) | OK: 6662 | Sin lat: 138 | Err: 0 | 27.2/s
+[11:43:49] 7000/8182 (85.6%) | OK: 6856 | Sin lat: 144 | Err: 0 | 27.2/s
+[11:43:56] 7200/8182 (88.0%) | OK: 7051 | Sin lat: 149 | Err: 0 | 27.3/s
+[11:44:04] 7400/8182 (90.4%) | OK: 7244 | Sin lat: 156 | Err: 0 | 27.2/s
+[11:44:12] 7600/8182 (92.9%) | OK: 7440 | Sin lat: 160 | Err: 0 | 27.1/s
+[11:44:19] 7800/8182 (95.3%) | OK: 7634 | Sin lat: 166 | Err: 0 | 27.2/s
+[11:44:26] 8000/8182 (97.8%) | OK: 7827 | Sin lat: 173 | Err: 0 | 27.2/s
+[11:44:32] 8182/8182 (100.0%) | OK: 8002 | Sin lat: 180 | Err: 0 | 27.3/s
+[11:44:32] === RESUMEN ===
+[11:44:32] Total: 8182 | Con latino: 8002 (97.8%) | Sin latino: 180 | API errors: 0
+[11:44:32] Tiempo: 5.0 min
+[11:44:32] --- HOSTS (embeds con audio latino) ---
+[11:44:32]   vimeos.net: 7923
+[11:44:32]   videoapp.zip: 7899
+[11:44:32]   voe.sx: 7815
+[11:44:32]   hlswish.com: 7225
+[11:44:32]   goodstream.one: 7004
+[11:44:32]   filemoon.sx: 6179
+[11:44:32]   doodstream.com: 379
+[11:44:32]   waaw.to: 72
+[11:44:32]   mega.nz: 65
+[11:44:32]   www.youtube.com: 60
+[11:44:32]   jetload.net: 33
+[11:44:32]   gounlimited.to: 33
+[11:44:32]   goodstream.uno: 28
+[11:44:32]   www.fembed.com: 20
+[11:44:32]   streamlare.com: 16
+[11:44:32]   wishonly.site: 13
+[11:44:32]   swhoi.com: 11
+[11:44:32]   swdyu.com: 8
+[11:44:32]   drive.google.com: 7
+[11:44:32]   jilliandescribecompany.com: 6
+[11:44:32]   embedwish.com: 5
+[11:44:32]   playerwish.com: 5
+[11:44:32]   watchsb.com: 4
+[11:44:32]   sbbrisk.com: 3
+[11:44:32]   sbanh.com: 3
+[11:44:32]   v2.zplayer.live: 3
+[11:44:32]   streams3.com: 3
+[11:44:32]   jodwish.com: 3
+[11:44:32]   sblongvu.com: 2
+[11:44:32]   sbspeed.com: 2
+[11:44:32]   mikaylaarealike.com: 2
+[11:44:32]   flaswish.com: 1
+[11:44:32]   wishfast.top: 1
+[11:44:32]   streamwish.to: 1
+[11:44:32]   lvturbo.com: 1
+[11:44:32]   sbhight.com: 1
+[11:44:32]   unknown: 1
+[11:44:32]   dood.ws: 1
+[11:44:32]   asnwish.com: 1
+[11:44:32]   strwish.com: 1
+[11:44:32]   megaup.net: 1
+[11:44:32]   1fichier.com: 1
+[11:44:32]   lukesitturn.com: 1
+[11:44:32]   videoapp.tel: 1
+[11:44:32] --- RAZONES DE FALLO ---
+[11:44:32] Guardado: auditoria-cuevana-rapida.json
