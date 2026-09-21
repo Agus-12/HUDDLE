@@ -52,7 +52,11 @@ Live Action (apartado propio, no caricaturas):
 - Resolución (`resolverCaricaturaHttp`, ~3s): cap → `anchor-data-container data-id` → POST `get_system_data` (`target_id=`) → JSON con iframe Byse → `/api/videos/<cod>` → playback AES-256-GCM (llave en `key_parts[version, 31-version]`) → master m3u8.
 - Merge latino: capítulos en inglés se reemplazan con Lacartoons (`LCT_MERGE`: Billy T1-T5, Ben 10 T3/T4+2x12).
 
-## Sonda Caricaturas (`sondaCaricaturas`, v241)
+## Sondas (v242: una por fuente)
+- `sondaDanimados`, `sondaLacartoons`, `sondaMisc` — cada una: 5 vivas + 3 muertas por ciclo, pausas 2s (rate-limit 429), log propio (`sonda-danimados.log`, etc.), notifica con su nombre.
+- `sondaCaricaturas()` = wrapper que corre las 3 en arranque + cada 6h y persiste `cari-vistas.txt` (claves `dani:`/`lct:`/`cari:`).
+
+## Sonda (diseño original v241) Caricaturas (`sondaCaricaturas`, v241)
 Corre al arranque (90s) y cada 6h. Muestras CHICAS y despacio (rate-limit):
 1. **DANI vivas**: 5 series visibles → página con episodios. Si falla → fallo; 3 fallos → `dani-ocultas.txt` + notifica.
 2. **LCT vivas**: 5 series → página con capítulos. Igual → `lct-ocultas.txt`.
@@ -66,11 +70,11 @@ Corre al arranque (90s) y cada 6h. Muestras CHICAS y despacio (rate-limit):
 - Las ocultas precargadas (DANI_OCULTAS, LCT_OCULTAS) son curaduría, no muerte: la sonda NO las revive ni las toca.
 - Éxito perdona (`...Perdonar`).
 
-## Panel de estado
-- Tarjeta **Caricaturas** en Fuentes de video, con logo (`/sites/caricaturas.png`, arte original + esquinas redondeadas).
+## Panel de estado (v242: 3 tarjetas separadas)
+- **Danimados** (rosa `#fb7185`, logo pingüino original `/sites/danimados.png`), **Lacartoons** (teal `#2dd4bf`, monograma `/sites/lacartoons.png`), **MisCaricaturas** (amarillo `#ffd93b`, Bob `/sites/caricaturas.png`).
+- Cada tarjeta con su detalle + su log de sonda (`Danimados`/`Lacartoons`/`MisCaricaturas` notifican por separado).
 - Total = dani + lct + cari curadas; ocultas = sonda + curaduría; vistas = verificadas.
-- Detalle con log de sonda por fuente (Danimados/Lacartoons/MisCaricaturas notifican por separado).
-- Catálogo "Caricaturas" (arriba) = activas de la fuente (1,078), NO filas del feed (~254): misma métrica que las demás fuentes.
+- Catálogo "Caricaturas" (arriba) = suma de las 3 activas (1,078), NO filas del feed (~254).
 - Catálogo "Series" = solo animes: Danimados es familia Caricaturas (la app lo archiva con `site: 'Caricaturas'`), así no se cuenta doble en el Total.
 
 ## Archivos en disco

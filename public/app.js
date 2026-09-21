@@ -653,7 +653,7 @@ async function cargarIntro(url) {
 function esEpisodioSolo() {
   if (!SOLO || SOLO.cerrado) return false;
   if (SOLO.info && SOLO.info.eps && SOLO.info.eps.length > 1) return true;
-  return /latanime\.org\/ver\/|miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}([ab])?(?:-|$)|lacartoons\.com\/serie\/capitulo\/|animeflv\.[a-z.]+\/ver\/|\/episode\/|danimados\.cc\/episodios\/|gopelis\.com\/ver\/tv\//i.test(SOLO.url || ''); /* v186 dani + v198 gopelis */
+  return /latanime\.org\/ver\/|miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}([ab])?(?:-|$)|lacartoons\.com\/serie\/capitulo\/|animeflv\.[a-z.]+\/ver\/|\/episode\/|danimados\.cc\/episodios\//i.test(SOLO.url || ''); /* v186 dani */
 }
 function ventanaIntro() {
   /* {t, dur} del video activo — SOLO en vivo, nativo de sala, espejo */
@@ -1494,11 +1494,11 @@ function imgPorProxy(src) {
   if (/animeflv\.|latanime\.|miscaricaturas\./i.test(src)) return '/api/img?u=' + encodeURIComponent(src); /* v102 */
   return src;
 }
-function abrirSeriePicker(res, enSala, esAnime, esGp) {
+function abrirSeriePicker(res, enSala, esAnime) {
   const esNv = /novelas360\.com\/categories\//i.test(res.url || ''); /* v206 */
   const esEnp = /enpantallatv\.com\//i.test(res.url || ''); /* v206.2 */
   const esMovie = /movie\.huddle\/(?:serie|v)\//i.test(res.url || ''); /* v207: app Movie · v212: v = catálogo vivo */
-  const slugM = esGp ? (/series\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esMovie ? (/movie\.huddle\/(?:serie|v)\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esNv ? (/categories\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esEnp ? (/enpantallatv\.com\/([a-z0-9-]+)/i.exec(res.url || '') || []) : (/(?:serie|anime)\/([a-z0-9-]+)/i.exec(res.url || '') || []);
+  const slugM = esMovie ? (/movie\.huddle\/(?:serie|v)\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esNv ? (/categories\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esEnp ? (/enpantallatv\.com\/([a-z0-9-]+)/i.exec(res.url || '') || []) : (/(?:serie|anime)\/([a-z0-9-]+)/i.exec(res.url || '') || []);
   if (!slugM || !slugM[1]) { toast('No pude leer esa serie'); return; }
   const slug = slugM[1];
   const esLat = /latanime\./i.test(res.url || ''); /* v63: anime de Latanime */
@@ -1511,7 +1511,7 @@ function abrirSeriePicker(res, enSala, esAnime, esGp) {
   if (poster0) { po.src = poster0; po.style.display = ''; } else po.style.display = 'none';
   $('#spTemporadas').innerHTML = '';
   $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">Buscando episodios…</div>';
-  fetch((esMovie ? '/api/movie/ficha/' + (/movie\.huddle\/v\//i.test(res.url || '') ? 'v' : '') + slug : esGp ? '/api/gopelis/' + slug : esEnp ? '/api/enp/' + slug : esNv ? '/api/novelas/' + slug : esAnime ? ('/api/anime/' + slug + (esLat ? '?site=latanime' : '')) : '/api/serie/' + slug)).then((r) => r.json()).then((d) => { /* v206 + v206.2 + v207 · v216: el catálogo vivo pide ficha v<vod> */
+  fetch((esMovie ? '/api/movie/ficha/' + (/movie\.huddle\/v\//i.test(res.url || '') ? 'v' : '') + slug : esEnp ? '/api/enp/' + slug : esNv ? '/api/novelas/' + slug : esAnime ? ('/api/anime/' + slug + (esLat ? '?site=latanime' : '')) : '/api/serie/' + slug)).then((r) => r.json()).then((d) => { /* v206 + v206.2 + v207 · v216: el catálogo vivo pide ficha v<vod> */
     /* v62: animes → una sola lista de episodios, sin miniaturas */
     const eps = esAnime
       ? (d.episodios || []).map((e) => ({ temporada: 1, ep: e.n, url: e.url, titulo: e.titulo || ('Episodio ' + e.n), img: '' }))
@@ -1826,29 +1826,10 @@ document.addEventListener('click', (e) => {
 });
 
 /* v61: ¿es una serie? → abrir el selector en vez del espejo directo */
-/* v199: película de GoPelis — la ficha da la url /ver/movie/<id> y de ahí
- * todo fluye como cualquier peli (Solo: resolutor; sala: reproducción nativa) */
-async function abrirGopelisPeli(res, enSala) {
-  const sm = /peliculas\/([a-z0-9-]+)/i.exec(res.url || '');
-  if (!sm) { toast('No pude leer esa película'); return; }
-  toast('Buscando la película…');
-  try {
-    const d = await (await fetch('/api/gopelispeli/' + sm[1])).json();
-    if (!d || !d.ok || !d.url) { toast((d && d.error) || 'No pude abrir esa película'); return; }
-    const r2 = { url: d.url, title: d.titulo || res.title || '', img: d.poster || res.img || '' };
-    if (S.modoSolo) { abrirSolo(r2.url, { title: r2.title, img: r2.img }); return; }
-    S.pendingStart = { url: r2.url, name: r2.title, img: r2.img };
-    S.mirrorInfo = { title: r2.title, img: r2.img, url: r2.url, sub: 'Cargando tu sala…' };
-    mostrarPeliLoading();
-    const code = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
-    connect(code);
-  } catch { toast('Sin conexión con el servidor'); }
-}
+
 
 function elegirTitulo(res, enSala) {
   if (/movie\.huddle\/(?:serie|v)\//i.test(res.url || '')) { abrirSeriePicker(res, enSala); return true; } /* v207: novelas del app Movie (mapa local) · v212: catálogo vivo API */
-  if (/gopelis\.com\/peliculas\//i.test(res.url || '')) { abrirGopelisPeli(res, enSala); return true; } /* v199: película de GoPelis (latino) */
-  if (/gopelis\.com\/series\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, false, true); return true; } /* v198: GoPelis (latino) */
   if (/lacartoons\.com\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v112: antes que el genérico /serie/ (sus urls también lo traen) */
   if (/danimados\.cc\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v175: ANTES del genérico /serie/ — la tarjeta de danimados es dani-titanes bajo /serie/ y caía en el picker de Cuevana («cargando temporadas» → error) */
   if (/\/serie\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, false); return true; }
@@ -1943,12 +1924,14 @@ $('#mirrorUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') star
  * actualiza con lo que guarda el servidor (data/sites.json) */
 let SITES = [
   /* v65: Latanime primero (predeterminado) + logos propios en /sites/
-   * v68: fuera GoPelis y AnimeFLV — v70: fuera AnimeD23 también */
+   * v68: fuera AnimeFLV — v70: fuera AnimeD23 también */
   { name: 'Latanime', full: 'Latanime — animes con audio latino', url: 'https://latanime.org/', logo: '/sites/latanime.png' },
   { name: 'Cuevana', full: 'Cuevana — películas y series (8k+ latinas)', url: 'https://cuevana.mov/', logo: '/sites/cuevana.png' },
   { name: 'CineCalidad', full: 'Cine-Calidad — películas y series', url: 'https://cine-calidad.mx/', logo: '/sites/cinecalidad.png' }, /* v235: separado de Cuevana */
   { name: 'PelisXD', full: 'PelisXD — películas en HD (catálogo grande)', url: 'https://www.pelisxd.com/', logo: '/sites/pelisxd.png' }, /* v98 */
-  { name: 'Caricaturas', full: 'Mis Caricaturas + Lacartoons — clásicas de nick/CN en latino', url: 'https://miscaricaturas.com/', logo: '/sites/caricaturas.png' }, /* v102; v112: también lacartoons */
+  { name: 'Danimados', full: 'Danimados — series animadas en latino', url: 'https://danimados.cc/', logo: '/sites/danimados.png' }, /* v242: fuente propia */
+  { name: 'Lacartoons', full: 'Lacartoons — clásicas de CN/Nick en latino', url: 'https://lacartoons.com/', logo: '/sites/lacartoons.png' }, /* v242: fuente propia */
+  { name: 'MisCaricaturas', full: 'MisCaricaturas — clásicas en latino', url: 'https://miscaricaturas.com/', logo: '/sites/caricaturas.png' }, /* v242: fuente propia */
   { name: 'YouTube', full: 'YouTube — videos', url: 'https://www.youtube.com/', logo: '/sites/youtube.png' },
   /* v208: Novelas360 fuera de la lista de fuentes — mala calidad. La fila «Novelas» sigue existiendo con el catálogo de la app Movie.
   { name: 'Novelas', full: 'Novelas360 — telenovelas por capítulos', url: 'https://novelas360.com/', logo: '/sites/novelas.png' },
@@ -2722,9 +2705,9 @@ $('#btnSwitch').addEventListener('click', () => {
 const SITE_LOGOS = {
   'cuevana.mov': '/sites/cuevana.png',
   'cine-calidad.mx': '/sites/cinecalidad.png', /* v235: separado de Cuevana */
-  'gopelis.com': '/sites/gopelis.png',
   'youtube.com': '/sites/youtube.png',
   'animed23.com': '/sites/animed23.png',
+  'danimados.cc': '/sites/danimados.png', 'lacartoons.com': '/sites/lacartoons.png', 'miscaricaturas.com': '/sites/caricaturas.png', /* v242 */
 };
 function siteLogoFor(host) {
   const h = String(host || '').replace(/^www\./, '').toLowerCase();

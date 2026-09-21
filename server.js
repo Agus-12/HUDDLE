@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v241.1'; // 241.1: Numeros coherentes + icono caricaturas
+const UI_VERSION = 'v242'; // 242: GoPelis fuera + 3 fuentes caricaturas separadas
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
@@ -392,7 +392,6 @@ let DANI_CAT = new Map();
 const LA_TODOS = new Set(), LA_OCULTAS_SET = new Set(); /* v198 */
 const LA_MUERTAS_SET = new Set(); /* v200: auditadas con video caído */
 const LA_VISTAS = new Set(); /* v240: series verificadas por la sonda de Latanime */
-const GP_OCULTAS_SET = new Set(); /* v200: gopelis sin servidores vivos */
 /* v203: PODREDUMBRE — mp4upload borra archivos a diario (Akame ga Kill
  * murió en vivo en una sesión). 3 fallos espaciados ≥10 min → se oculta
  * sola. Revisión cada 6 h de las ocultadas con <7 días: si reviven, vuelven. */
@@ -683,7 +682,7 @@ async function sondaCuevana() {
 
 /* v205.2: PODREDUMBRE GENERAL — el mismo circuito de latanime (fallos
  * reales → ocultar; éxito → perdonar; re-chequeo periódico → revivir)
- * para GoPelis, PelisXD, AnimeFLV y Cuevana. Un capítulo puntual de
+ * para PelisXD, AnimeFLV y Cuevana. Un capítulo puntual de
  * caricaturas NO oculta la serie (un muerto no mata una de 300; el feed
  * ya nace filtrado y el error avisa claro). */
 const PXD_OCULTAS = new Set(), AF_OCULTAS = new Set(), CVM_OCULTAS = new Set();
@@ -720,8 +719,8 @@ console.log('[boot] CVM_OCULTAS=' + CVM_OCULTAS.size + ' Cuevana mov ocultas');
 const pxdVistas = new Set(); /* slugs ya verificados alguna vez */
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'pxd-vistas.txt'), 'utf8').split('\n')) if (l.trim()) pxdVistas.add(l.trim()); } catch {}
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'af-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) AF_OCULTAS.add(l.trim()); } catch {}
-const FALLOS_GP = new Map(), FALLOS_PXD = new Map(), FALLOS_AF = new Map(), FALLOS_CV = new Map();
-for (const [mapa, arch] of [[FALLOS_GP, 'fallos-gp.json'], [FALLOS_PXD, 'fallos-pxd.json'], [FALLOS_AF, 'fallos-af.json'], [FALLOS_CV, 'fallos-cv.json']]) {
+const FALLOS_PXD = new Map(), FALLOS_AF = new Map(), FALLOS_CV = new Map();
+for (const [mapa, arch] of [[FALLOS_PXD, 'fallos-pxd.json'], [FALLOS_AF, 'fallos-af.json'], [FALLOS_CV, 'fallos-cv.json']]) {
   try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR, arch), 'utf8')) || {})) mapa.set(k, v); } catch {}
 }
 const fallosGuardarT = new Map();
@@ -745,18 +744,6 @@ function ocultasReescribir(set, archivo) {
   clearTimeout(ocT.get(archivo));
   ocT.set(archivo, setTimeout(() => { ocT.delete(archivo); try { fs.writeFileSync(path.join(__dirname, 'public', archivo), [...set].sort().join('\n') + '\n'); } catch {} }, 3000));
 }
-/* GoPelis — ocultar en vivo por ID (el catálogo filtra por clave slug vía
- * GP_ID_REV id→clave, el mismo mapa de su Lázaro) */
-function gpOcultarPorId(id) {
-  const key = GP_ID_REV.get(id);
-  falloRegistrar(FALLOS_GP, 'fallos-gp.json', 'gp:' + id, () => {
-    if (!key || GP_OCULTAS_SET.has(key)) return;
-    GP_OCULTAS_SET.add(key);
-    ocultasReescribir(GP_OCULTAS_SET, 'gopelis-ocultas.txt');
-    console.log('[podredumbre] gp: ' + key + ' ocultada tras 3 fallos');
-  });
-}
-function gpPerdonarPorId(id) { falloPerdonar(FALLOS_GP, 'fallos-gp.json', 'gp:' + id); }
 /* PelisXD / AnimeFLV — ocultar por slug */
 function pxdOcultar(slug) {
   falloRegistrar(FALLOS_PXD, 'fallos-pxd.json', slug, () => {
@@ -791,29 +778,9 @@ function cvFallo(slug) { /* v205.5: servidores existían pero TODOS fallaron —
 function cvPerdonarFile() { try { fs.writeFileSync(path.join(DATA_DIR, 'cv-ocultas-rt.json'), JSON.stringify([...CV_OCULTAS_RT])); } catch {} }
 
 /* re-chequeo general cada 6 h — poquitos por vuelta y con calma */
-let revGiro = { gp: 0, pxd: 0, af: 0, cv: 0 };
+let revGiro = { pxd: 0, af: 0, cv: 0 };
 async function revivirGeneral() {
   const probados = [];
-  /* GoPelis: resolver de verdad (es HTTP puro) — 2 por vuelta */
-  const gpKeys = [...GP_OCULTAS_SET];
-  for (let i = 0; i < 2 && gpKeys.length; i++) {
-    const key = gpKeys[(revGiro.gp + i) % gpKeys.length];
-    try {
-      const esPeli = key.startsWith('p:');
-      const slug = esPeli ? key.slice(2) : key;
-      let url = '';
-      if (esPeli) {
-        const id = [...GP_ID_REV.entries()].find(([, k]) => k === key)?.[0];
-        if (id) url = GP_BASE + 'ver/movie/' + id;
-      } else {
-        const ficha = await datosGopelis(slug).catch(() => null);
-        const ep0 = ficha && ficha.episodios && ficha.episodios[0];
-        if (ep0 && ep0.url) url = ep0.url;
-      }
-      if (url) { await resolverGopelis(url); gpOcultaQuitar(key); probados.push('gp:' + key + ' REVIVIÓ'); sondaNotify("GoPelis", "revivio", key, key + " revivio — resuelve otra vez"); }
-    } catch {}
-  }
-  revGiro.gp += 2;
   /* PelisXD: resolutor completo (1 por vuelta, puede usar navegador) */
   const pxdKeys = [...PXD_OCULTAS];
   if (pxdKeys.length) {
@@ -869,7 +836,7 @@ const epsEscribir = () => { try { fs.writeFileSync(path.join(DATA_DIR, 'eps-muer
 function esEpUrl(u) {
   return /latanime\.org\/ver\/[a-z0-9-]+-episodio-\d+/i.test(u) || /animeflv\.one\/ver\/[a-z0-9-]+-\d+/.test(u)
     || /lacartoons\.com\/serie\/capitulo\//i.test(u) || /danimados\.cc\/episodios\//i.test(u)
-    || /miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}/i.test(u) || /gopelis\.com\/ver\/tv\//i.test(u)
+    || /miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}/i.test(u)
     || /cine-calidad\.mx\/(?:episode\/|serie\/[a-z0-9-]+\/)/i.test(u)
     || /novelas360\.com\/video\//i.test(u)
     || /enpantallatv\.com\/[a-z0-9-]*capitulo[a-z0-9-]*\//i.test(u); /* v206.2 */
@@ -1261,7 +1228,7 @@ const MOVIE_HOST_VIRTUAL = 'movie.huddle'; /* host ficticio: identidad de serie/
  * dentro de una VM blindada y nunca sale al tráfico). Sin llave, el origen da
  * 403 y el espejo es 100% relleno. Así que se tumban: con false, las funciones
  * de abajo no emiten nada de Movie y la app se queda con las fuentes latinas
- * abiertas que SÍ reproducen (gopelis, cine-calidad, pelisxd, series…). */
+ * abiertas que SÍ reproducen (cine-calidad, pelisxd, series…). */
 const MOVIE_ENABLED = false;
 const MOVIE_ORIGEN = (process.env.MOVIE_ORIGEN || 'http://147.124.216.142').replace(/\/+$/, ''); /* el origen pelado (sin wsSecret) */
 const MOVIE_MAPA_RUTA = process.env.MOVIE_MAPA || path.join(os.homedir(), 'movie-mapa-secuencias.json');
@@ -1862,22 +1829,11 @@ try {
   } catch {}
   try {
     for (const l of fs.readFileSync(path.join(__dirname, 'public', 'latanime-muertas.txt'), 'utf8').split('\n')) if (l.trim()) LA_MUERTAS_SET.add(l.trim());
-    for (const l of fs.readFileSync(path.join(__dirname, 'public', 'gopelis-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) GP_OCULTAS_SET.add(l.trim());
   } catch {}
   try {
     for (const l of fs.readFileSync(path.join(__dirname, 'public', 'latanime-vistas.txt'), 'utf8').split('\n')) if (l.trim()) LA_VISTAS.add(l.trim());
   } catch {} /* v240: vistas de la sonda de Latanime */
-  console.log('[latanime] ' + LA_TODOS.size + ' series (' + LA_OCULTAS_SET.size + ' cast/dup, ' + LA_MUERTAS_SET.size + ' muertas, ' + LA_VISTAS.size + ' vistas) | [gopelis] ' + GP_OCULTAS_SET.size + ' ocultas');
-} catch {}
-/* v199: inventario de PELÍCULAS que ya tenemos (cine-calidad) — para no
- * duplicar las de GoPelis en el buscador */
-const CV_PELIS_TOKENS = [];
-try {
-  for (const l of fs.readFileSync(path.join(__dirname, 'public', 'cine-pelis-titulos.txt'), 'utf8').split('\n')) {
-    const t = normalizarTxt(l);
-    if (t) CV_PELIS_TOKENS.push(new Set(t.split(' ')));
-  }
-  console.log('[pelis] ' + CV_PELIS_TOKENS.length + ' en el inventario de cine-calidad');
+  console.log('[latanime] ' + LA_TODOS.size + ' series (' + LA_OCULTAS_SET.size + ' cast/dup, ' + LA_MUERTAS_SET.size + ' muertas, ' + LA_VISTAS.size + ' vistas)');
 } catch {}
 /* v178: portadas de IMDB (el usuario las pidió «tal y como los jóvenes
  * titanles»... como Teen Titans) — mapa slug → m.media-amazon generado con
@@ -1996,217 +1952,6 @@ function daniTituloDe(slug) {
   return (v && v.t ? String(v.t).replace(/\xa0/g, ' ') : slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
 }
 function daniCoverDe(slug) { return CARI_PORTADAS.get(DANI_COVER_DE.get(slug) || slug) || DANI_IMDB.get(slug) || '/api/dani/poster/' + slug; } /* v180: portada curada local (IMDb) primero */
-/* ═══════ v198/v199: GOPELIS — series y PELÍCULAS en LATINO, HTTP puro ═══════
- * Series: /series?page=N (3 págs) → ficha /series/<slug> → /ver/tv/<id>?season=N.
- * Pelis: /peliculas?page=N (15 págs, ~508) → ficha /peliculas/<slug> →
- * /ver/movie/<tmdbId>. Player: /api/stream-player trae PAGE_TOKEN;
- * el directUrl de /sources llega VIEJO (403): el sitio mismo re-resuelve
- * cada servidor con RESOLVE_URL?token=…&pt=… y ese es el m3u8 FRESCO. */
-const GP_BASE = 'https://gopelis.com/';
-const gpCatCache = { at: 0, items: [] };
-const gpDatos = new Map(); /* slug → {at, d} 3 h */
-const gpStream = new Map(); /* id-s-e → {at, m3u8} 1 h (m3u8 '' = sin servidores vivos, 10 min) */
-const gpPelisCache = { at: 0, items: [] }; /* catálogo de PELÍCULAS, 6 h */
-async function gpCatalogo() {
-  if (Date.now() - gpCatCache.at < 6 * 3600 * 1000 && gpCatCache.items.length) return gpCatCache.items;
-  const items = [];
-  const limpiar = (t) => t.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim().slice(0, 80);
-  /* 3 páginas: slugs, títulos y pósters de la MISMA página (bloques de ~3.9k chars) */
-  for (let p = 1; p <= 3; p++) {
-    const r = await fetchSeguro(GP_BASE + 'series?page=' + p, 15000).catch(() => null);
-    if (!r || !r.ok) continue;
-    const h = await r.text();
-    for (const m of h.matchAll(/href="\/series\/([a-z0-9-]+)"/g)) {
-      const slug = m[1];
-      let it = items.find((x) => x.slug === slug);
-      if (!it) { it = { slug, titulo: '', img: '' }; items.push(it); }
-      if (!it.titulo) {
-        const t = /<h3[^>]*>([^<]+)<\/h3>/.exec(h.slice(m.index, m.index + 6500));
-        if (t) it.titulo = limpiar(t[1]);
-      }
-      if (!it.img) {
-        const zona = h.slice(Math.max(0, m.index - 1400), m.index);
-        const im = /src="(https:\/\/image\.tmdb\.org[^"]+)"/.exec(zona);
-        if (im) it.img = im[1].replace('/w500/', '/w342/');
-      }
-    }
-  }
-  const buenos = items.filter((x) => x.titulo && !GP_OCULTAS_SET.has(x.slug)); /* v200: sin las muertas */
-  if (buenos.length) { gpCatCache.at = Date.now(); gpCatCache.items = buenos; }
-  return buenos.length ? buenos : gpCatCache.items;
-}
-
-async function datosGopelis(slug) {
-  const c = gpDatos.get(slug);
-  if (c && Date.now() - c.at < 3 * 3600 * 1000) return c.d;
-  const r = await fetchSeguro(GP_BASE + 'series/' + slug, 15000).catch(() => null);
-  if (!r || !r.ok) return null;
-  const h = await r.text();
-  const titulo = ((/<h1[^>]*>([^<]+)<\/h1>/.exec(h) || [])[1] || (/<title>([^<(]+)/.exec(h) || [])[1] || slug).replace(/\s*\(Ver Online Latino\)\s*[-–]?\s*/i, '').trim();
-  const poster = ((/property="og:image"\s+content="([^"]+)"/.exec(h) || /content="([^"]+)"\s+property="og:image"/.exec(h) || [])[1] || '').replace(/[\r\n]/g, '');
-  const rutas = [...new Set([...h.matchAll(/\/ver\/tv\/(\d+)\?season=(\d+)/g)].map((m) => ({ id: m[1], s: +m[2] })))];
-  if (!rutas.length) return null;
-  const idTmdb = rutas[0].id;
-  const episodios = [];
-  for (const { s: S } of rutas.sort((a, b) => a.s - b.s)) {
-    const r2 = await fetchSeguro(GP_BASE + 'ver/tv/' + idTmdb + '?season=' + S, 15000).catch(() => null);
-    if (!r2 || !r2.ok) continue;
-    const h2 = await r2.text();
-    const nes = [...new Set([...h2.matchAll(/Episodio\s*(\d+)/g)].map((x) => +x[1]))];
-    for (const E of nes.sort((a, b) => a - b)) {
-      episodios.push({ temporada: S, ep: E, url: GP_BASE + 'ver/tv/' + idTmdb + '?season=' + S + '&ep=' + E, titulo: 'Episodio ' + E });
-    }
-  }
-  if (!episodios.length) return null;
-  const d = { ok: true, slug, titulo, poster, episodios };
-  gpDatos.set(slug, { at: Date.now(), d });
-  return d;
-}
-async function resolverGopelis(epUrl) {
-  /* v199: series (/ver/tv/<id>?season=S&ep=E) Y películas (/ver/movie/<id>) */
-  const m = /gopelis\.com\/ver\/(?:tv|movie)\/(\d+)(?:\?season=(\d+)&ep=(\d+))?/i.exec(epUrl || '');
-  if (!m) throw new Error('Título de GoPelis no válido');
-  const esTv = /ver\/tv\//i.test(epUrl);
-  const [, id, S, E] = m;
-  const kk = esTv ? id + '-' + S + '-' + E : 'p-' + id;
-  const c = gpStream.get(kk);
-  if (c && c.m3u8 && Date.now() - c.at < 3600 * 1000) return { m3u8: c.m3u8, proxy: true, subs: [] };
-  if (c && !c.m3u8 && Date.now() - c.at < 3 * 60 * 1000) throw new Error('GoPelis: sin servidores vivos ahora — intenta en unos minutos'); /* v199: negativo corto 3 min */
-  const purl = GP_BASE + 'api/stream-player?source=peliapi-player&type=' + (esTv ? 'tv&id=' + id + '&season=' + S + '&episode=' + E : 'movie&id=' + id);
-  const r = await fetchSeguro(purl, 20000).catch(() => null);
-  if (!r || !r.ok) throw new Error('GoPelis no entregó el player');
-  const hp = await r.text();
-  const apiUrl = (/(?:const\s+)?API_URL\s*=\s*"([^"]+)"/.exec(hp) || [])[1];
-  const pt = (/(?:const\s+)?PAGE_TOKEN\s*=\s*"([^"]+)"/.exec(hp) || [])[1];
-  const resUrl = (/(?:const\s+)?RESOLVE_URL\s*=\s*"([^"]+)"/.exec(hp) || [])[1] || 'https://nsrplay.space/api/v1/embed/resolve';
-  if (!apiUrl || !pt) throw new Error('GoPelis: player sin token');
-  const r2 = await fetchSeguro(apiUrl + (apiUrl.includes('?') ? '&' : '?') + 'pt=' + encodeURIComponent(pt), 20000).catch(() => null);
-  if (!r2 || !r2.ok) throw new Error('GoPelis: fuentes no disponibles');
-  const d = await r2.json().catch(() => null);
-  /* v199: el directUrl de /sources suele estar VIEJO (403) — el player del
-   * sitio re-resuelve cada servidor con /resolve?token=… y ESE m3u8 fresco
-   * es el que sirve. Se valida cada candidato (#EXTM3U) y gana el primero vivo. */
-  /* v199.2: cada /resolve ROTA el nodo de la CDN y solo algunos viven — se
-   * re-resuelve el mismo token hasta caer en nodo sano (checado rápido en
-   * directo; el ganador se confirma por /api/hls, el mismo camino del cliente) */
-  let ganador = '';
-  const servidores = (d && d.servers || []).filter((x) => x && x.token).slice(0, 8);
-  for (const sv of servidores) {
-    if (ganador) break;
-    for (let k = 0; k < 3 && !ganador; k++) {
-      const ru = resUrl + '?token=' + encodeURIComponent(sv.token) + '&parentUrl=' + encodeURIComponent(purl) + '&pt=' + encodeURIComponent(pt);
-      const rr = await fetchSeguro(ru, 15000).catch(() => null);
-      let du = '';
-      try { const jj = rr && rr.ok ? await rr.json() : null; du = jj && jj.data && typeof jj.data.directUrl === 'string' ? jj.data.directUrl : ''; } catch {}
-      if (!du) continue;
-      if (!esProxeable(du)) break; /* este token no es de la CDN reproducible: siguiente servidor */
-      try {
-        const hh2 = new URL(du).hostname;
-        if (!hlsUAs.has(hh2)) hlsUAs.set(hh2, FETCH_UA); /* el proxy pide con la MISMA UA que emitió el token */
-        if (!hlsReferers.has(hh2)) hlsReferers.set(hh2, '');
-        hlsALs.set(hh2, 'es-MX,es;q=0.9,en;q=0.8'); /* y el mismo Accept-Language */
-      } catch {}
-      const vd = await fetchSeguro(du, 10000).catch(() => null);
-      const ricco = vd && vd.ok && (await vd.text()).includes('#EXTM3U');
-      console.log('[gp] candidato ' + (new URL(du).host) + ' → ' + (vd ? vd.status : 'err') + (ricco ? ' ✓' : ''));
-      if (!ricco) { await new Promise((r3) => setTimeout(r3, 2500)); continue; } /* vimeos acelera las ráfagas: esperar y rotar */
-      const vp = await fetchSeguro('http://127.0.0.1:' + PORT + '/api/hls?u=' + encodeURIComponent(du), 20000).catch(() => null);
-      if (vp && vp.ok && (await vp.text()).includes('#EXTM3U')) { ganador = du; break; }
-    }
-  }
-  if (!ganador) {
-    gpStream.set(kk, { at: Date.now(), m3u8: '' }); /* negativo corto: el usuario puede reintentar */
-    gpOcultarPorId(id); /* v205.2: podredumbre general — 3 fallos y se oculta sola */
-    throw new Error('GoPelis: ningún servidor vive para este título');
-  }
-  gpStream.set(kk, { at: Date.now(), m3u8: ganador });
-  try { const key = GP_ID_REV.get(id); if (key) gpOcultaQuitar(key); } catch {} /* v202: revivió */
-  gpPerdonarPorId(id); /* v205.2 */
-  return { m3u8: ganador, proxy: true, subs: [] };
-}
-
-/* v202: Lázarus de GoPelis — los nodos aletean: si una oculta vuelve a
- * resolver, reviva. Mapa id-tmdb → clave oculta (fichas en 2º plano). */
-const GP_ID_REV = new Map();
-try {
-    const jg = JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'gp-ids.json'), 'utf8')) || [];
-    const pares = Array.isArray(jg) ? jg : Object.entries(jg); /* v202.1: tolerante a objeto y a pares */
-    for (const [k2, v2] of pares) GP_ID_REV.set(k2, v2);
-  } catch {}
-let gpRtTimer = null;
-function gpOcultaQuitar(key) {
-  if (!key || !GP_OCULTAS_SET.has(key)) return;
-  GP_OCULTAS_SET.delete(key);
-  clearTimeout(gpRtTimer);
-  gpRtTimer = setTimeout(() => { try { fs.writeFileSync(path.join(__dirname, 'public', 'gopelis-ocultas.txt'), [...GP_OCULTAS_SET].sort().join('\n') + '\n'); } catch {} }, 3000);
-  console.log('[lázaro] gp: ' + key + ' volvió a la vida — fuera de ocultas');
-}
-async function gpMapaIds() {
-  let nuevos = 0;
-  for (const key of [...GP_OCULTAS_SET]) {
-    if (GP_ID_REV.has(key)) continue;
-    const esPeli = key.startsWith('p:');
-    const slug = esPeli ? key.slice(2) : key;
-    try {
-      const r = await fetchSeguro(GP_BASE + (esPeli ? 'peliculas/' : 'series/') + slug, 15000);
-      if (r && r.ok) {
-        const h = await r.text();
-        const m = esPeli ? /ver\/movie\/(\d+)/.exec(h) : /ver\/tv\/(\d+)/.exec(h);
-        if (m) { GP_ID_REV.set(m[1], key); nuevos++; }
-      }
-    } catch {}
-    await new Promise((r2) => setTimeout(r2, 2500));
-  }
-  try { fs.writeFileSync(path.join(DATA_DIR, 'gp-ids.json'), JSON.stringify([...GP_ID_REV])); } catch {}
-  console.log('[lázaro] gp: mapa de ids listo (' + GP_ID_REV.size + ' entradas, +' + nuevos + ')');
-}
-setTimeout(() => { gpMapaIds().catch(() => {}); }, 90 * 1000); /* tras arrancar, sin estorbar */
-
-/* v199: catálogo de PELÍCULAS de GoPelis (~508, 15 páginas) */
-async function gpCatalogoPelis() {
-  if (Date.now() - gpPelisCache.at < 6 * 3600 * 1000 && gpPelisCache.items.length) return gpPelisCache.items;
-  const items = [];
-  const limpiar = (t) => t.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim().slice(0, 90);
-  for (let p = 1; p <= 16; p++) {
-    const r = await fetchSeguro(GP_BASE + 'peliculas?page=' + p, 15000).catch(() => null);
-    if (!r || !r.ok) continue;
-    const h = await r.text();
-    let nuevos = 0;
-    for (const m of h.matchAll(/href="\/peliculas\/([a-z0-9-]+)"/g)) {
-      if (items.some((x) => x.slug === m[1])) continue;
-      nuevos++;
-      const t = /<h3[^>]*>([^<]+)<\/h3>/.exec(h.slice(m.index, m.index + 6500));
-      const zona = h.slice(Math.max(0, m.index - 1400), m.index);
-      const im = /src="(https:\/\/image\.tmdb\.org[^"]+)"/.exec(zona);
-      if (t) items.push({ slug: m[1], titulo: limpiar(t[1]), img: im ? im[1].replace('/w500/', '/w342/') : '' });
-    }
-    if (!nuevos) break; /* página sin contenido nuevo: fin del listado */
-  }
-  const visibles = items.filter((x) => !GP_OCULTAS_SET.has('p:' + x.slug)); /* v200: sin las muertas */
-  if (visibles.length) { gpPelisCache.at = Date.now(); gpPelisCache.items = visibles; }
-  return visibles;
-}
-
-/* v199: ficha de PELÍCULA → {ok, esPeli, titulo, poster, url(/ver/movie/<id>)} */
-async function datosGopelisPeli(slug) {
-  const c = gpDatos.get('p:' + slug);
-  if (c && Date.now() - c.at < 3 * 3600 * 1000) return c.d;
-  const r = await fetchSeguro(GP_BASE + 'peliculas/' + slug, 15000).catch(() => null);
-  if (!r || !r.ok) throw new Error('GoPelis: ficha no disponible');
-  const h = await r.text();
-  const t = /<h1[^>]*>([^<]+)<\/h1>/.exec(h);
-  const og = /property="og:image" content="([^"]+)"/.exec(h);
-  const vm = /href="(\/ver\/movie\/\d+)"/.exec(h);
-  if (!t || !vm) throw new Error('GoPelis: ficha incompleta');
-  const dres = {
-    ok: true, esPeli: true,
-    titulo: t[1].replace(/\s*\(Ver Online Latino\)\s*/i, '').replace(/\s+/g, ' ').trim().slice(0, 90),
-    poster: og ? og[1] : '',
-    url: GP_BASE + vm[1].replace(/^\//, ''),
-  };
-  gpDatos.set('p:' + slug, { at: Date.now(), d: dres });
-  return dres;
-}
 
 /* v193: portada por TÍTULO desde la API de sugerencias de IMDb (para
  * tarjetas de búsqueda que llegaron sin imagen: pelisxd, cine-calidad…) */
@@ -2447,7 +2192,6 @@ async function resolverNativoInterno(url) {
   if (/danimados\.cc\/episodios\//i.test(url)) return resolverDani(url); /* v172 */
   if (/youtube\.com\/(watch|shorts)|youtu\.be\//i.test(url)) return resolverYoutube(url); /* v164 */
   if (/lacartoons\.com\/serie\/capitulo\//i.test(url)) return resolverLacartoons(url); /* v116: sin esto, los capítulos de lacartoons en SALA caían al espejo de navegador (abría la página web en vez de reproducir nativo) */
-  if (/gopelis\.com\/ver\//i.test(url)) return resolverGopelis(url); /* v198/v199: series y películas de GoPelis nativas en sala */
   return resolverSolo(url);
 }
 
@@ -4662,7 +4406,7 @@ function serveStatic(req, res, urlPath) {
 const SITES_FILE = path.join(__dirname, 'data', 'sites.json');
 const LOGO_DIR = path.join(__dirname, 'public', 'sites-logos');
 const SITES_SEED = [
-  /* v65: Latanime primero (predeterminado) — v68: fuera GoPelis y AnimeFLV
+  /* v65: Latanime primero (predeterminado) — v68: fuera AnimeFLV
    * v70: fuera AnimeD23 también (queda Latanime, Cuevana y YouTube) */
   { name: 'Latanime', desc: 'Animes con audio latino', url: 'https://latanime.org/', logo: '/sites/latanime.png' },
   { name: 'Cuevana', desc: 'Películas y series', url: 'https://cuevana.mov/', logo: '/sites/cuevana.png' },
@@ -4677,11 +4421,11 @@ function loadSitesFile() {
         /* v46: Cuevana movió su portada de /inicio a la raíz */
         if (/^https?:\/\/(www\.)?cuevana\.[a-z.]+\/inicio\/?$/i.test(s.url || '')) { s.url = s.url.replace(/\/inicio\/?$/i, '/'); cambio = true; }
       }
-      /* v68/v70: fuera GoPelis y AnimeD23 — v97: AnimeFLV REGRESA
+      /* v68/v70: fuera AnimeD23 — v97: AnimeFLV REGRESA
        * (trae mp4upload entre sus servidores y sirve de respaldo) */
       const antes = l.length;
-      l = l.filter((s) => !/gopelis\.|animed23\./i.test(s.url || ''));
-      if (l.length !== antes) { cambio = true; console.log('[sitios] - GoPelis y AnimeD23'); }
+      l = l.filter((s) => !/animed23\./i.test(s.url || ''));
+      if (l.length !== antes) { cambio = true; console.log('[sitios] - AnimeD23'); }
       /* v65: logos propios para Latanime y AnimeFLV (los favicons de Google
        * a veces no cargan → salía el recuadro azul con ?) y Latanime
        * predeterminado: primero en la lista */
@@ -4832,7 +4576,7 @@ async function agregarSitio(urlRaw) {
 
 /* ---------------------- servidor ---------------------- */
 
-/* v45: búsqueda en las páginas del directorio — v46: Cuevana y GoPelis por sus
+/* v45: búsqueda en las páginas del directorio — v46: Cuevana por su
  * APIs internas (con póster); resultados listos para crear la sala */
 async function buscarCuevana(q) {
   const r = await fetchSeguro(`https://cine-calidad.mx/wp-json/mycustom/v1/search/?s=${encodeURIComponent(q)}&page=1`, 9000);
@@ -5008,7 +4752,7 @@ async function resolverCuevanaMov(pageUrl) {
   throw new Error('Cuevana: ningún host resolvió m3u8 para ' + slug);
 }
 
-/* v70: fuera las búsquedas de GoPelis y AnimeFLV (código retirado) */
+/* v70: fuera las búsquedas de AnimeFLV (código retirado) */
 const metaCache = new Map();
 const serieCache = new Map();
 async function metaDePelicula(url) {
@@ -5081,15 +4825,6 @@ async function metaDePelicula(url) {
           /* v62→v67: AnimeFLV bloquea imágenes directas → proxy propio */
           const poster = /animeflv\./i.test(pst) ? '/api/img?u=' + encodeURIComponent(pst) : pst;
           if (t) d = { title: slugM[2] ? `${t} — Episodio ${slugM[2]}` : t, poster };
-        }
-      } catch {}
-    } else if (/gopelis\./.test(dom)) {
-      try {
-        const r = await fetchSeguro(`https://gopelis.com/api/search?q=${encodeURIComponent(slug.replace(/-/g, ' '))}`, 8000);
-        if (r.ok) {
-          const dd = await r.json().catch(() => ({}));
-          const p = (dd.results || []).find((x) => x.slug === slug) || (dd.results || [])[0];
-          if (p) d = { title: p.title, poster: p.posterPath ? `https://image.tmdb.org/t/p/w342${p.posterPath}` : '' };
         }
       } catch {}
     } else if (/pelisxd\./.test(dom)) {
@@ -7441,89 +7176,84 @@ async function cariProbe(slug) {
   } catch { return false; }
 }
 
-/* v241: SONDA CARICATURAS — muestras chicas y despacio (429 en rafaga) */
+/* v242: 3 SONDAS SEPARADAS — una por fuente (despacio por rate-limit 429) */
+async function sondaDanimados() {
+  const t0 = Date.now(), PAUSA = 2000;
+  let vm = 0, mv = 0;
+  const pausa = () => new Promise((r) => setTimeout(r, PAUSA));
+  const sh = (arr) => { const a = [...arr]; for (let k = a.length - 1; k > 0; k--) { const z = Math.floor(Math.random() * (k + 1)); [a[k], a[z]] = [a[z], a[k]]; } return a; };
+  for (const slug of sh([...DANI_CAT.keys()].filter((x) => !DANI_OCULTAS.has(x) && !DANI_MUERTAS.has(x))).slice(0, 5)) {
+    try {
+      CARI_VISTAS.add('dani:' + slug);
+      if (await daniProbe(slug)) daniPerdonar(slug);
+      else { const era = DANI_MUERTAS.has(slug); daniOcultar(slug); if (!era && DANI_MUERTAS.has(slug)) { vm++; sondaNotify('Danimados', 'muerto', slug, slug + ' murio — sin episodios'); } }
+    } catch {}
+    await pausa();
+  }
+  for (const slug of sh([...DANI_MUERTAS]).slice(0, 3)) {
+    try {
+      if (await daniProbe(slug)) { DANI_MUERTAS.delete(slug); ocultasReescribir(DANI_MUERTAS, 'dani-muertas.txt'); daniPerdonar(slug); mv++; sondaNotify('Danimados', 'revivio', slug, slug + ' revivio — episodios encontrados'); }
+    } catch {}
+    await pausa();
+  }
+  const el = ((Date.now() - t0) / 1000).toFixed(1);
+  console.log('[sonda] dani (' + el + 's): ' + ((vm || mv) ? ('vivas→muertas=' + vm + ' muertas→vivas=' + mv) : 'sin cambios'));
+  try { fs.appendFileSync(path.join(__dirname, 'sonda-danimados.log'), '[' + new Date().toISOString() + '] ' + el + 's vivas→muertas=' + vm + ' muertas→vivas=' + mv + ' muertas=' + DANI_MUERTAS.size + '\n'); } catch {}
+}
+async function sondaLacartoons() {
+  const t0 = Date.now(), PAUSA = 2000;
+  let vm = 0, mv = 0;
+  const pausa = () => new Promise((r) => setTimeout(r, PAUSA));
+  const sh = (arr) => { const a = [...arr]; for (let k = a.length - 1; k > 0; k--) { const z = Math.floor(Math.random() * (k + 1)); [a[k], a[z]] = [a[z], a[k]]; } return a; };
+  for (const x of sh([...LCT_SERIES.values()].filter((v) => !LCT_MUERTAS.has(v.slug))).slice(0, 5)) {
+    try {
+      CARI_VISTAS.add('lct:' + x.lctId);
+      if (await lctProbe(x.lctId)) lctPerdonar(x.slug);
+      else { const era = LCT_MUERTAS.has(x.slug); lctOcultar(x.slug); if (!era && LCT_MUERTAS.has(x.slug)) { vm++; sondaNotify('Lacartoons', 'muerto', x.slug, x.slug + ' murio — sin capitulos'); } }
+    } catch {}
+    await pausa();
+  }
+  for (const slug of sh([...LCT_MUERTAS]).slice(0, 3)) {
+    try {
+      const lct = [...LCT_SERIES.values()].find((v) => v.slug === slug);
+      if (lct && await lctProbe(lct.lctId)) { LCT_MUERTAS.delete(slug); ocultasReescribir(LCT_MUERTAS, 'lct-muertas.txt'); lctPerdonar(slug); mv++; sondaNotify('Lacartoons', 'revivio', slug, slug + ' revivio — capitulos encontrados'); }
+    } catch {}
+    await pausa();
+  }
+  const el = ((Date.now() - t0) / 1000).toFixed(1);
+  console.log('[sonda] lct (' + el + 's): ' + ((vm || mv) ? ('vivas→muertas=' + vm + ' muertas→vivas=' + mv) : 'sin cambios'));
+  try { fs.appendFileSync(path.join(__dirname, 'sonda-lacartoons.log'), '[' + new Date().toISOString() + '] ' + el + 's vivas→muertas=' + vm + ' muertas→vivas=' + mv + ' muertas=' + LCT_MUERTAS.size + '\n'); } catch {}
+}
+async function sondaMisc() {
+  const t0 = Date.now(), PAUSA = 2000;
+  let vm = 0, mv = 0;
+  const pausa = () => new Promise((r) => setTimeout(r, PAUSA));
+  const sh = (arr) => { const a = [...arr]; for (let k = a.length - 1; k > 0; k--) { const z = Math.floor(Math.random() * (k + 1)); [a[k], a[z]] = [a[z], a[k]]; } return a; };
+  for (const slug of sh(CARI_ORDEN.filter((x) => !CARI_MUERTAS.has(x))).slice(0, 5)) {
+    try {
+      CARI_VISTAS.add('cari:' + slug);
+      if (await cariProbe(slug)) cariPerdonar(slug);
+      else { const era = CARI_MUERTAS.has(slug); cariOcultar(slug); if (!era && CARI_MUERTAS.has(slug)) { vm++; sondaNotify('MisCaricaturas', 'muerto', slug, slug + ' murio — sin capitulos'); } }
+    } catch {}
+    await pausa();
+  }
+  for (const slug of sh([...CARI_MUERTAS]).slice(0, 3)) {
+    try {
+      if (await cariProbe(slug)) { CARI_MUERTAS.delete(slug); ocultasReescribir(CARI_MUERTAS, 'cari-muertas.txt'); cariPerdonar(slug); mv++; sondaNotify('MisCaricaturas', 'revivio', slug, slug + ' revivio — capitulos encontrados'); }
+    } catch {}
+    await pausa();
+  }
+  const el = ((Date.now() - t0) / 1000).toFixed(1);
+  console.log('[sonda] misc (' + el + 's): ' + ((vm || mv) ? ('vivas→muertas=' + vm + ' muertas→vivas=' + mv) : 'sin cambios'));
+  try { fs.appendFileSync(path.join(__dirname, 'sonda-miscaricaturas.log'), '[' + new Date().toISOString() + '] ' + el + 's vivas→muertas=' + vm + ' muertas→vivas=' + mv + ' muertas=' + CARI_MUERTAS.size + '\n'); } catch {}
+}
 async function sondaCaricaturas() {
-  try {
-    const memMB = process.memoryUsage().heapUsed / 1024 / 1024;
-    if (memMB > 350) { console.warn('[sonda] cari saltado — memoria alta: ' + memMB.toFixed(0) + 'MB'); return; }
-    const start = Date.now();
-    const POR_FUENTE = 5, POR_MUERTAS = 5, PAUSA = 2000;
-    let vivas_muertas = 0, muertas_vivas = 0;
-    const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-    const pausa = () => new Promise(r => setTimeout(r, PAUSA));
-    /* DANI vivas */
-    try {
-      const vis = [...DANI_CAT.keys()].filter(x => !DANI_OCULTAS.has(x) && !DANI_MUERTAS.has(x));
-      for (const slug of shuffle(vis).slice(0, POR_FUENTE)) {
-        try {
-          CARI_VISTAS.add('dani:' + slug);
-          if (await daniProbe(slug)) daniPerdonar(slug);
-          else {
-            const era = DANI_MUERTAS.has(slug);
-            daniOcultar(slug);
-            if (!era && DANI_MUERTAS.has(slug)) { vivas_muertas++; sondaNotify("Danimados", "muerto", slug, slug + " murio — sin episodios"); }
-          }
-        } catch {}
-        await pausa();
-      }
-    } catch (e) { console.warn('[sonda] cari dani error: ' + String(e).slice(0, 60)); }
-    /* LCT vivas */
-    try {
-      const vis = [...LCT_SERIES.values()].filter(x => !LCT_MUERTAS.has(x.slug));
-      for (const x of shuffle(vis).slice(0, POR_FUENTE)) {
-        try {
-          CARI_VISTAS.add('lct:' + x.lctId);
-          if (await lctProbe(x.lctId)) lctPerdonar(x.slug);
-          else {
-            const era = LCT_MUERTAS.has(x.slug);
-            lctOcultar(x.slug);
-            if (!era && LCT_MUERTAS.has(x.slug)) { vivas_muertas++; sondaNotify("Lacartoons", "muerto", x.slug, x.slug + " murio — sin capitulos"); }
-          }
-        } catch {}
-        await pausa();
-      }
-    } catch (e) { console.warn('[sonda] cari lct error: ' + String(e).slice(0, 60)); }
-    /* CARI vivas */
-    try {
-      for (const slug of shuffle(CARI_ORDEN.filter(x => !CARI_MUERTAS.has(x))).slice(0, POR_FUENTE)) {
-        try {
-          CARI_VISTAS.add('cari:' + slug);
-          if (await cariProbe(slug)) cariPerdonar(slug);
-          else {
-            const era = CARI_MUERTAS.has(slug);
-            cariOcultar(slug);
-            if (!era && CARI_MUERTAS.has(slug)) { vivas_muertas++; sondaNotify("MisCaricaturas", "muerto", slug, slug + " murio — sin capitulos"); }
-          }
-        } catch {}
-        await pausa();
-      }
-    } catch (e) { console.warn('[sonda] cari misc error: ' + String(e).slice(0, 60)); }
-    /* MUERTAS: revivieron? */
-    try {
-      const pool = [...DANI_MUERTAS].map(x => ({ f: 'dani', k: x })).concat([...LCT_MUERTAS].map(x => ({ f: 'lct', k: x }))).concat([...CARI_MUERTAS].map(x => ({ f: 'cari', k: x })));
-      for (const it of shuffle(pool).slice(0, POR_MUERTAS)) {
-        try {
-          let vive = false;
-          if (it.f === 'dani') vive = await daniProbe(it.k);
-          else if (it.f === 'cari') vive = await cariProbe(it.k);
-          else { const lct = [...LCT_SERIES.values()].find(x => x.slug === it.k); vive = lct ? await lctProbe(lct.lctId) : false; }
-          if (vive) {
-            if (it.f === 'dani') { DANI_MUERTAS.delete(it.k); ocultasReescribir(DANI_MUERTAS, 'dani-muertas.txt'); daniPerdonar(it.k); }
-            if (it.f === 'lct') { LCT_MUERTAS.delete(it.k); ocultasReescribir(LCT_MUERTAS, 'lct-muertas.txt'); lctPerdonar(it.k); }
-            if (it.f === 'cari') { CARI_MUERTAS.delete(it.k); ocultasReescribir(CARI_MUERTAS, 'cari-muertas.txt'); cariPerdonar(it.k); }
-            muertas_vivas++;
-            sondaNotify(it.f === 'dani' ? "Danimados" : it.f === 'lct' ? "Lacartoons" : "MisCaricaturas", "revivio", it.k, it.k + " revivio — episodios encontrados");
-          }
-        } catch {}
-        await pausa();
-      }
-    } catch (e) { console.warn('[sonda] cari muertas error: ' + String(e).slice(0, 60)); }
-    try { fs.writeFileSync(path.join(__dirname, 'public', 'cari-vistas.txt'), [...CARI_VISTAS].join('\n') + '\n'); } catch {}
-    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
-    const logLine = `[${new Date().toISOString()}] ${elapsed}s vivas→muertas=${vivas_muertas} muertas→vivas=${muertas_vivas} muertas=${DANI_MUERTAS.size + LCT_MUERTAS.size + CARI_MUERTAS.size} vistas=${CARI_VISTAS.size}\n`;
-    console.log('[sonda] cari (' + elapsed + 's): ' + ((vivas_muertas || muertas_vivas) ? ('vivas→muertas=' + vivas_muertas + ' muertas→vivas=' + muertas_vivas) : 'sin cambios'));
-    try { fs.appendFileSync(path.join(__dirname, 'sonda-caricaturas.log'), logLine); } catch {}
-  } catch (e) { console.warn('[sonda] cari error: ' + String(e).slice(0, 60)); }
+  const memMB = process.memoryUsage().heapUsed / 1024 / 1024;
+  if (memMB > 350) { console.warn('[sonda] caricaturas saltado — memoria alta: ' + memMB.toFixed(0) + 'MB'); return; }
+  try { await sondaDanimados(); } catch (e) { console.warn('[sonda] dani error: ' + String(e).slice(0, 60)); }
+  try { await sondaLacartoons(); } catch (e) { console.warn('[sonda] lct error: ' + String(e).slice(0, 60)); }
+  try { await sondaMisc(); } catch (e) { console.warn('[sonda] misc error: ' + String(e).slice(0, 60)); }
+  try { fs.writeFileSync(path.join(__dirname, 'public', 'cari-vistas.txt'), [...CARI_VISTAS].join('\n') + '\n'); } catch {}
 }
 
 async function buscarEnSitios(q) {
@@ -9666,7 +9396,7 @@ async function proxearHls(req, res, target) {
   let ref = 'https://goodstream.one/';
   let hostUp = '';
   try { hostUp = new URL(target).hostname; } catch {}
-  try { ref = hlsReferers.has(hostUp) ? hlsReferers.get(hostUp) : ref; } catch {} /* v199: '' guardado = SIN referer (vimeos de GoPelis) */
+  try { ref = hlsReferers.has(hostUp) ? hlsReferers.get(hostUp) : ref; } catch {} /* v199: '' guardado = SIN referer (vimeos) */
   /* v235: auto-detectar Referer correcto según el CDN host */
   if (ref === 'https://goodstream.one/' && hostUp) {
     if (/vimeos\.(net|zip)/i.test(hostUp)) ref = 'https://vimeos.net/';
@@ -10380,20 +10110,6 @@ async function cuevanaLatest() {
         if (/^index5\.m3u8$/i.test(archivo)) return movieServirM3u8(req, res, clave, epId);
         return movieServirTs(req, res, clave, epId, decodeURIComponent(archivo));
       }
-      if (url.pathname.startsWith('/api/gopelispeli/')) { /* v199: ficha de PELÍCULA de GoPelis */
-      const slug = decodeURIComponent(url.pathname.split('/')[3] || '').toLowerCase();
-      if (!/^[a-z0-9-]{2,90}$/.test(slug)) return json(res, 400, { ok: false, error: 'Película inválida' });
-      const d = await datosGopelisPeli(slug).catch(() => null);
-      if (!d) return json(res, 502, { ok: false, error: 'No pude leer esa película de GoPelis — intenta luego' });
-      return json(res, 200, d);
-    }
-    if (url.pathname.startsWith('/api/gopelis/')) { /* v198: ficha y episodios de GoPelis (latino) */
-      const slug = decodeURIComponent(url.pathname.split('/')[3] || '').toLowerCase();
-      if (!/^[a-z0-9-]{2,90}$/.test(slug)) return json(res, 400, { ok: false, error: 'Serie inválida' });
-      const d = await datosGopelis(slug).catch(() => null);
-      if (!d) return json(res, 502, { ok: false, error: 'No pude leer esa serie de GoPelis — intenta luego' });
-      return json(res, 200, d);
-    }
     if (url.pathname.startsWith('/api/dani/poster/')) { /* v177: póster perezoso og:image */
       const slug = decodeURIComponent(url.pathname.split('/')[4] || '');
       /* v193: hay series con slug unicode (ranma-½, 女生宿舍日常…) — los mapas
@@ -10641,42 +10357,8 @@ async function cuevanaLatest() {
         }
         return true;
       });
-      /* v198: GOPELIS casca en la búsqueda (solo lo que cine-calidad NO tiene) */
-      try {
-        const catGp = await gpCatalogo();
-        const qG = normalizarTxt(q);
-        const gpHits = catGp.filter((g) => {
-          const tn = normalizarTxt(g.titulo);
-          if (!tn.includes(qG) && !qG.split(' ').every((w) => w.length > 1 && tn.includes(w))) {
-            const inter = tn.split(' ').filter((w) => w.length > 1 && qG.includes(w)).length;
-            if (inter < Math.min(2, tn.split(' ').length)) return false;
-          }
-          return !r.resultados.some((x) => {
-            if (!/cine-calidad\.mx\/serie\//.test(x.url || '')) return false;
-            const xn = normalizarTxt(x.title || '');
-            const gn = tn;
-            return xn && gn && (xn === gn || (xn.split(' ').filter((w) => gn.includes(w)).length >= Math.min(2, gn.split(' ').length)));
-          });
-        }).slice(0, 6);
-        for (const g of gpHits.reverse()) r.resultados.unshift({ title: g.titulo, url: GP_BASE + 'series/' + g.slug, img: g.img || '', site: 'GoPelis', extra: 'Latino' });
-        /* v199: PELÍCULAS de GoPelis que NO tenemos (inventario cine-calidad) */
-        const catGp2 = await gpCatalogoPelis();
-        const gpP2 = catGp2.filter((g) => {
-          const tn = normalizarTxt(g.titulo);
-          if (!tn) return false;
-          if (tn.includes(qG) || qG.split(' ').every((w) => w.length > 1 && tn.includes(w))) return true;
-          const inter = tn.split(' ').filter((w) => w.length > 1 && qG.includes(w)).length;
-          if (inter < Math.min(2, tn.split(' ').length)) return false;
-          return true;
-        }).filter((g) => {
-          const ws = normalizarTxt(g.titulo).split(' ');
-          const ya = CV_PELIS_TOKENS.some((ct) => { const n = ws.filter((w) => ct.has(w)).length; return n >= Math.min(2, ws.length); }); /* v199.1: TODOS los tokens — «rio 2» no puede ignorar el «2» */
-          return !ya; /* la tenemos en cine-calidad: fuera */
-        }).filter((g) => !r.resultados.some((x) => normalizarTxt(x.title || '') === normalizarTxt(g.titulo))).slice(0, 3);
-        for (const g of gpP2.reverse()) r.resultados.unshift({ title: g.titulo, url: GP_BASE + 'peliculas/' + g.slug, img: g.img || '', site: 'GoPelis', extra: 'Película · Latino' });
-      } catch {}
       /* v207: MOVIE (app) — las novelas latinas del mapa local cascan primero
-       * en la búsqueda (mismo criterio de parecido que GoPelis, por título) */
+       * en la búsqueda (por parecido de título) */
       try {
         const qM = normalizarTxt(q);
         if (qM.length > 1) {
@@ -10889,12 +10571,11 @@ async function cuevanaLatest() {
         const esCari = /miscaricaturas\.com\//i.test(target); /* v102: caricaturas */
         const esLct = /lacartoons\.com\/serie\/capitulo\//i.test(target); /* v112: lacartoons */
         const esDani = /danimados\.cc\/episodios\//i.test(target); /* v179: danimados en Solo — sin esto TODO el catálogo nuevo caía al resolutor viejo de Cuevana: «Este título no tiene servidor goodstream» */
-        const esGp = /gopelis\.com\/ver\/(?:tv|movie)\//i.test(target); /* v198 series + v199 películas de GoPelis (latino) */
         const esNv = /novelas360\.com\/video\//i.test(target); /* v206 novelas */
         const esEnp = /enpantallatv\.com\/[a-z0-9-]*capitulo/i.test(target); /* v206.2 */
         const esMovie = new RegExp(MOVIE_HOST_VIRTUAL.replace(/\./g, '\\.') + '\\/ver\\/', 'i').test(target); /* v207: Movie (mapa local) */
         let r;
-        try { r = await (esMovie ? resolverMovie(target) : esEpAnime ? resolverAnime(target) : esCuevanaMov ? resolverCuevanaMov(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esGp ? resolverGopelis(target) : esNv ? resolverNovela(target) : esEnp ? resolverEnp(target) : resolverSolo(target)); epsPerdonar(target); } /* v205.5 + v206 + v206.2 + v207 + v235 cuevana.mov */
+        try { r = await (esMovie ? resolverMovie(target) : esEpAnime ? resolverAnime(target) : esCuevanaMov ? resolverCuevanaMov(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esNv ? resolverNovela(target) : esEnp ? resolverEnp(target) : resolverSolo(target)); epsPerdonar(target); } /* v205.5 + v206 + v206.2 + v207 + v235 cuevana.mov */
         catch (e2r) { epsFallo(target); throw e2r; } /* v205.5: episodios muertos al contador */
         return json(res, 200, { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy });
       } catch (e) {
@@ -11098,7 +10779,7 @@ async function cuevanaLatest() {
         });
       return json(res, 200, { ok: true, rooms: list, srvVersion: UI_VERSION });
     }
-    if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION, introCrawl: { pend: CRAWL.pend.length, hechas: CRAWL.hechas || 0, total: CRAWL.total || 0 }, laMuertas: LA_MUERTAS_SET.size, gpOcultas: GP_OCULTAS_SET.size, pxdOcultas: PXD_OCULTAS.size, afOcultas: AF_OCULTAS.size, ccOcultas: CC_OCULTAS.size, ccTotal: ccIdx.slugs.length }); /* v122+190+v205.2+v238 */
+    if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION, introCrawl: { pend: CRAWL.pend.length, hechas: CRAWL.hechas || 0, total: CRAWL.total || 0 }, laMuertas: LA_MUERTAS_SET.size, pxdOcultas: PXD_OCULTAS.size, afOcultas: AF_OCULTAS.size, ccOcultas: CC_OCULTAS.size, ccTotal: ccIdx.slugs.length }); /* v122+190+v205.2+v238 */
     if (url.pathname === '/api/set-relay') { /* v236: actualizar CDN relay URL del Mac Mini */
       const newUrl = (url.searchParams.get('url') || '').trim().replace(/\/+$/, '');
       if (!newUrl) return json(res, 400, { ok: false, error: 'Falta ?url=' });
@@ -11148,12 +10829,26 @@ async function cuevanaLatest() {
             vistas: LA_VISTAS.size,
             activas: LA_TODOS.size - LA_OCULTAS_SET.size - LA_MUERTAS_SET.size,
           },
-          caricaturas: {
-            nombre: 'Caricaturas',
-            total: DANI_CAT.size + LCT_SERIES.size + CARI_ORDEN.length,
-            ocultas: DANI_OCULTAS.size + LCT_OCULTAS.size + DANI_MUERTAS.size + LCT_MUERTAS.size + CARI_MUERTAS.size,
-            vistas: CARI_VISTAS.size,
-            activas: DANI_CAT.size + LCT_SERIES.size + CARI_ORDEN.length - DANI_OCULTAS.size - LCT_OCULTAS.size - DANI_MUERTAS.size - LCT_MUERTAS.size - CARI_MUERTAS.size,
+          danimados: {
+            nombre: 'Danimados',
+            total: DANI_CAT.size,
+            ocultas: DANI_OCULTAS.size + DANI_MUERTAS.size,
+            vistas: [...CARI_VISTAS].filter((x) => x.startsWith('dani:')).length,
+            activas: DANI_CAT.size - DANI_OCULTAS.size - DANI_MUERTAS.size,
+          },
+          lacartoons: {
+            nombre: 'Lacartoons',
+            total: LCT_SERIES.size,
+            ocultas: LCT_OCULTAS.size + LCT_MUERTAS.size,
+            vistas: [...CARI_VISTAS].filter((x) => x.startsWith('lct:')).length,
+            activas: LCT_SERIES.size - LCT_OCULTAS.size - LCT_MUERTAS.size,
+          },
+          miscaricaturas: {
+            nombre: 'MisCaricaturas',
+            total: CARI_ORDEN.length,
+            ocultas: CARI_MUERTAS.size,
+            vistas: [...CARI_VISTAS].filter((x) => x.startsWith('cari:')).length,
+            activas: CARI_ORDEN.length - CARI_MUERTAS.size,
           },
         },
         usuarios: users.size,
@@ -11265,7 +10960,7 @@ async function cuevanaLatest() {
         espejos: MOVIE_ESPEJOS,
         espejoPreferido: movieEspejoPreferido() || null,
         intros: { analizados: CRAWL.hechas || 0, total: CRAWL.total || 0, enCola: CRAWL.pend.length, aprendidas: Object.keys(INTROS).length, sinIntro: (CRAWL.sinIntro || []).length, muestra },
-        moderacion: { animesMuertos: LA_MUERTAS_SET.size, animesCastDup: LA_OCULTAS_SET.size, gopelis: GP_OCULTAS_SET.size, pelisxd: PXD_OCULTAS.size, animeflv: AF_OCULTAS.size, cuevana: CV_OCULTAS_RT.size, novelas: NV_OCULTAS.size, caricaturasMuertas: DANI_MUERTAS.size + LCT_MUERTAS.size + CARI_MUERTAS.size, protegidas: CV_PROTEGIDAS.size, epsOcultos: EPS_MUERTOS.size, fallosEnCurso: [FALLOS_GP, FALLOS_PXD, FALLOS_AF, FALLOS_CV, FALLOS_NV, FALLOS_DANI, FALLOS_LCT, FALLOS_CARI, EPS_FALLOS].reduce((a2, mm2) => a2 + [...mm2.values()].filter((x2) => x2.f >= 1 && !x2.h).length, 0) },
+        moderacion: { animesMuertos: LA_MUERTAS_SET.size, animesCastDup: LA_OCULTAS_SET.size, pelisxd: PXD_OCULTAS.size, animeflv: AF_OCULTAS.size, cuevana: CV_OCULTAS_RT.size, novelas: NV_OCULTAS.size, caricaturasMuertas: DANI_MUERTAS.size + LCT_MUERTAS.size + CARI_MUERTAS.size, protegidas: CV_PROTEGIDAS.size, epsOcultos: EPS_MUERTOS.size, fallosEnCurso: [FALLOS_PXD, FALLOS_AF, FALLOS_CV, FALLOS_NV, FALLOS_DANI, FALLOS_LCT, FALLOS_CARI, EPS_FALLOS].reduce((a2, mm2) => a2 + [...mm2.values()].filter((x2) => x2.f >= 1 && !x2.h).length, 0) },
         catalogos: { caricaturas: cariFeedCache.items.length, cartoons: cariFeedCache.toons.length, liveaction: cariFeedCache.live.length, danimados: DANI_CAT.size, animes: LA_TODOS.size - LA_OCULTAS_SET.size - LA_MUERTAS_SET.size, novelas: nvdCache.items.length },
         cosecha,
         movie: (() => { /* v207: estado del mapa local del app Movie */
@@ -11609,7 +11304,7 @@ function panelHtml() {
     const mo = d.moderacion;
     document.getElementById('modChips').innerHTML =
       chip('bad', 'Animes muertos', mo.animesMuertos) + chip('warn', 'Animes cast/dup', mo.animesCastDup) +
-      chip('bad', 'GoPelis', mo.gopelis) + chip('bad', 'PelisXD', mo.pelisxd) + chip('bad', 'AnimeFLV', mo.animeflv) +
+      chip('bad', 'PelisXD', mo.pelisxd) + chip('bad', 'AnimeFLV', mo.animeflv) +
       chip('bad', 'Cuevana', mo.cuevana) + chip('ok', 'Protegidas', mo.protegidas) + chip('bad', 'Episodios', mo.epsOcultos) + chip('warn', 'Fallos en curso', mo.fallosEnCurso);
     const ca = d.catalogos;
     document.getElementById('catChips').innerHTML =
