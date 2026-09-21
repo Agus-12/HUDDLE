@@ -528,6 +528,14 @@ function montarNativo(porProxy) {
       const hls = new window.Hls(cfgHls(src));
       S.nativo.hls = hls;
       prefiereEspanol(v, hls); /* v94: audio español si lo hay */
+      hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+        try {
+          if (hls.levels && hls.levels.length > 1) {
+            const max = hls.levels.length - 1;
+            if (hls.autoLevelEnabled) hls.nextLevel = max;
+          }
+        } catch {}
+      });
       hls.on(window.Hls.Events.FRAG_LOADED, () => { S.nativo && (S.nativo.saltosMovie = 0); }); /* v220 */
       /* v92: si el directo no sirve (CORS del origen), re-servimos por
        * el proxy — igual que el modo Solo */
@@ -578,10 +586,39 @@ function montarNativo(porProxy) {
  * tiraba el video y volvía al inicio; ahora se SALTA el hueco (30 s) y sigue. */
 function esFlujoMovie(url) { return /^\/api\/movie\//.test(String(url || '')); }
 function cfgHls(src) {
+  const base = { maxBufferLength: 30, capLevelToPlayerSize: false, startLevel: -1, abrEwmaDefaultEstimate: 6000000 };
   return esFlujoMovie(src)
-    ? { maxBufferLength: 30, fragLoadingMaxRetry: 6, fragLoadingRetryDelay: 1000, fragLoadingMaxRetryTimeoutMs: 30000, manifestLoadingMaxRetry: 4, levelLoadingMaxRetry: 4 }
-    : { maxBufferLength: 30 };
+    ? { ...base, fragLoadingMaxRetry: 6, fragLoadingRetryDelay: 1000, fragLoadingMaxRetryTimeoutMs: 30000, manifestLoadingMaxRetry: 4, levelLoadingMaxRetry: 4 }
+    : base;
 }
+// v256 híbrido 5h: cache en navegador para Cuevana (2KB por peli)
+const CUEVANA_LS_TTL = 5*3600*1000;
+const CUEVANA_LS_PREFIX = 'huddle:cuevana:';
+function cuevanaLsGet(slug){
+  try{
+    const raw = localStorage.getItem(CUEVANA_LS_PREFIX+slug);
+    if(!raw) return null;
+    const o = JSON.parse(raw);
+    if(!o || !o.m3u8 || Date.now()-o.at > CUEVANA_LS_TTL) { localStorage.removeItem(CUEVANA_LS_PREFIX+slug); return null; }
+    return o;
+  }catch{ return null; }
+}
+function cuevanaLsSet(slug, res){
+  try{
+    if(!slug || !res || !res.m3u8) return;
+    localStorage.setItem(CUEVANA_LS_PREFIX+slug, JSON.stringify({ m3u8: res.m3u8, subs: res.subs||[], proxy: !!res.proxy, mp4: !!res.mp4, at: Date.now() }));
+    // limpiar si >80 entradas
+    let n=0; for(let i=0;i<localStorage.length;i++){ if((localStorage.key(i)||'').startsWith(CUEVANA_LS_PREFIX)) n++; }
+    if(n>80){
+      const arr=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&k.startsWith(CUEVANA_LS_PREFIX)){ try{ arr.push([k, JSON.parse(localStorage.getItem(k)).at]); }catch{} } }
+      arr.sort((a,b)=>a[1]-b[1]); for(let i=0;i<arr.length-60;i++) localStorage.removeItem(arr[i][0]);
+    }
+  }catch{}
+}
+function cuevanaSlugDeUrl(u){
+  try{ const m=/\/pelicula\/\d+\/([^/?#]+)/i.exec(u)||/\/pelicula\/+([^/?#]+)/i.exec(u); return m?m[1]:''; }catch{ return ''; }
+}
+
 function saltarHuecoMovie(hls, video, estado, aviso) {
   const saltos = (estado.saltosMovie || 0) + 1;
   estado.saltosMovie = saltos;
@@ -3488,6 +3525,29 @@ async function abrirSolo(pageUrl, info, opts) {
     montarSolo(SOLO.res, false);
     return;
   }
+  // v256 híbrido 5h: intenta cache local antes de pedir al server (solo Cuevana)
+  const _slugLS = cuevanaSlugDeUrl(pageUrl);
+  let _fromLS = null;
+  if (/cuevana\.mov\/pelicula\//i.test(pageUrl) && _slugLS) {
+    const _cached = cuevanaLsGet(_slugLS);
+    if (_cached) {
+      // verificar que el m3u8 sigue vivo (proxy)
+      try {
+        const _ok = await fetch('/api/hls?u=' + encodeURIComponent(_cached.m3u8), { cache: 'no-store' }).then(r=>r.ok && r.headers.get('content-type') && /mpegurl|m3u8/i.test(r.headers.get('content-type')||'') ? r.text().then(tx=>/#EXTM3U/i.test(tx)) : false).catch(()=>false);
+        // si no pudimos verificar, igual lo intentamos (el montar lo reintentará)
+        _fromLS = _cached;
+        console.log('[cuevana cache] hit LS', _slugLS);
+      } catch {}
+      if (_fromLS) {
+        if (!SOLO || SOLO.url !== pageUrl || SOLO.cerrado) return;
+        SOLO.res = _fromLS;
+        montarSolo(_fromLS, await elegirModoSolo(_fromLS));
+        // refresca en 2º plano por si expiró
+        fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(pageUrl)).then(r=>r.json()).then(d2=>{ if(d2 && d2.ok && d2.m3u8) cuevanaLsSet(_slugLS, d2); }).catch(()=>{});
+        return;
+      }
+    }
+  }
   try {
     const r = await fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(pageUrl));
     const d = await r.json();
@@ -3497,6 +3557,7 @@ async function abrirSolo(pageUrl, info, opts) {
     }
     if (!SOLO || SOLO.url !== pageUrl || SOLO.cerrado) return; /* cerraron mientras buscaba */
     SOLO.res = d;
+    if (/cuevana\.mov\/pelicula\//i.test(pageUrl) && _slugLS) cuevanaLsSet(_slugLS, d);
     montarSolo(d, await elegirModoSolo(d)); /* v99: sonda — carrera proxy vs directo */
   } catch (e) {
     if (SOLO && SOLO.url === pageUrl && !SOLO.cerrado) {
@@ -3596,6 +3657,18 @@ function montarSolo(d, viaProxy) {
       const hls = new window.Hls(cfgHls(src));
       SOLO.hls = hls;
       prefiereEspanol(video, hls); /* v94: audio español si lo hay */
+      hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+        try {
+          // arrancar en la más alta disponible, luego el usuario puede bajar si quiere
+          if (hls.levels && hls.levels.length > 1) {
+            const max = hls.levels.length - 1;
+            // si está en auto y la estimada es baja por el relay, forzar la más alta al inicio
+            if (hls.autoLevelEnabled) hls.nextLevel = max;
+          }
+          pintarQMenuSolo();
+        } catch {}
+      });
+      hls.on(window.Hls.Events.LEVEL_SWITCHED, () => { try { pintarQMenuSolo(); } catch {} });
       hls.on(window.Hls.Events.FRAG_LOADED, () => { if (SOLO) SOLO.saltosMovie = 0; }); /* v220 */
       /* v83: cuando llega el manifest sabemos qué calidades hay */
       hls.on(window.Hls.Events.MANIFEST_PARSED, () => {

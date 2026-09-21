@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v255'; // 255: Fix relay ngrok header + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v256'; // 256: Cache híbrido 5h + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -4807,6 +4807,9 @@ async function buscarCuevana(q) {
  * ═══════════════════════════════════════════════════════════════════ */
 
 const CUEVANA_API = 'https://cuevana.mov/wp-json/wpreact/v1/movie/';
+const CUEVANA_M3U8_CACHE = new Map(); // slug -> {m3u8, subs, proxy, mp4, at}
+const CUEVANA_CACHE_TTL = 5*3600*1000; // 5h híbrido
+
 const CUEVANA_POSTS_API = 'https://cuevana.mov/wp-json/wpreact/v1/postsapi';
 const CUEVANA_SITEMAPS = Array.from({length: 9}, (_, i) => `https://cuevana.mov/pelicula-sitemap${i ? i+1 : ''}.xml`);
 const CUEVANA_HOSTS_OK = ['goodstream.one', 'vimeos.net', 'hlswish.com', 'videoapp.zip'];
@@ -4884,6 +4887,19 @@ async function resolverCuevanaMov(pageUrl) {
   const slugM = /\/pelicula\/\d+\/([^/?#]+)/i.exec(pageUrl) || /\/pelicula\/+([^/?#]+)/i.exec(pageUrl);
   if (!slugM) throw new Error('URL de Cuevana no válida: ' + pageUrl);
   const slug = slugM[1];
+  // cache 5h RAM
+  const cc = CUEVANA_M3U8_CACHE.get(slug);
+  if (cc && Date.now() - cc.at < CUEVANA_CACHE_TTL) {
+    // verificar que el m3u8 sigue vivo (HEAD rápido)
+    try {
+      const vr = await fetchSeguro(cc.m3u8, 4000).catch(()=>null);
+      if (vr && vr.ok) {
+        const txt = await vr.text().catch(()=> '');
+        if (txt.includes('#EXTM3U')) return { m3u8: cc.m3u8, subs: cc.subs||[], proxy: !!cc.proxy, mp4: !!cc.mp4 };
+      }
+    } catch {}
+    CUEVANA_M3U8_CACHE.delete(slug);
+  }
   const r = await fetchSeguro(CUEVANA_API + encodeURIComponent(slug), 12000);
   if (!r.ok) throw new Error('API Cuevana error: ' + r.status);
   const d = await r.json();
@@ -4958,7 +4974,14 @@ async function resolverCuevanaMov(pageUrl) {
           if (txt.includes('#EXTM3U')) {
             const cdnHost = new URL(m3u8).hostname;
             if (!hlsReferers.has(cdnHost)) hlsReferers.set(cdnHost, 'https://' + host + '/');
-            return { m3u8, subs: [], proxy: true, mp4: false };
+            const resObj = { m3u8, subs: [], proxy: true, mp4: false };
+            CUEVANA_M3U8_CACHE.set(slug, { ...resObj, at: Date.now() });
+            // limpiar mapa si crece
+            if (CUEVANA_M3U8_CACHE.size > 400) {
+              const entries = [...CUEVANA_M3U8_CACHE.entries()].sort((a,b)=>a[1].at-b[1].at);
+              for(let i=0;i<entries.length-300;i++) CUEVANA_M3U8_CACHE.delete(entries[i][0]);
+            }
+            return resObj;
           }
         }
       }
