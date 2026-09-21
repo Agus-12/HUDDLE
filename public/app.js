@@ -3020,7 +3020,7 @@ $('#btnCreateGo').addEventListener('click', () => {
  * Antes el badge buscaba por nombre en SITES: 'Caricaturas'/'Cartoons'/'Movie'/
  * 'Novelas'/'AnimeFLV' no existían ahí y caían a la carita o a favicons viejos
  * del servidor. Ahora el dominio manda; ?v= rompe el caché del navegador. */
-const LOGO_V = '244';
+const LOGO_V = '246';
 const LOGOS_DOMINIO = {
   'latanime.org': 'latanime.png',
   'cuevana.mov': 'cuevana.png',
@@ -3030,16 +3030,26 @@ const LOGOS_DOMINIO = {
   'lacartoons.com': 'lacartoons.png',
   'miscaricaturas.com': 'caricaturas.png',
   'animeflv.one': 'animeflv.png', 'animeflv.net': 'animeflv.png', 'animeflv.io': 'animeflv.png',
-  'novelas360.com': 'novelas.png', 'enpantallatv.com': 'novelas.png',
+  'novelas360.com': 'novelas.png', 'enpantallatv.com': 'novelas.png', 'movie.huddle': 'novelas.png',
+  'animed23.com': 'animed23.png',
   'youtube.com': 'youtube.png', 'youtu.be': 'youtube.png',
 };
 function logoPara(url, nombre) {
   try {
     const h = String(new URL(url || 'x:', location.origin).hostname || '').replace(/^www\./, '').toLowerCase();
-    if (h === 'movie.huddle') return '/carita.png'; /* catálogo propio: la carita */
+    if (h === 'movie.huddle') {
+      // Telenovelas (Movie catálogo) muestra TLN en vez de carita — el resto del catálogo propio sigue con carita si no es novela
+      const n = String(nombre || '').toLowerCase();
+      if (n === 'novelas' || n === 'movie' || n === 'telenovelas') return '/sites/novelas.png?v=' + LOGO_V;
+      return '/carita.png';
+    }
     for (const k of Object.keys(LOGOS_DOMINIO)) if (h === k || h.endsWith('.' + k)) return '/sites/' + LOGOS_DOMINIO[k] + '?v=' + LOGO_V;
   } catch {}
-  const s = (typeof SITES !== 'undefined' ? SITES : []).find((x) => x.name === nombre);
+  // Fallback por nombre (cuando la URL falla o es relativa) — mapea alias genéricos del feed
+  const alias = { 'caricaturas': '/sites/caricaturas.png', 'cartoons': '/sites/lacartoons.png', 'danimados': '/sites/danimados.png', 'lacartoons': '/sites/lacartoons.png', 'miscaricaturas': '/sites/caricaturas.png', 'animed23': '/sites/animed23.png', 'animeflv': '/sites/animeflv.png', 'novelas': '/sites/novelas.png', 'telenovelas': '/sites/novelas.png', 'cuevana': '/sites/cuevana.png', 'cinecalidad': '/sites/cinecalidad.png', 'pelisxd': '/sites/pelisxd.png', 'latanime': '/sites/latanime.png' };
+  const low = String(nombre || '').toLowerCase();
+  if (alias[low]) return alias[low] + '?v=' + LOGO_V;
+  const s = (typeof SITES !== 'undefined' ? SITES : []).find((x) => String(x.name||'').toLowerCase() === low);
   if (s && s.logo) return s.logo.includes('?') ? s.logo : s.logo + '?v=' + LOGO_V;
   return '/carita.png'; /* v105: si no hay logo, la carita de Huddle */
 }
