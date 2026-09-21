@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v258'; // 258: Cuevana directo sin relay (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v259'; // 259: Fix goodstream Referer completo (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -5014,7 +5014,7 @@ async function resolverCuevanaMov(pageUrl) {
           const txt = await vr.text().catch(() => '');
           if (txt.includes('#EXTM3U')) {
             const cdnHost = new URL(m3u8).hostname;
-            if (!hlsReferers.has(cdnHost)) hlsReferers.set(cdnHost, 'https://' + host + '/');
+            if (!hlsReferers.has(cdnHost)) hlsReferers.set(cdnHost, embed.url);
             const isGood = /goodstream|vimeos|hlswish/i.test(host);
             const resObj = { m3u8, subs: [], proxy: true, mp4: false };
             CUEVANA_M3U8_CACHE.set(slug, { ...resObj, at: Date.now(), isGood });
