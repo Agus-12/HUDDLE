@@ -35,7 +35,7 @@ function checkAdminAuth(req, res) {
   return true;
 }
 
-const UI_VERSION = 'v238'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
+const UI_VERSION = 'v239'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
@@ -7004,25 +7004,45 @@ async function catalogoLocal() {
  * separado) | danimados: catálogo base de caricaturas | genero-<slug>:
  * cine-calidad SOLO películas. */
 const catCache = new Map(); /* clave → { at, items, mas } */
+/* v239: catCv pre-fetch TODAS las páginas de CineCalidad y cachea el catálogo completo */
+const cvFullCache = { movies: { items: [], at: 0 }, series: { items: [], at: 0 } };
+const CV_FULL_TTL = 2 * 3600 * 1000; /* 2h */
+
+async function catCvFull(kind) {
+  const cached = cvFullCache[kind];
+  if (cached.items.length && Date.now() - cached.at < CV_FULL_TTL) return cached.items;
+  console.log('[catCv] descargando catálogo completo de CineCalidad (' + kind + ')...');
+  const allItems = [];
+  for (let page = 1; page <= 600; page++) {
+    try {
+      const r = await fetchSeguro('https://cine-calidad.mx/wp-json/mycustom/v1/' + kind + '?page=' + page, 10000);
+      if (!r.ok) break;
+      const d = await r.json().catch(() => []);
+      const arr = Array.isArray(d) ? d : (d.posts || []);
+      if (!arr.length) break;
+      const items = arr.map((p) => ({
+        title: String(p.title || '').replace(/&amp;/g, '&'),
+        url: kind === 'series' ? 'https://cine-calidad.mx/serie/' + p.slug : 'https://cine-calidad.mx/pelicula/' + p.slug + '/',
+        img: String(p.featured_image || '').replace('/w780/', '/w342/'),
+        site: 'CineCalidad',
+        extra: [String(p.date || '').slice(0, 4), p.rating ? '★ ' + (+p.rating).toFixed(1) : ''].filter(Boolean).join(' · '),
+      })).filter((x) => x.title && !cvOcultaUrl(x.url));
+      allItems.push(...items);
+      if (arr.length < 20) break;
+    } catch { break; }
+  }
+  cvFullCache[kind] = { items: allItems, at: Date.now() };
+  console.log('[catCv] ' + kind + ': ' + allItems.length + ' títulos cacheados');
+  return allItems;
+}
+
+setTimeout(() => { catCvFull('movies').catch(() => {}); catCvFull('series').catch(() => {}); }, 30 * 1000);
+
 async function catCv(kind, pag) {
-  const key = 'cv-' + kind + '-' + pag;
-  const c = catCache.get(key);
-  if (c && Date.now() - c.at < 30 * 60 * 1000) return c;
-  const r = await fetchSeguro('https://cine-calidad.mx/wp-json/mycustom/v1/' + kind + '?page=' + pag, 12000);
-  if (!r.ok) return { items: [], mas: false };
-  const d = await r.json().catch(() => []);
-  const arr = Array.isArray(d) ? d : (d.posts || []);
-  const mas = arr.length >= 20; /* v205: página llena del API CRUDO — el filtro de ocultas no corta el scroll */
-  const items = arr.map((p) => ({
-    title: String(p.title || ''),
-    url: kind === 'series' ? 'https://cine-calidad.mx/serie/' + p.slug : 'https://cine-calidad.mx/pelicula/' + p.slug + '/',
-    img: String(p.featured_image || '').replace('/w780/', '/w342/'),
-    site: 'CineCalidad',
-    extra: [String(p.date || '').slice(0, 4), p.rating ? '★ ' + (+p.rating).toFixed(1) : ''].filter(Boolean).join(' · '),
-  })).filter((x) => x.title && !cvOcultaUrl(x.url)); /* v200: ocultas fuera */
-  const out = { items, mas };
-  if (items.length) catCache.set(key, { at: Date.now(), items, mas });
-  return out;
+  const por = 20;
+  const allItems = await catCvFull(kind);
+  const ini = (pag - 1) * por;
+  return { items: allItems.slice(ini, ini + por), mas: ini + por < allItems.length };
 }
 async function catAnimes(pag) {
   const key = 'la-' + pag;
@@ -11295,11 +11315,11 @@ function panelHtml() {
     document.getElementById('pie').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es');
   }
   function tic() {
-    fetch('/api/estado', ).then(function (r) { return r.json(); }).then(pintar).catch(function () {
+    fetch('/api/estado').then(function (r) { return r.json(); }).then(pintar).catch(function () {
       document.getElementById('pie').textContent = 'sin conexión con el server — reintentando…';
     });
-    fetch('/api/stats', ).then(function (r) { return r.json(); }).then(pintarStats).catch(function () {});
-    fetch('/api/users', ).then(function (r) { return r.json(); }).then(pintarUsers).catch(function () {});
+    fetch('/api/stats').then(function (r) { return r.json(); }).then(pintarStats).catch(function () {});
+    fetch('/api/users').then(function (r) { return r.json(); }).then(pintarUsers).catch(function () {});
   }
   tic();
   setInterval(tic, 5000); /* v205.5: casi al momento */
