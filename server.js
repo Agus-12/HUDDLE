@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v239.11'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
+const UI_VERSION = 'v239.12'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
@@ -10907,11 +10907,21 @@ async function cuevanaLatest() {
 
     /* v238: gestión de usuarios — listar y eliminar */
     if (url.pathname === '/api/users' && req.method === 'GET') {
-      /* v239.10: incluir si está online (en alguna sala) */
+      /* v239.11: online = en sala O viendo en Solo (progreso reciente <5min) */
       const onlineSet = new Set();
+      const FIVE_MIN = 5 * 60 * 1000;
+      const now = Date.now();
+      /* Usuarios en salas */
       for (const room of rooms.values()) {
         for (const u of room.users.values()) {
           if (u.name) onlineSet.add(u.name.toLowerCase());
+        }
+      }
+      /* Usuarios en modo Solo (progreso reportado en los últimos 5 min) */
+      for (const [key, items] of continuar) {
+        if (Array.isArray(items) && items.length > 0) {
+          const last = items[0]; /* más reciente primero */
+          if (last.ts && now - last.ts < FIVE_MIN) onlineSet.add(key);
         }
       }
       const lista = [];
