@@ -1,0 +1,246 @@
+{
+  "date": "2026-09-21T19:29:58.611Z",
+  "version": "v266",
+  "metodo": "directo primero sin relay, single-use no-verify, prioriza vimeos>goodstream, FETCH_UA + Referer embed",
+  "total": 8183,
+  "resuelven": 7895,
+  "noResuelven": 288,
+  "pctResuelven": 96.48,
+  "detalle": {
+    "sinLatino": 116,
+    "apiErr": 64,
+    "sinM3u8": 108
+  },
+  "hostCounts": {
+    "vimeos": 7864,
+    "goodstream": 19,
+    "hlswish": 12
+  },
+  "samples": [
+    {
+      "slug": "dietro-la-notte",
+      "via": "vimeos",
+      "m3u8": "https://s11.vimeos.net/hls2/03/00003/sxdg5p803wzt_h/master.m3u8?t=jM4ItUr0Bv1gc5cKZBq0VACm"
+    },
+    {
+      "slug": "muerte-y-vida-de-un-activista-politico",
+      "via": "vimeos",
+      "m3u8": "https://s9.vimeos.net/hls2/02/00003/r7tmn4doxx2y_h/master.m3u8?t=pxpAoUHu58q-7ogwpivUi7ZTR"
+    },
+    {
+      "slug": "radical",
+      "via": "vimeos",
+      "m3u8": "https://s9.vimeos.net/hls2/02/00003/e9dkgmbk2s73_,n,h,.urlset/master.m3u8?t=G_ou618ufqQCY9"
+    },
+    {
+      "slug": "ecos-del-pasado",
+      "via": "vimeos",
+      "m3u8": "https://p5.vimeos.zip/hls2/02/00003/2ir3vnnke0sg_h/master.m3u8?t=H7inYGngAKh4LWXjZyeCP_gOZ"
+    },
+    {
+      "slug": "cunados",
+      "via": "vimeos",
+      "m3u8": "https://p6.vimeos.zip/hls2/02/00003/x0x4lrd1xsqj_h/master.m3u8?t=H_GDKljm2FwPUTREU9KE6fDrv"
+    },
+    {
+      "slug": "cazadores-en-tierra-inhospita",
+      "via": "vimeos",
+      "m3u8": "https://p5.vimeos.zip/hls2/02/00003/myn79jmqa2iq_,n,h,.urlset/master.m3u8?t=tVeD84Hnytj_sM"
+    },
+    {
+      "slug": "lados-opuestos",
+      "via": "vimeos",
+      "m3u8": "https://s9.vimeos.net/hls2/02/00003/occqhoetz3xw_h/master.m3u8?t=aFSPfVt1T3LSt8Yz_WyLQZsIf"
+    },
+    {
+      "slug": "a-royal-recipe-for-love",
+      "via": "vimeos",
+      "m3u8": "https://s9.vimeos.net/hls2/02/00003/fxd28did4254_h/master.m3u8?t=N1TzfwbD1c3aRs_zuI2mdHCQ8"
+    },
+    {
+      "slug": "los-viajeros",
+      "via": "vimeos",
+      "m3u8": "https://p7.vimeos.zip/hls2/02/00003/8s7o976z9td6_h/master.m3u8?t=zUzmAvoBw5D8zdryAsbBLl73h"
+    },
+    {
+      "slug": "el-gran-fraude",
+      "via": "vimeos",
+      "m3u8": "https://p7.vimeos.zip/hls2/02/00003/lqef89n3b55k_h/master.m3u8?t=_6uKkaButWukSZQicXH037Fp8"
+    },
+    {
+      "slug": "jedine-tereza",
+      "via": "vimeos",
+      "m3u8": "https://vimeos.zip/hls2/02/00003/6j0df7lhcvgk_h/master.m3u8?t=SrtPWNCMdmJaFu5SV4JPIaGUJtOR"
+    },
+    {
+      "slug": "los-segundones",
+      "via": "vimeos",
+      "m3u8": "https://p5.vimeos.zip/hls2/03/00003/bvvix9a17z9y_,n,h,.urlset/master.m3u8?t=a4fTcLsf1RyNAU"
+    },
+    {
+      "slug": "un-tiempo-para-recordar",
+      "via": "vimeos",
+      "m3u8": "https://p4.vimeos.zip/hls2/02/00003/gyvldqqy6sw5_h/master.m3u8?t=yg4n-OX2d62VkmGyJLM6jQ5Lj"
+    },
+    {
+      "slug": "la-piscina",
+      "via": "vimeos",
+      "m3u8": "https://p4.vimeos.zip/hls2/03/00003/rr900bvgx7i1_h/master.m3u8?t=Z75DrxdLmbgeHRnkQdQYOpYrb"
+    },
+    {
+      "slug": "la-magia-del-chocolate",
+      "via": "vimeos",
+      "m3u8": "https://p5.vimeos.zip/hls2/03/00000/phbuvu98qwot_h/master.m3u8?t=siJdlto7kAjGcJeKGeXOv37Nk"
+    },
+    {
+      "slug": "una-flor-en-el-barro",
+      "via": "vimeos",
+      "m3u8": "https://p3.vimeos.zip/hls2/02/00003/2oxtafnpf6fs_h/master.m3u8?t=T7Upu0n5SW7_2iDMlE9CxZxhZ"
+    },
+    {
+      "slug": "los-secretos-no-se-pueden-enterrar",
+      "via": "vimeos",
+      "m3u8": "https://p4.vimeos.zip/hls2/02/00003/k0uzr9i8639d_h/master.m3u8?t=K7_79TgL0Ax9bRY6eefId6NCt"
+    },
+    {
+      "slug": "senora-influencer",
+      "via": "vimeos",
+      "m3u8": "https://vimeos.zip/hls2/02/00003/pcaafxmx9qpm_h/master.m3u8?t=EN3WpAyhDuF7J4KJVUAebgkuvl2x"
+    },
+    {
+      "slug": "remando-como-un-solo-hombre",
+      "via": "vimeos",
+      "m3u8": "https://p2.vimeos.zip/hls2/02/00003/9gc34pzm06vy_h/master.m3u8?t=yYuv7btyeTXZ70dH8MXtxKo3y"
+    },
+    {
+      "slug": "la-unica-salida",
+      "via": "vimeos",
+      "m3u8": "https://s9.vimeos.net/hls2/02/00003/ahfg29frtl6n_h/master.m3u8?t=sP9cJAqNYdD6oF61xbRIuluql"
+    }
+  ],
+  "failsSample": [
+    {
+      "slug": "la-version-persa",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "fuera-de-la-ley",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "vive-dentro",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "gracias-lo-siento",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "alien%c2%b3",
+      "reason": "api_404"
+    },
+    {
+      "slug": "el-diario-de-greg-en-navidad-atrapados-en-la-nieve",
+      "reason": "sin_latino"
+    },
+    {
+      "slug": "dejar-el-mundo-atras",
+      "reason": "sin_latino"
+    },
+    {
+      "slug": "mi-querido-monstruo",
+      "reason": "sin_latino"
+    },
+    {
+      "slug": "silber-y-el-libro-de-los-suenos",
+      "reason": "sin_latino"
+    },
+    {
+      "slug": "la-tipica-navidad",
+      "reason": "sin_latino"
+    },
+    {
+      "slug": "%d0%bc%d1%80%d0%b0%d0%ba",
+      "reason": "api_404"
+    },
+    {
+      "slug": "suzume",
+      "reason": "sin_latino"
+    },
+    {
+      "slug": "de-grote-slijmfilm",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "el-conejo-de-terciopelo",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "%e7%99%92%e3%81%97%e3%81%ae%e3%81%93%e3%81%93%e3%82%8d%e3%81%bf%ef%bd%9e%e8%87%aa%e5%88%86%e3%82%92%e5%a5%bd%e3%81%8d%e3%81%ab%e3%81%aa%e3%82%8b%e6%96%b9%e6%b3%95%ef%bd%9e",
+      "reason": "api_404"
+    },
+    {
+      "slug": "you-hurt-my-feelings",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "wwe-fastlane-2023",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "la-clave-del-corazon",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "el-curandero",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "%e5%86%99%e7%9c%9f%e3%81%ae%e5%a5%b3",
+      "reason": "api_404"
+    },
+    {
+      "slug": "cincuenta-tartas-para-jane",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "starship-troopers-invasion",
+      "reason": "sin_latino"
+    },
+    {
+      "slug": "no-tengas-miedo",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "el-grito-silencioso-el-caso-roe-v-wade",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "un-extrano-entre-nosotras",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "extincion",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "el-hotel-de-los-lios-garcia-y-garcia-2",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "%d0%b2%d0%bd%d0%b5-%d0%b7%d0%be%d0%bd%d1%8b-%d0%b4%d0%be%d1%81%d1%82%d1%83%d0%bf%d0%b0",
+      "reason": "api_404"
+    },
+    {
+      "slug": "secretos-de-espias",
+      "reason": "sin_m3u8"
+    },
+    {
+      "slug": "una-buena-persona",
+      "reason": "sin_latino"
+    }
+  ],
+  "tiempoS": 336.5,
+  "slugsTotalSitemap": 8183,
+  "concurrency": 20
+}
