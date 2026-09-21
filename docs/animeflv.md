@@ -1,33 +1,32 @@
-# AnimeFLV — Documentación Técnica
+# AnimeFLV — Ficha técnica
 
 ## Datos generales
-- **URL**: https://vww.animeflv.one
-- **Tipo**: Anime (respaldo de Latanime)
-- **Catálogo**: Slugs en `public/animeflv-slugs.txt` (exclusivos)
-- **Idioma**: Latino y subtitulado
-- **Protocolo**: HTTP puro
-
-## Rol en Huddle
-Es el **respaldo de Latanime**. Solo aparece en la búsqueda cuando Latanime NO tiene la serie (evita duplicados).
+- **URL**: https://vww.animeflv.one (espejo; el .net bloquea datacenters)
+- **Tipo**: Anime subtitulado (mayoría) + algunos latinos
+- **Catálogo**: 2,955 slugs en `public/animeflv-slugs.txt` → **2,920 vivos** (auditoría sept 2026)
+- **Rol**: complemento de Latanime (81% NO está en Latanime), no respaldo
+- **Protocolo**: HTTP para mp4upload (~27%), navegador del servidor para el resto
 
 ## Flujo de resolución (`resolverAnimeflv`)
-```
-1. Descargar página del episodio
-2. Extraer data-encrypt (hex) del primer opt
-3. POST a /flv con body 'acc=opt&i=' + enc
-4. La respuesta trae <li encrypt="hex"> → cada hex es URL de embed
-5. Filtrar mp4upload → extraerMp4 (HTTP puro)
-6. Si no hay mp4upload → resolverAnimePorNavegador (headless)
-7. Si todo falla → afOcultar (podredumbre)
-```
+1. GET `/ver/<slug>-<n>` → `data-encrypt` (hex) del primer `.opt`
+2. POST `/flv` (`acc=opt&i=<hex>`, con Referer + X-Requested-With) → `<li encrypt="<hex>">`
+3. Cada hex = URL de embed (mp4upload, hqq, ok.ru, mega, yourupload, voe, uqload, streamwish…)
+4. Si hay mp4upload → `extraerMp4` (HTTP puro) → video directo
+5. Si no → `resolverAnimePorNavegador` (headless, lee la URL que pide el player)
+6. Si todo falla → `afOcultar` (podredumbre 3 fallos)
 
-## Sistema de podredumbre
-- `AF_OCULTAS_SET`: slugs ocultos
-- `FALLOS_AF`: slug → {f, last, h}
-- 3 fallos → se oculta
-- Re-chequeo cada 6h (2 por vuelta)
+## Sonda (`sondaAnimeflv`, v243)
+- 5 vivas + 3 muertas por ciclo, arranque + cada 6h, pausas 1.5s (sin rate-limit conocido)
+- Probe `afProbe` = ep1 trae enc + `/flv` lista ≥1 servidor (criterio de la auditoría, NO exige mp4upload: esos juegan por navegador)
+- Log `sonda-animeflv.log`, consola `[sonda] af`, notifica como `AnimeFLV`
+- Lázaro en `revivirGeneral` con el mismo criterio (2 por vuelta)
 
-## Archivos en disco
-- `public/animeflv-slugs.txt` — slugs exclusivos
-- `public/af-ocultas.txt` — series ocultas
-- `data/fallos-af.json` — registro de fallos
+## Archivos
+- `public/animeflv-slugs.txt` — catálogo (2,955)
+- `public/af-ocultas.txt` — muertas (35 iniciales de la auditoría)
+- `public/af-vistas.txt` — verificadas por sonda
+- `data/fallos-af.json` — podredumbre
+
+## Panel
+- Tarjeta **AnimeFLV** (melocotón `#feac5d`, logo AF) con detalle + log de sonda
+- Catálogo **Series** = Latanime + AnimeFLV activas

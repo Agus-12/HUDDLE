@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v242'; // 242: GoPelis fuera + 3 fuentes caricaturas separadas
+const UI_VERSION = 'v243'; // 243: Auditoria AnimeFLV + sonda + panel
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
@@ -463,8 +463,8 @@ async function laRevizar() { /* apelaciones: ocultadas hace <7 días, una a una 
     console.log('[podredumbre] revisión terminada: ' + vivas2 + ' revivieron de ' + cands.length);
   } finally { laReviviendo = false; }
 }
-setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); }, 90 * 1000);
-setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); }, 6 * 3600 * 1000);
+setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); }, 90 * 1000);
+setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); }, 6 * 3600 * 1000);
 
 /* v234: SONDA PELISXD — revisa películas ocultas para ver si volvieron */
 /* v234: SONDA PELISXD COMPLETA — 3 frentes:
@@ -719,6 +719,9 @@ console.log('[boot] CVM_OCULTAS=' + CVM_OCULTAS.size + ' Cuevana mov ocultas');
 const pxdVistas = new Set(); /* slugs ya verificados alguna vez */
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'pxd-vistas.txt'), 'utf8').split('\n')) if (l.trim()) pxdVistas.add(l.trim()); } catch {}
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'af-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) AF_OCULTAS.add(l.trim()); } catch {}
+const AF_TODOS = new Set(), AF_VISTAS = new Set(); /* v243: catálogo + verificadas por sonda */
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'animeflv-slugs.txt'), 'utf8').split('\n')) if (l.trim()) AF_TODOS.add(l.trim()); } catch {}
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'af-vistas.txt'), 'utf8').split('\n')) if (l.trim()) AF_VISTAS.add(l.trim()); } catch {}
 const FALLOS_PXD = new Map(), FALLOS_AF = new Map(), FALLOS_CV = new Map();
 for (const [mapa, arch] of [[FALLOS_PXD, 'fallos-pxd.json'], [FALLOS_AF, 'fallos-af.json'], [FALLOS_CV, 'fallos-cv.json']]) {
   try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR, arch), 'utf8')) || {})) mapa.set(k, v); } catch {}
@@ -787,23 +790,13 @@ async function revivirGeneral() {
     const slug = pxdKeys[revGiro.pxd % pxdKeys.length]; revGiro.pxd++;
     try { await resolverPelisxd('https://www.pelisxd.com/pelicula/' + slug); PXD_OCULTAS.delete(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt'); probados.push('pxd:' + slug + ' REVIVIÓ'); sondaNotify("PelisXD", "revivio", slug, slug + " revivio — resuelve otra vez"); } catch {}
   }
-  /* AnimeFLV: POST /flv + mp4upload vivo (2 por vuelta, sin navegador) */
+  /* AnimeFLV: enc + ≥1 servidor listado (2 por vuelta) — v243: el criterio
+   * mp4upload-video nunca revivía títulos que juegan por navegador */
   const afKeys = [...AF_OCULTAS];
-  for (let i = 0; i < 2 && afKeys.length; i++) {
-    const slug = afKeys[(revGiro.af + i) % afKeys.length];
+  for (let k = 0; k < 2 && afKeys.length; k++) {
+    const slug = afKeys[(revGiro.af + k) % afKeys.length];
     try {
-      const r = await fetchSeguro('https://vww.animeflv.one/ver/' + slug + '-1', 12000).catch(() => null);
-      const enc = r && r.ok ? (/class="opt"[^>]*data-encrypt="([0-9a-f]+)"/i.exec(await r.text()) || [])[1] : '';
-      const cuerpo = enc ? await fetch('https://vww.animeflv.one/flv', { method: 'POST', headers: { 'User-Agent': MIRROR_UA, Referer: 'https://vww.animeflv.one/ver/' + slug + '-1', 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' }, body: 'acc=opt&i=' + enc, signal: AbortSignal.timeout(12000) }).then((x) => x.text()).catch(() => '') : '';
-      const mp4s = [...new Set([...cuerpo.matchAll(/<li[^>]*encrypt="([0-9a-f]+)"/gi)].map((m2) => { try { return Buffer.from(m2[1], 'hex').toString('utf8'); } catch { return ''; } }).filter((u) => /mp4upload\./i.test(u)))];
-      let vive = false;
-      for (const emb of mp4s.slice(0, 2)) {
-        const e2 = await fetchSeguro(emb, 12000).catch(() => null);
-        const tx = e2 && e2.ok ? await e2.text() : '';
-        const mU = tx.match(/["'](https?:\/\/[^"'\s<>]*mp4upload[^"'\s<>]*\.mp4[^"'\s<>]*)["']/i);
-        if (mU && await sirveElVideo(mU[1], emb)) { vive = true; break; }
-      }
-      if (vive) { AF_OCULTAS.delete(slug); ocultasReescribir(AF_OCULTAS, 'af-ocultas.txt'); probados.push('af:' + slug + ' REVIVIÓ'); sondaNotify("AnimeFLV", "revivio", slug, slug + " revivio — mp4upload vivo"); }
+      if (await afProbe(slug)) { AF_OCULTAS.delete(slug); ocultasReescribir(AF_OCULTAS, 'af-ocultas.txt'); afPerdonar(slug); probados.push('af:' + slug + ' REVIVIÓ'); sondaNotify("AnimeFLV", "revivio", slug, slug + " revivio — servidores otra vez"); }
     } catch {}
   }
   revGiro.af += 2;
@@ -5078,6 +5071,52 @@ async function buscarLatanime(q) {
 
 /* v97: AnimeFLV de vuelta — catálogo gigante y trae mp4upload entre sus
  * servidores (extraíble); respaldo cuando la versión de Latanime está muerta */
+/* v243: probe AnimeFLV — ep1 trae enc + /flv lista ≥1 servidor (criterio de la auditoría) */
+async function afProbe(slug) {
+  try {
+    const epUrl = 'https://vww.animeflv.one/ver/' + slug + '-1';
+    const r = await fetchSeguro(epUrl, 12000).catch(() => null);
+    if (!r || !r.ok) return false;
+    const enc = (/class="opt"[^>]*data-encrypt="([0-9a-f]+)"/i.exec(await r.text()) || [])[1];
+    if (!enc) return false;
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 12000);
+    let cuerpo = '';
+    try {
+      const r2 = await fetch('https://vww.animeflv.one/flv', { method: 'POST', headers: { 'User-Agent': FETCH_UA, Referer: epUrl, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' }, body: 'acc=opt&i=' + enc, signal: ctl.signal });
+      cuerpo = r2.ok ? await r2.text() : '';
+    } catch {} finally { clearTimeout(t); }
+    const embeds = [...cuerpo.matchAll(/<li[^>]*encrypt="([0-9a-f]+)"/gi)].map((m) => { try { return Buffer.from(m[1], 'hex').toString('utf8'); } catch { return ''; } });
+    return embeds.some((u) => /^https?:\/\//i.test(u));
+  } catch { return false; }
+}
+/* v243: SONDA ANIMEFLV — 5 vivas + 3 muertas por ciclo */
+async function sondaAnimeflv() {
+  try {
+    const memMB = process.memoryUsage().heapUsed / 1024 / 1024;
+    if (memMB > 350) { console.warn('[sonda] af saltado — memoria alta: ' + memMB.toFixed(0) + 'MB'); return; }
+    const t0 = Date.now();
+    let vm = 0, mv = 0;
+    const sh = (arr) => { const a = [...arr]; for (let k = a.length - 1; k > 0; k--) { const z = Math.floor(Math.random() * (k + 1)); [a[k], a[z]] = [a[z], a[k]]; } return a; };
+    for (const slug of sh([...AF_TODOS].filter((x) => !AF_OCULTAS.has(x))).slice(0, 5)) {
+      try {
+        AF_VISTAS.add(slug);
+        if (await afProbe(slug)) afPerdonar(slug);
+        else { const era = AF_OCULTAS.has(slug); afOcultar(slug); if (!era && AF_OCULTAS.has(slug)) { vm++; sondaNotify('AnimeFLV', 'muerto', slug, slug + ' murio — sin servidores'); } }
+      } catch {}
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    for (const slug of sh([...AF_OCULTAS]).slice(0, 3)) {
+      try {
+        if (await afProbe(slug)) { AF_OCULTAS.delete(slug); ocultasReescribir(AF_OCULTAS, 'af-ocultas.txt'); afPerdonar(slug); mv++; sondaNotify('AnimeFLV', 'revivio', slug, slug + ' revivio — servidores otra vez'); }
+      } catch {}
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    try { fs.writeFileSync(path.join(__dirname, 'public', 'af-vistas.txt'), [...AF_VISTAS].join('\n') + '\n'); } catch {}
+    const el = ((Date.now() - t0) / 1000).toFixed(1);
+    console.log('[sonda] af (' + el + 's): ' + ((vm || mv) ? ('vivas→muertas=' + vm + ' muertas→vivas=' + mv) : 'sin cambios'));
+    try { fs.appendFileSync(path.join(__dirname, 'sonda-animeflv.log'), '[' + new Date().toISOString() + '] ' + el + 's vivas→muertas=' + vm + ' muertas→vivas=' + mv + ' muertas=' + AF_OCULTAS.size + ' vistas=' + AF_VISTAS.size + '\n'); } catch {}
+  } catch (e) { console.warn('[sonda] af error: ' + String(e).slice(0, 60)); }
+}
 async function buscarAnimeflv(q) {
   const r = await fetchSeguro('https://vww.animeflv.one/animes?buscar=' + encodeURIComponent(q), 9000);
   if (!r.ok) return [];
@@ -5092,7 +5131,7 @@ async function buscarAnimeflv(q) {
     const url = 'https://vww.animeflv.one/' + href;
     if (vistos.has(url)) continue;
     vistos.add(url);
-    const afSl = (/ver\/([a-z0-9-]+)-\d+/.exec(href) || [])[1] || ''; /* v205.2: ocultadas por podredumbre fuera */
+    const afSl = (/anime\/([a-z0-9-]+)/.exec(href) || [])[1] || ''; /* v205.2: ocultadas fuera · v243: era /ver/ y nunca matcheaba */
     if (AF_OCULTAS.has(afSl)) continue;
     out.push({
       title: h3.replace(/&#0?39;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim(),
@@ -10843,6 +10882,13 @@ async function cuevanaLatest() {
             vistas: [...CARI_VISTAS].filter((x) => x.startsWith('lct:')).length,
             activas: LCT_SERIES.size - LCT_OCULTAS.size - LCT_MUERTAS.size,
           },
+          animeflv: {
+            nombre: 'AnimeFLV',
+            total: AF_TODOS.size,
+            ocultas: AF_OCULTAS.size,
+            vistas: AF_VISTAS.size,
+            activas: AF_TODOS.size - AF_OCULTAS.size,
+          },
           miscaricaturas: {
             nombre: 'MisCaricaturas',
             total: CARI_ORDEN.length,
@@ -10961,7 +11007,7 @@ async function cuevanaLatest() {
         espejoPreferido: movieEspejoPreferido() || null,
         intros: { analizados: CRAWL.hechas || 0, total: CRAWL.total || 0, enCola: CRAWL.pend.length, aprendidas: Object.keys(INTROS).length, sinIntro: (CRAWL.sinIntro || []).length, muestra },
         moderacion: { animesMuertos: LA_MUERTAS_SET.size, animesCastDup: LA_OCULTAS_SET.size, pelisxd: PXD_OCULTAS.size, animeflv: AF_OCULTAS.size, cuevana: CV_OCULTAS_RT.size, novelas: NV_OCULTAS.size, caricaturasMuertas: DANI_MUERTAS.size + LCT_MUERTAS.size + CARI_MUERTAS.size, protegidas: CV_PROTEGIDAS.size, epsOcultos: EPS_MUERTOS.size, fallosEnCurso: [FALLOS_PXD, FALLOS_AF, FALLOS_CV, FALLOS_NV, FALLOS_DANI, FALLOS_LCT, FALLOS_CARI, EPS_FALLOS].reduce((a2, mm2) => a2 + [...mm2.values()].filter((x2) => x2.f >= 1 && !x2.h).length, 0) },
-        catalogos: { caricaturas: cariFeedCache.items.length, cartoons: cariFeedCache.toons.length, liveaction: cariFeedCache.live.length, danimados: DANI_CAT.size, animes: LA_TODOS.size - LA_OCULTAS_SET.size - LA_MUERTAS_SET.size, novelas: nvdCache.items.length },
+        catalogos: { caricaturas: cariFeedCache.items.length, cartoons: cariFeedCache.toons.length, liveaction: cariFeedCache.live.length, danimados: DANI_CAT.size, animes: LA_TODOS.size - LA_OCULTAS_SET.size - LA_MUERTAS_SET.size, novelas: nvdCache.items.length, animeflv: AF_TODOS.size - AF_OCULTAS.size },
         cosecha,
         movie: (() => { /* v207: estado del mapa local del app Movie */
           movieRecargar();

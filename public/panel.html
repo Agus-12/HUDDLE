@@ -197,9 +197,9 @@ function renderDash(d){
     +'<div class="card" onclick="showPage(\'Users\')"><div class="n">'+d.usuarios+'</div><div class="t">Usuarios ▸</div></div>';
   var ca=d.catalogos||{};
   var f=_stats?_stats.fuentes:{};
-  var tp=0;for(var k in f){if(k!=='latanime'&&k!=='danimados'&&k!=='lacartoons'&&k!=='miscaricaturas')tp+=Math.max(0,f[k].activas||0);}
+  var tp=0;for(var k in f){if(k!=='latanime'&&k!=='danimados'&&k!=='lacartoons'&&k!=='miscaricaturas'&&k!=='animeflv')tp+=Math.max(0,f[k].activas||0);}
   var laAct=f.latanime?Math.max(0,f.latanime.activas||0):0;
-  var ts=(ca.animes||0);
+  var ts=(ca.animes||0)+(ca.animeflv||0);
   var tc=((f.danimados?Math.max(0,f.danimados.activas||0):0)+(f.lacartoons?Math.max(0,f.lacartoons.activas||0):0)+(f.miscaricaturas?Math.max(0,f.miscaricaturas.activas||0):0))||((ca.caricaturas||0)+(ca.cartoons||0)+(ca.liveaction||0));
   var gt=tp+ts+tc;
   document.getElementById('catCards').innerHTML=
@@ -208,7 +208,7 @@ function renderDash(d){
     +'<div class="card noclick"><div class="n" style="color:#38bdf8">'+tc+'</div><div class="t">Caricaturas</div></div>'
     +'<div class="card noclick"><div class="n" style="color:#ffb020">'+gt+'</div><div class="t">Total</div></div>';
   document.getElementById('catDetail').innerHTML=
-    'Caricaturas: <b>'+ca.caricaturas+'</b> · Cartoons: <b>'+ca.cartoons+'</b> · Live Action: <b>'+ca.liveaction+'</b> · Danimados: <b>'+ca.danimados+'</b> · Animes: <b>'+ca.animes+'</b>';
+    'Caricaturas: <b>'+ca.caricaturas+'</b> · Cartoons: <b>'+ca.cartoons+'</b> · Live Action: <b>'+ca.liveaction+'</b> · Danimados: <b>'+ca.danimados+'</b> · Animes: <b>'+ca.animes+'</b> · AnimeFLV: <b>'+ca.animeflv+'</b>';
   var ii=d.intros||{};
   var pct=ii.total?Math.round(ii.analizados*100/ii.total):0;
   var ih='<div class="barra"><i style="width:'+pct+'%;background:linear-gradient(90deg,#8a5cf6,#38e08a)"></i></div>'
@@ -230,8 +230,8 @@ function renderDash(d){
 function renderFuentes(stats){
   _stats=stats;
   var f=stats.fuentes||{};
-  var colors={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8',latanime:'#ffb020',danimados:'#fb7185',lacartoons:'#2dd4bf',miscaricaturas:'#ffd93b'};
-  var logos={cuevana:'cuevana.png',pelisxd:'pelisxd.png',cinecalidad:'cinecalidad.png',latanime:'latanime.png',danimados:'danimados.png',lacartoons:'lacartoons.png',miscaricaturas:'caricaturas.png'};
+  var colors={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8',latanime:'#ffb020',danimados:'#fb7185',lacartoons:'#2dd4bf',miscaricaturas:'#ffd93b',animeflv:'#feac5d'};
+  var logos={cuevana:'cuevana.png',pelisxd:'pelisxd.png',cinecalidad:'cinecalidad.png',latanime:'latanime.png',danimados:'danimados.png',lacartoons:'lacartoons.png',miscaricaturas:'caricaturas.png',animeflv:'animeflv.png'};
   var totalAct=0,html='';
   for(var k in f){
     var s=f[k];var c=colors[k]||'#efeaf7';
@@ -250,10 +250,10 @@ function renderFuentes(stats){
 
 function showFuente(k){
   var f=_stats?_stats.fuentes[k]:null;if(!f)return;
-  var colors={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8',latanime:'#ffb020',danimados:'#fb7185',lacartoons:'#2dd4bf',miscaricaturas:'#ffd93b'};
-  var names={cuevana:'Cuevana',pelisxd:'PelisXD',cinecalidad:'CineCalidad',latanime:'Latanime',danimados:'Danimados',lacartoons:'Lacartoons',miscaricaturas:'MisCaricaturas'};
+  var colors={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8',latanime:'#ffb020',danimados:'#fb7185',lacartoons:'#2dd4bf',miscaricaturas:'#ffd93b',animeflv:'#feac5d'};
+  var names={cuevana:'Cuevana',pelisxd:'PelisXD',cinecalidad:'CineCalidad',latanime:'Latanime',danimados:'Danimados',lacartoons:'Lacartoons',miscaricaturas:'MisCaricaturas',animeflv:'AnimeFLV'};
   var c=colors[k]||'#efeaf7';
-  var logos={cuevana:'cuevana.png',pelisxd:'pelisxd.png',cinecalidad:'cinecalidad.png',latanime:'latanime.png',danimados:'danimados.png',lacartoons:'lacartoons.png',miscaricaturas:'caricaturas.png'};
+  var logos={cuevana:'cuevana.png',pelisxd:'pelisxd.png',cinecalidad:'cinecalidad.png',latanime:'latanime.png',danimados:'danimados.png',lacartoons:'lacartoons.png',miscaricaturas:'caricaturas.png',animeflv:'animeflv.png'};
   var logo=logos[k]?'<img src="/sites/'+logos[k]+'?v=242" alt="" style="width:48px;height:48px;object-fit:contain;vertical-align:middle;margin-right:10px;filter:drop-shadow(0 0 8px '+c+'66)" onerror="this.style.display=\'none\'">':'';
   var act=Math.max(0,f.activas||0);
   var pct=f.total?Math.round(act*100/f.total):0;
