@@ -35,7 +35,7 @@ function checkAdminAuth(req, res) {
   return true;
 }
 
-const UI_VERSION = 'v239.1'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
+const UI_VERSION = 'v239.2'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
