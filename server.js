@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v269'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v270'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -5343,6 +5343,8 @@ async function peliculasPorGenero(slug, pag) {
     if (pxdItems[i]) mezcla.push(pxdItems[i]);
     if (cvMovItems[i]) mezcla.push(cvMovItems[i]);
   }
+  // v270: rotativo — baraja el orden dentro del género cada carga
+  for(let i=mezcla.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [mezcla[i],mezcla[j]]=[mezcla[j],mezcla[i]]; }
   const items = mezcla.length ? mezcla : cvItems;
   if (items.length) generosCache.set(slug, { at: Date.now(), items });
   return items;
@@ -10754,7 +10756,6 @@ async function d23Latest() {
   } catch { return d23LatestCache.items; }
 }
 async function animesMezclados() {
-  // v269: una sola fila de animes, intercalando Latanime + AnimeFLV + D23 para dar vida
   const [la, af, d23] = await Promise.all([
     animesDelMomento().catch(() => []),
     afLatest().catch(() => []),
@@ -10767,15 +10768,54 @@ async function animesMezclados() {
     if (af[i]) mezcla.push(af[i]);
     if (d23[i]) mezcla.push(d23[i]);
   }
-  return mezcla.length ? mezcla : la;
+  const out = mezcla.length ? mezcla : la;
+  // v270: rotativo por carga — baraja leve para que no siempre sea mismo orden
+  for(let i=out.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [out[i],out[j]]=[out[j],out[i]]; }
+  return out;
+}
+/* v270: series mezcladas 1-1 (CineCalidad + populares serie) + rotativo */
+async function seriesMezcladas(){
+  const [s1, s2] = await Promise.all([
+    seriesRecientes().catch(()=>[]),
+    popularesDeHoy().then(xs=> (xs||[]).filter(x=>/\/serie\//.test(x.url))).catch(()=>[]),
+  ]);
+  const mezcla=[];
+  const max=Math.max(s1.length, s2.length);
+  for(let i=0;i<max && mezcla.length<32;i++){
+    if(s1[i]) mezcla.push(s1[i]);
+    if(s2[i] && !mezcla.find(x=>x.url===s2[i].url)) mezcla.push(s2[i]);
+  }
+  const out = mezcla.length ? mezcla : s1;
+  for(let i=out.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [out[i],out[j]]=[out[j],out[i]]; }
+  return out;
+}
+/* v270: Estrenos — todas las nuevas pelis que van entrando (PelisXD + Cuevana + CineCalidad tendencias) */
+async function estrenosMezclados(){
+  const [pxd, cv, cc] = await Promise.all([
+    pelisxdLatest().catch(()=>[]),
+    cuevanaLatest().catch(()=>[]),
+    popularesDeHoy().catch(()=>[]),
+  ]);
+  // filtrar solo pelis (no series) para estrenos
+  const ccPelis = (cc||[]).filter(x=>!/\/serie\//.test(x.url));
+  const mezcla=[];
+  const max=Math.max(pxd.length, cv.length, ccPelis.length);
+  for(let i=0;i<max && mezcla.length<36;i++){
+    if(pxd[i]) mezcla.push(pxd[i]);
+    if(cv[i]) mezcla.push(cv[i]);
+    if(ccPelis[i]) mezcla.push(ccPelis[i]);
+  }
+  // rotativo
+  for(let i=mezcla.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [mezcla[i],mezcla[j]]=[mezcla[j],mezcla[i]]; }
+  return mezcla;
 }
 
       /* v55: populares del día + v57: series recién agregadas
        * v101: + 6 filas de género que rotan cada día
        * v102: + caricaturas (debajo de los animes) */
-      const [day, series, animes, generos, cari, nv] = await Promise.all([ /* v206: + novelas */
+      const [day, series, animes, generos, cari, nv, estrenos] = await Promise.all([ /* v206: + novelas */
         popularesDeHoy().catch(() => []),
-        seriesRecientes().catch(() => []),
+        seriesMezcladas().catch(() => []),
         animesMezclados().catch(() => []), /* v269: animes intercalados Latanime+AnimeFLV+D23 */
         /* v234: batch de a 6 géneros para no saturar memoria */
         (async () => {
@@ -10794,10 +10834,15 @@ async function animesMezclados() {
         })(),
         caricaturasDestacadas().catch(() => ({ caricaturas: [], cartoons: [] })),
         nvCatalogo().catch(() => []), /* v206 */
+        estrenosMezclados().catch(() => []),
       ]);
       const fCV = (xs) => (xs || []).filter((x) => !cvOcultaUrl(x.url) && !laOcultaUrl(x.url)); /* v195 muertas + v198 latanime castellano/duplicados fuera */
+      // v270: rotativo — cada carga baraja un poco para no ver siempre lo mismo
+      const shuf = (a)=>{ const x=[...a]; for(let i=x.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [x[i],x[j]]=[x[j],x[i]];} return x; };
+      const dayR = shuf(fCV(day)); const seriesR = shuf(fCV(series)); const animesR = shuf(fCV(animes));
+      const estrenosR = shuf((estrenos||[]).filter(x=>!cvOcultaUrl(x.url) && !laOcultaUrl(x.url)));
       return json(res, 200, {
-        ok: true, results: fCV(day), series: fCV(series), animes: fCV(animes),
+        ok: true, results: dayR, series: seriesR, animes: animesR, estrenos: estrenosR,
         caricaturas: cari.caricaturas || [],
         cartoons: cari.cartoons || [], /* v119: apartado propio de Lacartoons */
         liveaction: cari.liveaction || [], /* v205: iCarly, Drake & Josh, Power Rangers… */

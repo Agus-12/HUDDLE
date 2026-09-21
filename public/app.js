@@ -4089,12 +4089,26 @@ $('#soloEndCancelar').addEventListener('click', pararCuentaSiguiente);
 /* v205: toque de una tarjeta del feed o del catálogo — un solo
  * comportamiento: series → picker de episodios; Solo → directo; Juntos →
  * crea la sala con la carátula al instante */
+function guardarHistorial(res){
+  try{
+    const key='huddle_historial';
+    let arr=[]; try{ arr=JSON.parse(localStorage.getItem(key)||'[]'); }catch{}
+    if(!Array.isArray(arr)) arr=[];
+    // evita duplicado consecutivo
+    if(arr.length && arr[0].url===res.url) return;
+    arr.unshift({ title: res.title||'', url: res.url||'', site: res.site||'', at: Date.now() });
+    if(arr.length>24) arr=arr.slice(0,24);
+    localStorage.setItem(key, JSON.stringify(arr));
+  }catch{}
+}
 function tocarFeedResultado(res) {
+  guardarHistorial(res);
   if (elegirTitulo(res)) return; /* v61: series → temporadas y episodios */
   if (S.modoSolo) { /* v81: sin sala — directo en tu dispositivo */
     abrirSolo(res.url, { title: res.title || '', img: res.img || '' });
     return;
   }
+  // v270: historial ya guardado arriba
   S.pendingStart = { url: res.url, name: res.title, img: res.img || '' };
   /* v60: carátula a pantalla completa desde YA — la sala carga por detrás */
   S.mirrorInfo = { title: res.title || '', img: res.img || '', url: res.url, sub: 'Cargando tu sala…' };
@@ -4132,9 +4146,67 @@ async function cargarPopulares() {
     }
     /* v67: tercera fila — animes del momento (Latanime); un toque abre
      * el selector de episodios, igual que cualquier anime */
+    // v270: Recomendado para ti — solo si hay historial (>=3)
+    try{
+      const hist = JSON.parse(localStorage.getItem('huddle_historial')||'[]');
+      const recoBox = document.querySelector('#recoBox');
+      const recoRow = document.querySelector('#recoRow');
+      const nombre = (S.profile && S.profile.name) || (()=>{
+        try{ const p=JSON.parse(localStorage.getItem('huddle_profile')||'null'); return p&&p.name; }catch{return '';}
+      })() || '';
+      if(recoBox && recoRow && hist && hist.length>=3){
+        const palabras = {};
+        hist.slice(0,8).forEach(h=>{
+          (h.title||'').toLowerCase().split(/[^a-z0-9áéíóúñ]+/).forEach(w=>{
+            if(w.length<3) return;
+            if(['the','los','las','del','una','con','para','esta','este','esto','pelicula','serie','anime'].includes(w)) return;
+            palabras[w]=(palabras[w]||0)+1;
+          });
+        });
+        const topW = Object.entries(palabras).sort((a,b)=>b[1]-a[1]).slice(0,4).map(x=>x[0]);
+        // junta todo el feed para buscar similares
+        const pool = [
+          ...(d.results||[]), ...(d.series||[]), ...(d.animes||[]),
+          ...(d.generos||[]).flatMap(g=>g.items||[]),
+          ...(d.caris||[]), ...(d.cartoons||[]), ...(d.liveaction||[]),
+          ...(d.estrenos||[]), ...(d.pelisxd||[]), ...(d.cuevana||[])
+        ];
+        const vistos = new Set(hist.map(h=>h.url));
+        let recom = [];
+        if(topW.length){
+          recom = pool.filter(r=> !vistos.has(r.url) && topW.some(w=> (r.title||'').toLowerCase().includes(w))).slice(0,16);
+        }
+        if(recom.length<8){
+          // fallback: aleatorio de generos
+          const pool2 = (d.generos||[]).flatMap(g=>g.items||[]).filter(r=>!vistos.has(r.url));
+          const sh = [...pool2]; for(let i=sh.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [sh[i],sh[j]]=[sh[j],sh[i]]; }
+          for(const r of sh){ if(recom.length>=12) break; if(!recom.find(x=>x.url===r.url)) recom.push(r); }
+        }
+        if(recom.length){
+          recoRow.innerHTML='';
+          recom.slice(0,16).forEach(res=> recoRow.appendChild(crearTarjetaResultado(res, alTocar(res))));
+          const t = document.querySelector('#recoTitle');
+          if(t) t.textContent = nombre ? ('Recomendado para ' + nombre) : 'Recomendado para ti';
+          recoBox.classList.remove('hidden');
+        }
+      }
+    }catch(e){ console.warn('reco',e); }
     if (wrapA && filaA && d.animes && d.animes.length) {
       d.animes.slice(0, 16).forEach((res) => filaA.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrapA.classList.remove('hidden');
+    }
+    // v270: Estrenos fila debajo de animes
+    const wrapE = document.querySelector('#estrenosBox');
+    const filaE = document.querySelector('#estrenosRow');
+    if(wrapE && filaE && d.estrenos && d.estrenos.length){
+      filaE.innerHTML='';
+      d.estrenos.slice(0,16).forEach((res)=> filaE.appendChild(crearTarjetaResultado(res, alTocar(res))));
+      wrapE.classList.remove('hidden');
+    } else if(wrapE && filaE && d.pelisxd && d.cuevana){
+      // fallback si no hay estrenos mezclados
+      const mix=[]; const a=d.pelisxd||[], b=d.cuevana||[]; const m=Math.max(a.length,b.length);
+      for(let i=0;i<m&&mix.length<16;i++){ if(a[i]) mix.push(a[i]); if(b[i]) mix.push(b[i]); }
+      if(mix.length){ mix.forEach(res=> filaE.appendChild(crearTarjetaResultado(res, alTocar(res)))); wrapE.classList.remove('hidden'); }
     }
     /* v102: caricaturas — debajo de los animes; un toque abre el selector */
     const wrapC = document.querySelector('#cariBox');
