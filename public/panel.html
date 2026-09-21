@@ -253,6 +253,7 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
         <div class="stat-mini"><div class="k">Total vivos</div><div class="v" id="audPelisTotalV">0</div></div>
         <div class="stat-mini"><div class="k">OK</div><div class="v" id="audPelisOkV" style="color:#22c55e">0</div></div>
         <div class="stat-mini"><div class="k">Fallos</div><div class="v" id="audPelisFailV" style="color:#f87171">0</div></div>
+        <div class="stat-mini"><div class="k">Reparados</div><div class="v" id="audPelisRepV" style="color:#38bdf8">0</div></div>
       </div>
       <div style="font-size:11px;color:#9d93b5;margin-top:6px;display:flex;flex-wrap:wrap;gap:4px" id="audPelisFuente"></div>
       <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-top:10px;display:flex;align-items:center;gap:6px">
@@ -282,7 +283,8 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
       <div class="stat-row">
         <div class="stat-mini"><div class="k">Total vivos</div><div class="v" id="audSeriesTotalV">0</div></div>
         <div class="stat-mini"><div class="k">OK</div><div class="v" id="audSeriesOkV" style="color:#22c55e">0</div></div>
-        <div class="stat-mini"><div class="k">Reparados</div><div class="v" id="audSeriesFailV" style="color:#f59e0b">0</div></div>
+        <div class="stat-mini"><div class="k">Fallos</div><div class="v" id="audSeriesFailV" style="color:#f87171">0</div></div>
+        <div class="stat-mini"><div class="k">Reparados</div><div class="v" id="audSeriesRepV" style="color:#38bdf8">0</div></div>
       </div>
       <div style="font-size:11px;color:#9d93b5;margin-top:6px;display:flex;flex-wrap:wrap;gap:4px" id="audSeriesFuente"></div>
       <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-top:10px;display:flex;align-items:center;gap:6px">
@@ -588,19 +590,21 @@ function renderAuditoria(d){
   var p=a.progreso.peliculas, s=a.progreso.series;
   // pelis
   var peliBar=document.getElementById('audPelisBar'); if(peliBar) peliBar.style.width=(p.pct||0)+'%';
-  var peliTxt=document.getElementById('audPelisTxt'); if(peliTxt) peliTxt.textContent=(p.verificadas||0)+' / '+(p.total||0)+' · OK:'+(p.ok||0)+' Fail:'+(p.fail||0);
+  var peliTxt=document.getElementById('audPelisTxt'); if(peliTxt) peliTxt.textContent=(p.verificadas||0)+' / '+(p.total||0)+' · OK:'+(p.ok||0)+' Fail:'+(p.fail||0)+' Rep:'+(p.reparadas||0);
   var peliPct=document.getElementById('audPelisPct'); if(peliPct) peliPct.textContent=(p.pct||0)+'%';
   var peliTotalV=document.getElementById('audPelisTotalV'); if(peliTotalV) peliTotalV.textContent=p.total||0;
   var peliOkV=document.getElementById('audPelisOkV'); if(peliOkV) peliOkV.textContent=p.ok||0;
   var peliFailV=document.getElementById('audPelisFailV'); if(peliFailV) peliFailV.textContent=p.fail||0;
+  var peliRepV=document.getElementById('audPelisRepV'); if(peliRepV) peliRepV.textContent=p.reparadas||0;
   var peliEst=document.getElementById('audPelisEst'); if(peliEst) peliEst.textContent= running && a.alcance.peliculas ? 'vivo' : a.alcance.peliculas ? 'listo' : 'off';
   // series
   var serBar=document.getElementById('audSeriesBar'); if(serBar) serBar.style.width=(s.pct||0)+'%';
-  var serTxt=document.getElementById('audSeriesTxt'); if(serTxt) serTxt.textContent=(s.verificadas||0)+' / '+(s.total||0)+' · OK:'+(s.ok||0)+' Fail:'+(s.fail||0);
+  var serTxt=document.getElementById('audSeriesTxt'); if(serTxt) serTxt.textContent=(s.verificadas||0)+' / '+(s.total||0)+' · OK:'+(s.ok||0)+' Fail:'+(s.fail||0)+' Rep:'+(s.reparadas||0);
   var serPct=document.getElementById('audSeriesPct'); if(serPct) serPct.textContent=(s.pct||0)+'%';
   var serTotalV=document.getElementById('audSeriesTotalV'); if(serTotalV) serTotalV.textContent=s.total||0;
   var serOkV=document.getElementById('audSeriesOkV'); if(serOkV) serOkV.textContent=s.ok||0;
   var serFailV=document.getElementById('audSeriesFailV'); if(serFailV) serFailV.textContent=s.fail||0;
+  var serRepV=document.getElementById('audSeriesRepV'); if(serRepV) serRepV.textContent=s.reparadas||0;
   var serEst=document.getElementById('audSeriesEst'); if(serEst) serEst.textContent= running && a.alcance.series ? 'vivo' : a.alcance.series ? 'listo' : 'off';
 
   // preview bars

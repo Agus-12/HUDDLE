@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v266'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v267'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -33,7 +33,7 @@ const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_
 const HUDDLE_AUDITORIA = {
   activo: false, pausado: false, iniciadoEn: 0, pausadoEn: 0,
   alcance: { peliculas: true, series: true, fuentes: { pelisxd:true, cuevana:true, cinecalidad:true, animeflv:true, latanime:true, animed23:true, danimados:true, lacartoons:true, miscaricaturas:true, novelas:false } },
-  progreso: { peliculas: { total:0, verificadas:0, ok:0, fail:0, pct:0, porFuente:{} }, series: { total:0, verificadas:0, ok:0, fail:0, pct:0, porFuente:{} }, duplicadas:0 },
+  progreso: { peliculas: { total:0, verificadas:0, ok:0, fail:0, reparadas:0, pct:0, porFuente:{} }, series: { total:0, verificadas:0, ok:0, fail:0, reparadas:0, pct:0, porFuente:{} }, duplicadas:0 },
   logs: [], // {ts, fuente, tipo, slug, msg} max 200
   _timer: null, _batch: 0,
 };
@@ -5628,7 +5628,7 @@ async function sondaHuddlePeliculas(){
             try{ globalThis._searchCache.delete(t.slug); }catch{}
             // Reintentar una vez
             const h2 = await huddleProbePelicula(t.slug, t.fuente).catch(()=>({huddle:false}));
-            if(h2.huddle){ reparadas++; auditoriaLog('Huddle-Pelis','reparado',t.slug, t.fuente+':'+t.slug+' REPARADO tras limpiar cache'); }
+            if(h2.huddle){ reparadas++; HUDDLE_AUDITORIA.progreso.peliculas.reparadas++; auditoriaLog('Huddle-Pelis','reparado',t.slug, t.fuente+':'+t.slug+' REPARADO tras limpiar cache'); }
             // Notificar sonda fuente
             sondaNotify('Huddle','huddle-falla', t.slug, t.fuente+':'+t.slug+' huddle falla pero fuente ok — cache limpiado');
           } else {
@@ -5737,7 +5737,7 @@ async function sondaHuddleSeries(){
             try{ globalThis._searchCache.delete(t.slug); }catch{}
             try{ DANI_FEEDS.delete(t.slug); }catch{}
             const h2 = await huddleProbeSerie(t.slug, t.fuente).catch(()=>({huddle:false}));
-            if(h2.huddle){ reparadas++; auditoriaLog('Huddle-Series','reparado',t.slug, t.fuente+':'+t.slug+' REPARADO'); }
+            if(h2.huddle){ reparadas++; HUDDLE_AUDITORIA.progreso.series.reparadas++; auditoriaLog('Huddle-Series','reparado',t.slug, t.fuente+':'+t.slug+' REPARADO'); }
             sondaNotify('Huddle','huddle-falla',t.slug, t.fuente+':'+t.slug+' huddle falla fuente ok');
           } else {
             fail++; HUDDLE_AUDITORIA.progreso.series.fail++;
@@ -5773,8 +5773,8 @@ function auditoriaIniciar(alcance){
     }
   }
   HUDDLE_AUDITORIA.activo=true; HUDDLE_AUDITORIA.pausado=false; HUDDLE_AUDITORIA.iniciadoEn=Date.now();
-  HUDDLE_AUDITORIA.progreso.peliculas={ total:0, verificadas:0, ok:0, fail:0, pct:0, porFuente:{} };
-  HUDDLE_AUDITORIA.progreso.series={ total:0, verificadas:0, ok:0, fail:0, pct:0, porFuente:{} };
+  HUDDLE_AUDITORIA.progreso.peliculas={ total:0, verificadas:0, ok:0, fail:0, reparadas:0, pct:0, porFuente:{} };
+  HUDDLE_AUDITORIA.progreso.series={ total:0, verificadas:0, ok:0, fail:0, reparadas:0, pct:0, porFuente:{} };
   // Calcular totales vivos
   try{
     let totP=0; if(HUDDLE_AUDITORIA.alcance.fuentes.pelisxd) totP+= [...(pelisxdIdx?.slugs||[])].filter(s=>!PXD_OCULTAS.has(s)).length || 4700;
