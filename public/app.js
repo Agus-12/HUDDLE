@@ -1918,6 +1918,22 @@ function startMirrorFromPicker() {
 $('#btnMirror').addEventListener('click', startMirrorFromPicker);
 $('#mirrorUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') startMirrorFromPicker(); });
 
+/* v244: autoridad única de logos — por DOMINIO (mismo que panel). LOGO_V debe ir ANTES de SITES/renderPageDrop para evitar TDZ (ReferenceError al cargar). */
+const LOGO_V = '247';
+const LOGOS_DOMINIO = {
+  'latanime.org': 'latanime.png',
+  'cuevana.mov': 'cuevana.png',
+  'cine-calidad.mx': 'cinecalidad.png',
+  'pelisxd.com': 'pelisxd.png', 'lisxd.com': 'pelisxd.png',
+  'danimados.cc': 'danimados.png',
+  'lacartoons.com': 'lacartoons.png',
+  'miscaricaturas.com': 'caricaturas.png',
+  'animeflv.one': 'animeflv.png', 'animeflv.net': 'animeflv.png', 'animeflv.io': 'animeflv.png',
+  'novelas360.com': 'novelas.png', 'enpantallatv.com': 'novelas.png', 'movie.huddle': 'novelas.png',
+  'animed23.com': 'animed23.png',
+  'youtube.com': 'youtube.png', 'youtu.be': 'youtube.png',
+};
+
 /* v34: páginas recomendadas en desplegable propio CON LOGOS — un toque y a ver;
    la fila de URL solo aparece al elegir "Otra página" */
 /* v43: el directorio de páginas ya no está clavado — parte de estos 4 y se
@@ -3016,24 +3032,7 @@ $('#btnCreateGo').addEventListener('click', () => {
  * resultados listos para crear la sala o navegar el espejo */
 /* v50: resultados como cartelera — filas horizontales deslizables por página,
  * carátula grande, nombre abajo y el logo de la página en la esquina */
-/* v244: autoridad única de logos — por DOMINIO (los mismos archivos del panel).
- * Antes el badge buscaba por nombre en SITES: 'Caricaturas'/'Cartoons'/'Movie'/
- * 'Novelas'/'AnimeFLV' no existían ahí y caían a la carita o a favicons viejos
- * del servidor. Ahora el dominio manda; ?v= rompe el caché del navegador. */
-const LOGO_V = '246';
-const LOGOS_DOMINIO = {
-  'latanime.org': 'latanime.png',
-  'cuevana.mov': 'cuevana.png',
-  'cine-calidad.mx': 'cinecalidad.png',
-  'pelisxd.com': 'pelisxd.png', 'lisxd.com': 'pelisxd.png',
-  'danimados.cc': 'danimados.png',
-  'lacartoons.com': 'lacartoons.png',
-  'miscaricaturas.com': 'caricaturas.png',
-  'animeflv.one': 'animeflv.png', 'animeflv.net': 'animeflv.png', 'animeflv.io': 'animeflv.png',
-  'novelas360.com': 'novelas.png', 'enpantallatv.com': 'novelas.png', 'movie.huddle': 'novelas.png',
-  'animed23.com': 'animed23.png',
-  'youtube.com': 'youtube.png', 'youtu.be': 'youtube.png',
-};
+// LOGO_V y LOGOS_DOMINIO ya definidos arriba (antes de SITES) para evitar TDZ
 function logoPara(url, nombre) {
   try {
     const h = String(new URL(url || 'x:', location.origin).hostname || '').replace(/^www\./, '').toLowerCase();

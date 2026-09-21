@@ -9,7 +9,7 @@ WorkingDirectory=__APP_HOME__/huddle
 Environment=NODE_ENV=production
 Environment=MIRROR_MAX=8
 Environment=CHROME_PATH=__CHROME_BIN__
-ExecStart=/usr/bin/node --expose-gc --max-old-space-size=512 server.js
+ExecStart=/usr/bin/node --expose-gc --max-old-space-size=768 server.js
 Restart=always
 RestartSec=3
 

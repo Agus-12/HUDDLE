@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v246'; // 246: TLN telenovelas + logos feed fix + sonda panel v246
+const UI_VERSION = 'v247'; // 247: fix TDZ LOGO_V · heal front roto v246 + sonda intros
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
