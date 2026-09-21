@@ -11216,7 +11216,13 @@ function panelHtml() {
   <h2><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 7v5l3 2"/></svg> Intros aprendidas</h2>
   <table id="introTabla"><thead><tr><th>Sitio</th><th>Serie</th><th>Temp.</th><th>Segundos</th></tr></thead><tbody></tbody></table>
 
-  <p class="pie" id="pie">conectando…</p>
+  <h2><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18"/><path d="m7 14 4-4 4 4 6-6"/></svg> Fuentes de video — Estadísticas</h2>
+  <div id="fuentesGrid" class="grid"></div>
+
+  <h2><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffb020" stroke-width="2" stroke-linecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Usuarios</h2>
+  <div class="card"><div id="userList" style="font-size:13px">Cargando…</div></div>
+
+    <p class="pie" id="pie">conectando…</p>
 </div>
 <script>
   function fmtSeg(s) {
@@ -11267,9 +11273,56 @@ function panelHtml() {
     fetch('/api/estado').then(function (r) { return r.json(); }).then(pintar).catch(function () {
       document.getElementById('pie').textContent = 'sin conexión con el server — reintentando…';
     });
+    fetch('/api/stats').then(function (r) { return r.json(); }).then(pintarStats).catch(function () {});
+    fetch('/api/users').then(function (r) { return r.json(); }).then(pintarUsers).catch(function () {});
   }
   tic();
   setInterval(tic, 5000); /* v205.5: casi al momento */
+
+  function pintarStats(d) {
+    if (!d.fuentes) return;
+    var html = '';
+    var colores = { cuevana: '#38e08a', pelisxd: '#8a5cf6', cinecalidad: '#38bdf8' };
+    for (var k in d.fuentes) {
+      var f = d.fuentes[k];
+      var color = colores[k] || '#efeaf7';
+      var pct = f.total ? Math.round(f.activas * 100 / f.total) : 0;
+      html += '<div class="card" style="border-left:3px solid ' + color + '">';
+      html += '<div class="n" style="color:' + color + '">' + f.activas + '</div>';
+      html += '<div class="t">' + f.nombre + ' activas</div>';
+      html += '<div style="margin-top:8px;font-size:11px;color:#9d93b5">';
+      html += 'Total: ' + f.total + ' · Ocultas: ' + f.ocultas + ' · Vistas: ' + f.vistas;
+      html += '</div>';
+      html += '<div class="barra" style="margin-top:6px"><i style="width:' + pct + '%;background:' + color + '"></i></div>';
+      html += '<div style="font-size:10px;color:#9d93b5;text-align:right">' + pct + '% activas</div>';
+      html += '</div>';
+    }
+    html += '<div class="card"><div class="n">' + d.memoria + ' MB</div><div class="t">Memoria</div></div>';
+    html += '<div class="card"><div class="n">' + d.usuarios + '</div><div class="t">Usuarios</div></div>';
+    document.getElementById('fuentesGrid').innerHTML = html;
+  }
+
+  function pintarUsers(d) {
+    if (!d.usuarios) return;
+    var html = '<div style="margin-bottom:8px"><b>' + d.total + '</b> usuarios registrados</div>';
+    html += '<table style="width:100%"><thead><tr><th>Nombre</th><th>Último acceso</th><th></th></tr></thead><tbody>';
+    d.usuarios.forEach(function (u) {
+      var last = u.lastSeenAt ? new Date(u.lastSeenAt).toLocaleDateString('es') : '—';
+      html += '<tr><td>' + u.name + '</td><td>' + last + '</td>';
+      html += '<td><button onclick="eliminarUser(\'' + u.name + '\')" style="background:#ff5c7a;color:#fff;border:none;border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer">Eliminar</button></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    document.getElementById('userList').innerHTML = html;
+  }
+
+  function eliminarUser(name) {
+    if (!confirm('¿Eliminar usuario ' + name + '?')) return;
+    fetch('/api/users', { method: 'DELETE', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name: name}) })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d.ok) { alert('Eliminado: ' + name); tic(); } else alert(d.error); })
+      .catch(function () { alert('Error'); });
+  }
 </script>
 </body>
 </html>`;
