@@ -22,7 +22,21 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v236.7'; // 236.7: CDN relay ngrok + CineCalidad buscador + proxy directo por relay
+const UI_VERSION = 'v236.8'; // 236.8: buscarCineCalidad + relay persistente + memory guard
+
+/* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
+if (typeof global.gc === 'function') {
+  setInterval(() => {
+    const mb = process.memoryUsage().heapUsed / 1024 / 1024;
+    if (mb > 300) {
+      global.gc();
+      const after = process.memoryUsage().heapUsed / 1024 / 1024;
+      console.log('[mem] GC: ' + mb.toFixed(0) + 'MB → ' + after.toFixed(0) + 'MB');
+    }
+  }, 30000);
+} else {
+  console.log('[mem] GC no disponible — iniciar con --expose-gc');
+}
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const MAX_USERS = 30;
 const ROOM_TTL_MS = 40 * 60 * 1000; // salas vacías se borran a los 40 min (libera memoria)
