@@ -7175,7 +7175,9 @@ async function buscarEnSitios(q) {
     const key = String(r.url).toLowerCase();
     if (vistos.has(key)) return null;
     vistos.add(key);
-    return { title: r.title, url: r.url, img: r.img || '', site: r.site, extra: r.extra || '', _score: similitud(nq, normalizarTxt(r.title)) };
+    const o = { title: r.title, url: r.url, img: r.img || '', site: r.site, extra: r.extra || '', _score: similitud(nq, normalizarTxt(r.title)) };
+    if (r._apiFresh) o._apiFresh = true; /* v237.1: preservar flag para bypass cvOcultaUrl */
+    return o;
   }).filter(Boolean);
   const lctHits = puntuar(catalogo.filter((x) => x.site === 'Cartoons')).filter((r) => r._score >= 0.5);
   const todos = [
