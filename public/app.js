@@ -599,7 +599,7 @@ function cfgHls(src) {
     : base;
 }
 // v256 híbrido 5h: cache en navegador para Cuevana (2KB por peli)
-const CUEVANA_LS_TTL_GOOD = 60*1000;
+const CUEVANA_LS_TTL_GOOD = 0;
 const CUEVANA_LS_TTL = 5*3600*1000;
 const CUEVANA_LS_PREFIX = 'huddle:cuevana:';
 function cuevanaLsGet(slug){
