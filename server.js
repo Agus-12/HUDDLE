@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v268'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v269'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -5252,6 +5252,19 @@ async function pelisxdPorGenero(slug) {
     return items;
   } catch { return []; }
 }
+async function pelisxdPorGeneroPagina(slug, pag){
+  const pxdSlug = PXD_GENERO_MAP[slug];
+  if(!pxdSlug) return [];
+  try{
+    const r = await fetchSeguro('https://www.pelisxd.com/genero/' + pxdSlug + '?page=' + pag, 12000);
+    if(!r.ok) return [];
+    const html = await r.text();
+    const items=[];
+    const re = /href="\/pelicula\/([a-z0-9-]+)"[^>]*>[\s\S]*?src="([^"]+)"[\s\S]*?<h3[^>]*>([^<]+)<\/h3>\s*<span[^>]*>(\d{4})<\/span>/g;
+    let m; while((m=re.exec(html)) && items.length<12){ items.push({ title: m[3].trim(), url: 'https://www.pelisxd.com/pelicula/'+m[1], img: (m[2].startsWith('/')?'https://www.pelisxd.com':'')+m[2].replace('/w780/','/w342/').replace('/original/','/w342/'), site:'PelisXD', extra:m[4]||'' }); }
+    return items;
+  }catch{ return []; }
+}
 /* v235: Cuevana películas por género */
 const PXD_CV_GENERO_MAP = {
   accion: 'accion', animacion: 'animacion', aventura: 'aventura',
@@ -5280,10 +5293,37 @@ async function cuevanaPorGenero(slug) {
     return items;
   } catch { return []; }
 }
+async function cuevanaPorGeneroPagina(slug, pag){
+  const cvSlug = PXD_CV_GENERO_MAP[slug] || slug;
+  try{
+    const r = await fetchSeguro('https://cuevana.mov/wp-json/wpreact/v1/postsapi?per_page=12&page=' + pag + '&genre=' + cvSlug, 12000);
+    if(!r.ok) return [];
+    const d = await r.json().catch(()=>({}));
+    return (d.posts||[]).filter(p=>p.type==='pelicula' && !CVM_OCULTAS.has(p.slug)).slice(0,12).map(p=>({ title:p.title||'', url:'https://cuevana.mov/pelicula/'+(p.tmdb_id||'0')+'/'+p.slug, img:p.featured_image||'', site:'Cuevana', extra:p.year||'' }));
+  }catch{ return []; }
+}
 
 async function peliculasPorGenero(slug, pag) {
-  if (pag > 1) { /* v205: páginas del catálogo — directas, sin caché */
-    return (await generoPagina(slug, pag)).items.slice(0, 20);
+  if (pag > 1) {
+    // v269: paginado intercalado de las 3 fuentes para Ver todo con vida
+    const pxdSlug = PXD_GENERO_MAP[slug];
+    const cvSlug = PXD_CV_GENERO_MAP[slug] || slug;
+    const [cc, pxd, cv] = await Promise.all([
+      generoPagina(slug, pag).catch(() => ({ items: [], mas: false })),
+      pxdSlug ? pelisxdPorGeneroPagina(slug, pag).catch(() => []) : Promise.resolve([]),
+      cuevanaPorGeneroPagina(slug, pag).catch(() => []),
+    ]);
+    const a = (cc.items || []).slice(0,10);
+    const b = (pxd || []).slice(0,10);
+    const c = (cv || []).slice(0,10);
+    const mezcla = [];
+    const max = Math.max(a.length, b.length, c.length);
+    for (let i = 0; i < max && mezcla.length < 30; i++) {
+      if (a[i]) mezcla.push(a[i]);
+      if (b[i]) mezcla.push(b[i]);
+      if (c[i]) mezcla.push(c[i]);
+    }
+    return mezcla.length ? mezcla : (cc.items || []).slice(0, 20);
   }
   const c = generosCache.get(slug);
   if (c && Date.now() - c.at < 60 * 60 * 1000 && c.items.length) return c.items;
@@ -10655,6 +10695,80 @@ async function cuevanaLatest() {
     return items;
   } catch { return cuevanaLatestCache.items; }
 }
+/* v269: AnimeFLV y D23 últimos para feed vivo intercalado */
+const afLatestCache = { at: 0, items: [] };
+async function afLatest() {
+  if (Date.now() - afLatestCache.at < 3 * 3600 * 1000 && afLatestCache.items.length) return afLatestCache.items;
+  try {
+    const r = await fetchSeguro('https://vww.animeflv.one/', 12000);
+    if (!r.ok) return afLatestCache.items;
+    const html = await r.text();
+    const items = [];
+    const seen = new Set();
+    // AnimeFLV home: <a href="/anime/slug"><img src="..."><h3>Title</h3>
+    const re = /href="\/anime\/([a-z0-9-]+)"[^>]*>[\s\S]{0,400}?src="([^"]+)"[\s\S]{0,400}?<h3[^>]*>([^<]+)<\/h3>/g;
+    let m;
+    while ((m = re.exec(html)) && items.length < 12) {
+      const slug = m[1];
+      if (seen.has(slug) || AF_OCULTAS.has(slug)) continue;
+      seen.add(slug);
+      let img = m[2] || '';
+      if (img.startsWith('/')) img = 'https://vww.animeflv.one' + img;
+      items.push({ title: m[3].trim().slice(0,80), url: 'https://vww.animeflv.one/anime/' + slug, img, site: 'AnimeFLV', extra: 'Sub' });
+    }
+    if (items.length) { afLatestCache.at = Date.now(); afLatestCache.items = items; }
+    return items.length ? items : afLatestCache.items;
+  } catch { return afLatestCache.items; }
+}
+const d23LatestCache = { at: 0, items: [] };
+async function d23Latest() {
+  if (Date.now() - d23LatestCache.at < 3 * 3600 * 1000 && d23LatestCache.items.length) return d23LatestCache.items;
+  try {
+    const r = await fetchSeguro('https://animed23.com/', 12000);
+    if (!r.ok) return d23LatestCache.items;
+    const html = await r.text();
+    const items = [];
+    const seen = new Set();
+    const re = /href="https:\/\/animed23\.com\/anime\/([a-z0-9-]+)\/"[^>]*>[\s\S]{0,500}?src="([^"]+)"[\s\S]{0,500}?<h3[^>]*>([^<]+)<\/h3>/g;
+    let m;
+    while ((m = re.exec(html)) && items.length < 12) {
+      const slug = m[1];
+      if (seen.has(slug) || D23_OCULTAS.has(slug)) continue;
+      seen.add(slug);
+      let img = m[2] || '';
+      if (img.startsWith('/')) img = 'https://animed23.com' + img;
+      items.push({ title: m[3].trim().slice(0,80), url: 'https://animed23.com/anime/' + slug + '/', img, site: 'AnimeD23', extra: 'Latino' });
+    }
+    // fallback simple
+    if (!items.length) {
+      const re2 = /href="https:\/\/animed23\.com\/anime\/([a-z0-9-]+)\/"/g;
+      while ((m = re2.exec(html)) && items.length < 12) {
+        const slug = m[1];
+        if (seen.has(slug) || D23_OCULTAS.has(slug)) continue;
+        seen.add(slug);
+        items.push({ title: slug.replace(/-/g,' ').slice(0,80), url: 'https://animed23.com/anime/' + slug + '/', img: '', site: 'AnimeD23', extra: 'Latino' });
+      }
+    }
+    if (items.length) { d23LatestCache.at = Date.now(); d23LatestCache.items = items; }
+    return items.length ? items : d23LatestCache.items;
+  } catch { return d23LatestCache.items; }
+}
+async function animesMezclados() {
+  // v269: una sola fila de animes, intercalando Latanime + AnimeFLV + D23 para dar vida
+  const [la, af, d23] = await Promise.all([
+    animesDelMomento().catch(() => []),
+    afLatest().catch(() => []),
+    d23Latest().catch(() => []),
+  ]);
+  const mezcla = [];
+  const max = Math.max(la.length, af.length, d23.length);
+  for (let i = 0; i < max && mezcla.length < 36; i++) {
+    if (la[i]) mezcla.push(la[i]);
+    if (af[i]) mezcla.push(af[i]);
+    if (d23[i]) mezcla.push(d23[i]);
+  }
+  return mezcla.length ? mezcla : la;
+}
 
       /* v55: populares del día + v57: series recién agregadas
        * v101: + 6 filas de género que rotan cada día
@@ -10662,7 +10776,7 @@ async function cuevanaLatest() {
       const [day, series, animes, generos, cari, nv] = await Promise.all([ /* v206: + novelas */
         popularesDeHoy().catch(() => []),
         seriesRecientes().catch(() => []),
-        animesDelMomento().catch(() => []), /* v67: animes del momento (Latanime) */
+        animesMezclados().catch(() => []), /* v269: animes intercalados Latanime+AnimeFLV+D23 */
         /* v234: batch de a 6 géneros para no saturar memoria */
         (async () => {
           const gens = generosDelDia();
@@ -11044,7 +11158,13 @@ async function cuevanaLatest() {
           const items = DANI_CAT_ARR.slice(ini, ini + por).map(([sl, v]) => ({ title: String(v.t).replace(/\xa0/g, ' '), url: 'https://danimados.cc/serie/' + sl, img: daniCoverDe(sl), site: 'Caricaturas', extra: '' }));
           return json(res, 200, { ok: true, pag, por, total: DANI_CAT_ARR.length, mas: ini + por < DANI_CAT_ARR.length, items });
         }
-        if (tipo.startsWith('genero-')) { const g = await generoPagina(tipo.slice(7), pag); return json(res, 200, { ok: true, pag, por: 20, items: g.items.slice(0, 20), mas: g.mas }); }
+        if (tipo.startsWith('genero-')) {
+          const slug = tipo.slice(7);
+          const items = await peliculasPorGenero(slug, pag);
+          // v269: mezclado vivo — mas si alguna fuente tiene más paginas
+          const cc = await generoPagina(slug, pag).catch(()=>({mas:false}));
+          return json(res, 200, { ok: true, pag, por: 20, items: items.slice(0, 20), mas: !!cc.mas || items.length>=20 });
+        }
         return json(res, 404, { ok: false, error: 'Catálogo desconocido' });
       } catch {
         return json(res, 502, { ok: false, error: 'No pude leer ese catálogo — intenta luego' });
