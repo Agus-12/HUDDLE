@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v237'; // 237: buscarCineCalidad bypass cvOcultaUrl + relay persistente + memory guard
+const UI_VERSION = 'v238'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
@@ -462,8 +462,8 @@ async function laRevizar() { /* apelaciones: ocultadas hace <7 días, una a una 
     console.log('[podredumbre] revisión terminada: ' + vivas2 + ' revivieron de ' + cands.length);
   } finally { laReviviendo = false; }
 }
-setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); }, 90 * 1000);
-setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); }, 6 * 3600 * 1000);
+setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); }, 90 * 1000);
+setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); }, 6 * 3600 * 1000);
 
 /* v234: SONDA PELISXD — revisa películas ocultas para ver si volvieron */
 /* v234: SONDA PELISXD COMPLETA — 3 frentes:
@@ -684,6 +684,14 @@ async function sondaCuevana() {
 const PXD_OCULTAS = new Set(), AF_OCULTAS = new Set(), CVM_OCULTAS = new Set();
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'pxd-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) PXD_OCULTAS.add(l.trim()); } catch {}
 try { for (const l of fs.readFileSync(path.join(__dirname, 'cuevana-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) CVM_OCULTAS.add(l.trim()); } catch {} /* v235: 180 Cuevana sin embeds */
+
+/* v238: CineCalidad — vistas, ocultas, índice */
+const CC_VISTAS = new Set();
+const CC_OCULTAS = new Set();
+try { for (const l of fs.readFileSync(path.join(__dirname, 'cc-vistas.txt'), 'utf8').split('\n')) if (l.trim()) CC_VISTAS.add(l.trim()); } catch {}
+try { for (const l of fs.readFileSync(path.join(__dirname, 'cc-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) CC_OCULTAS.add(l.trim()); } catch {}
+let ccIdx = { slugs: [], at: 0, buscando: null };
+const CC_IDX_TTL = 12 * 3600 * 1000;
 console.log('[boot] CVM_OCULTAS=' + CVM_OCULTAS.size + ' Cuevana mov ocultas');
 
 const pxdVistas = new Set(); /* slugs ya verificados alguna vez */
@@ -7153,6 +7161,92 @@ async function buscarCineCalidad(q) {
   }).filter((p) => p.title && p.url);
 }
 
+/* v238: CineCalidad — índice lazy via API de búsqueda */
+async function cinecalidadIndice() {
+  if (ccIdx.slugs.length && Date.now() - ccIdx.at < CC_IDX_TTL) return ccIdx.slugs;
+  if (ccIdx.buscando) return ccIdx.buscando;
+  ccIdx.buscando = (async () => {
+    const slugs = new Set();
+    const letras = ['a','e','i','o','s','d','l','c','p','m','t','r'];
+    for (const q of letras) {
+      for (let page = 1; page <= 8; page++) {
+        try {
+          const r = await fetchSeguro('https://cine-calidad.mx/wp-json/mycustom/v1/search/?s=' + q + '&page=' + page, 10000);
+          if (!r.ok) break;
+          const d = await r.json();
+          const posts = d.posts || [];
+          if (!posts.length) break;
+          for (const p of posts) { if (p.slug) slugs.add(p.slug + '|' + (p.type || 'movies') + '|' + (p.title || '')); }
+        } catch { break; }
+      }
+    }
+    ccIdx = { slugs: [...slugs], at: Date.now(), buscando: null };
+    console.log('[cinecalidad] ' + ccIdx.slugs.length + ' slugs en índice');
+    return ccIdx.slugs;
+  })();
+  return ccIdx.buscando;
+}
+
+/* v238: verificar si una peli/serie de CineCalidad sirve */
+async function verificarCC(slug, tipo) {
+  try {
+    const esSerie = (tipo || '').includes('series');
+    const url = 'https://cine-calidad.mx/' + (esSerie ? 'serie/' : 'pelicula/') + slug + '/';
+    const r = await fetchSeguro(url, 12000);
+    if (!r.ok) return { ok: false, reason: 'HTTP ' + r.status };
+    const html = await r.text();
+    const hasEmbed = /goodstream\.one|vimeos\.(net|zip)|hlswish\.com|videoapp\.zip/i.test(html);
+    return { ok: hasEmbed, reason: hasEmbed ? 'embed' : 'no-embed' };
+  } catch (e) { return { ok: false, reason: String(e.message || e).slice(0, 60) }; }
+}
+
+/* v238: sonda CineCalidad — mismo patrón que Cuevana/PelisXD */
+async function sondaCineCalidad() {
+  try {
+    const memMB = process.memoryUsage().heapUsed / 1024 / 1024;
+    if (memMB > 350) { console.warn('[sonda] cc saltado — memoria alta: ' + memMB.toFixed(0) + 'MB'); return; }
+    const sitemap = await cinecalidadIndice();
+    if (!sitemap.length) return;
+    const start = Date.now();
+    let nuevas_ok = 0, nuevas_fail = 0, vivas_muertas = 0, muertas_vivas = 0;
+    const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    /* NUEVAS */
+    const desconocidas = shuffle(sitemap.filter(s => { const slug = s.split('|')[0]; return !CC_VISTAS.has(slug) && !CC_OCULTAS.has(slug); })).slice(0, 10);
+    for (const entry of desconocidas) {
+      const [slug, tipo] = entry.split('|');
+      const r = await verificarCC(slug, tipo);
+      CC_VISTAS.add(slug);
+      if (r.ok) nuevas_ok++;
+      else { CC_OCULTAS.add(slug); nuevas_fail++; }
+    }
+    /* VIVAS */
+    const vivas = shuffle(sitemap.filter(s => !CC_OCULTAS.has(s.split('|')[0]))).slice(0, 10);
+    for (const entry of vivas) {
+      const [slug, tipo] = entry.split('|');
+      const r = await verificarCC(slug, tipo);
+      if (!r.ok) { CC_OCULTAS.add(slug); vivas_muertas++; }
+    }
+    /* MUERTAS */
+    const muertas = shuffle([...CC_OCULTAS]).slice(0, 10);
+    for (const slug of muertas) {
+      const entry = sitemap.find(s => s.split('|')[0] === slug);
+      const tipo = entry ? entry.split('|')[1] : 'movies';
+      const r = await verificarCC(slug, tipo);
+      if (r.ok) { CC_OCULTAS.delete(slug); muertas_vivas++; }
+    }
+    /* Persistir */
+    try { fs.writeFileSync(path.join(__dirname, 'cc-ocultas.txt'), [...CC_OCULTAS].join('\n') + '\n'); } catch {}
+    try { fs.writeFileSync(path.join(__dirname, 'cc-vistas.txt'), [...CC_VISTAS].join('\n') + '\n'); } catch {}
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    const parts = [];
+    if (nuevas_ok) parts.push('nuevas_ok=' + nuevas_ok);
+    if (nuevas_fail) parts.push('nuevas_fail=' + nuevas_fail);
+    if (vivas_muertas) parts.push('vivas→muertas=' + vivas_muertas);
+    if (muertas_vivas) parts.push('muertas→vivas=' + muertas_vivas);
+    console.log('[sonda] cc (' + elapsed + 's): ' + (parts.join(', ') || 'sin cambios') + ' ocultas=' + CC_OCULTAS.size + ' vistas=' + CC_VISTAS.size);
+  } catch (e) { console.warn('[sonda] cc error: ' + String(e.message || e).slice(0, 100)); }
+}
+
 async function buscarEnSitios(q) {
   const nq = normalizarTxt(q);
   const [cuevana, cuevanaMov, latanime, animeflv, pelisxd, cari, cineCalidad, catalogo, movieCosecha] = await Promise.all([
@@ -10725,7 +10819,7 @@ async function cuevanaLatest() {
         });
       return json(res, 200, { ok: true, rooms: list, srvVersion: UI_VERSION });
     }
-    if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION, introCrawl: { pend: CRAWL.pend.length, hechas: CRAWL.hechas || 0, total: CRAWL.total || 0 }, laMuertas: LA_MUERTAS_SET.size, gpOcultas: GP_OCULTAS_SET.size, pxdOcultas: PXD_OCULTAS.size, afOcultas: AF_OCULTAS.size }); /* v122+190+v205.2 */
+    if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION, introCrawl: { pend: CRAWL.pend.length, hechas: CRAWL.hechas || 0, total: CRAWL.total || 0 }, laMuertas: LA_MUERTAS_SET.size, gpOcultas: GP_OCULTAS_SET.size, pxdOcultas: PXD_OCULTAS.size, afOcultas: AF_OCULTAS.size, ccOcultas: CC_OCULTAS.size, ccTotal: ccIdx.slugs.length }); /* v122+190+v205.2+v238 */
     if (url.pathname === '/api/set-relay') { /* v236: actualizar CDN relay URL del Mac Mini */
       const newUrl = (url.searchParams.get('url') || '').trim().replace(/\/+$/, '');
       if (!newUrl) return json(res, 400, { ok: false, error: 'Falta ?url=' });
@@ -10734,6 +10828,58 @@ async function cuevanaLatest() {
       try { require('fs').writeFileSync('/tmp/huddle-relay.txt', newUrl); } catch {} /* v236.8: persistir relay */
       return json(res, 200, { ok: true, relay: CDN_RELAY });
     }
+
+    /* v238: estadísticas por fuente */
+    if (url.pathname === '/api/stats' && req.method === 'GET') {
+      const stats = {
+        ok: true,
+        fuentes: {
+          cuevana: {
+            nombre: 'Cuevana',
+            total: cuevanaIdx.slugs.length || 0,
+            ocultas: CVM_OCULTAS.size,
+            vistas: CVM_VISTAS.size,
+            activas: (cuevanaIdx.slugs.length || 0) - CVM_OCULTAS.size,
+          },
+          pelisxd: {
+            nombre: 'PelisXD',
+            total: (typeof pelisxdIdx !== 'undefined' ? pelisxdIdx.slugs.length : 0) || 0,
+            ocultas: PXD_OCULTAS.size,
+            vistas: pxdVistas.size,
+            activas: ((typeof pelisxdIdx !== 'undefined' ? pelisxdIdx.slugs.length : 0) || 0) - PXD_OCULTAS.size,
+          },
+          cinecalidad: {
+            nombre: 'CineCalidad',
+            total: ccIdx.slugs.length || 0,
+            ocultas: CC_OCULTAS.size,
+            vistas: CC_VISTAS.size,
+            activas: (ccIdx.slugs.length || 0) - CC_OCULTAS.size,
+          },
+        },
+        usuarios: users.size,
+        memoria: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      };
+      return json(res, 200, stats);
+    }
+
+    /* v238: gestión de usuarios — listar y eliminar */
+    if (url.pathname === '/api/users' && req.method === 'GET') {
+      const lista = [];
+      for (const [key, u] of users) {
+        lista.push({ name: u.name || key, createdAt: u.createdAt || null, lastSeenAt: u.lastSeenAt || null });
+      }
+      return json(res, 200, { ok: true, total: lista.length, usuarios: lista });
+    }
+    if (url.pathname === '/api/users' && req.method === 'DELETE') {
+      const body = await readBody(req);
+      const target = String(body.name || '').trim().toLowerCase();
+      if (!target) return json(res, 400, { ok: false, error: 'Falta name' });
+      if (!users.has(target)) return json(res, 404, { ok: false, error: 'Usuario no encontrado' });
+      users.delete(target);
+      try { guardarUsuarios(); } catch {}
+      return json(res, 200, { ok: true, eliminado: target });
+    }
+
     if (url.pathname === '/api/intros') { /* v205.3: estado del rastreador — v205.4: en navegador pinta el PANEL; ?json=1 o curl → JSON; v223: + cosecha Movie */
       const SITIOS = { dani: 'Caricaturas', mm: 'Caricaturas', lct: 'Cartoons', la: 'Anime', af: 'AnimeFLV', cv: 'Cuevana' };
       const muestra = Object.entries(INTROS).slice(0, 40).map(([k, v]) => {
