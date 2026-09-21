@@ -118,3 +118,4 @@ raveroom/
 ## Despliegue en Oracle Cloud (gratis, 8 espejos)
 
 Ver **GUIA-ORACLE.md** — guía paso a paso (cuenta, máquina ARM 2 núcleos/12 GB, instalación con `deploy/oracle/setup-oracle.sh`).
+# v239.2
