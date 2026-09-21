@@ -17,7 +17,7 @@ body{background:#0d0b14;color:#efeaf7;font-family:-apple-system,'Segoe UI',Robot
 .bell{position:relative;background:none;border:none;color:#9d93b5;font-size:18px;cursor:pointer;padding:4px}
 .bell:hover{color:#efeaf7}
 .bell .badge{position:absolute;top:-2px;right:-4px;background:#ff5c7a;color:#fff;font-size:9px;font-weight:800;border-radius:99px;padding:1px 5px;min-width:14px;text-align:center}
-.page{display:none;padding:16px;max-width:800px;margin:0 auto}
+.page{display:none;padding:16px;max-width:860px;margin:0 auto}
 .page.active{display:block}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}
 .card{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:14px;cursor:pointer;transition:border-color .2s}
@@ -25,8 +25,9 @@ body{background:#0d0b14;color:#efeaf7;font-family:-apple-system,'Segoe UI',Robot
 .card .n{font-size:24px;font-weight:800}
 .card .t{color:#9d93b5;font-size:10px;margin-top:2px;text-transform:uppercase;letter-spacing:.6px}
 .card.noclick{cursor:default}.card.noclick:hover{border-color:#2a2338}
-.sec-title{font-size:13px;color:#9d93b5;text-transform:uppercase;letter-spacing:1px;margin:18px 0 10px}
-.fcard{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:16px;cursor:pointer;transition:border-color .2s;margin-bottom:10px}
+.sec-title{font-size:13px;color:#9d93b5;text-transform:uppercase;letter-spacing:1px;margin:18px 0 10px;display:flex;align-items:center;gap:8px}
+.sec-title .line{flex:1;height:1px;background:#1e1a2e;margin-left:8px}
+.fcard{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:16px;cursor:pointer;transition:border-color .2s;margin-bottom:10px;position:relative;overflow:hidden}
 .fcard:hover{border-color:#8a5cf6}
 .fcard .fhead{display:flex;align-items:center;justify-content:space-between}
 .fcard .fname{font-size:16px;font-weight:700}
@@ -43,8 +44,8 @@ body{background:#0d0b14;color:#efeaf7;font-family:-apple-system,'Segoe UI',Robot
 .uname{flex:1;font-size:13px}
 .udate{font-size:11px;color:#9d93b5;min-width:80px;text-align:right}
 .ubtn{background:#ff5c7a;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
-.detail-section{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:16px;margin-bottom:12px}
-.detail-section h3{font-size:14px;margin-bottom:10px}
+.detail-section{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:16px;margin-bottom:12px;position:relative}
+.detail-section h3{font-size:14px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
 .barra{height:10px;background:#241d31;border-radius:99px;overflow:hidden;margin:6px 0}
 .barra i{display:block;height:100%;border-radius:99px;transition:width .6s}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
@@ -60,13 +61,42 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
 .user-legend span{display:flex;align-items:center;gap:4px}
 .log-entry{display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #1a1625;font-size:12px}
 .log-entry:last-child{border-bottom:0}
-.log-icon{flex-shrink:0;width:20px;text-align:center}
-.log-msg{flex:1;color:#b8aed0}
-.log-time{color:#9d93b5;font-size:10px;min-width:60px;text-align:right;flex-shrink:0}
+.log-icon{flex-shrink:0;width:20px;text-align:center;display:flex;align-items:center;justify-content:center}
+.log-msg{flex:1;color:#b8aed0;overflow:hidden;text-overflow:ellipsis}
+.log-time{color:#9d93b5;font-size:10px;min-width:56px;text-align:right;flex-shrink:0}
 .notif-panel{position:fixed;top:52px;right:12px;background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:12px;max-width:340px;width:calc(100vw - 24px);max-height:60vh;overflow-y:auto;z-index:20;display:none;box-shadow:0 8px 32px rgba(0,0,0,.5)}
 .notif-panel.show{display:block}
 .notif-title{font-size:13px;color:#9d93b5;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
 .notif-close{background:none;border:none;color:#9d93b5;font-size:16px;cursor:pointer}
+/* Auditoria premium */
+.audit-preview{background:linear-gradient(135deg,#1c1433 0%,#17131f 55%,#1a102e 100%);border-color:#3b1f8a;cursor:pointer}
+.audit-preview::before{content:'';position:absolute;inset:0;background:radial-gradient(520px 180px at 85% -10%, rgba(124,58,237,.18), transparent 60%), radial-gradient(400px 160px at 10% 110%, rgba(34,197,94,.10), transparent 60%);pointer-events:none}
+.audit-preview:hover{border-color:#7c3aed;transform:translateY(-1px);box-shadow:0 8px 24px rgba(124,58,237,.12)}
+.ctrl-btn{display:inline-flex;align-items:center;gap:7px;border:none;border-radius:10px;padding:9px 16px;font-weight:800;font-size:13px;cursor:pointer;transition:all .15s}
+.ctrl-btn:disabled{opacity:.42;cursor:not-allowed;filter:grayscale(.15)}
+.ctrl-btn.play{background:#22c55e;color:#052e16;box-shadow:0 4px 12px rgba(34,197,94,.25)}
+.ctrl-btn.pause{background:#f59e0b;color:#451a03}
+.ctrl-btn.stop{background:#1f162e;color:#f87171;border:1px solid #3a1e2e}
+.ctrl-btn.play:hover:not(:disabled),.ctrl-btn.pause:hover:not(:disabled),.ctrl-btn.stop:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.05)}
+.scope-pill{display:inline-flex;align-items:center;gap:6px;background:#1a1625;border:1px solid #2a2338;border-radius:99px;padding:6px 12px;font-size:12px;cursor:pointer;user-select:none;transition:.14s;color:#b8aed0}
+.scope-pill.active{background:#2a1f45;border-color:#7c3aed;color:#ede9fe;box-shadow:0 0 0 3px rgba(124,58,237,.12)}
+.scope-pill input{display:none}
+.scope-pill .dot2{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.9}
+.audit-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:720px){.audit-grid{grid-template-columns:1fr}}
+.sonda-card{overflow:hidden}
+.sonda-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;opacity:.9}
+.sonda-card.pelis::before{background:linear-gradient(90deg,#22c55e,#16a34a)}
+.sonda-card.series::before{background:linear-gradient(90deg,#8a5cf6,#a78bfa)}
+.badge-idle{background:#1f2937;color:#9ca3af;border:1px solid #374151;padding:5px 11px;border-radius:99px;font-size:11px;font-weight:800;letter-spacing:.6px}
+.badge-run{background:#052e16;color:#22c55e;border:1px solid #14532d;padding:5px 11px;border-radius:99px;font-size:11px;font-weight:800;letter-spacing:.6px;box-shadow:0 0 10px rgba(34,197,94,.18)}
+.badge-pause{background:#451a03;color:#f59e0b;border:1px solid #7c2d12;padding:5px 11px;border-radius:99px;font-size:11px;font-weight:800;letter-spacing:.6px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.92)}}
+.stat-row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.stat-mini{background:#0d0b14;border:1px solid #2a2338;border-radius:10px;padding:7px 10px;min-width:72px;flex:1}
+.stat-mini .k{font-size:10px;color:#9d93b5;text-transform:uppercase;letter-spacing:.5px}
+.stat-mini .v{font-size:16px;font-weight:800;margin-top:2px}
 </style>
 </head>
 <body>
@@ -83,7 +113,6 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
   </div>
 </div>
 
-<!-- Notifications dropdown -->
 <div class="notif-panel" id="notifPanel">
   <div class="notif-title">Notificaciones de sonda <button class="notif-close" onclick="toggleNotifs()">✕</button></div>
   <div id="notifList"></div>
@@ -92,53 +121,187 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
 <!-- DASHBOARD -->
 <div class="page active" id="pageDash">
   <div class="grid" id="dashCards"></div>
-  <div class="sec-title">Catálogo total</div>
+  <div class="sec-title">Catálogo total <span class="line"></span></div>
   <div class="grid" id="catCards"></div>
   <div id="catDetail" style="font-size:12px;color:#9d93b5;line-height:1.8;margin-bottom:16px"></div>
-  <div class="sec-title">Fuentes de video</div>
+  <div class="sec-title">Fuentes de video <span class="line"></span></div>
   <div id="fuentesCards"></div>
-  <div class="sec-title" style="color:#c4b5fd">🔍 Auditoría Huddle — Sonda Maestro (24/7)</div>
-  <div class="detail-section" id="auditoriaBox" style="border-color:#4c1d95">
-    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
-      <button id="btnAudPlay" onclick="controlAuditoria('play')" style="background:#22c55e;color:#000;border:none;border-radius:8px;padding:8px 16px;font-weight:800;cursor:pointer">▶ Play</button>
-      <button id="btnAudPausa" onclick="controlAuditoria('pausa')" style="background:#f59e0b;color:#000;border:none;border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer">⏸ Pausa</button>
-      <button id="btnAudCancel" onclick="controlAuditoria('cancelar')" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer">⏹ Cancelar</button>
-      <span id="auditoriaEstado" style="font-size:12px;color:#c4b5fd;margin-left:8px">—</span>
-    </div>
-    <div style="font-size:12px;color:#9d93b5;margin-bottom:8px">Alcance (qué audita Huddle):</div>
-    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px">
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="aud_pelis" checked onchange="auditoriaScopeChanged()"> Películas</label>
-      <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="aud_series" checked onchange="auditoriaScopeChanged()"> Series (cap por cap)</label>
-    </div>
-    <div id="audFuentes" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
-      <!-- checks por fuente se generan en JS -->
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
-      <div>
-        <div style="font-size:11px;color:#9d93b5;text-transform:uppercase;letter-spacing:.5px">Películas (vivos)</div>
-        <div class="barra"><i id="audPelisBar" style="width:0%;background:#22c55e"></i></div>
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:#9d93b5"><span id="audPelisTxt">0 / 0</span><span id="audPelisPct">0%</span></div>
-        <div style="font-size:11px;color:#9d93b5;margin-top:4px" id="audPelisFuente"></div>
+
+  <div class="sec-title" style="color:#c4b5fd">Centro de control <span class="line" style="background:#2e2550"></span></div>
+  <div class="fcard audit-preview" onclick="showPage('Huddle')">
+    <div class="fhead" style="position:relative;z-index:1">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#4c1d95,#7c3aed);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(124,58,237,.25)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 12 L12 3"/><path d="M12 12 L19 12"/><path d="M12 12 L16.5 7.5"/><circle cx="12" cy="12" r="1.5" fill="#fff" stroke="none"/></svg>
+        </div>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:#ede9fe;display:flex;align-items:center;gap:8px">Panel Huddle <span id="auditPreviewBadge" class="badge-idle" style="font-size:10px;padding:3px 8px">IDLE</span></div>
+          <div style="font-size:11px;color:#a99bc9;margin-top:2px">Auditoría maestro · 2 sondas 24/7 · auto-repara</div>
+        </div>
       </div>
-      <div>
-        <div style="font-size:11px;color:#9d93b5;text-transform:uppercase;letter-spacing:.5px">Series (vivos cap por cap)</div>
-        <div class="barra"><i id="audSeriesBar" style="width:0%;background:#8a5cf6"></i></div>
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:#9d93b5"><span id="audSeriesTxt">0 / 0</span><span id="audSeriesPct">0%</span></div>
-        <div style="font-size:11px;color:#9d93b5;margin-top:4px" id="audSeriesFuente"></div>
+      <div style="display:flex;align-items:center;gap:8px;color:#c4b5fd">
+        <span style="font-size:11px;font-weight:700;display:none" id="auditPreviewPct">0%</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
       </div>
     </div>
-    <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#9d93b5;margin-bottom:8px">
-      <span>Muertas siempre ocultas (no se auditan) · </span>
-      <span id="auditoriaNota" style="color:#c4b5fd"></span>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;position:relative;z-index:1">
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:8px 10px">
+        <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#9d93b5;text-transform:uppercase;letter-spacing:.5px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 3v14M16 3v14M2 8h20M2 12h20"/></svg> Películas
+        </div>
+        <div class="bar" style="height:5px;margin-top:6px"><i id="auditPreviewPelisBar" style="width:0%;background:#22c55e"></i></div>
+        <div style="font-size:11px;color:#c4b5fd;margin-top:4px" id="auditPreviewPelisTxt">0 / 0</div>
+      </div>
+      <div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:8px 10px">
+        <div style="display:flex;align-items:center;gap:6px;font-size:10px;color:#9d93b5;text-transform:uppercase;letter-spacing:.5px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="12" rx="2"/><path d="M16 3l-4 4-4-4"/><path d="M8 21h8"/></svg> Series
+        </div>
+        <div class="bar" style="height:5px;margin-top:6px"><i id="auditPreviewSeriesBar" style="width:0%;background:#8a5cf6"></i></div>
+        <div style="font-size:11px;color:#c4b5fd;margin-top:4px" id="auditPreviewSeriesTxt">0 / 0</div>
+      </div>
     </div>
-    <div style="max-height:220px;overflow:auto;border:1px solid #2a2338;border-radius:8px;padding:8px;background:#0d0b14" id="auditoriaLog"></div>
-    <div style="font-size:10px;color:#6b7280;margin-top:6px">Sonda Huddle 24/7: cada 90s (si está en Play) o cada 6h en segundo plano. Si Huddle falla pero la fuente directa OK → auto-limpia cache Huddle y reintenta. Logs también en <code>sonda-huddle-*.log</code></div>
+    <div style="font-size:10px;color:#7c6fa0;margin-top:8px;position:relative;z-index:1;display:flex;gap:6px;align-items:center">
+      <span class="live-dot" id="auditPreviewDot" style="display:none"></span>
+      <span id="auditPreviewNote">Toca para abrir el panel</span>
+    </div>
   </div>
 
-  <div class="sec-title">Rastreador de intros</div>
+  <div class="sec-title">Rastreador de intros <span class="line"></span></div>
   <button class="toggle-btn" onclick="toggleIntros()">▸ Mostrar intros aprendidas</button>
   <div id="introsWrap" style="display:none"></div>
   <p class="pie" id="pie">conectando…</p>
+</div>
+
+<!-- HUDDLE PANEL -->
+<div class="page" id="pageHuddle">
+  <!-- hero -->
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+    <div style="width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#4c1d95,#7c3aed 60%,#a78bfa);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(124,58,237,.30);flex-shrink:0">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 12 L12 3"/><path d="M12 12 L19.5 12"/><path d="M12 12 L17 7"/><circle cx="12" cy="12" r="1.8" fill="#fff" stroke="none"/></svg>
+    </div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:19px;font-weight:900;letter-spacing:-.2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">Panel Huddle <span style="font-size:11px;font-weight:700;color:#a78bfa;background:#1e1438;border:1px solid #3b2a6b;border-radius:99px;padding:3px 8px">v252 · 24/7</span></div>
+      <div style="font-size:12px;color:#9d93b5;margin-top:2px">Dos sondas maestras · solo vivos · muertas siempre ocultas · auto-repara Huddle</div>
+    </div>
+    <span id="huddleStatusBadge" class="badge-idle">IDLE</span>
+  </div>
+
+  <!-- controls -->
+  <div class="detail-section" style="border-color:#2e2550">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px">
+      <button id="btnAudPlay" onclick="controlAuditoria('play')" class="ctrl-btn play">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v14l11-7z"/></svg> Play
+      </button>
+      <button id="btnAudPausa" onclick="controlAuditoria('pausa')" class="ctrl-btn pause">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/></svg> <span id="btnAudPausaLabel">Pausa</span>
+      </button>
+      <button id="btnAudCancel" onclick="controlAuditoria('cancelar')" class="ctrl-btn stop">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor" stroke="none"/></svg> Cancelar
+      </button>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px;font-size:11px;color:#9d93b5">
+        <span class="live-dot" id="huddleLiveDot" style="display:none"></span>
+        <span id="auditoriaEstado">—</span>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8a5cf6" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/></svg>
+      <span style="font-size:12px;font-weight:700;color:#c4b5fd">Alcance</span>
+      <span style="font-size:11px;color:#6b7280">elige qué audita Huddle</span>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <label class="scope-pill active" id="pill_pelis"><input type="checkbox" id="aud_pelis" checked onchange="auditoriaScopeChanged()"> <span class="dot2" style="background:#22c55e"></span> Películas</label>
+      <label class="scope-pill active" id="pill_series"><input type="checkbox" id="aud_series" checked onchange="auditoriaScopeChanged()"> <span class="dot2" style="background:#8a5cf6"></span> Series <span style="font-size:10px;color:#9d93b5">cap × cap</span></label>
+    </div>
+
+    <div style="font-size:11px;color:#9d93b5;margin-bottom:6px;display:flex;align-items:center;gap:6px">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg> Por fuente
+    </div>
+    <div id="audFuentes" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+
+    <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#7c6fa0">
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block"></span> Vivos se auditan</span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:7px;height:7px;border-radius:50%;background:#4b5563;display:inline-block"></span> Muertas ocultas</span>
+      <span id="auditoriaNota" style="color:#a78bfa"></span>
+    </div>
+  </div>
+
+  <!-- 2 sondas -->
+  <div class="audit-grid">
+    <!-- Películas -->
+    <div class="detail-section sonda-card pelis">
+      <h3>
+        <span style="width:28px;height:28px;border-radius:9px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.22);display:flex;align-items:center;justify-content:center">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 3v14M16 3v14M2 8h20M2 12h20"/></svg>
+        </span>
+        <span style="font-weight:900">Sonda Películas</span>
+        <span style="font-size:11px;color:#9d93b5;font-weight:600">· todas las fuentes</span>
+        <span style="margin-left:auto;display:flex;align-items:center;gap:6px">
+          <span class="live-dot" id="dotPelis" style="display:none"></span>
+          <span id="audPelisPct" style="font-size:12px;font-weight:900;color:#22c55e">0%</span>
+        </span>
+      </h3>
+      <div class="barra"><i id="audPelisBar" style="width:0%;background:linear-gradient(90deg,#22c55e,#16a34a)"></i></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#9d93b5;margin-top:4px">
+        <span id="audPelisTxt">0 / 0 · OK:0 Fail:0</span>
+        <span id="audPelisEst" style="color:#22c55e;font-weight:700"></span>
+      </div>
+      <div class="stat-row">
+        <div class="stat-mini"><div class="k">Total vivos</div><div class="v" id="audPelisTotalV">0</div></div>
+        <div class="stat-mini"><div class="k">OK</div><div class="v" id="audPelisOkV" style="color:#22c55e">0</div></div>
+        <div class="stat-mini"><div class="k">Fallos</div><div class="v" id="audPelisFailV" style="color:#f87171">0</div></div>
+      </div>
+      <div style="font-size:11px;color:#9d93b5;margin-top:6px;display:flex;flex-wrap:wrap;gap:4px" id="audPelisFuente"></div>
+      <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-top:10px;display:flex;align-items:center;gap:6px">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Logs películas
+      </div>
+      <div id="audLogPelis" style="max-height:300px;overflow:auto;border:1px solid #2a2338;border-radius:10px;padding:8px;background:#0d0b14;margin-top:6px"></div>
+    </div>
+
+    <!-- Series -->
+    <div class="detail-section sonda-card series">
+      <h3>
+        <span style="width:28px;height:28px;border-radius:9px;background:rgba(138,92,246,.13);border:1px solid rgba(138,92,246,.22);display:flex;align-items:center;justify-content:center">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8a5cf6" stroke-width="2"><rect x="2" y="7" width="20" height="12" rx="2"/><path d="M16 3l-4 4-4-4"/><path d="M8 21h8"/></svg>
+        </span>
+        <span style="font-weight:900">Sonda Series</span>
+        <span style="font-size:11px;color:#9d93b5;font-weight:600">· capítulo × capítulo</span>
+        <span style="margin-left:auto;display:flex;align-items:center;gap:6px">
+          <span class="live-dot" id="dotSeries" style="background:#8a5cf6;box-shadow:0 0 8px #8a5cf6;display:none"></span>
+          <span id="audSeriesPct" style="font-size:12px;font-weight:900;color:#8a5cf6">0%</span>
+        </span>
+      </h3>
+      <div class="barra"><i id="audSeriesBar" style="width:0%;background:linear-gradient(90deg,#8a5cf6,#a78bfa)"></i></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#9d93b5;margin-top:4px">
+        <span id="audSeriesTxt">0 / 0 · OK:0 Fail:0</span>
+        <span id="audSeriesEst" style="color:#8a5cf6;font-weight:700"></span>
+      </div>
+      <div class="stat-row">
+        <div class="stat-mini"><div class="k">Total vivos</div><div class="v" id="audSeriesTotalV">0</div></div>
+        <div class="stat-mini"><div class="k">OK</div><div class="v" id="audSeriesOkV" style="color:#22c55e">0</div></div>
+        <div class="stat-mini"><div class="k">Reparados</div><div class="v" id="audSeriesFailV" style="color:#f59e0b">0</div></div>
+      </div>
+      <div style="font-size:11px;color:#9d93b5;margin-top:6px;display:flex;flex-wrap:wrap;gap:4px" id="audSeriesFuente"></div>
+      <div style="font-size:10px;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-top:10px;display:flex;align-items:center;gap:6px">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Logs series
+      </div>
+      <div id="audLogSeries" style="max-height:300px;overflow:auto;border:1px solid #2a2338;border-radius:10px;padding:8px;background:#0d0b14;margin-top:6px"></div>
+    </div>
+  </div>
+
+  <div class="detail-section" style="border-color:#2e2550">
+    <h3>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      Log unificado
+      <span style="font-size:11px;color:#6b7280;font-weight:500">· últimos 30</span>
+      <span style="margin-left:auto;font-size:11px;color:#6b7280" id="audLogCount">0</span>
+    </h3>
+    <div id="auditoriaLog" style="max-height:340px;overflow:auto;border:1px solid #2a2338;border-radius:10px;padding:8px;background:#0d0b14"></div>
+    <div style="font-size:10px;color:#6b7280;margin-top:8px;line-height:1.6">
+      Sonda Huddle 24/7: ciclo cada 90s si está en Play, o cada 6h en segundo plano. Si Huddle falla pero la fuente directa OK → limpia cache (pelisxdMetaCache / cuevanaGeneroCache / _searchCache / DANI_FEEDS) y reintenta. Muertas PXD/AF/CVM/CC/D23/LA nunca se auditan.
+    </div>
+  </div>
 </div>
 
 <!-- USUARIOS -->
@@ -200,11 +363,13 @@ function renderNotifs(){
   var html='';
   if(!_notifs.length){html='<div style="color:#9d93b5;font-size:12px;padding:8px 0">Sin notificaciones</div>';}
   _notifs.slice(0,30).forEach(function(n){
-    var icon=n.tipo==='muerto'?'✕':'✓';
-    var color=n.tipo==='muerto'?'#ff5c7a':'#38e08a';
+    var col=n.tipo==='muerto'?'#ff5c7a':'#38e08a';
+    var svg=n.tipo==='muerto'
+      ?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+col+'" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>'
+      :'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+col+'" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>';
     html+='<div class="log-entry">'
-      +'<div class="log-icon" style="color:'+color+';font-weight:800">'+icon+'</div>'
-      +'<div class="log-msg"><b style="color:'+color+'">'+n.fuente+'</b> '+n.msg+'</div>'
+      +'<div class="log-icon">'+svg+'</div>'
+      +'<div class="log-msg"><b style="color:'+col+'">'+n.fuente+'</b> '+n.msg+'</div>'
       +'<div class="log-time">'+timeAgo(n.ts)+'</div></div>';
   });
   document.getElementById('notifList').innerHTML=html;
@@ -307,7 +472,6 @@ function showFuente(k){
     +'<div id="fuenteLog-'+k+'"><div style="color:#9d93b5;font-size:12px">Cargando…</div></div></div>';
   document.getElementById('fuenteContent').innerHTML=html;
   showPage('Fuente');
-  // Load sonda log for this source
   fetch('/api/sonda-log?fuente='+encodeURIComponent(names[k]||k)+'&limit=30')
     .then(function(r){return r.json()})
     .then(function(d){
@@ -315,10 +479,12 @@ function showFuente(k){
       if(!d.items||!d.items.length){el.innerHTML='<div style="color:#9d93b5;font-size:12px">Sin movimientos recientes</div>';return;}
       var lh='';
       d.items.forEach(function(n){
-        var icon=n.tipo==='muerto'?'✕':'✓';
         var col=n.tipo==='muerto'?'#ff5c7a':'#38e08a';
+        var svg=n.tipo==='muerto'
+          ?'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+col+'" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>'
+          :'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+col+'" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>';
         lh+='<div class="log-entry">'
-          +'<div class="log-icon" style="color:'+col+';font-weight:800">'+icon+'</div>'
+          +'<div class="log-icon">'+svg+'</div>'
           +'<div class="log-msg" style="color:'+col+'">'+n.msg+'</div>'
           +'<div class="log-time">'+timeAgo(n.ts)+'</div></div>';
       });
@@ -357,59 +523,149 @@ function renderUsers(data){
 var _auditoria=null;
 function auditoriaFuentesChecks(){
   var fuentes=[
-    {k:'pelisxd', label:'PelisXD'},
-    {k:'cuevana', label:'CuevanaMov'},
-    {k:'cinecalidad', label:'CineCalidad'},
-    {k:'animeflv', label:'AnimeFLV'},
-    {k:'latanime', label:'Latanime'},
-    {k:'animed23', label:'AnimeD23'},
-    {k:'danimados', label:'Danimados'},
-    {k:'lacartoons', label:'Lacartoons'},
-    {k:'miscaricaturas', label:'MisCaris'}
+    {k:'pelisxd', label:'PelisXD', col:'#8a5cf6'},
+    {k:'cuevana', label:'Cuevana', col:'#38e08a'},
+    {k:'cinecalidad', label:'CineCal.', col:'#38bdf8'},
+    {k:'animeflv', label:'AnimeFLV', col:'#feac5d'},
+    {k:'latanime', label:'Latanime', col:'#ffb020'},
+    {k:'animed23', label:'AnimeD23', col:'#22c55e'},
+    {k:'danimados', label:'Danimados', col:'#fb7185'},
+    {k:'lacartoons', label:'Lacartoons', col:'#2dd4bf'},
+    {k:'miscaricaturas', label:'MisCaris', col:'#ffd93b'}
   ];
   var html='';
   fuentes.forEach(function(f){
-    html+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;background:#1a1625;border:1px solid #2a2338;border-radius:99px;padding:4px 8px"><input type="checkbox" id="aud_'+f.k+'" checked onchange="auditoriaScopeChanged()"> '+f.label+'</label>';
+    html+='<label class="scope-pill active" id="pill_'+f.k+'"><input type="checkbox" id="aud_'+f.k+'" checked onchange="auditoriaScopeChanged()"> <span class="dot2" style="background:'+f.col+'"></span> '+f.label+'</label>';
   });
   document.getElementById('audFuentes').innerHTML=html;
+  // pill pelis/series toggles style sync
+  [['aud_pelis','pill_pelis'],['aud_series','pill_series']].forEach(function(p){
+    var cb=document.getElementById(p[0]), pill=document.getElementById(p[1]);
+    if(cb&&pill){ cb.addEventListener('change',function(){ pill.classList.toggle('active',cb.checked); }); pill.addEventListener('click',function(e){ if(e.target.tagName!=='INPUT'){ e.preventDefault(); cb.checked=!cb.checked; cb.dispatchEvent(new Event('change')); auditoriaScopeChanged(); }}); }
+  });
+}
+function svgForTipo(tipo, col){
+  if(tipo==='ok') return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+col+'" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>';
+  if(tipo==='fail') return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+col+'" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+  if(tipo==='reparado') return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+col+'" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>';
+  if(tipo==='huddle-falla-fuente-ok') return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+col+'" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>';
+  return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+col+'" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>';
 }
 function renderAuditoria(d){
   if(!d || !d.auditoria) return;
   _auditoria=d.auditoria;
   var a=d.auditoria;
-  var estado = a.activo ? (a.pausado ? '⏸ PAUSADO' : '▶ EJECUTANDO') : '⏹ IDLE';
-  var color = a.activo ? (a.pausado ? '#f59e0b' : '#22c55e') : '#9d93b5';
-  document.getElementById('auditoriaEstado').innerHTML='<b style="color:'+color+'">'+estado+'</b> · '+ (a.progreso.peliculas.verificadas + a.progreso.series.verificadas)+' verificadas';
-  document.getElementById('audPelisBar').style.width=(a.progreso.peliculas.pct||0)+'%';
-  document.getElementById('audPelisTxt').textContent=(a.progreso.peliculas.verificadas||0)+' / '+(a.progreso.peliculas.total||0)+' · OK:'+(a.progreso.peliculas.ok||0)+' Fail:'+(a.progreso.peliculas.fail||0);
-  document.getElementById('audPelisPct').textContent=(a.progreso.peliculas.pct||0)+'%';
-  document.getElementById('audSeriesBar').style.width=(a.progreso.series.pct||0)+'%';
-  document.getElementById('audSeriesTxt').textContent=(a.progreso.series.verificadas||0)+' / '+(a.progreso.series.total||0)+' · OK:'+(a.progreso.series.ok||0)+' Fail:'+(a.progreso.series.fail||0);
-  document.getElementById('audSeriesPct').textContent=(a.progreso.series.pct||0)+'%';
-  var pf = a.progreso.peliculas.porFuente||{}; var sf = a.progreso.series.porFuente||{};
-  document.getElementById('audPelisFuente').textContent = Object.keys(pf).length ? Object.entries(pf).map(function(e){return e[0]+':'+e[1]}).join(' · ') : '';
-  document.getElementById('audSeriesFuente').textContent = Object.keys(sf).length ? Object.entries(sf).map(function(e){return e[0]+':'+e[1]}).join(' · ') : '';
-  document.getElementById('auditoriaNota').textContent = a.activo ? 'Auditoría activa '+ (a.alcance.peliculas?' pelis':'') + (a.alcance.series?' series':'') : 'Sondas 24/7 en segundo plano cada 6h';
-  // sync checks without triggering change loop
-  if(document.getElementById('aud_pelis')) document.getElementById('aud_pelis').checked=!!a.alcance.peliculas;
-  if(document.getElementById('aud_series')) document.getElementById('aud_series').checked=!!a.alcance.series;
+  var running = a.activo && !a.pausado;
+  var paused = a.activo && a.pausado;
+  var badge = document.getElementById('huddleStatusBadge');
+  var previewBadge = document.getElementById('auditPreviewBadge');
+  var dotLive = document.getElementById('huddleLiveDot');
+  var previewDot = document.getElementById('auditPreviewDot');
+  var dotPelis = document.getElementById('dotPelis');
+  var dotSeries = document.getElementById('dotSeries');
+  if(badge){
+    if(running){ badge.className='badge-run'; badge.textContent='EJECUTANDO'; }
+    else if(paused){ badge.className='badge-pause'; badge.textContent='PAUSADO'; }
+    else { badge.className='badge-idle'; badge.textContent='IDLE'; }
+  }
+  if(previewBadge){
+    if(running){ previewBadge.className='badge-run'; previewBadge.textContent='RUN'; previewBadge.style.display=''; }
+    else if(paused){ previewBadge.className='badge-pause'; previewBadge.textContent='PAUSA'; previewBadge.style.display=''; }
+    else { previewBadge.className='badge-idle'; previewBadge.textContent='IDLE'; }
+  }
+  if(dotLive) dotLive.style.display = running ? '' : 'none';
+  if(previewDot) previewDot.style.display = running ? '' : 'none';
+  if(dotPelis) dotPelis.style.display = running && a.alcance.peliculas ? '' : 'none';
+  if(dotSeries) dotSeries.style.display = running && a.alcance.series ? '' : 'none';
+
+  var estadoTxt = running ? 'Ejecutando · ' + (a.progreso.peliculas.verificadas + a.progreso.series.verificadas) + ' verificadas'
+                : paused ? 'Pausado · ' + (a.progreso.peliculas.verificadas + a.progreso.series.verificadas) + ' verificadas'
+                : 'Idle · ' + (a.progreso.peliculas.verificadas + a.progreso.series.verificadas) + ' verificadas';
+  var estEl=document.getElementById('auditoriaEstado'); if(estEl) estEl.textContent=estadoTxt;
+
+  var p=a.progreso.peliculas, s=a.progreso.series;
+  // pelis
+  var peliBar=document.getElementById('audPelisBar'); if(peliBar) peliBar.style.width=(p.pct||0)+'%';
+  var peliTxt=document.getElementById('audPelisTxt'); if(peliTxt) peliTxt.textContent=(p.verificadas||0)+' / '+(p.total||0)+' · OK:'+(p.ok||0)+' Fail:'+(p.fail||0);
+  var peliPct=document.getElementById('audPelisPct'); if(peliPct) peliPct.textContent=(p.pct||0)+'%';
+  var peliTotalV=document.getElementById('audPelisTotalV'); if(peliTotalV) peliTotalV.textContent=p.total||0;
+  var peliOkV=document.getElementById('audPelisOkV'); if(peliOkV) peliOkV.textContent=p.ok||0;
+  var peliFailV=document.getElementById('audPelisFailV'); if(peliFailV) peliFailV.textContent=p.fail||0;
+  var peliEst=document.getElementById('audPelisEst'); if(peliEst) peliEst.textContent= running && a.alcance.peliculas ? 'vivo' : a.alcance.peliculas ? 'listo' : 'off';
+  // series
+  var serBar=document.getElementById('audSeriesBar'); if(serBar) serBar.style.width=(s.pct||0)+'%';
+  var serTxt=document.getElementById('audSeriesTxt'); if(serTxt) serTxt.textContent=(s.verificadas||0)+' / '+(s.total||0)+' · OK:'+(s.ok||0)+' Fail:'+(s.fail||0);
+  var serPct=document.getElementById('audSeriesPct'); if(serPct) serPct.textContent=(s.pct||0)+'%';
+  var serTotalV=document.getElementById('audSeriesTotalV'); if(serTotalV) serTotalV.textContent=s.total||0;
+  var serOkV=document.getElementById('audSeriesOkV'); if(serOkV) serOkV.textContent=s.ok||0;
+  var serFailV=document.getElementById('audSeriesFailV'); if(serFailV) serFailV.textContent=s.fail||0;
+  var serEst=document.getElementById('audSeriesEst'); if(serEst) serEst.textContent= running && a.alcance.series ? 'vivo' : a.alcance.series ? 'listo' : 'off';
+
+  // preview bars
+  var prePB=document.getElementById('auditPreviewPelisBar'); if(prePB) prePB.style.width=(p.pct||0)+'%';
+  var preSB=document.getElementById('auditPreviewSeriesBar'); if(preSB) preSB.style.width=(s.pct||0)+'%';
+  var prePT=document.getElementById('auditPreviewPelisTxt'); if(prePT) prePT.textContent=(p.verificadas||0)+' / '+(p.total||0)+' · '+(p.pct||0)+'%';
+  var preST=document.getElementById('auditPreviewSeriesTxt'); if(preST) preST.textContent=(s.verificadas||0)+' / '+(s.total||0)+' · '+(s.pct||0)+'%';
+  var preP=document.getElementById('auditPreviewPct'); if(preP){ var totPct = Math.round(((p.pct||0)+(s.pct||0))/ ( (a.alcance.peliculas&&a.alcance.series)?2 : 1) )||0; preP.textContent=totPct+'%'; preP.style.display= a.activo ? '' : 'none'; }
+  var preNote=document.getElementById('auditPreviewNote');
+  if(preNote) preNote.textContent = running ? 'Sonda activa · toca para ver detalle' : paused ? 'Pausado · toca para reanudar' : 'Toca para abrir el panel';
+
+  var pf = p.porFuente||{}; var sf = s.porFuente||{};
+  var peliFuente=document.getElementById('audPelisFuente'); if(peliFuente) peliFuente.innerHTML = Object.keys(pf).length ? Object.entries(pf).map(function(e){return '<span style="background:#0d0b14;border:1px solid #2a2338;border-radius:99px;padding:3px 8px">'+e[0]+' <b style="color:#22c55e">'+e[1]+'</b></span>'}).join('') : '<span style="color:#6b7280">—</span>';
+  var serFuente=document.getElementById('audSeriesFuente'); if(serFuente) serFuente.innerHTML = Object.keys(sf).length ? Object.entries(sf).map(function(e){return '<span style="background:#0d0b14;border:1px solid #2a2338;border-radius:99px;padding:3px 8px">'+e[0]+' <b style="color:#8a5cf6">'+e[1]+'</b></span>'}).join('') : '<span style="color:#6b7280">—</span>';
+  var nota=document.getElementById('auditoriaNota'); if(nota) nota.textContent = a.activo ? 'Activo: '+(a.alcance.peliculas?' pelis':'')+(a.alcance.series?' series':'')+' · '+Object.keys(a.alcance.fuentes||{}).filter(function(k){return a.alcance.fuentes[k]}).length+' fuentes' : 'Sondas 24/7 cada 6h en segundo plano';
+
+  // sync pills
+  var pelisCb=document.getElementById('aud_pelis'); if(pelisCb) pelisCb.checked=!!a.alcance.peliculas;
+  var seriesCb=document.getElementById('aud_series'); if(seriesCb) seriesCb.checked=!!a.alcance.series;
+  var pillP=document.getElementById('pill_pelis'); if(pillP) pillP.classList.toggle('active', !!a.alcance.peliculas);
+  var pillS=document.getElementById('pill_series'); if(pillS) pillS.classList.toggle('active', !!a.alcance.series);
   ['pelisxd','cuevana','cinecalidad','animeflv','latanime','animed23','danimados','lacartoons','miscaricaturas'].forEach(function(k){
-    var el=document.getElementById('aud_'+k);
-    if(el && a.alcance.fuentes && typeof a.alcance.fuentes[k]!=='undefined') el.checked=!!a.alcance.fuentes[k];
+    var el=document.getElementById('aud_'+k); var pill=document.getElementById('pill_'+k);
+    if(el && a.alcance.fuentes && typeof a.alcance.fuentes[k]!=='undefined'){ el.checked=!!a.alcance.fuentes[k]; if(pill) pill.classList.toggle('active', !!a.alcance.fuentes[k]); }
   });
-  // logs
-  var lh='';
-  (a.logs||[]).slice(0,30).forEach(function(l){
-    var col = l.tipo==='ok' ? '#22c55e' : l.tipo==='fail' ? '#ef4444' : l.tipo==='huddle-falla-fuente-ok' ? '#f59e0b' : l.tipo==='reparado' ? '#38bdf8' : '#9d93b5';
-    var icon = l.tipo==='ok' ? '✓' : l.tipo==='reparado' ? '↻' : l.tipo==='huddle-falla-fuente-ok' ? '⚠' : '✕';
-    lh+='<div class="log-entry"><div class="log-icon" style="color:'+col+'">'+icon+'</div><div class="log-msg" style="color:'+col+'"><b>'+l.fuente+'</b> '+l.msg+'</div><div class="log-time">'+timeAgo(l.ts)+'</div></div>';
-  });
-  document.getElementById('auditoriaLog').innerHTML = lh || '<div style="color:#6b7280;font-size:11px;padding:8px">Sin logs aún — dale Play para iniciar</div>';
-  // botones estado
-  document.getElementById('btnAudPlay').disabled = a.activo && !a.pausado;
-  document.getElementById('btnAudPausa').disabled = !a.activo || a.pausado;
-  document.getElementById('btnAudPausa').textContent = a.pausado ? '▶ Reanudar' : '⏸ Pausa';
-  document.getElementById('btnAudPausa').onclick = function(){ controlAuditoria(a.pausado ? 'reanudar' : 'pausa'); };
+
+  // logs split
+  var pelisSources={'pelisxd':1,'cuevana':1,'cinecalidad':1};
+  var seriesSources={'animeflv':1,'latanime':1,'animed23':1,'danimados':1,'lacartoons':1,'miscaricaturas':1,'lct':1,'dani':1,'cari':1,'af':1,'la':1,'d23':1};
+  function isPelisLog(l){ var f=(l.fuente||'').toLowerCase(); return pelisSources[f]||f.indexOf('pelis')>=0||f.indexOf('cuevana')>=0||f.indexOf('cinecalidad')>=0; }
+  function isSeriesLog(l){ var f=(l.fuente||'').toLowerCase(); return seriesSources[f]||f.indexOf('anime')>=0||f.indexOf('latanime')>=0||f.indexOf('danimados')>=0||f.indexOf('lacart')>=0||f.indexOf('misc')>=0||l.msg.indexOf('cap')>=0||l.msg.indexOf('episodio')>=0; }
+
+  var logs=(a.logs||[]).slice(0,40);
+  function logHtml(list){
+    if(!list.length) return '<div style="color:#6b7280;font-size:11px;padding:12px;text-align:center">Sin logs aún</div>';
+    var h='';
+    list.forEach(function(l){
+      var col = l.tipo==='ok' ? '#22c55e' : l.tipo==='fail' ? '#ef4444' : l.tipo==='huddle-falla-fuente-ok' ? '#f59e0b' : l.tipo==='reparado' ? '#38bdf8' : '#9d93b5';
+      var svg=svgForTipo(l.tipo, col);
+      h+='<div class="log-entry"><div class="log-icon">'+svg+'</div><div class="log-msg" style="color:'+col+'"><b>'+(l.fuente||'')+'</b> '+l.msg+'</div><div class="log-time">'+timeAgo(l.ts)+'</div></div>';
+    });
+    return h;
+  }
+  var pelisLogs=logs.filter(isPelisLog);
+  var seriesLogs=logs.filter(isSeriesLog);
+  // if filters empty, fallback to show unified split
+  if(!pelisLogs.length && !seriesLogs.length){ pelisLogs=logs.slice(0,15); seriesLogs=logs.slice(0,15); }
+  else { if(!pelisLogs.length) pelisLogs=logs.filter(function(l){return !isSeriesLog(l)}).slice(0,15); if(!seriesLogs.length) seriesLogs=logs.filter(function(l){return !isPelisLog(l)}).slice(0,15); }
+  var elP=document.getElementById('audLogPelis'); if(elP) elP.innerHTML=logHtml(pelisLogs.slice(0,20));
+  var elS=document.getElementById('audLogSeries'); if(elS) elS.innerHTML=logHtml(seriesLogs.slice(0,20));
+  var elU=document.getElementById('auditoriaLog'); if(elU) elU.innerHTML=logHtml(logs.slice(0,30));
+  var elC=document.getElementById('audLogCount'); if(elC) elC.textContent=logs.length;
+
+  // botones
+  var btnPlay=document.getElementById('btnAudPlay'); if(btnPlay) btnPlay.disabled = a.activo && !a.pausado;
+  var btnPausa=document.getElementById('btnAudPausa'); var btnPausaLabel=document.getElementById('btnAudPausaLabel');
+  if(btnPausa){
+    btnPausa.disabled = !a.activo;
+    if(btnPausaLabel) btnPausaLabel.textContent = a.pausado ? 'Reanudar' : 'Pausa';
+    // icon swap
+    if(a.pausado){
+      btnPausa.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v14l11-7z"/></svg> <span id="btnAudPausaLabel">Reanudar</span>';
+    } else {
+      btnPausa.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor" stroke="none"/></svg> <span id="btnAudPausaLabel">Pausa</span>';
+    }
+    btnPausa.onclick = function(){ controlAuditoria(a.pausado ? 'reanudar' : 'pausa'); };
+  }
 }
 function auditoriaScopeChanged(){
   var alcance={
@@ -420,6 +676,12 @@ function auditoriaScopeChanged(){
   ['pelisxd','cuevana','cinecalidad','animeflv','latanime','animed23','danimados','lacartoons','miscaricaturas'].forEach(function(k){
     var el=document.getElementById('aud_'+k);
     if(el) alcance.fuentes[k]=!!el.checked;
+  });
+  document.getElementById('pill_pelis')?.classList.toggle('active', alcance.peliculas);
+  document.getElementById('pill_series')?.classList.toggle('active', alcance.series);
+  ['pelisxd','cuevana','cinecalidad','animeflv','latanime','animed23','danimados','lacartoons','miscaricaturas'].forEach(function(k){
+    var pill=document.getElementById('pill_'+k); var el=document.getElementById('aud_'+k);
+    if(pill&&el) pill.classList.toggle('active', el.checked);
   });
   fetch('/api/auditoria/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accion:'configurar', alcance:alcance})}).catch(function(){});
 }
