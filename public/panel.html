@@ -7,25 +7,21 @@
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0d0b14;color:#efeaf7;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;padding:0;min-height:100vh}
-/* Nav bar */
 .navbar{background:#17131f;border-bottom:1px solid #2a2338;padding:12px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
 .navbar .back{background:none;border:none;color:#8a5cf6;font-size:20px;cursor:pointer;padding:4px 8px;display:none}
 .navbar .back.show{display:block}
 .navbar h1{font-size:17px;display:flex;align-items:center;gap:8px;flex:1}
 .navbar h1 .dot{width:9px;height:9px;border-radius:50%;background:#38e08a;box-shadow:0 0 6px #38e08a}
-.navbar .ver{font-size:10px;color:#9d93b5}
+.navbar .clock{font-size:12px;color:#9d93b5;font-variant-numeric:tabular-nums}
 .page{display:none;padding:16px;max-width:800px;margin:0 auto}
 .page.active{display:block}
-/* Dashboard cards */
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}
 .card{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:14px;cursor:pointer;transition:border-color .2s}
 .card:hover{border-color:#8a5cf6}
 .card .n{font-size:24px;font-weight:800}
 .card .t{color:#9d93b5;font-size:10px;margin-top:2px;text-transform:uppercase;letter-spacing:.6px}
 .card.noclick{cursor:default}.card.noclick:hover{border-color:#2a2338}
-/* Section titles */
 .sec-title{font-size:13px;color:#9d93b5;text-transform:uppercase;letter-spacing:1px;margin:18px 0 10px}
-/* Fuente cards */
 .fcard{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:16px;cursor:pointer;transition:border-color .2s;margin-bottom:10px}
 .fcard:hover{border-color:#8a5cf6}
 .fcard .fhead{display:flex;align-items:center;justify-content:space-between}
@@ -34,7 +30,6 @@ body{background:#0d0b14;color:#efeaf7;font-family:-apple-system,'Segoe UI',Robot
 .fcard .fsub{font-size:11px;color:#9d93b5;margin-top:2px}
 .fcard .bar{height:6px;background:#241d31;border-radius:99px;overflow:hidden;margin-top:8px}
 .fcard .bar i{display:block;height:100%;border-radius:99px;transition:width .6s}
-/* Users */
 .urow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #1a1625}
 .urow:last-child{border-bottom:0}
 .udot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
@@ -44,7 +39,6 @@ body{background:#0d0b14;color:#efeaf7;font-family:-apple-system,'Segoe UI',Robot
 .uname{flex:1;font-size:13px}
 .udate{font-size:11px;color:#9d93b5;min-width:80px;text-align:right}
 .ubtn{background:#ff5c7a;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
-/* Detail page */
 .detail-section{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:16px;margin-bottom:12px}
 .detail-section h3{font-size:14px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
 .barra{height:10px;background:#241d31;border-radius:99px;overflow:hidden;margin:6px 0}
@@ -55,7 +49,6 @@ body{background:#0d0b14;color:#efeaf7;font-family:-apple-system,'Segoe UI',Robot
 table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
 th{text-align:left;color:#9d93b5;font-size:10px;text-transform:uppercase;padding:6px 4px;border-bottom:1px solid #2a2338}
 td{padding:5px 4px;border-bottom:1px solid #1a1625}
-/* Intros collapsible */
 .toggle-btn{background:none;border:1px solid #2a2338;border-radius:8px;color:#9d93b5;padding:6px 14px;font-size:12px;cursor:pointer;margin:6px 0}
 .toggle-btn:hover{border-color:#8a5cf6;color:#efeaf7}
 .pie{color:#9d93b5;font-size:11px;text-align:center;padding:16px}
@@ -63,13 +56,13 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
 </head>
 <body>
 
-<!-- NAVBAR -->
 <div class="navbar">
   <button class="back" id="backBtn" onclick="goBack()">←</button>
-  <h1><span class="dot"></span> Huddle <span class="ver" id="navVer"></span></h1>
+  <h1><span class="dot"></span> Huddle</h1>
+  <span class="clock" id="clock"></span>
 </div>
 
-<!-- PAGE: DASHBOARD -->
+<!-- DASHBOARD -->
 <div class="page active" id="pageDash">
   <div class="grid" id="dashCards"></div>
   <div class="sec-title">Catálogo total</div>
@@ -83,31 +76,51 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
   <p class="pie" id="pie">conectando…</p>
 </div>
 
-<!-- PAGE: USUARIOS -->
+<!-- USUARIOS -->
 <div class="page" id="pageUsers">
-  <div class="sec-title">Todos los usuarios <span id="userCount" style="float:right"></span></div>
+  <div class="sec-title">Usuarios <span id="userCount" style="float:right"></span></div>
   <div id="usersList"></div>
 </div>
 
-<!-- PAGE: FUENTE DETAIL -->
+<!-- FUENTE DETAIL -->
 <div class="page" id="pageFuente">
   <div id="fuenteContent"></div>
 </div>
 
 <script>
-var _page='dash';
 var _estado=null,_stats=null;
-var W2=14*86400000, W3=21*86400000;
+var TWO_W=14*86400000, THREE_W=21*86400000;
 
-function fmt(s){var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return(d?d+'d ':'')+(h?h+'h ':'')+m+'m'}
-function dotClass(ts){if(!ts)return'gray';var age=Date.now()-ts;return age<W2?'green':(age<W3?'yellow':'gray');}
-function dotLabel(ts){if(!ts)return'Nunca entro';var age=Date.now()-ts;return age<W2?'Activo':(age<W3?'Inactivo':'Desactivado');}
+function fmt(s){if(!s&&s!==0)return'--';var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return(d?d+'d ':'')+(h?h+'h ':'')+m+'m';}
+
+function updateClock(){
+  var now=new Date();
+  var h=now.getHours(),m=now.getMinutes(),s=now.getSeconds();
+  document.getElementById('clock').textContent=(h<10?'0':'')+h+':'+(m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+}
+updateClock();setInterval(updateClock,1000);
+
+function dotClass(ts){
+  if(!ts)return'gray';
+  var age=Date.now()-ts;
+  if(age<TWO_W)return'green';
+  if(age<THREE_W)return'yellow';
+  return'gray';
+}
+function dotLabel(ts){
+  if(!ts)return'Nunca entro';
+  var age=Date.now()-ts;
+  var days=Math.floor(age/86400000);
+  if(days<1)return'Hoy';
+  if(days<14)return days+' dias activo';
+  if(days<21)return days+' dias inactivo';
+  return days+' dias - desactivado';
+}
 
 function showPage(id){
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   document.getElementById('page'+id).classList.add('active');
   document.getElementById('backBtn').classList.toggle('show',id!=='Dash');
-  _page=id;
   window.scrollTo(0,0);
 }
 function goBack(){showPage('Dash');}
@@ -121,13 +134,11 @@ function toggleIntros(){
 
 function renderDash(d){
   _estado=d;
-  document.getElementById('navVer').textContent=d.version;
   document.getElementById('dashCards').innerHTML=
     '<div class="card noclick"><div class="n">'+fmt(d.encendidoHace)+'</div><div class="t">Encendido</div></div>'
     +'<div class="card noclick"><div class="n">'+d.memoriaMb+' MB</div><div class="t">Memoria</div></div>'
     +'<div class="card noclick"><div class="n">'+d.salasActivas+'</div><div class="t">Salas</div></div>'
     +'<div class="card" onclick="showPage(\'Users\')"><div class="n">'+d.usuarios+'</div><div class="t">Usuarios ▸</div></div>';
-  // Catalogo
   var ca=d.catalogos||{};
   var f=_stats?_stats.fuentes:{};
   var tp=0;for(var k in f)tp+=(f[k].activas>0?f[k].activas:0);
@@ -141,7 +152,6 @@ function renderDash(d){
     +'<div class="card noclick"><div class="n" style="color:#ffb020">'+gt+'</div><div class="t">Total</div></div>';
   document.getElementById('catDetail').innerHTML=
     'Caricaturas: <b>'+ca.caricaturas+'</b> · Cartoons: <b>'+ca.cartoons+'</b> · Live Action: <b>'+ca.liveaction+'</b> · Danimados: <b>'+ca.danimados+'</b> · Animes: <b>'+ca.animes+'</b>';
-  // Intros
   var ii=d.intros||{};
   var pct=ii.total?Math.round(ii.analizados*100/ii.total):0;
   var ih='<div class="barra"><i style="width:'+pct+'%;background:linear-gradient(90deg,#8a5cf6,#38e08a)"></i></div>'
@@ -153,7 +163,7 @@ function renderDash(d){
     +'<span class="chip">En cola <b>'+ii.enCola+'</b></span></div>';
   if(ii.muestra&&ii.muestra.length){
     ih+='<table><thead><tr><th>Sitio</th><th>Serie</th><th>Temp</th><th>Seg</th></tr></thead><tbody>';
-    ii.muestra.forEach(function(m){ih+='<tr><td>'+m.sitio+'</td><td>'+m.serie+'</td><td>T'+m.temporada+'</td><td>'+m.inicio+'→'+m.fin+'</td></tr>';});
+    ii.muestra.forEach(function(m){ih+='<tr><td>'+m.sitio+'</td><td>'+m.serie+'</td><td>T'+m.temporada+'</td><td>'+m.inicio+' → '+m.fin+'</td></tr>';});
     ih+='</tbody></table>';
   }
   document.getElementById('introsWrap').innerHTML=ih;
@@ -164,11 +174,10 @@ function renderFuentes(stats){
   _stats=stats;
   var f=stats.fuentes||{};
   var colors={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8'};
-  var totalAct=0;
-  var html='';
+  var totalAct=0,html='';
   for(var k in f){
     var s=f[k];var c=colors[k]||'#efeaf7';
-    var act=s.activas>0?s.activas:0;
+    var act=Math.max(0,s.activas||0);
     totalAct+=act;
     var pct=s.total?Math.round(act*100/s.total):0;
     html+='<div class="fcard" onclick="showFuente(\''+k+'\')">'
@@ -181,29 +190,25 @@ function renderFuentes(stats){
 }
 
 function showFuente(k){
-  var f=_stats?_stats.fuentes[k]:null;
-  if(!f)return;
+  var f=_stats?_stats.fuentes[k]:null;if(!f)return;
   var colors={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8'};
   var c=colors[k]||'#efeaf7';
-  var act=f.activas>0?f.activas:0;
+  var act=Math.max(0,f.activas||0);
   var pct=f.total?Math.round(act*100/f.total):0;
-  var html='<div class="detail-section">'
-    +'<h3 style="color:'+c+'">'+f.nombre+'</h3>'
+  var html='<div class="detail-section"><h3 style="color:'+c+'">'+f.nombre+'</h3>'
     +'<div class="barra"><i style="width:'+pct+'%;background:'+c+'"></i></div>'
     +'<div style="display:flex;justify-content:space-between;font-size:12px;color:#9d93b5;margin:6px 0">'
     +'<span>'+act+' activas de '+f.total+'</span><span>'+pct+'%</span></div>'
     +'<div class="chips">'
     +'<span class="chip ok">Activas <b>'+act+'</b></span>'
     +'<span class="chip bad">Ocultas <b>'+f.ocultas+'</b></span>'
-    +'<span class="chip">Verificadas <b>'+(f.vistas||0)+'</b></span></div>'
-    +'</div>';
-  html+='<div class="detail-section"><h3>Estado de la sonda</h3>'
+    +'<span class="chip">Verificadas <b>'+(f.vistas||0)+'</b></span></div></div>'
+    +'<div class="detail-section"><h3>Estado de la sonda</h3>'
     +'<div style="font-size:12px;color:#9d93b5;line-height:1.8">'
-    +'<div>La sonda revisa automáticamente películas cada ~6 horas.</div>'
+    +'<div>La sonda revisa automáticamente cada ~6 horas.</div>'
     +'<div>Ocultas encontradas: <b style="color:#ff5c7a">'+f.ocultas+'</b></div>'
     +'<div>Ya verificadas: <b>'+f.vistas+'</b></div>'
-    +'<div>Pendientes por verificar: <b>'+(f.total-f.vistas)+'</b></div>'
-    +'</div></div>';
+    +'<div>Pendientes: <b>'+(f.total-f.vistas)+'</b></div></div></div>';
   document.getElementById('fuenteContent').innerHTML=html;
   showPage('Fuente');
 }
@@ -211,9 +216,10 @@ function showFuente(k){
 function renderUsers(data){
   var users=data.usuarios||[];
   var sorted=users.slice().sort(function(a,b){return(b.lastSeenAt||0)-(a.lastSeenAt||0)});
-  var html='';
+  var green=0,yellow=0,gray=0,html='';
   sorted.forEach(function(u){
     var cls=dotClass(u.lastSeenAt);
+    if(cls==='green')green++;else if(cls==='yellow')yellow++;else gray++;
     var lbl=dotLabel(u.lastSeenAt);
     var dt=u.lastSeenAt?new Date(u.lastSeenAt).toLocaleDateString('es'):'—';
     html+='<div class="urow">'
@@ -223,7 +229,7 @@ function renderUsers(data){
       +'<button class="ubtn" onclick="eliminarUser(\''+u.name.replace(/'/g,"\\'")+'\')">Eliminar</button></div>';
   });
   document.getElementById('usersList').innerHTML=html||'<div style="color:#9d93b5;font-size:13px;padding:20px 0">Sin usuarios</div>';
-  document.getElementById('userCount').textContent=users.length+' usuarios';
+  document.getElementById('userCount').innerHTML='<span style="color:#38e08a">'+green+'</span> / <span style="color:#ffb020">'+yellow+'</span> / <span style="color:#555">'+gray+'</span> de '+users.length;
 }
 
 function tic(){

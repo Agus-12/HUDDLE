@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v239.5'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
+const UI_VERSION = 'v239.9'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
@@ -10867,30 +10867,33 @@ async function cuevanaLatest() {
 
     /* v238: estadísticas por fuente */
     if (url.pathname === '/api/stats' && req.method === 'GET') {
-      
+      /* v239.9: usar datos reales — índices se cargan bajo demanda, usar Sets + archivos como respaldo */
+      const cvTotal = cuevanaIdx.slugs.length || (CVM_OCULTAS.size + CVM_VISTAS.size);
+      const pxdTotal = (typeof pelisxdIdx !== 'undefined' ? pelisxdIdx.slugs.length : 0) || (PXD_OCULTAS.size + pxdVistas.size);
+      const ccTotal = ccIdx.slugs.length || (CC_OCULTAS.size + CC_VISTAS.size);
       const stats = {
         ok: true,
         fuentes: {
           cuevana: {
             nombre: 'Cuevana',
-            total: cuevanaIdx.slugs.length || 0,
+            total: cvTotal,
             ocultas: CVM_OCULTAS.size,
             vistas: CVM_VISTAS.size,
-            activas: (cuevanaIdx.slugs.length || 0) - CVM_OCULTAS.size,
+            activas: Math.max(0, cvTotal - CVM_OCULTAS.size),
           },
           pelisxd: {
             nombre: 'PelisXD',
-            total: (typeof pelisxdIdx !== 'undefined' ? pelisxdIdx.slugs.length : 0) || 0,
+            total: pxdTotal,
             ocultas: PXD_OCULTAS.size,
             vistas: pxdVistas.size,
-            activas: ((typeof pelisxdIdx !== 'undefined' ? pelisxdIdx.slugs.length : 0) || 0) - PXD_OCULTAS.size,
+            activas: Math.max(0, pxdTotal - PXD_OCULTAS.size),
           },
           cinecalidad: {
             nombre: 'CineCalidad',
-            total: ccIdx.slugs.length || 0,
+            total: ccTotal,
             ocultas: CC_OCULTAS.size,
             vistas: CC_VISTAS.size,
-            activas: (ccIdx.slugs.length || 0) - CC_OCULTAS.size,
+            activas: Math.max(0, ccTotal - CC_OCULTAS.size),
           },
         },
         usuarios: users.size,
