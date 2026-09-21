@@ -199,8 +199,8 @@ function renderDash(d){
   var f=_stats?_stats.fuentes:{};
   var tp=0;for(var k in f){if(k!=='latanime'&&k!=='caricaturas')tp+=Math.max(0,f[k].activas||0);}
   var laAct=f.latanime?Math.max(0,f.latanime.activas||0):0;
-  var ts=(ca.animes||0)+(ca.danimados||0);
-  var tc=(ca.caricaturas||0)+(ca.cartoons||0)+(ca.liveaction||0);
+  var ts=(ca.animes||0);
+  var tc=f.caricaturas?Math.max(0,f.caricaturas.activas||0):((ca.caricaturas||0)+(ca.cartoons||0)+(ca.liveaction||0));
   var gt=tp+ts+tc;
   document.getElementById('catCards').innerHTML=
     '<div class="card noclick"><div class="n" style="color:#38e08a">'+tp+'</div><div class="t">Películas</div></div>'

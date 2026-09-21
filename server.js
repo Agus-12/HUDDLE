@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v241'; // 241: Auditoria caricaturas + sonda + fix 31-minutos
+const UI_VERSION = 'v241.1'; // 241.1: Numeros coherentes + icono caricaturas
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
