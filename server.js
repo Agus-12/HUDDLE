@@ -7137,6 +7137,7 @@ async function buscarCineCalidad(q) {
   if (!r.ok) return [];
   const d = await r.json();
   const posts = d.posts || d || [];
+  console.log('[buscar-cc] q=' + q + ' posts=' + posts.length);
   return posts.map((p) => {
     const slug = p.slug || '';
     const esSerie = (p.type || '').toLowerCase().includes('series');
