@@ -22,6 +22,19 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
+/* v238: admin auth helper */
+function checkAdminAuth(req, res) {
+  const adminUser = 'Admin';
+  const adminPass = 'Samuelito8';
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Basic ') || Buffer.from(auth.slice(6), 'base64').toString() !== adminUser + ':' + adminPass) {
+    res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Huddle Admin"', 'Content-Type': 'text/plain' });
+    res.end('Credenciales requeridas');
+    return false;
+  }
+  return true;
+}
+
 const UI_VERSION = 'v238'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
@@ -10831,6 +10844,7 @@ async function cuevanaLatest() {
 
     /* v238: estadísticas por fuente */
     if (url.pathname === '/api/stats' && req.method === 'GET') {
+      if (!checkAdminAuth(req, res)) return;
       const stats = {
         ok: true,
         fuentes: {
@@ -10864,6 +10878,7 @@ async function cuevanaLatest() {
 
     /* v238: gestión de usuarios — listar y eliminar */
     if (url.pathname === '/api/users' && req.method === 'GET') {
+      if (!checkAdminAuth(req, res)) return;
       const lista = [];
       for (const [key, u] of users) {
         lista.push({ name: u.name || key, createdAt: u.createdAt || null, lastSeenAt: u.lastSeenAt || null });
@@ -10871,6 +10886,7 @@ async function cuevanaLatest() {
       return json(res, 200, { ok: true, total: lista.length, usuarios: lista });
     }
     if (url.pathname === '/api/users' && req.method === 'DELETE') {
+      if (!checkAdminAuth(req, res)) return;
       const body = await readBody(req);
       const target = String(body.name || '').trim().toLowerCase();
       if (!target) return json(res, 400, { ok: false, error: 'Falta name' });
@@ -10900,10 +10916,19 @@ async function cuevanaLatest() {
         titulosCheckpoint: cosecha && cosecha.meta ? cosecha.meta.hits : 0,
       };
       if (!/text\/html/i.test(req.headers.accept || '') || url.searchParams.get('json') === '1') return json(res, 200, datos);
+      /* v238: auth básica para el panel */
+      const adminUser = 'Admin';
+      const adminPass = 'Samuelito8';
+      const auth = req.headers.authorization || '';
+      if (!auth.startsWith('Basic ') || Buffer.from(auth.slice(6), 'base64').toString() !== adminUser + ':' + adminPass) {
+        res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Huddle Admin"', 'Content-Type': 'text/plain' });
+        return res.end('Credenciales requeridas');
+      }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
       return res.end(panelHtml());
     }
     if (url.pathname === '/api/estado') { /* v205.4: todo el estado en un JSON para el panel; v223: + cosecha; v227: + llave CDN */
+      if (!checkAdminAuth(req, res)) return;
       const SITIOS2 = { dani: 'Caricaturas', mm: 'Caricaturas', lct: 'Cartoons', la: 'Anime', af: 'AnimeFLV', cv: 'Cuevana' };
       const muestra = Object.entries(INTROS).slice(0, 60).map(([k, v]) => {
         const p = k.split(':');
@@ -11270,11 +11295,11 @@ function panelHtml() {
     document.getElementById('pie').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es');
   }
   function tic() {
-    fetch('/api/estado').then(function (r) { return r.json(); }).then(pintar).catch(function () {
+    fetch('/api/estado', {credentials:'same-origin'}).then(function (r) { return r.json(); }).then(pintar).catch(function () {
       document.getElementById('pie').textContent = 'sin conexión con el server — reintentando…';
     });
-    fetch('/api/stats').then(function (r) { return r.json(); }).then(pintarStats).catch(function () {});
-    fetch('/api/users').then(function (r) { return r.json(); }).then(pintarUsers).catch(function () {});
+    fetch('/api/stats', {credentials:'same-origin'}).then(function (r) { return r.json(); }).then(pintarStats).catch(function () {});
+    fetch('/api/users', {credentials:'same-origin'}).then(function (r) { return r.json(); }).then(pintarUsers).catch(function () {});
   }
   tic();
   setInterval(tic, 5000); /* v205.5: casi al momento */
