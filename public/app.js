@@ -531,8 +531,15 @@ function montarNativo(porProxy) {
       hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
         try {
           if (hls.levels && hls.levels.length > 1) {
-            const max = hls.levels.length - 1;
-            if (hls.autoLevelEnabled) hls.nextLevel = max;
+            setTimeout(() => {
+              try {
+                if (hls.autoLevelEnabled && hls.levels && hls.levels.length > 1) {
+                  const max = hls.levels.length - 1;
+                  const bw = hls.bandwidthEstimate || 0;
+                  if (bw > 800000 || hls.levels[max].bitrate < bw*1.2) hls.nextLevel = max;
+                }
+              } catch {}
+            }, 8000);
           }
         } catch {}
       });
@@ -586,12 +593,13 @@ function montarNativo(porProxy) {
  * tiraba el video y volvía al inicio; ahora se SALTA el hueco (30 s) y sigue. */
 function esFlujoMovie(url) { return /^\/api\/movie\//.test(String(url || '')); }
 function cfgHls(src) {
-  const base = { maxBufferLength: 30, capLevelToPlayerSize: false, startLevel: -1, abrEwmaDefaultEstimate: 6000000 };
+  const base = { maxBufferLength: 60, maxMaxBufferLength: 120, capLevelToPlayerSize: false, startLevel: -1, abrEwmaDefaultEstimate: 6000000, abrBandWidthFactor: 0.95, abrBandWidthUpFactor: 0.7 };
   return esFlujoMovie(src)
     ? { ...base, fragLoadingMaxRetry: 6, fragLoadingRetryDelay: 1000, fragLoadingMaxRetryTimeoutMs: 30000, manifestLoadingMaxRetry: 4, levelLoadingMaxRetry: 4 }
     : base;
 }
 // v256 híbrido 5h: cache en navegador para Cuevana (2KB por peli)
+const CUEVANA_LS_TTL_GOOD = 60*1000;
 const CUEVANA_LS_TTL = 5*3600*1000;
 const CUEVANA_LS_PREFIX = 'huddle:cuevana:';
 function cuevanaLsGet(slug){
@@ -599,7 +607,9 @@ function cuevanaLsGet(slug){
     const raw = localStorage.getItem(CUEVANA_LS_PREFIX+slug);
     if(!raw) return null;
     const o = JSON.parse(raw);
-    if(!o || !o.m3u8 || Date.now()-o.at > CUEVANA_LS_TTL) { localStorage.removeItem(CUEVANA_LS_PREFIX+slug); return null; }
+    if(!o || !o.m3u8) return null;
+    const ttl = /goodstream|vimeos|hlswish/i.test(o.m3u8) ? CUEVANA_LS_TTL_GOOD : CUEVANA_LS_TTL;
+    if(Date.now()-o.at > ttl) { localStorage.removeItem(CUEVANA_LS_PREFIX+slug); return null; }
     return o;
   }catch{ return null; }
 }
@@ -3531,21 +3541,15 @@ async function abrirSolo(pageUrl, info, opts) {
   if (/cuevana\.mov\/pelicula\//i.test(pageUrl) && _slugLS) {
     const _cached = cuevanaLsGet(_slugLS);
     if (_cached) {
-      // verificar que el m3u8 sigue vivo (proxy)
-      try {
-        const _ok = await fetch('/api/hls?u=' + encodeURIComponent(_cached.m3u8), { cache: 'no-store' }).then(r=>r.ok && r.headers.get('content-type') && /mpegurl|m3u8/i.test(r.headers.get('content-type')||'') ? r.text().then(tx=>/#EXTM3U/i.test(tx)) : false).catch(()=>false);
-        // si no pudimos verificar, igual lo intentamos (el montar lo reintentará)
-        _fromLS = _cached;
-        console.log('[cuevana cache] hit LS', _slugLS);
-      } catch {}
-      if (_fromLS) {
-        if (!SOLO || SOLO.url !== pageUrl || SOLO.cerrado) return;
-        SOLO.res = _fromLS;
-        montarSolo(_fromLS, await elegirModoSolo(_fromLS));
-        // refresca en 2º plano por si expiró
-        fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(pageUrl)).then(r=>r.json()).then(d2=>{ if(d2 && d2.ok && d2.m3u8) cuevanaLsSet(_slugLS, d2); }).catch(()=>{});
-        return;
-      }
+      _fromLS = _cached;
+      console.log('[cuevana cache] hit LS', _slugLS);
+      if (!SOLO || SOLO.url !== pageUrl || SOLO.cerrado) return;
+      SOLO.res = _fromLS;
+      montarSolo(_fromLS, await elegirModoSolo(_fromLS));
+      // si el master estaba expirado, el player disparará ERROR y re-resolverá solo
+      // refresca en 2º plano por si expiró
+      fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(pageUrl)).then(r=>r.json()).then(d2=>{ if(d2 && d2.ok && d2.m3u8) cuevanaLsSet(_slugLS, d2); }).catch(()=>{});
+      return;
     }
   }
   try {
@@ -3658,14 +3662,21 @@ function montarSolo(d, viaProxy) {
       SOLO.hls = hls;
       prefiereEspanol(video, hls); /* v94: audio español si lo hay */
       hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+        try { pintarQMenuSolo(); } catch {}
+        // v257: empieza en Auto, a los 8s si estabilizó sube a la más alta
         try {
-          // arrancar en la más alta disponible, luego el usuario puede bajar si quiere
           if (hls.levels && hls.levels.length > 1) {
-            const max = hls.levels.length - 1;
-            // si está en auto y la estimada es baja por el relay, forzar la más alta al inicio
-            if (hls.autoLevelEnabled) hls.nextLevel = max;
+            setTimeout(() => {
+              try {
+                if (hls.autoLevelEnabled && hls.levels && hls.levels.length > 1) {
+                  const max = hls.levels.length - 1;
+                  // solo sube si el ancho de banda estimado da para 720p+
+                  const bw = hls.bandwidthEstimate || 0;
+                  if (bw > 800000 || hls.levels[max].bitrate < bw*1.2) hls.nextLevel = max;
+                }
+              } catch {}
+            }, 8000);
           }
-          pintarQMenuSolo();
         } catch {}
       });
       hls.on(window.Hls.Events.LEVEL_SWITCHED, () => { try { pintarQMenuSolo(); } catch {} });

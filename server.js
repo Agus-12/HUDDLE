@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v256'; // 256: Cache híbrido 5h + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v257'; // 257: Fluidez Cuevana (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -4887,17 +4887,11 @@ async function resolverCuevanaMov(pageUrl) {
   const slugM = /\/pelicula\/\d+\/([^/?#]+)/i.exec(pageUrl) || /\/pelicula\/+([^/?#]+)/i.exec(pageUrl);
   if (!slugM) throw new Error('URL de Cuevana no válida: ' + pageUrl);
   const slug = slugM[1];
-  // cache 5h RAM
+  // cache híbrido: goodstream/vimeos 60s (single-use), otros 5h
   const cc = CUEVANA_M3U8_CACHE.get(slug);
-  if (cc && Date.now() - cc.at < CUEVANA_CACHE_TTL) {
-    // verificar que el m3u8 sigue vivo (HEAD rápido)
-    try {
-      const vr = await fetchSeguro(cc.m3u8, 4000).catch(()=>null);
-      if (vr && vr.ok) {
-        const txt = await vr.text().catch(()=> '');
-        if (txt.includes('#EXTM3U')) return { m3u8: cc.m3u8, subs: cc.subs||[], proxy: !!cc.proxy, mp4: !!cc.mp4 };
-      }
-    } catch {}
+  if (cc && Date.now() - cc.at < (cc.isGood ? 60*1000 : CUEVANA_CACHE_TTL)) {
+    return { m3u8: cc.m3u8, subs: cc.subs||[], proxy: !!cc.proxy, mp4: !!cc.mp4 };
+  } else if (cc) {
     CUEVANA_M3U8_CACHE.delete(slug);
   }
   const r = await fetchSeguro(CUEVANA_API + encodeURIComponent(slug), 12000);
@@ -4974,8 +4968,9 @@ async function resolverCuevanaMov(pageUrl) {
           if (txt.includes('#EXTM3U')) {
             const cdnHost = new URL(m3u8).hostname;
             if (!hlsReferers.has(cdnHost)) hlsReferers.set(cdnHost, 'https://' + host + '/');
+            const isGood = /goodstream|vimeos|hlswish/i.test(host);
             const resObj = { m3u8, subs: [], proxy: true, mp4: false };
-            CUEVANA_M3U8_CACHE.set(slug, { ...resObj, at: Date.now() });
+            CUEVANA_M3U8_CACHE.set(slug, { ...resObj, at: Date.now(), isGood });
             // limpiar mapa si crece
             if (CUEVANA_M3U8_CACHE.size > 400) {
               const entries = [...CUEVANA_M3U8_CACHE.entries()].sort((a,b)=>a[1].at-b[1].at);
@@ -10106,13 +10101,15 @@ async function proxearHls(req, res, target) {
   if (ref) cabUp.Referer = ref;
   if (req.headers.range) cabUp.Range = String(req.headers.range);
   let upstream = null;
-  if (useRelayDirect && CDN_RELAY) {
-    /* v236.6: saltar intentos directos — estos CDNs bloquean IPs de datacenter */
+  // v257: para fluidez, probar directo primero para segmentos HLS (aunque sea goodstream), solo master va por relay si hace falta
+  // Si es master.m3u8, sí probar relay primero (token IP-bound); si es .ts o index, probar directo primero
+  const esMaster = /master\.m3u8/i.test(target);
+  if (useRelayDirect && CDN_RELAY && esMaster) {
     try {
       const relayUrl = CDN_RELAY + '/?u=' + encodeURIComponent(target);
       const ctl2 = new AbortController();
-      const t2 = setTimeout(() => ctl2.abort(), 15000);
-      upstream = await fetch(relayUrl, { signal: ctl2.signal, redirect: 'follow' });
+      const t2 = setTimeout(() => ctl2.abort(), 12000);
+      upstream = await fetch(relayUrl, { signal: ctl2.signal, redirect: 'follow', headers: { 'ngrok-skip-browser-warning': 'true' } });
       clearTimeout(t2);
       if (upstream.ok) console.log('[hls-proxy] relay directo OK:', decodeURIComponent(target).slice(0, 60));
       else { try { upstream.body && upstream.body.cancel(); } catch {} upstream = null; }
