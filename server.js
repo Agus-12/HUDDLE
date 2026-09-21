@@ -518,6 +518,7 @@ async function sondaPelisxd() {
               /* No tiene Byse → ocultar de inmediato */
               PXD_OCULTAS.add(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt');
               nuevas_fail++;
+              sondaNotify("PelisXD", "muerto", slug, slug + " — sin Byse (nueva)");
             }
           } catch {}
         }
@@ -649,19 +650,19 @@ async function sondaCuevana() {
       const r = await verificarCuevana(slug);
       CVM_VISTAS.add(slug);
       if (r.ok) nuevas_ok++;
-      else { CVM_OCULTAS.add(slug); nuevas_fail++; }
+      else { CVM_OCULTAS.add(slug); nuevas_fail++; sondaNotify("Cuevana", "muerto", slug, slug + " — sin servidores (nueva)"); }
     }
     /* Frente VIVAS: muestra de activas */
     const vivas = shuffle(sitemap.filter(s => !CVM_OCULTAS.has(s))).slice(0, 15);
     for (const slug of vivas) {
       const r = await verificarCuevana(slug);
-      if (!r.ok) { CVM_OCULTAS.add(slug); vivas_muertas++; }
+      if (!r.ok) { CVM_OCULTAS.add(slug); vivas_muertas++; sondaNotify("Cuevana", "muerto", slug, slug + " murio — sin servidores"); }
     }
     /* Frente MUERTAS: muestra de ocultas */
     const muertas = shuffle([...CVM_OCULTAS]).slice(0, 15);
     for (const slug of muertas) {
       const r = await verificarCuevana(slug);
-      if (r.ok) { CVM_OCULTAS.delete(slug); muertas_vivas++; }
+      if (r.ok) { CVM_OCULTAS.delete(slug); muertas_vivas++; sondaNotify("Cuevana", "revivio", slug, slug + " revivio — servidores encontrados"); }
     }
     /* Persistir */
     try { fs.writeFileSync(path.join(__dirname, 'cuevana-ocultas.txt'), [...CVM_OCULTAS].join('\n') + '\n'); } catch {}
@@ -697,13 +698,18 @@ try { for (const l of fs.readFileSync(path.join(__dirname, 'cc-ocultas.txt'), 'u
 const CC_AUDIT_DEAD = new Set(["motor-city", "brainbugs", "end-of-the-rope", "la-pelicula-de-heffalump", "the-group", "efsunlu-ayin", "guadalupe-madre-de-la-humanidad", "vampira-humanista-busca-suicida", "mi-perfecto-ex", "corina", "vera-y-el-placer-de-los-otros", "angeles-caidos-guerreros-de-paz", "rift", "thundercats", "krypto-saves-the-day"]);
 for (const s of CC_AUDIT_DEAD) if (!CC_OCULTAS.has(s)) CC_OCULTAS.add(s);
 /* v239.13: Notificaciones de sonda — log de eventos recientes */
-const SONDALOG = []; /* {ts, fuente, tipo, slug, msg} — max 200 */
-const SONDALOG_MAX = 200;
+const SONDALOG_FILE = path.join(DATA_DIR, 'sonda-log.json');
+const SONDALOG = []; /* {ts, fuente, tipo, slug, msg} — max 500 */
+const SONDALOG_MAX = 500;
+try { const _sl = JSON.parse(fs.readFileSync(SONDALOG_FILE, 'utf8')); if (Array.isArray(_sl)) SONDALOG.push(..._sl); } catch {} /* v240: persistir log */
+let sondaLogTimer = null;
 function sondaNotify(fuente, tipo, slug, msg) {
   SONDALOG.unshift({ ts: Date.now(), fuente, tipo, slug, msg: String(msg || '').slice(0, 200) });
   if (SONDALOG.length > SONDALOG_MAX) SONDALOG.length = SONDALOG_MAX;
-  const icon = tipo === 'muerto' ? '💀' : tipo === 'revivio' ? '💚' : '🔍';
-  console.log(`[sonda-notif] ${icon} ${fuente}: ${msg}`);
+  clearTimeout(sondaLogTimer);
+  sondaLogTimer = setTimeout(() => { try { fs.writeFileSync(SONDALOG_FILE, JSON.stringify(SONDALOG)); } catch {} }, 3000);
+  const sym = tipo === 'muerto' ? 'x' : tipo === 'revivio' ? '+' : '?';
+  console.log(`[sonda-notif] ${sym} ${fuente}: ${msg}`);
 }
 
 let ccIdx = { slugs: [], at: 0, buscando: null };
