@@ -97,6 +97,44 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
   <div id="catDetail" style="font-size:12px;color:#9d93b5;line-height:1.8;margin-bottom:16px"></div>
   <div class="sec-title">Fuentes de video</div>
   <div id="fuentesCards"></div>
+  <div class="sec-title" style="color:#c4b5fd">🔍 Auditoría Huddle — Sonda Maestro (24/7)</div>
+  <div class="detail-section" id="auditoriaBox" style="border-color:#4c1d95">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+      <button id="btnAudPlay" onclick="controlAuditoria('play')" style="background:#22c55e;color:#000;border:none;border-radius:8px;padding:8px 16px;font-weight:800;cursor:pointer">▶ Play</button>
+      <button id="btnAudPausa" onclick="controlAuditoria('pausa')" style="background:#f59e0b;color:#000;border:none;border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer">⏸ Pausa</button>
+      <button id="btnAudCancel" onclick="controlAuditoria('cancelar')" style="background:#ef4444;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-weight:700;cursor:pointer">⏹ Cancelar</button>
+      <span id="auditoriaEstado" style="font-size:12px;color:#c4b5fd;margin-left:8px">—</span>
+    </div>
+    <div style="font-size:12px;color:#9d93b5;margin-bottom:8px">Alcance (qué audita Huddle):</div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="aud_pelis" checked onchange="auditoriaScopeChanged()"> Películas</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="aud_series" checked onchange="auditoriaScopeChanged()"> Series (cap por cap)</label>
+    </div>
+    <div id="audFuentes" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <!-- checks por fuente se generan en JS -->
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px">
+      <div>
+        <div style="font-size:11px;color:#9d93b5;text-transform:uppercase;letter-spacing:.5px">Películas (vivos)</div>
+        <div class="barra"><i id="audPelisBar" style="width:0%;background:#22c55e"></i></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#9d93b5"><span id="audPelisTxt">0 / 0</span><span id="audPelisPct">0%</span></div>
+        <div style="font-size:11px;color:#9d93b5;margin-top:4px" id="audPelisFuente"></div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#9d93b5;text-transform:uppercase;letter-spacing:.5px">Series (vivos cap por cap)</div>
+        <div class="barra"><i id="audSeriesBar" style="width:0%;background:#8a5cf6"></i></div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#9d93b5"><span id="audSeriesTxt">0 / 0</span><span id="audSeriesPct">0%</span></div>
+        <div style="font-size:11px;color:#9d93b5;margin-top:4px" id="audSeriesFuente"></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:#9d93b5;margin-bottom:8px">
+      <span>Muertas siempre ocultas (no se auditan) · </span>
+      <span id="auditoriaNota" style="color:#c4b5fd"></span>
+    </div>
+    <div style="max-height:220px;overflow:auto;border:1px solid #2a2338;border-radius:8px;padding:8px;background:#0d0b14" id="auditoriaLog"></div>
+    <div style="font-size:10px;color:#6b7280;margin-top:6px">Sonda Huddle 24/7: cada 90s (si está en Play) o cada 6h en segundo plano. Si Huddle falla pero la fuente directa OK → auto-limpia cache Huddle y reintenta. Logs también en <code>sonda-huddle-*.log</code></div>
+  </div>
+
   <div class="sec-title">Rastreador de intros</div>
   <button class="toggle-btn" onclick="toggleIntros()">▸ Mostrar intros aprendidas</button>
   <div id="introsWrap" style="display:none"></div>
@@ -315,6 +353,97 @@ function renderUsers(data){
     +'<span style="color:#ffb020">'+yellow+'</span> inactivos · '
     +'<span style="color:#ff5c7a">'+red+'</span> desactivados';
 }
+
+var _auditoria=null;
+function auditoriaFuentesChecks(){
+  var fuentes=[
+    {k:'pelisxd', label:'PelisXD'},
+    {k:'cuevana', label:'CuevanaMov'},
+    {k:'cinecalidad', label:'CineCalidad'},
+    {k:'animeflv', label:'AnimeFLV'},
+    {k:'latanime', label:'Latanime'},
+    {k:'animed23', label:'AnimeD23'},
+    {k:'danimados', label:'Danimados'},
+    {k:'lacartoons', label:'Lacartoons'},
+    {k:'miscaricaturas', label:'MisCaris'}
+  ];
+  var html='';
+  fuentes.forEach(function(f){
+    html+='<label style="display:flex;align-items:center;gap:4px;font-size:11px;background:#1a1625;border:1px solid #2a2338;border-radius:99px;padding:4px 8px"><input type="checkbox" id="aud_'+f.k+'" checked onchange="auditoriaScopeChanged()"> '+f.label+'</label>';
+  });
+  document.getElementById('audFuentes').innerHTML=html;
+}
+function renderAuditoria(d){
+  if(!d || !d.auditoria) return;
+  _auditoria=d.auditoria;
+  var a=d.auditoria;
+  var estado = a.activo ? (a.pausado ? '⏸ PAUSADO' : '▶ EJECUTANDO') : '⏹ IDLE';
+  var color = a.activo ? (a.pausado ? '#f59e0b' : '#22c55e') : '#9d93b5';
+  document.getElementById('auditoriaEstado').innerHTML='<b style="color:'+color+'">'+estado+'</b> · '+ (a.progreso.peliculas.verificadas + a.progreso.series.verificadas)+' verificadas';
+  document.getElementById('audPelisBar').style.width=(a.progreso.peliculas.pct||0)+'%';
+  document.getElementById('audPelisTxt').textContent=(a.progreso.peliculas.verificadas||0)+' / '+(a.progreso.peliculas.total||0)+' · OK:'+(a.progreso.peliculas.ok||0)+' Fail:'+(a.progreso.peliculas.fail||0);
+  document.getElementById('audPelisPct').textContent=(a.progreso.peliculas.pct||0)+'%';
+  document.getElementById('audSeriesBar').style.width=(a.progreso.series.pct||0)+'%';
+  document.getElementById('audSeriesTxt').textContent=(a.progreso.series.verificadas||0)+' / '+(a.progreso.series.total||0)+' · OK:'+(a.progreso.series.ok||0)+' Fail:'+(a.progreso.series.fail||0);
+  document.getElementById('audSeriesPct').textContent=(a.progreso.series.pct||0)+'%';
+  var pf = a.progreso.peliculas.porFuente||{}; var sf = a.progreso.series.porFuente||{};
+  document.getElementById('audPelisFuente').textContent = Object.keys(pf).length ? Object.entries(pf).map(function(e){return e[0]+':'+e[1]}).join(' · ') : '';
+  document.getElementById('audSeriesFuente').textContent = Object.keys(sf).length ? Object.entries(sf).map(function(e){return e[0]+':'+e[1]}).join(' · ') : '';
+  document.getElementById('auditoriaNota').textContent = a.activo ? 'Auditoría activa '+ (a.alcance.peliculas?' pelis':'') + (a.alcance.series?' series':'') : 'Sondas 24/7 en segundo plano cada 6h';
+  // sync checks without triggering change loop
+  if(document.getElementById('aud_pelis')) document.getElementById('aud_pelis').checked=!!a.alcance.peliculas;
+  if(document.getElementById('aud_series')) document.getElementById('aud_series').checked=!!a.alcance.series;
+  ['pelisxd','cuevana','cinecalidad','animeflv','latanime','animed23','danimados','lacartoons','miscaricaturas'].forEach(function(k){
+    var el=document.getElementById('aud_'+k);
+    if(el && a.alcance.fuentes && typeof a.alcance.fuentes[k]!=='undefined') el.checked=!!a.alcance.fuentes[k];
+  });
+  // logs
+  var lh='';
+  (a.logs||[]).slice(0,30).forEach(function(l){
+    var col = l.tipo==='ok' ? '#22c55e' : l.tipo==='fail' ? '#ef4444' : l.tipo==='huddle-falla-fuente-ok' ? '#f59e0b' : l.tipo==='reparado' ? '#38bdf8' : '#9d93b5';
+    var icon = l.tipo==='ok' ? '✓' : l.tipo==='reparado' ? '↻' : l.tipo==='huddle-falla-fuente-ok' ? '⚠' : '✕';
+    lh+='<div class="log-entry"><div class="log-icon" style="color:'+col+'">'+icon+'</div><div class="log-msg" style="color:'+col+'"><b>'+l.fuente+'</b> '+l.msg+'</div><div class="log-time">'+timeAgo(l.ts)+'</div></div>';
+  });
+  document.getElementById('auditoriaLog').innerHTML = lh || '<div style="color:#6b7280;font-size:11px;padding:8px">Sin logs aún — dale Play para iniciar</div>';
+  // botones estado
+  document.getElementById('btnAudPlay').disabled = a.activo && !a.pausado;
+  document.getElementById('btnAudPausa').disabled = !a.activo || a.pausado;
+  document.getElementById('btnAudPausa').textContent = a.pausado ? '▶ Reanudar' : '⏸ Pausa';
+  document.getElementById('btnAudPausa').onclick = function(){ controlAuditoria(a.pausado ? 'reanudar' : 'pausa'); };
+}
+function auditoriaScopeChanged(){
+  var alcance={
+    peliculas: !!document.getElementById('aud_pelis').checked,
+    series: !!document.getElementById('aud_series').checked,
+    fuentes:{}
+  };
+  ['pelisxd','cuevana','cinecalidad','animeflv','latanime','animed23','danimados','lacartoons','miscaricaturas'].forEach(function(k){
+    var el=document.getElementById('aud_'+k);
+    if(el) alcance.fuentes[k]=!!el.checked;
+  });
+  fetch('/api/auditoria/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accion:'configurar', alcance:alcance})}).catch(function(){});
+}
+function controlAuditoria(accion){
+  var alcance=null;
+  if(accion==='play'){
+    alcance={
+      peliculas: !!document.getElementById('aud_pelis').checked,
+      series: !!document.getElementById('aud_series').checked,
+      fuentes:{}
+    };
+    ['pelisxd','cuevana','cinecalidad','animeflv','latanime','animed23','danimados','lacartoons','miscaricaturas'].forEach(function(k){
+      var el=document.getElementById('aud_'+k);
+      if(el) alcance.fuentes[k]=!!el.checked;
+    });
+  }
+  fetch('/api/auditoria/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accion:accion, alcance:alcance})})
+    .then(function(r){return r.json()}).then(function(){ ticAuditoria(); }).catch(function(e){ alert('Error: '+(e&&e.message||e)); });
+}
+function ticAuditoria(){
+  fetch('/api/auditoria/estado').then(function(r){return r.json()}).then(renderAuditoria).catch(function(){});
+}
+auditoriaFuentesChecks();
+ticAuditoria(); setInterval(ticAuditoria, 5000);
 
 function tic(){
   fetch('/api/estado').then(function(r){return r.json()}).then(renderDash).catch(function(e){

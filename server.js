@@ -22,8 +22,49 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v251'; // 251: buscar muestra TODO curatorial (muertas siempre ocultas hasta revivir, novelas apagadas)
+const UI_VERSION = 'v252'; // 252: Sonda Huddle + Auditoría controlable (play/pausa/cancelar, scope pelis/series/fuente, 24/7, auto-repara)
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
+
+/* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
+ * (pelis de todas las fuentes + series cap por cap) 24/7, con control
+ * play/pausa/cancelar y scope seleccionable. Muertas no se revisan (no se
+ * muestran en Huddle). Se comunica con sondas por fuente para diagnosticar
+ * si el fallo es de Huddle o de la fuente y auto-repara caches de Huddle. */
+const HUDDLE_AUDITORIA = {
+  activo: false, pausado: false, iniciadoEn: 0, pausadoEn: 0,
+  alcance: { peliculas: true, series: true, fuentes: { pelisxd:true, cuevana:true, cinecalidad:true, animeflv:true, latanime:true, animed23:true, danimados:true, lacartoons:true, miscaricaturas:true, novelas:false } },
+  progreso: { peliculas: { total:0, verificadas:0, ok:0, fail:0, pct:0, porFuente:{} }, series: { total:0, verificadas:0, ok:0, fail:0, pct:0, porFuente:{} }, duplicadas:0 },
+  logs: [], // {ts, fuente, tipo, slug, msg} max 200
+  _timer: null, _batch: 0,
+};
+const AUDITORIA_PROGRESO_FILE = path.join(__dirname, 'auditorias', 'progreso.json');
+const AUDITORIA_LOGS_MAX = 200;
+function auditoriaLog(fuente, tipo, slug, msg){
+  HUDDLE_AUDITORIA.logs.unshift({ ts: Date.now(), fuente, tipo, slug: String(slug||'').slice(0,60), msg: String(msg||'').slice(0,180) });
+  if(HUDDLE_AUDITORIA.logs.length>AUDITORIA_LOGS_MAX) HUDDLE_AUDITORIA.logs.length=AUDITORIA_LOGS_MAX;
+  sondaNotify(fuente, tipo, slug, msg); // también al log global de sondas
+}
+function auditoriaGuardarProgreso(){
+  try{
+    fs.mkdirSync(path.join(__dirname,'auditorias'),{recursive:true});
+    const out = {
+      version: UI_VERSION, actualizado: new Date().toISOString(),
+      estado: HUDDLE_AUDITORIA.activo ? (HUDDLE_AUDITORIA.pausado?'pausado':'ejecutando') : 'idle',
+      alcance: HUDDLE_AUDITORIA.alcance,
+      progreso: HUDDLE_AUDITORIA.progreso,
+      logs: HUDDLE_AUDITORIA.logs.slice(0,20),
+      nota: HUDDLE_AUDITORIA.activo ? 'Auditoría Huddle en curso — sonda Huddle 24/7 verificando todo lo vivo' : 'Auditoría detenida — sondas Huddle 24/7 siguen vigilando en segundo plano cada 6h'
+    };
+    fs.writeFileSync(AUDITORIA_PROGRESO_FILE, JSON.stringify(out,null,2));
+  }catch{}
+}
+function auditoriaActualizarPct(){
+  const pp = HUDDLE_AUDITORIA.progreso.peliculas;
+  const ps = HUDDLE_AUDITORIA.progreso.series;
+  pp.pct = pp.total ? Math.round(pp.verificadas*100/pp.total) : 0;
+  ps.pct = ps.total ? Math.round(ps.verificadas*100/ps.total) : 0;
+}
+
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
@@ -464,8 +505,13 @@ async function laRevizar() { /* apelaciones: ocultadas hace <7 días, una a una 
     console.log('[podredumbre] revisión terminada: ' + vivas2 + ' revivieron de ' + cands.length);
   } finally { laReviviendo = false; }
 }
-setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); sondaNovelas().catch(() => {}); sondaD23().catch(() => {}); }, 90 * 1000);
-setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); sondaNovelas().catch(() => {}); sondaD23().catch(() => {}); }, 6 * 3600 * 1000);
+setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); sondaNovelas().catch(() => {}); sondaD23().catch(() => {}); 
+  // v252 Huddle: si no hay auditoría activa, igual corre una pasada ligera 24/7 cada 6h
+  if(!HUDDLE_AUDITORIA.activo) sondaHuddleGeneral().catch(()=>{});
+}, 90 * 1000);
+setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); sondaNovelas().catch(() => {}); sondaD23().catch(() => {}); 
+  if(!HUDDLE_AUDITORIA.activo) sondaHuddleGeneral().catch(()=>{});
+}, 6 * 3600 * 1000);
 
 /* v234: SONDA PELISXD — revisa películas ocultas para ver si volvieron */
 /* v234: SONDA PELISXD COMPLETA — 3 frentes:
@@ -5360,6 +5406,312 @@ async function sondaD23(){
     try{ fs.appendFileSync(path.join(__dirname,'sonda-animed23.log'),'['+new Date().toISOString()+'] '+el+'s vivas→muertas='+vm+' muertas→vivas='+mv+' muertas='+D23_OCULTAS.size+' vistas='+D23_VISTAS.size+'\n'); }catch{}
   }catch(e){ console.warn('[sonda] d23 error: '+String(e).slice(0,60)); }
 }
+
+/* v252: SONDAS HUDDLE — revisan TODO lo vivo de Huddle 24/7, cap por cap / peli por peli
+ * Películas: PelisXD + CuevanaMov + CineCalidad (solo vivos, muertas no se muestran)
+ * Series: Latanime + AnimeFLV + AnimeD23 + Danimados + Lacartoons + Misc (cap por cap vivos)
+ * Se comunican con sondas por fuente: si Huddle falla pero fuente directa OK → auto-repara Huddle (limpia caches)
+ */
+async function huddleProbePelicula(slug, fuente){
+  // Intenta resolver vía Huddle (misma ruta que usa el usuario)
+  try{
+    if(fuente==='pelisxd'){
+      const m = await pelisxdMeta(slug).catch(()=>null);
+      if(!m) return { huddle:false, reason:'no_meta' };
+      if(!m.alive) return { huddle:false, reason:'no_alive' };
+      // verificar Byse vía Huddle (cache)
+      const r = await verificarByse(slug).catch(()=>({ok:false}));
+      return { huddle: !!r.ok, reason: r.ok?'ok':(r.reason||'no_byse') };
+    }
+    if(fuente==='cuevana'){
+      const r = await verificarCuevana(slug).catch(()=>({ok:false}));
+      return { huddle: !!r.ok, reason: r.ok?'ok':(r.reason||'no_servidor') };
+    }
+    if(fuente==='cinecalidad'){
+      // CineCalidad via API search
+      const u = 'https://cine-calidad.mx/wp-json/mycustom/v1/search/?s='+encodeURIComponent(slug.replace(/-/g,' '))+'&page=1';
+      const rr = await fetchSeguro(u,10000).catch(()=>null);
+      if(!rr||!rr.ok) return { huddle:false, reason:'api_'+(rr?rr.status:'fail') };
+      const d = await rr.json().catch(()=>({}));
+      const found = (d.posts||[]).some(x=>x.slug===slug);
+      return { huddle: found, reason: found?'ok':'no_en_api' };
+    }
+  }catch(e){ return { huddle:false, reason: String(e).slice(0,40) }; }
+  return { huddle:false, reason:'fuente_desc' };
+}
+async function huddleProbeSerie(slug, fuente){
+  try{
+    if(fuente==='latanime'){
+      const vive = await laProbe(slug).catch(()=>false);
+      return { huddle: !!vive, reason: vive?'ok':'no_mp4upload' };
+    }
+    if(fuente==='animeflv'){
+      const vive = await afProbe(slug).catch(()=>false);
+      return { huddle: !!vive, reason: vive?'ok':'no_servidor' };
+    }
+    if(fuente==='animed23'){
+      const vive = await d23Probe(slug).catch(()=>false);
+      return { huddle: !!vive, reason: vive?'ok':'no_servidor' };
+    }
+    if(fuente==='danimados'){
+      const vive = await daniProbe(slug).catch(()=>false);
+      return { huddle: !!vive, reason: vive?'ok':'no_eps' };
+    }
+    if(fuente==='lacartoons'){
+      const lct = [...LCT_SERIES.values()].find(x=>x.slug===slug);
+      if(!lct) return { huddle:false, reason:'no_lct' };
+      const vive = await lctProbe(lct.lctId).catch(()=>false);
+      return { huddle: !!vive, reason: vive?'ok':'no_cap' };
+    }
+    if(fuente==='miscaricaturas'){
+      const vive = await cariProbe(slug).catch(()=>false);
+      return { huddle: !!vive, reason: vive?'ok':'no_cap' };
+    }
+  }catch(e){ return { huddle:false, reason: String(e).slice(0,40) }; }
+  return { huddle:false, reason:'fuente_desc' };
+}
+async function sondaHuddlePeliculas(){
+  try{
+    const memMB = process.memoryUsage().heapUsed/1024/1024;
+    if(memMB>350){ console.warn('[sonda-huddle] pelis saltado — memoria alta: '+memMB.toFixed(0)+'MB'); return; }
+    const t0=Date.now(); let ok=0,fail=0,reparadas=0;
+    const alcance = HUDDLE_AUDITORIA.alcance;
+    // Recolectar vivos por fuente
+    const tareas = [];
+    if(alcance.fuentes.pelisxd){
+      try{
+        const idx = await pelisxdIndice().catch(()=>[]);
+        const vivos = idx.filter(s=>!PXD_OCULTAS.has(s)).slice(0,8);
+        for(const s of vivos) tareas.push({fuente:'pelisxd', slug:s});
+      }catch{}
+    }
+    if(alcance.fuentes.cuevana){
+      try{
+        const idx = await cuevanaIndice().catch(()=>[]);
+        const vivos = idx.filter(s=>!CVM_OCULTAS.has(s)).slice(0,8);
+        for(const s of vivos) tareas.push({fuente:'cuevana', slug:s});
+      }catch{}
+    }
+    if(alcance.fuentes.cinecalidad){
+      try{
+        const vivos = [...CC_VISTAS].size ? [...CC_VISTAS].filter(s=>!CC_OCULTAS.has(s)).slice(0,6) : [];
+        // si no hay vistas, tomar del sitemap
+        if(!vivos.length){
+          const sitemap = ccIdx.slugs.length ? ccIdx.slugs : [];
+          const filt = sitemap.filter(x=>!CC_OCULTAS.has(x.split('|')[0])).slice(0,6).map(x=>x.split('|')[0]);
+          for(const s of filt) tareas.push({fuente:'cinecalidad', slug:s});
+        } else for(const s of vivos) tareas.push({fuente:'cinecalidad', slug:s});
+      }catch{}
+    }
+    // Mezclar y probar
+    for(let i=tareas.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [tareas[i],tareas[j]]=[tareas[j],tareas[i]]; }
+    for(const t of tareas.slice(0,10)){
+      try{
+        HUDDLE_AUDITORIA.progreso.peliculas.verificadas++;
+        const h = await huddleProbePelicula(t.slug, t.fuente);
+        const keyFuente = t.fuente;
+        HUDDLE_AUDITORIA.progreso.peliculas.porFuente[keyFuente]=(HUDDLE_AUDITORIA.progreso.peliculas.porFuente[keyFuente]||0)+1;
+        if(h.huddle){
+          ok++; HUDDLE_AUDITORIA.progreso.peliculas.ok++;
+          auditoriaLog('Huddle-Pelis','ok',t.slug, t.fuente+':'+t.slug+' OK en Huddle ('+h.reason+')');
+        } else {
+          // Verificar fuente directa
+          let fuenteOk=false, fuenteReason='';
+          try{
+            if(t.fuente==='pelisxd'){ const rr=await verificarByse(t.slug).catch(()=>({ok:false})); fuenteOk=!!rr.ok; fuenteReason=rr.reason||''; }
+            if(t.fuente==='cuevana'){ const rr=await verificarCuevana(t.slug).catch(()=>({ok:false})); fuenteOk=!!rr.ok; fuenteReason=rr.reason||''; }
+            if(t.fuente==='cinecalidad'){ fuenteOk=false; } // ya es directo
+          }catch{}
+          if(fuenteOk && !h.huddle){
+            // Huddle falla pero fuente OK → auto-repara Huddle
+            fail++; HUDDLE_AUDITORIA.progreso.peliculas.fail++;
+            auditoriaLog('Huddle-Pelis','huddle-falla-fuente-ok',t.slug, t.fuente+':'+t.slug+' Huddle NO resuelve pero fuente SÍ ('+h.reason+' vs fuente '+fuenteReason+') → limpiando cache Huddle');
+            // Auto-reparación Huddle: limpiar caches
+            try{ pelisxdMetaCache.delete(t.slug); }catch{}
+            try{ cuevanaGeneroCache.delete(t.slug); }catch{}
+            try{ globalThis._searchCache.delete(t.slug); }catch{}
+            // Reintentar una vez
+            const h2 = await huddleProbePelicula(t.slug, t.fuente).catch(()=>({huddle:false}));
+            if(h2.huddle){ reparadas++; auditoriaLog('Huddle-Pelis','reparado',t.slug, t.fuente+':'+t.slug+' REPARADO tras limpiar cache'); }
+            // Notificar sonda fuente
+            sondaNotify('Huddle','huddle-falla', t.slug, t.fuente+':'+t.slug+' huddle falla pero fuente ok — cache limpiado');
+          } else {
+            fail++; HUDDLE_AUDITORIA.progreso.peliculas.fail++;
+            auditoriaLog('Huddle-Pelis','fail',t.slug, t.fuente+':'+t.slug+' falla en Huddle y fuente ('+h.reason+')');
+          }
+        }
+      }catch(e){ fail++; }
+      await new Promise(r=>setTimeout(r,1800));
+      auditoriaActualizarPct(); auditoriaGuardarProgreso();
+      if(!HUDDLE_AUDITORIA.activo || HUDDLE_AUDITORIA.pausado) break;
+    }
+    const el=((Date.now()-t0)/1000).toFixed(1);
+    console.log('[sonda-huddle] pelis ('+el+'s): ok='+ok+' fail='+fail+' reparadas='+reparadas);
+    try{ fs.appendFileSync(path.join(__dirname,'sonda-huddle-pelis.log'),'['+new Date().toISOString()+'] '+el+'s ok='+ok+' fail='+fail+' reparadas='+reparadas+' verif='+HUDDLE_AUDITORIA.progreso.peliculas.verificadas+'\n'); }catch{}
+  }catch(e){ console.warn('[sonda-huddle] pelis error: '+String(e).slice(0,80)); }
+}
+async function sondaHuddleSeries(){
+  try{
+    const memMB = process.memoryUsage().heapUsed/1024/1024;
+    if(memMB>350){ console.warn('[sonda-huddle] series saltado — memoria alta: '+memMB.toFixed(0)+'MB'); return; }
+    const t0=Date.now(); let ok=0,fail=0,reparadas=0;
+    const alcance = HUDDLE_AUDITORIA.alcance;
+    const tareas=[];
+    if(alcance.fuentes.latanime){
+      try{
+        const vivos = [...LA_TODOS].filter(s=>!LA_OCULTAS_SET.has(s)&&!LA_MUERTAS_SET.has(s)).slice(0,6);
+        for(const s of vivos.sort(()=>Math.random()-0.5).slice(0,4)) tareas.push({fuente:'latanime', slug:s});
+      }catch{}
+    }
+    if(alcance.fuentes.animeflv){
+      try{
+        const vivos = [...AF_TODOS].filter(s=>!AF_OCULTAS.has(s)).slice(0,6);
+        for(const s of vivos.sort(()=>Math.random()-0.5).slice(0,3)) tareas.push({fuente:'animeflv', slug:s});
+      }catch{}
+    }
+    if(alcance.fuentes.animed23){
+      try{
+        const vivos = [...D23_TODOS].filter(s=>!D23_OCULTAS.has(s)).slice(0,4);
+        for(const s of vivos.sort(()=>Math.random()-0.5).slice(0,3)) tareas.push({fuente:'animed23', slug:s});
+      }catch{}
+    }
+    if(alcance.fuentes.danimados){
+      try{
+        const vivos = [...DANI_CAT.keys()].filter(s=>!DANI_OCULTAS.has(s)&&!DANI_MUERTAS.has(s)).slice(0,4);
+        for(const s of vivos.sort(()=>Math.random()-0.5).slice(0,3)) tareas.push({fuente:'danimados', slug:s});
+      }catch{}
+    }
+    if(alcance.fuentes.lacartoons){
+      try{
+        const vivos = [...LCT_SERIES.values()].filter(x=>!LCT_MUERTAS.has(x.slug)).slice(0,4);
+        for(const x of vivos.sort(()=>Math.random()-0.5).slice(0,2)) tareas.push({fuente:'lacartoons', slug:x.slug});
+      }catch{}
+    }
+    if(alcance.fuentes.miscaricaturas){
+      try{
+        const vivos = CARI_ORDEN.filter(s=>!CARI_MUERTAS.has(s)).slice(0,4);
+        for(const s of vivos.sort(()=>Math.random()-0.5).slice(0,2)) tareas.push({fuente:'miscaricaturas', slug:s});
+      }catch{}
+    }
+    for(let i=tareas.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [tareas[i],tareas[j]]=[tareas[j],tareas[i]]; }
+    for(const t of tareas.slice(0,8)){
+      try{
+        HUDDLE_AUDITORIA.progreso.series.verificadas++;
+        const h = await huddleProbeSerie(t.slug, t.fuente);
+        const keyFuente = t.fuente;
+        HUDDLE_AUDITORIA.progreso.series.porFuente[keyFuente]=(HUDDLE_AUDITORIA.progreso.series.porFuente[keyFuente]||0)+1;
+        if(h.huddle){
+          ok++; HUDDLE_AUDITORIA.progreso.series.ok++;
+          auditoriaLog('Huddle-Series','ok',t.slug, t.fuente+':'+t.slug+' OK cap1 en Huddle');
+          // Verificar también cap por cap (solo 1 cap extra por serie para no saturar)
+          try{
+            let eps=[]; if(t.fuente==='danimados') eps=await daniLista(t.slug).catch(()=>[]);
+            else if(t.fuente==='lacartoons'){ const l=[...LCT_SERIES.values()].find(x=>x.slug===t.slug); if(l) {const d=await datosCaricatura(t.slug).catch(()=>null); eps=d?d.episodios:[];} }
+            if(eps.length>1){
+              const sample = eps.sort(()=>Math.random()-0.5).slice(0,2);
+              for(const ep of sample){
+                if(EPS_MUERTOS.has(ep.url)) continue;
+                // Probar via Huddle (resolver)
+                let huddleEp=true; try{ await resolverNativo(ep.url).catch(()=>{huddleEp=false;}); }catch{ huddleEp=false; }
+                if(!huddleEp){
+                  // Probar fuente directa
+                  let fuenteEp=false; try{
+                    if(t.fuente==='danimados') fuenteEp=await daniProbe(t.slug);
+                    if(t.fuente==='lacartoons') fuenteEp=await lctProbe([...LCT_SERIES.values()].find(x=>x.slug===t.slug)?.lctId||'');
+                    if(t.fuente==='miscaricaturas') fuenteEp=await cariProbe(t.slug);
+                  }catch{}
+                  if(fuenteEp) auditoriaLog('Huddle-Series','huddle-ep-falla', t.slug, t.fuente+':'+t.slug+' ep '+ep.num+' Huddle NO pero fuente SÍ → revisar resolver');
+                }
+              }
+            }
+          }catch{}
+        } else {
+          // Verificar fuente directa
+          let fuenteOk=false; try{
+            if(t.fuente==='latanime') fuenteOk=await laProbe(t.slug);
+            if(t.fuente==='animeflv') fuenteOk=await afProbe(t.slug);
+            if(t.fuente==='animed23') fuenteOk=await d23Probe(t.slug);
+            if(t.fuente==='danimados') fuenteOk=await daniProbe(t.slug);
+            if(t.fuente==='lacartoons'){ const l=[...LCT_SERIES.values()].find(x=>x.slug===t.slug); if(l) fuenteOk=await lctProbe(l.lctId); }
+            if(t.fuente==='miscaricaturas') fuenteOk=await cariProbe(t.slug);
+          }catch{}
+          if(fuenteOk && !h.huddle){
+            fail++; HUDDLE_AUDITORIA.progreso.series.fail++;
+            auditoriaLog('Huddle-Series','huddle-falla-fuente-ok',t.slug, t.fuente+':'+t.slug+' Huddle NO pero fuente SÍ ('+h.reason+') → cache Huddle limpiado');
+            try{ globalThis._searchCache.delete(t.slug); }catch{}
+            try{ DANI_FEEDS.delete(t.slug); }catch{}
+            const h2 = await huddleProbeSerie(t.slug, t.fuente).catch(()=>({huddle:false}));
+            if(h2.huddle){ reparadas++; auditoriaLog('Huddle-Series','reparado',t.slug, t.fuente+':'+t.slug+' REPARADO'); }
+            sondaNotify('Huddle','huddle-falla',t.slug, t.fuente+':'+t.slug+' huddle falla fuente ok');
+          } else {
+            fail++; HUDDLE_AUDITORIA.progreso.series.fail++;
+            auditoriaLog('Huddle-Series','fail',t.slug, t.fuente+':'+t.slug+' falla Huddle y fuente ('+h.reason+')');
+          }
+        }
+      }catch(e){ fail++; }
+      await new Promise(r=>setTimeout(r,2000));
+      auditoriaActualizarPct(); auditoriaGuardarProgreso();
+      if(!HUDDLE_AUDITORIA.activo || HUDDLE_AUDITORIA.pausado) break;
+    }
+    const el=((Date.now()-t0)/1000).toFixed(1);
+    console.log('[sonda-huddle] series ('+el+'s): ok='+ok+' fail='+fail+' reparadas='+reparadas);
+    try{ fs.appendFileSync(path.join(__dirname,'sonda-huddle-series.log'),'['+new Date().toISOString()+'] '+el+'s ok='+ok+' fail='+fail+' reparadas='+reparadas+' verif='+HUDDLE_AUDITORIA.progreso.series.verificadas+'\n'); }catch{}
+  }catch(e){ console.warn('[sonda-huddle] series error: '+String(e).slice(0,80)); }
+}
+async function sondaHuddleGeneral(){
+  if(!HUDDLE_AUDITORIA.activo || HUDDLE_AUDITORIA.pausado) return;
+  const alc = HUDDLE_AUDITORIA.alcance;
+  if(alc.peliculas) await sondaHuddlePeliculas().catch(()=>{});
+  if(!HUDDLE_AUDITORIA.activo || HUDDLE_AUDITORIA.pausado) return;
+  if(alc.series) await sondaHuddleSeries().catch(()=>{});
+  auditoriaGuardarProgreso();
+}
+function auditoriaIniciar(alcance){
+  if(alcance){
+    if(typeof alcance.peliculas==='boolean') HUDDLE_AUDITORIA.alcance.peliculas=alcance.peliculas;
+    if(typeof alcance.series==='boolean') HUDDLE_AUDITORIA.alcance.series=alcance.series;
+    if(alcance.fuentes && typeof alcance.fuentes==='object'){
+      for(const k of Object.keys(HUDDLE_AUDITORIA.alcance.fuentes)){
+        if(typeof alcance.fuentes[k]==='boolean') HUDDLE_AUDITORIA.alcance.fuentes[k]=alcance.fuentes[k];
+      }
+    }
+  }
+  HUDDLE_AUDITORIA.activo=true; HUDDLE_AUDITORIA.pausado=false; HUDDLE_AUDITORIA.iniciadoEn=Date.now();
+  HUDDLE_AUDITORIA.progreso.peliculas={ total:0, verificadas:0, ok:0, fail:0, pct:0, porFuente:{} };
+  HUDDLE_AUDITORIA.progreso.series={ total:0, verificadas:0, ok:0, fail:0, pct:0, porFuente:{} };
+  // Calcular totales vivos
+  try{
+    let totP=0; if(HUDDLE_AUDITORIA.alcance.fuentes.pelisxd) totP+= [...(pelisxdIdx?.slugs||[])].filter(s=>!PXD_OCULTAS.has(s)).length || 4700;
+    if(HUDDLE_AUDITORIA.alcance.fuentes.cuevana) totP+= 8000 - CVM_OCULTAS.size;
+    if(HUDDLE_AUDITORIA.alcance.fuentes.cinecalidad) totP+= 10950 - CC_OCULTAS.size;
+    HUDDLE_AUDITORIA.progreso.peliculas.total = totP || 1000;
+  }catch{}
+  try{
+    let totS=0;
+    if(HUDDLE_AUDITORIA.alcance.fuentes.latanime) totS+= LA_TODOS.size - LA_OCULTAS_SET.size - LA_MUERTAS_SET.size;
+    if(HUDDLE_AUDITORIA.alcance.fuentes.animeflv) totS+= AF_TODOS.size - AF_OCULTAS.size;
+    if(HUDDLE_AUDITORIA.alcance.fuentes.animed23) totS+= D23_TODOS.size - D23_OCULTAS.size;
+    if(HUDDLE_AUDITORIA.alcance.fuentes.danimados) totS+= DANI_CAT.size - DANI_OCULTAS.size - DANI_MUERTAS.size;
+    if(HUDDLE_AUDITORIA.alcance.fuentes.lacartoons) totS+= LCT_SERIES.size - LCT_OCULTAS.size - LCT_MUERTAS.size;
+    if(HUDDLE_AUDITORIA.alcance.fuentes.miscaricaturas) totS+= CARI_ORDEN.length - CARI_MUERTAS.size;
+    HUDDLE_AUDITORIA.progreso.series.total = totS || 500;
+  }catch{}
+  auditoriaLog('Huddle','inicio','auditoria','Auditoría iniciada: pelis='+HUDDLE_AUDITORIA.alcance.peliculas+' series='+HUDDLE_AUDITORIA.alcance.series+' fuentes='+Object.entries(HUDDLE_AUDITORIA.alcance.fuentes).filter(([k,v])=>v).map(([k])=>k).join(','));
+  auditoriaGuardarProgreso();
+  // Lanzar ciclo inmediato y luego cada 6h + intervalo corto 90s para auditoría activa
+  setTimeout(()=> sondaHuddleGeneral().catch(()=>{}), 5000);
+  if(HUDDLE_AUDITORIA._timer) clearInterval(HUDDLE_AUDITORIA._timer);
+  HUDDLE_AUDITORIA._timer = setInterval(()=> sondaHuddleGeneral().catch(()=>{}), 90*1000);
+}
+function auditoriaPausar(){ if(HUDDLE_AUDITORIA.activo && !HUDDLE_AUDITORIA.pausado){ HUDDLE_AUDITORIA.pausado=true; HUDDLE_AUDITORIA.pausadoEn=Date.now(); auditoriaLog('Huddle','pausado','auditoria','Auditoría pausada'); auditoriaGuardarProgreso(); } }
+function auditoriaReanudar(){ if(HUDDLE_AUDITORIA.activo && HUDDLE_AUDITORIA.pausado){ HUDDLE_AUDITORIA.pausado=false; auditoriaLog('Huddle','reanudado','auditoria','Auditoría reanudada'); auditoriaGuardarProgreso(); setTimeout(()=> sondaHuddleGeneral().catch(()=>{}), 2000); } }
+function auditoriaCancelar(){ 
+  if(HUDDLE_AUDITORIA._timer) clearInterval(HUDDLE_AUDITORIA._timer);
+  HUDDLE_AUDITORIA._timer=null; HUDDLE_AUDITORIA.activo=false; HUDDLE_AUDITORIA.pausado=false;
+  auditoriaLog('Huddle','cancelado','auditoria','Auditoría cancelada');
+  auditoriaGuardarProgreso();
+}
+
 async function buscarAnimeflv(q) {
   const r = await fetchSeguro('https://vww.animeflv.one/animes?buscar=' + encodeURIComponent(q), 9000);
   if (!r.ok) return [];
@@ -11069,6 +11421,28 @@ async function cuevanaLatest() {
       return json(res, 200, { ok: true, rooms: list, srvVersion: UI_VERSION });
     }
     if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION, mostrarTodo: HUDDLE_MOSTRAR_TODO, novelasOn: NOVELAS_EXTERNAS_ON, introCrawl: { pend: CRAWL.pend.length, hechas: CRAWL.hechas || 0, total: CRAWL.total || 0 }, laMuertas: LA_MUERTAS_SET.size, pxdOcultas: PXD_OCULTAS.size, afOcultas: AF_OCULTAS.size, ccOcultas: CC_OCULTAS.size, ccTotal: ccIdx.slugs.length }); /* v122+190+v205.2+v238 — v250 mostrarTodo */
+    if (url.pathname === '/api/auditoria/estado' && req.method === 'GET') {
+      auditoriaActualizarPct();
+      return json(res, 200, { ok:true, version: UI_VERSION, auditoria: { activo: HUDDLE_AUDITORIA.activo, pausado: HUDDLE_AUDITORIA.pausado, iniciadoEn: HUDDLE_AUDITORIA.iniciadoEn, alcance: HUDDLE_AUDITORIA.alcance, progreso: HUDDLE_AUDITORIA.progreso, logs: HUDDLE_AUDITORIA.logs.slice(0,50) }, progresoFile: (()=>{ try{ return JSON.parse(fs.readFileSync(AUDITORIA_PROGRESO_FILE,'utf8')); }catch{ return null; }})() });
+    }
+    if (url.pathname === '/api/auditoria/control' && req.method === 'POST') {
+      const body = await readBody(req);
+      const accion = String(body.accion||'').toLowerCase();
+      if(accion==='play' || accion==='iniciar'){ auditoriaIniciar(body.alcance||null); return json(res,200,{ok:true, estado: HUDDLE_AUDITORIA.activo?'ejecutando':'idle'}); }
+      if(accion==='pausa' || accion==='pausar'){ auditoriaPausar(); return json(res,200,{ok:true, pausado:true}); }
+      if(accion==='reanudar' || accion==='resume'){ auditoriaReanudar(); return json(res,200,{ok:true, pausado:false}); }
+      if(accion==='cancelar' || accion==='cancel' || accion==='stop'){ auditoriaCancelar(); return json(res,200,{ok:true, activo:false}); }
+      if(accion==='configurar' && body.alcance){ 
+        // actualizar alcance sin iniciar
+        const a=body.alcance;
+        if(typeof a.peliculas==='boolean') HUDDLE_AUDITORIA.alcance.peliculas=a.peliculas;
+        if(typeof a.series==='boolean') HUDDLE_AUDITORIA.alcance.series=a.series;
+        if(a.fuentes) for(const k of Object.keys(HUDDLE_AUDITORIA.alcance.fuentes)) if(typeof a.fuentes[k]==='boolean') HUDDLE_AUDITORIA.alcance.fuentes[k]=a.fuentes[k];
+        auditoriaGuardarProgreso();
+        return json(res,200,{ok:true, alcance: HUDDLE_AUDITORIA.alcance});
+      }
+      return json(res,400,{ok:false, error:'Acción no válida (play/pausa/reanudar/cancelar/configurar)'});
+    }
     if (url.pathname === '/api/set-relay') { /* v236: actualizar CDN relay URL del Mac Mini */
       const newUrl = (url.searchParams.get('url') || '').trim().replace(/\/+$/, '');
       if (!newUrl) return json(res, 400, { ok: false, error: 'Falta ?url=' });
