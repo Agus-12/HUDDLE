@@ -12,7 +12,11 @@ body{background:#0d0b14;color:#efeaf7;font-family:-apple-system,'Segoe UI',Robot
 .navbar .back.show{display:block}
 .navbar h1{font-size:17px;display:flex;align-items:center;gap:8px;flex:1}
 .navbar h1 .dot{width:9px;height:9px;border-radius:50%;background:#38e08a;box-shadow:0 0 6px #38e08a}
+.navbar .right{display:flex;align-items:center;gap:12px}
 .navbar .clock{font-size:12px;color:#9d93b5;font-variant-numeric:tabular-nums}
+.bell{position:relative;background:none;border:none;color:#9d93b5;font-size:18px;cursor:pointer;padding:4px}
+.bell:hover{color:#efeaf7}
+.bell .badge{position:absolute;top:-2px;right:-4px;background:#ff5c7a;color:#fff;font-size:9px;font-weight:800;border-radius:99px;padding:1px 5px;min-width:14px;text-align:center}
 .page{display:none;padding:16px;max-width:800px;margin:0 auto}
 .page.active{display:block}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}
@@ -35,7 +39,7 @@ body{background:#0d0b14;color:#efeaf7;font-family:-apple-system,'Segoe UI',Robot
 .udot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .udot.green{background:#38e08a;box-shadow:0 0 5px #38e08a}
 .udot.yellow{background:#ffb020;box-shadow:0 0 5px #ffb020}
-.udot.red{background:#ff5c7a;box-shadow:0 0 5px #ff5c7a}
+.udot.red{background:#ff5c7a}
 .uname{flex:1;font-size:13px}
 .udate{font-size:11px;color:#9d93b5;min-width:80px;text-align:right}
 .ubtn{background:#ff5c7a;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
@@ -54,6 +58,15 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
 .pie{color:#9d93b5;font-size:11px;text-align:center;padding:16px}
 .user-legend{display:flex;gap:12px;font-size:11px;color:#9d93b5;margin-bottom:10px}
 .user-legend span{display:flex;align-items:center;gap:4px}
+.log-entry{display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #1a1625;font-size:12px}
+.log-entry:last-child{border-bottom:0}
+.log-icon{flex-shrink:0;width:20px;text-align:center}
+.log-msg{flex:1;color:#b8aed0}
+.log-time{color:#9d93b5;font-size:10px;min-width:60px;text-align:right;flex-shrink:0}
+.notif-panel{position:fixed;top:52px;right:12px;background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:12px;max-width:340px;width:calc(100vw - 24px);max-height:60vh;overflow-y:auto;z-index:20;display:none;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.notif-panel.show{display:block}
+.notif-title{font-size:13px;color:#9d93b5;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.notif-close{background:none;border:none;color:#9d93b5;font-size:16px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -61,7 +74,18 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
 <div class="navbar">
   <button class="back" id="backBtn" onclick="goBack()">←</button>
   <h1><span class="dot"></span> Huddle</h1>
-  <span class="clock" id="clock"></span>
+  <div class="right">
+    <button class="bell" id="bellBtn" onclick="toggleNotifs()">
+      🔔<span class="badge" id="bellBadge" style="display:none">0</span>
+    </button>
+    <span class="clock" id="clock"></span>
+  </div>
+</div>
+
+<!-- Notifications dropdown -->
+<div class="notif-panel" id="notifPanel">
+  <div class="notif-title">Notificaciones de sonda <button class="notif-close" onclick="toggleNotifs()">✕</button></div>
+  <div id="notifList"></div>
 </div>
 
 <!-- DASHBOARD -->
@@ -82,9 +106,9 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
 <div class="page" id="pageUsers">
   <div class="sec-title">Usuarios <span id="userCount" style="float:right"></span></div>
   <div class="user-legend">
-    <span><div class="udot green"></div> En sala ahora</span>
+    <span><div class="udot green"></div> En linea</span>
     <span><div class="udot yellow"></div> Inactivo &lt;2 sem</span>
-    <span><div class="udot red"></div> Inactivo &gt;3 sem</span>
+    <span><div class="udot red"></div> &gt;3 sem</span>
   </div>
   <div id="usersList"></div>
 </div>
@@ -95,7 +119,7 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
 </div>
 
 <script>
-var _estado=null,_stats=null;
+var _estado=null,_stats=null,_notifs=[],_seenNotifs=0;
 var TWO_W=14*86400000, THREE_W=21*86400000;
 
 function fmt(s){
@@ -105,6 +129,13 @@ function fmt(s){
   if(h>0)return h+'h '+m+'m';
   return m+'m';
 }
+function timeAgo(ts){
+  var s=Math.floor((Date.now()-ts)/1000);
+  if(s<60)return s+'s';
+  if(s<3600)return Math.floor(s/60)+'m';
+  if(s<86400)return Math.floor(s/3600)+'h';
+  return Math.floor(s/86400)+'d';
+}
 
 function updateClock(){
   var now=new Date();
@@ -113,10 +144,38 @@ function updateClock(){
 }
 updateClock();setInterval(updateClock,1000);
 
+function toggleNotifs(){
+  var p=document.getElementById('notifPanel');
+  p.classList.toggle('show');
+  if(p.classList.contains('show')){_seenNotifs=_notifs.length;updateBell();}
+}
+
+function updateBell(){
+  var newCount=_notifs.length-_seenNotifs;
+  var badge=document.getElementById('bellBadge');
+  if(newCount>0){badge.textContent=newCount>99?'99+':newCount;badge.style.display='';}
+  else{badge.style.display='none';}
+}
+
+function renderNotifs(){
+  var html='';
+  if(!_notifs.length){html='<div style="color:#9d93b5;font-size:12px;padding:8px 0">Sin notificaciones</div>';}
+  _notifs.slice(0,30).forEach(function(n){
+    var icon=n.tipo==='muerto'?'💀':'💚';
+    var color=n.tipo==='muerto'?'#ff5c7a':'#38e08a';
+    html+='<div class="log-entry">'
+      +'<div class="log-icon">'+icon+'</div>'
+      +'<div class="log-msg"><b style="color:'+color+'">'+n.fuente+'</b> '+n.msg+'</div>'
+      +'<div class="log-time">'+timeAgo(n.ts)+'</div></div>';
+  });
+  document.getElementById('notifList').innerHTML=html;
+}
+
 function showPage(id){
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
   document.getElementById('page'+id).classList.add('active');
   document.getElementById('backBtn').classList.toggle('show',id!=='Dash');
+  document.getElementById('notifPanel').classList.remove('show');
   window.scrollTo(0,0);
 }
 function goBack(){showPage('Dash');}
@@ -188,6 +247,7 @@ function renderFuentes(stats){
 function showFuente(k){
   var f=_stats?_stats.fuentes[k]:null;if(!f)return;
   var colors={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8'};
+  var names={cuevana:'Cuevana',pelisxd:'PelisXD',cinecalidad:'CineCalidad'};
   var c=colors[k]||'#efeaf7';
   var act=Math.max(0,f.activas||0);
   var pct=f.total?Math.round(act*100/f.total):0;
@@ -199,14 +259,27 @@ function showFuente(k){
     +'<span class="chip ok">Activas <b>'+act+'</b></span>'
     +'<span class="chip bad">Ocultas <b>'+f.ocultas+'</b></span>'
     +'<span class="chip">Verificadas <b>'+(f.vistas||0)+'</b></span></div></div>'
-    +'<div class="detail-section"><h3>Estado de la sonda</h3>'
-    +'<div style="font-size:12px;color:#9d93b5;line-height:1.8">'
-    +'<div>La sonda revisa automáticamente cada ~6 horas.</div>'
-    +'<div>Ocultas: <b style="color:#ff5c7a">'+f.ocultas+'</b></div>'
-    +'<div>Verificadas: <b>'+f.vistas+'</b></div>'
-    +'<div>Pendientes: <b>'+(f.total-f.vistas)+'</b></div></div></div>';
+    +'<div class="detail-section"><h3>Log de la sonda</h3>'
+    +'<div id="fuenteLog-'+k+'"><div style="color:#9d93b5;font-size:12px">Cargando…</div></div></div>';
   document.getElementById('fuenteContent').innerHTML=html;
   showPage('Fuente');
+  // Load sonda log for this source
+  fetch('/api/sonda-log?fuente='+encodeURIComponent(names[k]||k)+'&limit=30')
+    .then(function(r){return r.json()})
+    .then(function(d){
+      var el=document.getElementById('fuenteLog-'+k);
+      if(!d.items||!d.items.length){el.innerHTML='<div style="color:#9d93b5;font-size:12px">Sin movimientos recientes</div>';return;}
+      var lh='';
+      d.items.forEach(function(n){
+        var icon=n.tipo==='muerto'?'💀':'💚';
+        var col=n.tipo==='muerto'?'#ff5c7a':'#38e08a';
+        lh+='<div class="log-entry">'
+          +'<div class="log-icon">'+icon+'</div>'
+          +'<div class="log-msg" style="color:'+col+'">'+n.msg+'</div>'
+          +'<div class="log-time">'+timeAgo(n.ts)+'</div></div>';
+      });
+      el.innerHTML=lh;
+    }).catch(function(){});
 }
 
 function renderUsers(data){
@@ -232,7 +305,7 @@ function renderUsers(data){
   });
   document.getElementById('usersList').innerHTML=html||'<div style="color:#9d93b5;font-size:13px;padding:20px 0">Sin usuarios</div>';
   document.getElementById('userCount').innerHTML=
-    '<span style="color:#38e08a">'+green+'</span> en sala · '
+    '<span style="color:#38e08a">'+green+'</span> en linea · '
     +'<span style="color:#ffb020">'+yellow+'</span> inactivos · '
     +'<span style="color:#ff5c7a">'+red+'</span> desactivados';
 }
@@ -243,6 +316,11 @@ function tic(){
   });
   fetch('/api/stats').then(function(r){return r.json()}).then(renderFuentes).catch(function(){});
   fetch('/api/users').then(function(r){return r.json()}).then(renderUsers).catch(function(){});
+  fetch('/api/sonda-log?limit=50').then(function(r){return r.json()}).then(function(d){
+    _notifs=d.items||[];
+    renderNotifs();
+    updateBell();
+  }).catch(function(){});
 }
 tic();setInterval(tic,5000);
 
