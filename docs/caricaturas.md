@@ -67,9 +67,11 @@ Corre al arranque (90s) y cada 6h. Muestras CHICAS y despacio (rate-limit):
 - Éxito perdona (`...Perdonar`).
 
 ## Panel de estado
-- Tarjeta **Caricaturas** en Fuentes de video, con logo (`/sites/caricaturas.png`).
+- Tarjeta **Caricaturas** en Fuentes de video, con logo (`/sites/caricaturas.png`, arte original + esquinas redondeadas).
 - Total = dani + lct + cari curadas; ocultas = sonda + curaduría; vistas = verificadas.
 - Detalle con log de sonda por fuente (Danimados/Lacartoons/MisCaricaturas notifican por separado).
+- Catálogo "Caricaturas" (arriba) = activas de la fuente (1,078), NO filas del feed (~254): misma métrica que las demás fuentes.
+- Catálogo "Series" = solo animes: Danimados es familia Caricaturas (la app lo archiva con `site: 'Caricaturas'`), así no se cuenta doble en el Total.
 
 ## Archivos en disco
 - `public/dani-catalogo.json` — 821 series danimados
