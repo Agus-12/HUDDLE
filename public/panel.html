@@ -97,6 +97,10 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
 .stat-mini{background:#0d0b14;border:1px solid #2a2338;border-radius:10px;padding:7px 10px;min-width:72px;flex:1}
 .stat-mini .k{font-size:10px;color:#9d93b5;text-transform:uppercase;letter-spacing:.5px}
 .stat-mini .v{font-size:16px;font-weight:800;margin-top:2px}
+.storage-bar{height:8px;background:#241d31;border-radius:99px;overflow:hidden;margin-top:6px}
+.storage-bar i{display:block;height:100%;border-radius:99px;transition:width .6s}
+.completa-card{border-color:#f59e0b !important; background:linear-gradient(135deg,rgba(245,158,11,.08),transparent)}
+.completa-card::before{background:linear-gradient(90deg,#f59e0b,#fbbf24) !important}
 </style>
 </head>
 <body>
@@ -182,10 +186,28 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 12 L12 3"/><path d="M12 12 L19.5 12"/><path d="M12 12 L17 7"/><circle cx="12" cy="12" r="1.8" fill="#fff" stroke="none"/></svg>
     </div>
     <div style="flex:1;min-width:0">
-      <div style="font-size:19px;font-weight:900;letter-spacing:-.2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">Panel Huddle <span style="font-size:11px;font-weight:700;color:#a78bfa;background:#1e1438;border:1px solid #3b2a6b;border-radius:99px;padding:3px 8px">v263 · 24/7</span></div>
+      <div style="font-size:19px;font-weight:900;letter-spacing:-.2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">Panel Huddle <span style="font-size:11px;font-weight:700;color:#a78bfa;background:#1e1438;border:1px solid #3b2a6b;border-radius:99px;padding:3px 8px">v268 · 24/7</span></div>
       <div style="font-size:12px;color:#9d93b5;margin-top:2px">Dos sondas maestras · solo vivos · muertas siempre ocultas · auto-repara Huddle</div>
     </div>
     <span id="huddleStatusBadge" class="badge-idle">IDLE</span>
+  </div>
+  <!-- v268: salud + storage + 100 users -->
+  <div class="detail-section" id="healthCard" style="border-color:#1e2a3a">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:32px;height:32px;border-radius:9px;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.22);display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></div>
+        <div>
+          <div style="font-size:13px;font-weight:800">Servidor <span id="healthVersion" style="font-size:11px;color:#38bdf8"></span></div>
+          <div style="font-size:11px;color:#9d93b5">100 usuarios simultáneos · <span id="healthUptime">—</span> · <span id="healthMem">—</span></div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:#38bdf8;background:rgba(56,189,248,.10);border:1px solid rgba(56,189,248,.20);border-radius:99px;padding:5px 10px;font-weight:700" id="healthConc">10 conc · 0.5s</div>
+    </div>
+    <div style="margin-top:10px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#9d93b5"><span>Almacenamiento</span><span id="healthDiscoTxt">—</span></div>
+      <div class="storage-bar"><i id="healthDiscoBar" style="width:0%;background:linear-gradient(90deg,#38bdf8,#0ea5e9)"></i></div>
+      <div style="font-size:10px;color:#6b7280;margin-top:4px" id="healthDiscoNote">Revisando...</div>
+    </div>
   </div>
 
   <!-- controls -->
@@ -292,6 +314,28 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
       </div>
       <div id="audLogSeries" style="max-height:300px;overflow:auto;border:1px solid #2a2338;border-radius:10px;padding:8px;background:#0d0b14;margin-top:6px"></div>
     </div>
+  </div>
+
+  <!-- v268: auditoría 100% real peli×peli / ep×ep con 30 conc (~35min) -->
+  <div class="detail-section sonda-card completa-card" id="completaCard">
+    <h3>
+      <span style="width:28px;height:28px;border-radius:9px;background:rgba(245,158,11,.14);border:1px solid rgba(245,158,11,.25);display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
+      <span style="font-weight:900">Auditoría 100% real</span>
+      <span style="font-size:11px;color:#9d93b5;font-weight:600">· peli×peli & ep×ep · 30 conc · ~35min</span>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:6px"><span class="live-dot" id="dotCompleta" style="background:#f59e0b;box-shadow:0 0 8px #f59e0b;display:none"></span><span id="completaPct" style="font-size:12px;font-weight:900;color:#f59e0b">0%</span></span>
+    </h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+      <button id="btnCompletaStart" onclick="controlCompleta('start')" class="ctrl-btn" style="background:#f59e0b;color:#451a03"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v14l11-7z"/></svg> Auditoría 100% (30min)</button>
+      <button id="btnCompletaCancel" onclick="controlCompleta('cancel')" class="ctrl-btn stop" style="display:none">Cancelar</button>
+      <span id="completaEstado" style="font-size:11px;color:#9d93b5;align-self:center">Idle — toca para barrer todo Huddle al 100%</span>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <div class="stat-mini"><div class="k">Pelis</div><div class="v" id="compPelisV" style="color:#22c55e">0/0</div><div class="barra" style="height:4px;margin-top:4px"><i id="compPelisBar" style="width:0%;background:#22c55e"></i></div><div style="font-size:10px;color:#9d93b5" id="compPelisTxt">0% · OK 0 Fail 0</div></div>
+      <div class="stat-mini"><div class="k">Series</div><div class="v" id="compSeriesV" style="color:#8a5cf6">0/0</div><div class="barra" style="height:4px;margin-top:4px"><i id="compSeriesBar" style="width:0%;background:#8a5cf6"></i></div><div style="font-size:10px;color:#9d93b5" id="compSeriesTxt">0% · OK 0 Fail 0</div></div>
+      <div class="stat-mini"><div class="k">Episodios</div><div class="v" id="compEpsV" style="color:#38bdf8">0/0</div><div class="barra" style="height:4px;margin-top:4px"><i id="compEpsBar" style="width:0%;background:#38bdf8"></i></div><div style="font-size:10px;color:#9d93b5" id="compEpsTxt">0% · OK 0 Fail 0</div></div>
+    </div>
+    <div style="font-size:11px;color:#9d93b5;margin-top:6px;display:flex;gap:8px;flex-wrap:wrap"><span id="compDuracion"></span><span id="compConc"></span></div>
+    <div id="completaLog" style="max-height:220px;overflow:auto;border:1px solid #2a2338;border-radius:10px;padding:8px;background:#0d0b14;margin-top:8px;font-size:11px;color:#9d93b5">Sin iniciar — audita película por película y episodio por episodio, con 30 hilos en paralelo. Guarda <b>auditorias/huddle-completa-*.json</b>.</div>
   </div>
 
   <div class="detail-section" style="border-color:#2e2550">
@@ -555,6 +599,64 @@ function svgForTipo(tipo, col){
   if(tipo==='huddle-falla-fuente-ok') return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+col+'" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>';
   return '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+col+'" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>';
 }
+auditoriaFuentesChecks();
+function ticAuditoria(){
+  fetch('/api/auditoria/estado').then(function(r){return r.json()}).then(renderAuditoria).catch(function(){});
+  fetch('/api/auditoria/completa').then(function(r){return r.json()}).then(renderCompleta).catch(function(){});
+  fetch('/api/health').then(function(r){return r.json()}).then(renderHealth).catch(function(){});
+}
+ticAuditoria(); setInterval(ticAuditoria, 5000);
+function renderHealth(h){
+  if(!h||!h.ok) return;
+  var v=document.getElementById('healthVersion'); if(v) v.textContent=h.version||'';
+  var up=document.getElementById('healthUptime'); if(up) up.textContent = h.uptime ? (Math.floor(h.uptime/3600)+'h '+Math.floor((h.uptime%3600)/60)+'m') : '—';
+  var mm=document.getElementById('healthMem'); if(mm) mm.textContent = h.memoria ? (h.memoria.heapMb+' MB heap / '+h.memoria.rssMb+' MB') : '—';
+  var conc=document.getElementById('healthConc'); if(conc) conc.textContent = (h.sondas && h.sondas.huddle ? h.sondas.huddle.conc+' conc · '+(h.sondas.huddle.pausaMs||500)+'ms' : '10 conc · 0.5s') + ' · 100 usuarios';
+  if(h.disco){
+    var txt=document.getElementById('healthDiscoTxt'); if(txt) txt.textContent = 'Usado '+h.disco.usadoGb+' GB / '+h.disco.totalGb+' GB — libre '+h.disco.libreGb+' GB ('+h.disco.pct+'%)';
+    var bar=document.getElementById('healthDiscoBar'); if(bar){ bar.style.width=h.disco.pct+'%'; bar.style.background = h.disco.pct>85 ? 'linear-gradient(90deg,#ef4444,#dc2626)' : h.disco.pct>70 ? 'linear-gradient(90deg,#f59e0b,#d97706)' : 'linear-gradient(90deg,#38bdf8,#0ea5e9)'; }
+    var note=document.getElementById('healthDiscoNote'); if(note){
+      if(h.disco.pct>85) note.textContent='⚠️ Almacenamiento crítico — amplía disco (Oracle Block Volume +20GB) o limpia /tmp y auditorias/*.log';
+      else if(h.disco.pct>70) note.textContent='Almacenamiento medio — recomendado ampliar a 60GB para 100 usuarios + logs';
+      else note.textContent='Almacenamiento saludable — aguanta 100 usuarios simultáneos sin trabarse (API + HLS via /api/hls, streams por CDN)';
+    }
+  }
+}
+function renderCompleta(d){
+  if(!d||!d.estado) return;
+  var e=d.estado, p=e.progreso||{}, pp=p.peliculas||{}, ps=p.series||{}, pe=p.episodios||{};
+  var activo=!!e.activo;
+  var dot=document.getElementById('dotCompleta'); if(dot) dot.style.display=activo?'inline-block':'none';
+  var btnS=document.getElementById('btnCompletaStart'); if(btnS) btnS.style.display=activo?'none':'inline-flex';
+  var btnC=document.getElementById('btnCompletaCancel'); if(btnC) btnC.style.display=activo?'inline-flex':'none';
+  var est=document.getElementById('completaEstado'); if(est){
+    if(activo) est.textContent='Corriendo — '+ (e.stats&&e.stats.concurrencia||30)+' hilos · '+(pp.verificadas||0)+'/'+(pp.total||0)+' pelis, '+(pe.verificadas||0)+'/'+(pe.total||0)+' eps';
+    else if(e.terminadoEn) est.textContent='Terminado en '+(e.stats&&e.stats.duracionSec||0)+'s — Pelis '+pp.ok+'/'+pp.total+' Series '+ps.ok+'/'+ps.total+' Eps '+pe.ok+'/'+pe.total;
+    else est.textContent='Idle — toca para barrer todo Huddle al 100% (película×película & episodio×episodio)';
+  }
+  var pct = pe.total ? Math.round((pe.verificadas/pe.total)*100) : pp.total ? Math.round((pp.verificadas/pp.total)*100) : 0;
+  var pctEl=document.getElementById('completaPct'); if(pctEl) pctEl.textContent=pct+'%';
+  var v1=document.getElementById('compPelisV'); if(v1) v1.textContent=(pp.verificadas||0)+'/'+(pp.total||0);
+  var b1=document.getElementById('compPelisBar'); if(b1) b1.style.width=(pp.pct||0)+'%';
+  var t1=document.getElementById('compPelisTxt'); if(t1) t1.textContent=(pp.pct||0)+'% · OK '+(pp.ok||0)+' Fail '+(pp.fail||0);
+  var v2=document.getElementById('compSeriesV'); if(v2) v2.textContent=(ps.verificadas||0)+'/'+(ps.total||0);
+  var b2=document.getElementById('compSeriesBar'); if(b2) b2.style.width=(ps.pct||0)+'%';
+  var t2=document.getElementById('compSeriesTxt'); if(t2) t2.textContent=(ps.pct||0)+'% · OK '+(ps.ok||0)+' Fail '+(ps.fail||0);
+  var v3=document.getElementById('compEpsV'); if(v3) v3.textContent=(pe.verificadas||0)+'/'+(pe.total||0);
+  var b3=document.getElementById('compEpsBar'); if(b3) b3.style.width=(pe.pct||0)+'%';
+  var t3=document.getElementById('compEpsTxt'); if(t3) t3.textContent=(pe.pct||0)+'% · OK '+(pe.ok||0)+' Fail '+(pe.fail||0);
+  var dur=document.getElementById('compDuracion'); if(dur) dur.textContent= e.activo && e.iniciadoEn ? '⏱ ' + Math.round((Date.now()-e.iniciadoEn)/1000)+'s' : e.stats&&e.stats.duracionSec ? '⏱ '+e.stats.duracionSec+'s total' : '';
+  var cc=document.getElementById('compConc'); if(cc) cc.textContent= e.stats ? '· '+e.stats.concurrencia+' hilos' : '';
+  var log=document.getElementById('completaLog'); if(log && e.logs && e.logs.length) log.innerHTML = e.logs.slice(0,12).map(function(l){ return '<div style="padding:4px 0;border-bottom:1px solid #1a1625">'+new Date(l.ts).toLocaleTimeString()+' — '+l.msg+'</div>'; }).join('');
+}
+function controlCompleta(accion){
+  if(accion==='start'){
+    if(!confirm('¿Iniciar auditoría 100% real?\n\nBarrerá PELÍCULA×PELÍCULA y EPISODIO×EPISODIO con 30 hilos.\nTarda ~30-45min para ~90k items y puede subir CPU/disco. ¿Continuar?')) return;
+    fetch('/api/auditoria/completa',{method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({concurrencia:30})}).then(function(r){return r.json()}).then(function(d){ if(!d.ok) alert(d.error||'No se pudo iniciar'); ticAuditoria(); }).catch(function(e){ alert('Error: '+(e&&e.message||e)); });
+  } else if(accion==='cancel'){
+    fetch('/api/auditoria/completa',{method:'DELETE'}).then(function(){ ticAuditoria(); });
+  }
+}
 function renderAuditoria(d){
   if(!d || !d.auditoria) return;
   _auditoria=d.auditoria;
@@ -707,11 +809,7 @@ function controlAuditoria(accion){
   fetch('/api/auditoria/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accion:accion, alcance:alcance})})
     .then(function(r){return r.json()}).then(function(){ ticAuditoria(); }).catch(function(e){ alert('Error: '+(e&&e.message||e)); });
 }
-function ticAuditoria(){
-  fetch('/api/auditoria/estado').then(function(r){return r.json()}).then(renderAuditoria).catch(function(){});
-}
-auditoriaFuentesChecks();
-ticAuditoria(); setInterval(ticAuditoria, 5000);
+
 
 function tic(){
   fetch('/api/estado').then(function(r){return r.json()}).then(renderDash).catch(function(e){
