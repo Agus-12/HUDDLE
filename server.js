@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v239.3'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
+const UI_VERSION = 'v239.5'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
@@ -10939,13 +10939,14 @@ async function cuevanaLatest() {
         titulosCheckpoint: cosecha && cosecha.meta ? cosecha.meta.hits : 0,
       };
       if (!/text\/html/i.test(req.headers.accept || '') || url.searchParams.get('json') === '1') return json(res, 200, datos);
-      /* v239.3: auth via cookie */
+      /* v239.5: auth via cookie — panel como archivo externo */
       const adminPass = 'Samuelito8';
       const cookies = (req.headers.cookie || '').split(';').reduce((acc, c) => { const [k,v] = c.trim().split('='); if(k) acc[k]=v; return acc; }, {});
       const urlPass = url.searchParams.get('pass');
       if (cookies.huddle_admin === 'ok' || urlPass === adminPass) {
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Set-Cookie': 'huddle_admin=ok; Path=/; HttpOnly' });
-        return res.end(panelHtml());
+        /* Set cookie and serve external panel file */
+        res.writeHead(302, { 'Location': '/panel.html', 'Set-Cookie': 'huddle_admin=ok; Path=/; HttpOnly', 'Cache-Control': 'no-store' });
+        return res.end();
       }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
       return res.end('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Huddle Admin</title><style>body{background:#0d0b14;color:#efeaf7;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}.box{background:#17131f;border:1px solid #2a2338;border-radius:16px;padding:30px;text-align:center;max-width:300px}input{background:#0d0b14;border:1px solid #2a2338;border-radius:8px;padding:10px;color:#efeaf7;width:100%;margin:10px 0;font-size:16px}button{background:#8a5cf6;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:16px;cursor:pointer;width:100%}h2{margin:0 0 20px}</style></head><body><div class="box"><h2>Huddle Admin</h2><form method="GET"><input type="password" name="pass" placeholder="Contrasena" autofocus><button type="submit">Entrar</button></form></div></body></html>');
@@ -10984,6 +10985,13 @@ async function cuevanaLatest() {
           return { mapa: fs.existsSync(MOVIE_MAPA_RUTA) ? MOVIE_MAPA_RUTA : 'FALTA — generar con mapear-secuencias-movie.js', origen: MOVIE_ORIGEN, series: seriesM, caidas: [...MOVIE.caidas.values()] };
         })(),
       });
+    }
+    if (url.pathname === '/panel.html') {
+      const cks = (req.headers.cookie || '').split(';').reduce((a, c) => { const [k,v] = c.trim().split('='); if(k) a[k]=v; return a; }, {});
+      if (cks.huddle_admin !== 'ok') {
+        res.writeHead(302, { 'Location': '/api/intros' });
+        return res.end();
+      }
     }
     return serveStatic(req, res, url.pathname);
   } catch (e) {

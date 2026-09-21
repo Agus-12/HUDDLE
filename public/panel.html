@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Huddle — Panel</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0d0b14;color:#efeaf7;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;padding:18px 14px 30px}
+.wrap{max-width:760px;margin:0 auto}
+h1{font-size:20px;display:flex;align-items:center;gap:9px}
+h1 .punto{width:9px;height:9px;border-radius:50%;background:#38e08a;box-shadow:0 0 8px #38e08a}
+h1 .ver{font-size:11px;color:#9d93b5;font-weight:400;margin-left:auto}
+.sub{color:#9d93b5;font-size:12px;margin:4px 0 16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.card{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:14px}
+.card .n{font-size:24px;font-weight:800}
+.card .t{color:#9d93b5;font-size:11px;margin-top:3px;text-transform:uppercase;letter-spacing:0.6px}
+h2{font-size:13px;color:#b8aed0;margin:20px 0 10px;text-transform:uppercase;letter-spacing:1px}
+.barra{background:#241d31;border-radius:99px;height:14px;overflow:hidden;margin:6px 0}
+.barra i{display:block;height:100%;background:linear-gradient(90deg,#8a5cf6,#38e08a);border-radius:99px;transition:width 0.6s}
+.barra-txt{display:flex;justify-content:space-between;color:#9d93b5;font-size:12px;margin-bottom:10px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:#17131f;border:1px solid #2a2338;border-radius:99px;padding:7px 13px;font-size:13px}
+.chip b{font-weight:800}
+.chip.ok b{color:#38e08a}.chip.warn b{color:#ffb020}.chip.bad b{color:#ff5c7a}
+table{width:100%;border-collapse:collapse;background:#17131f;border-radius:14px;overflow:hidden;font-size:13px}
+th{text-align:left;color:#9d93b5;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;padding:9px 12px;border-bottom:1px solid #2a2338}
+td{padding:9px 12px;border-bottom:1px solid #221c2e}
+tr:last-child td{border-bottom:0}
+.pie{color:#9d93b5;font-size:11px;text-align:center;margin-top:22px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1><span class="punto"></span> Huddle <span class="ver" id="ver"></span></h1>
+<p class="sub" id="sub">cargando…</p>
+<div class="grid" id="cards"></div>
+<h2>Cosecha Movie</h2>
+<div class="card"><div class="barra"><i id="cBarra" style="width:0"></i></div><div class="barra-txt"><span id="cTxt"></span><span id="cPct"></span></div><div class="chips" id="cChips"></div><div id="cRuta" style="color:#9d93b5;font-size:11px;margin-top:8px"></div></div>
+<h2>Rastreador de intros</h2>
+<div class="card"><div class="barra"><i id="iBarra" style="width:0"></i></div><div class="barra-txt"><span id="iTxt"></span><span id="iPct"></span></div><div class="chips" id="iChips"></div></div>
+<h2>Moderación</h2>
+<div class="chips" id="mChips"></div>
+<h2>Catálogos</h2>
+<div class="chips" id="catChips"></div>
+<h2>Intros aprendidas</h2>
+<table><thead><tr><th>Sitio</th><th>Serie</th><th>Temp.</th><th>Seg</th></tr></thead><tbody id="introBody"></tbody></table>
+<h2>Fuentes de video</h2>
+<div id="fuentesGrid" class="grid"></div>
+<h2>Usuarios</h2>
+<div class="card"><div id="userList">Cargando…</div></div>
+<p class="pie" id="pie">conectando…</p>
+</div>
+<script>
+function fmt(s){var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return(d?d+'d ':'')+(h?h+'h ':'')+m+'m'}
+function ch(c,t,n){return '<span class="chip '+c+'">'+t+' <b>'+n+'</b></span>'}
+
+function pintar(d){
+  try{
+    document.getElementById('ver').textContent=d.version;
+    document.getElementById('sub').textContent='Actualizado '+new Date().toLocaleTimeString('es');
+    document.getElementById('cards').innerHTML=
+      '<div class="card"><div class="n">'+fmt(d.encendidoHace)+'</div><div class="t">Encendido</div></div>'+
+      '<div class="card"><div class="n">'+d.memoriaMb+' MB</div><div class="t">Memoria</div></div>'+
+      '<div class="card"><div class="n">'+d.salasActivas+'</div><div class="t">Salas</div></div>'+
+      '<div class="card"><div class="n">'+d.usuarios+'</div><div class="t">Usuarios</div></div>';
+    var ii=d.intros;
+    var pct=ii.total?Math.round(ii.analizados*100/ii.total):0;
+    document.getElementById('iBarra').style.width=pct+'%';
+    document.getElementById('iTxt').textContent=ii.analizados+' de '+ii.total+' episodios';
+    document.getElementById('iPct').textContent=pct+'%';
+    document.getElementById('iChips').innerHTML=ch('ok','Aprendidas',ii.aprendidas)+ch('warn','Sin intro',ii.sinIntro)+ch('','En cola',ii.enCola);
+    var co=d.cosecha||{};
+    var totCo=co.archivo?co.archivo.total:0;
+    var posCo=co.meta?co.meta.pos:0;
+    var hitsCo=co.meta?co.meta.hits:0;
+    var pctCo=posCo?Math.min(100,Math.round((posCo-1000)/69000*100)):0;
+    document.getElementById('cBarra').style.width=pctCo+'%';
+    document.getElementById('cTxt').textContent=totCo?totCo+' titulos':'sin datos';
+    document.getElementById('cPct').textContent=posCo?'id '+posCo+' / 70k : '+pctCo+'%':'';
+    document.getElementById('cChips').innerHTML=(co.archivo?ch('ok','Catalogo',totCo)+ch('','Hit',hitsCo||totCo):ch('warn','En curso','1k-70k'))+(d.llaveCdn?ch('ok','Llave CDN','SI'):ch('bad','Llave CDN','NO'));
+    document.getElementById('cRuta').textContent=co.archivo?(co.archivo.ruta+' : '+(co.archivo.bytes/1024).toFixed(1)+' KB'):(co.nota||'');
+    var mo=d.moderacion||{};
+    document.getElementById('mChips').innerHTML=ch('bad','Animes muertos',mo.animesMuertos||0)+ch('warn','Cast/dup',mo.animesCastDup||0)+ch('bad','GoPelis',mo.gopelis||0)+ch('bad','PelisXD',mo.pelisxd||0)+ch('bad','AnimeFLV',mo.animeflv||0)+ch('bad','Cuevana',mo.cuevana||0)+ch('ok','Protegidas',mo.protegidas||0)+ch('bad','Eps',mo.epsOcultos||0);
+    var ca=d.catalogos||{};
+    document.getElementById('catChips').innerHTML=ch('','Caricaturas',ca.caricaturas||0)+ch('','Cartoons',ca.cartoons||0)+ch('','Live Action',ca.liveaction||0)+ch('','Danimados',ca.danimados||0)+ch('','Animes',ca.animes||0);
+    var tb=document.getElementById('introBody');
+    tb.innerHTML=(ii.muestra||[]).map(function(m){return '<tr><td>'+m.sitio+'</td><td>'+m.serie+'</td><td>T'+m.temporada+'</td><td>'+m.inicio+' &rarr; '+m.fin+'</td></tr>'}).join('')||'<tr><td colspan="4">Sin intros</td></tr>';
+    document.getElementById('pie').textContent='OK '+new Date().toLocaleTimeString('es');
+  }catch(e){document.getElementById('pie').textContent='Error pintar: '+e.message;}
+}
+
+function pintarStats(d){
+  if(!d.fuentes)return;
+  var html='',colores={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8'};
+  for(var k in d.fuentes){var f=d.fuentes[k],color=colores[k]||'#efeaf7',pct=f.total?Math.round(f.activas*100/f.total):0;
+    html+='<div class="card" style="border-left:3px solid '+color+'"><div class="n" style="color:'+color+'">'+f.activas+'</div><div class="t">'+f.nombre+' activas</div><div style="margin-top:8px;font-size:11px;color:#9d93b5">Total: '+f.total+' Ocultas: '+f.ocultas+'</div><div class="barra" style="margin-top:6px"><i style="width:'+pct+'%;background:'+color+'"></i></div></div>';}
+  html+='<div class="card"><div class="n">'+d.memoria+' MB</div><div class="t">Memoria</div></div>';
+  document.getElementById('fuentesGrid').innerHTML=html;
+}
+
+function pintarUsers(d){
+  if(!d.usuarios)return;
+  var html='<div style="margin-bottom:8px"><b>'+d.total+'</b> usuarios</div><table style="width:100%"><thead><tr><th>Nombre</th><th>Ultimo</th></tr></thead><tbody>';
+  d.usuarios.forEach(function(u){var last=u.lastSeenAt?new Date(u.lastSeenAt).toLocaleDateString('es'):'-';html+='<tr><td>'+u.name+'</td><td>'+last+'</td></tr>';});
+  html+='</tbody></table>';
+  document.getElementById('userList').innerHTML=html;
+}
+
+function tic(){
+  document.getElementById('pie').textContent='fetching...';
+  fetch('/api/estado').then(function(r){
+    document.getElementById('pie').textContent='HTTP '+r.status;
+    return r.json();
+  }).then(pintar).catch(function(e){
+    document.getElementById('pie').textContent='ERROR: '+(e&&e.message||e);
+  });
+  fetch('/api/stats').then(function(r){return r.json()}).then(pintarStats).catch(function(e){});
+  fetch('/api/users').then(function(r){return r.json()}).then(pintarUsers).catch(function(e){});
+}
+tic();
+setInterval(tic,5000);
+</script>
+</body>
+</html>
