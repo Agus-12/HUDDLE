@@ -11280,6 +11280,7 @@ function panelHtml() {
   function chip(clase, txt, n) { return '<span class="chip ' + clase + '">' + txt + ' <b>' + n + '</b></span>'; }
   function pintar(d) {
     try {
+    document.getElementById('pie').textContent = 'pintar() inicio, version=' + d.version;
     document.getElementById('ver').textContent = d.version;
     document.getElementById('cards').innerHTML =
       '<div class="card"><div class="n">' + fmtSeg(d.encendidoHace) + '</div><div class="t">Encendido</div></div>' +
@@ -11320,8 +11321,15 @@ function panelHtml() {
     } catch(e) { document.getElementById('pie').textContent = 'Error: ' + e.message; }
   }
   function tic() {
-    fetch('/api/estado').then(function (r) { return r.json(); }).then(pintar).catch(function () {
-      document.getElementById('pie').textContent = 'sin conexión con el server — reintentando…';
+    document.getElementById('pie').textContent = 'cargando datos…';
+    fetch('/api/estado').then(function (r) {
+      document.getElementById('pie').textContent = 'HTTP ' + r.status + ', parseando…';
+      return r.json();
+    }).then(function(d) {
+      document.getElementById('pie').textContent = 'datos OK, pintando…';
+      pintar(d);
+    }).catch(function (e) {
+      document.getElementById('pie').textContent = 'ERROR fetch/estado: ' + (e && e.message || e);
     });
     fetch('/api/stats').then(function (r) { return r.json(); }).then(pintarStats).catch(function () {});
     fetch('/api/users').then(function (r) { return r.json(); }).then(pintarUsers).catch(function () {});
