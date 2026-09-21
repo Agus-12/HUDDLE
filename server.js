@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v259'; // 259: Fix goodstream Referer completo (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v260'; // 260: HLS goodstream directo primero (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -10152,10 +10152,9 @@ async function proxearHls(req, res, target) {
   }
   if (req.headers.range) cabUp.Range = String(req.headers.range);
   let upstream = null;
-  // v257: para fluidez, probar directo primero para segmentos HLS (aunque sea goodstream), solo master va por relay si hace falta
-  // Si es master.m3u8, sí probar relay primero (token IP-bound); si es .ts o index, probar directo primero
+  // v260: para fluidez, probar directo primero SIEMPRE para goodstream (con cookie), relay solo como fallback
   const esMaster = /master\.m3u8/i.test(target);
-  if (useRelayDirect && CDN_RELAY && esMaster) {
+  if (false && useRelayDirect && CDN_RELAY && esMaster) {
     try {
       const relayUrl = CDN_RELAY + '/?u=' + encodeURIComponent(target);
       const ctl2 = new AbortController();
