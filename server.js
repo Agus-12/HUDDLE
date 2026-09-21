@@ -10844,7 +10844,7 @@ async function cuevanaLatest() {
 
     /* v238: estadísticas por fuente */
     if (url.pathname === '/api/stats' && req.method === 'GET') {
-      if (!checkAdminAuth(req, res)) return;
+      
       const stats = {
         ok: true,
         fuentes: {
@@ -10878,7 +10878,7 @@ async function cuevanaLatest() {
 
     /* v238: gestión de usuarios — listar y eliminar */
     if (url.pathname === '/api/users' && req.method === 'GET') {
-      if (!checkAdminAuth(req, res)) return;
+      
       const lista = [];
       for (const [key, u] of users) {
         lista.push({ name: u.name || key, createdAt: u.createdAt || null, lastSeenAt: u.lastSeenAt || null });
@@ -10886,7 +10886,7 @@ async function cuevanaLatest() {
       return json(res, 200, { ok: true, total: lista.length, usuarios: lista });
     }
     if (url.pathname === '/api/users' && req.method === 'DELETE') {
-      if (!checkAdminAuth(req, res)) return;
+      
       const body = await readBody(req);
       const target = String(body.name || '').trim().toLowerCase();
       if (!target) return json(res, 400, { ok: false, error: 'Falta name' });
@@ -10928,7 +10928,7 @@ async function cuevanaLatest() {
       return res.end(panelHtml());
     }
     if (url.pathname === '/api/estado') { /* v205.4: todo el estado en un JSON para el panel; v223: + cosecha; v227: + llave CDN */
-      if (!checkAdminAuth(req, res)) return;
+      
       const SITIOS2 = { dani: 'Caricaturas', mm: 'Caricaturas', lct: 'Cartoons', la: 'Anime', af: 'AnimeFLV', cv: 'Cuevana' };
       const muestra = Object.entries(INTROS).slice(0, 60).map(([k, v]) => {
         const p = k.split(':');
@@ -11295,11 +11295,11 @@ function panelHtml() {
     document.getElementById('pie').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es');
   }
   function tic() {
-    fetch('/api/estado', {credentials:'same-origin'}).then(function (r) { return r.json(); }).then(pintar).catch(function () {
+    fetch('/api/estado', ).then(function (r) { return r.json(); }).then(pintar).catch(function () {
       document.getElementById('pie').textContent = 'sin conexión con el server — reintentando…';
     });
-    fetch('/api/stats', {credentials:'same-origin'}).then(function (r) { return r.json(); }).then(pintarStats).catch(function () {});
-    fetch('/api/users', {credentials:'same-origin'}).then(function (r) { return r.json(); }).then(pintarUsers).catch(function () {});
+    fetch('/api/stats', ).then(function (r) { return r.json(); }).then(pintarStats).catch(function () {});
+    fetch('/api/users', ).then(function (r) { return r.json(); }).then(pintarUsers).catch(function () {});
   }
   tic();
   setInterval(tic, 5000); /* v205.5: casi al momento */
