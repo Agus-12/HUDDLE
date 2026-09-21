@@ -6,224 +6,231 @@
 <title>Huddle — Panel</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#0d0b14;color:#efeaf7;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;padding:18px 14px 30px}
-.wrap{max-width:800px;margin:0 auto}
-h1{font-size:22px;display:flex;align-items:center;gap:9px}
-h1 .dot{width:10px;height:10px;border-radius:50%;background:#38e08a;box-shadow:0 0 8px #38e08a}
-h1 .ver{font-size:11px;color:#9d93b5;font-weight:400;margin-left:auto}
-.sub{color:#9d93b5;font-size:12px;margin:4px 0 18px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px}
-.card{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:14px}
-.card .n{font-size:26px;font-weight:800}
-.card .t{color:#9d93b5;font-size:10px;margin-top:3px;text-transform:uppercase;letter-spacing:.6px}
-.section{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:16px;margin-bottom:14px}
-.section h2{font-size:14px;color:#efeaf7;margin:0 0 12px;display:flex;align-items:center;gap:8px}
-.section h2 .badge{background:#2a2338;border-radius:99px;padding:2px 10px;font-size:11px;color:#b8aed0;margin-left:auto}
-.hidden{display:none}
-.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
-.chip{background:#0d0b14;border:1px solid #2a2338;border-radius:99px;padding:6px 12px;font-size:12px}
-.chip b{font-weight:800}.chip.ok b{color:#38e08a}.chip.warn b{color:#ffb020}.chip.bad b{color:#ff5c7a}
-.barra{background:#241d31;border-radius:99px;height:10px;overflow:hidden;margin:6px 0}
+body{background:#0d0b14;color:#efeaf7;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;padding:0;min-height:100vh}
+/* Nav bar */
+.navbar{background:#17131f;border-bottom:1px solid #2a2338;padding:12px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:10}
+.navbar .back{background:none;border:none;color:#8a5cf6;font-size:20px;cursor:pointer;padding:4px 8px;display:none}
+.navbar .back.show{display:block}
+.navbar h1{font-size:17px;display:flex;align-items:center;gap:8px;flex:1}
+.navbar h1 .dot{width:9px;height:9px;border-radius:50%;background:#38e08a;box-shadow:0 0 6px #38e08a}
+.navbar .ver{font-size:10px;color:#9d93b5}
+.page{display:none;padding:16px;max-width:800px;margin:0 auto}
+.page.active{display:block}
+/* Dashboard cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}
+.card{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:14px;cursor:pointer;transition:border-color .2s}
+.card:hover{border-color:#8a5cf6}
+.card .n{font-size:24px;font-weight:800}
+.card .t{color:#9d93b5;font-size:10px;margin-top:2px;text-transform:uppercase;letter-spacing:.6px}
+.card.noclick{cursor:default}.card.noclick:hover{border-color:#2a2338}
+/* Section titles */
+.sec-title{font-size:13px;color:#9d93b5;text-transform:uppercase;letter-spacing:1px;margin:18px 0 10px}
+/* Fuente cards */
+.fcard{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:16px;cursor:pointer;transition:border-color .2s;margin-bottom:10px}
+.fcard:hover{border-color:#8a5cf6}
+.fcard .fhead{display:flex;align-items:center;justify-content:space-between}
+.fcard .fname{font-size:16px;font-weight:700}
+.fcard .fcount{font-size:28px;font-weight:800}
+.fcard .fsub{font-size:11px;color:#9d93b5;margin-top:2px}
+.fcard .bar{height:6px;background:#241d31;border-radius:99px;overflow:hidden;margin-top:8px}
+.fcard .bar i{display:block;height:100%;border-radius:99px;transition:width .6s}
+/* Users */
+.urow{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #1a1625}
+.urow:last-child{border-bottom:0}
+.udot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.udot.green{background:#38e08a;box-shadow:0 0 5px #38e08a}
+.udot.yellow{background:#ffb020;box-shadow:0 0 5px #ffb020}
+.udot.gray{background:#555}
+.uname{flex:1;font-size:13px}
+.udate{font-size:11px;color:#9d93b5;min-width:80px;text-align:right}
+.ubtn{background:#ff5c7a;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
+/* Detail page */
+.detail-section{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:16px;margin-bottom:12px}
+.detail-section h3{font-size:14px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.barra{height:10px;background:#241d31;border-radius:99px;overflow:hidden;margin:6px 0}
 .barra i{display:block;height:100%;border-radius:99px;transition:width .6s}
-/* Usuarios */
-.user-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #221c2e}
-.user-row:last-child{border-bottom:0}
-.user-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-.user-dot.green{background:#38e08a;box-shadow:0 0 6px #38e08a}
-.user-dot.yellow{background:#ffb020;box-shadow:0 0 6px #ffb020}
-.user-dot.white{background:#555}
-.user-name{flex:1;font-size:13px}
-.user-date{font-size:11px;color:#9d93b5;min-width:70px}
-.btn-del{background:#ff5c7a;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer}
-/* Fuentes */
-.fuente-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #221c2e;cursor:pointer}
-.fuente-row:last-child{border-bottom:0}
-.fuente-color{width:4px;height:36px;border-radius:2px;flex-shrink:0}
-.fuente-info{flex:1}
-.fuente-info .name{font-size:14px;font-weight:700}
-.fuente-info .sub2{font-size:11px;color:#9d93b5}
-.fuente-n{font-size:22px;font-weight:800;min-width:50px;text-align:right}
-.fuente-detail{padding:12px 0 6px;border-bottom:1px solid #221c2e;font-size:12px;color:#9d93b5;line-height:1.8}
-.fuente-detail b{color:#efeaf7}
-.bar-sm{height:6px;border-radius:99px;background:#241d31;overflow:hidden;margin:4px 0}
-.bar-sm span{display:block;height:100%;border-radius:99px}
-.pie{color:#9d93b5;font-size:11px;text-align:center;margin-top:18px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.chip{background:#0d0b14;border:1px solid #2a2338;border-radius:99px;padding:5px 11px;font-size:12px}
+.chip b{font-weight:800}.chip.ok b{color:#38e08a}.chip.warn b{color:#ffb020}.chip.bad b{color:#ff5c7a}
 table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
 th{text-align:left;color:#9d93b5;font-size:10px;text-transform:uppercase;padding:6px 4px;border-bottom:1px solid #2a2338}
 td{padding:5px 4px;border-bottom:1px solid #1a1625}
-.caret{color:#9d93b5;font-size:11px;cursor:pointer;margin-left:auto}
-@media(max-width:480px){.grid{grid-template-columns:1fr 1fr}.card .n{font-size:20px}}
+/* Intros collapsible */
+.toggle-btn{background:none;border:1px solid #2a2338;border-radius:8px;color:#9d93b5;padding:6px 14px;font-size:12px;cursor:pointer;margin:6px 0}
+.toggle-btn:hover{border-color:#8a5cf6;color:#efeaf7}
+.pie{color:#9d93b5;font-size:11px;text-align:center;padding:16px}
 </style>
 </head>
 <body>
-<div class="wrap">
-<h1><span class="dot"></span> Huddle <span class="ver" id="ver"></span></h1>
-<p class="sub" id="sub">conectando…</p>
 
-<!-- Dashboard siempre visible -->
-<div class="grid" id="cards"></div>
-
-<!-- Fuentes de video siempre visible -->
-<div class="section">
-  <h2>Fuentes de video <span class="badge" id="fuentesBadge">—</span></h2>
-  <div id="fuentesList"></div>
-  <div id="fuentesDetail" class="hidden"></div>
+<!-- NAVBAR -->
+<div class="navbar">
+  <button class="back" id="backBtn" onclick="goBack()">←</button>
+  <h1><span class="dot"></span> Huddle <span class="ver" id="navVer"></span></h1>
 </div>
 
-<!-- Catálogo total siempre visible -->
-<div class="section">
-  <h2>Catálogo total <span class="badge" id="catBadge">—</span></h2>
-  <div id="catGrid" class="grid" style="margin-bottom:0"></div>
-  <div id="catDetail" style="font-size:12px;color:#9d93b5;line-height:1.8;margin-top:10px"></div>
+<!-- PAGE: DASHBOARD -->
+<div class="page active" id="pageDash">
+  <div class="grid" id="dashCards"></div>
+  <div class="sec-title">Catálogo total</div>
+  <div class="grid" id="catCards"></div>
+  <div id="catDetail" style="font-size:12px;color:#9d93b5;line-height:1.8;margin-bottom:16px"></div>
+  <div class="sec-title">Fuentes de video</div>
+  <div id="fuentesCards"></div>
+  <div class="sec-title">Rastreador de intros</div>
+  <button class="toggle-btn" onclick="toggleIntros()">▸ Mostrar intros aprendidas</button>
+  <div id="introsWrap" style="display:none"></div>
+  <p class="pie" id="pie">conectando…</p>
 </div>
 
-<!-- Rastreador de intros OCULTO por defecto -->
-<div class="section">
-  <h2>Rastreador de intros <span class="badge" id="introBadge">—</span> <span class="caret" onclick="toggleIntros()">▸ mostrar</span></h2>
-  <div id="introsWrap" class="hidden"></div>
-</div>
-
-<!-- Usuarios -->
-<div class="section">
-  <h2>Usuarios <span class="badge" id="userBadge">—</span></h2>
+<!-- PAGE: USUARIOS -->
+<div class="page" id="pageUsers">
+  <div class="sec-title">Todos los usuarios <span id="userCount" style="float:right"></span></div>
   <div id="usersList"></div>
 </div>
 
-<p class="pie" id="pie">conectando…</p>
+<!-- PAGE: FUENTE DETAIL -->
+<div class="page" id="pageFuente">
+  <div id="fuenteContent"></div>
 </div>
 
 <script>
-var _openFuente=null;
+var _page='dash';
+var _estado=null,_stats=null;
+var W2=14*86400000, W3=21*86400000;
 
 function fmt(s){var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return(d?d+'d ':'')+(h?h+'h ':'')+m+'m'}
+function dotClass(ts){if(!ts)return'gray';var age=Date.now()-ts;return age<W2?'green':(age<W3?'yellow':'gray');}
+function dotLabel(ts){if(!ts)return'Nunca entro';var age=Date.now()-ts;return age<W2?'Activo':(age<W3?'Inactivo':'Desactivado');}
+
+function showPage(id){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('page'+id).classList.add('active');
+  document.getElementById('backBtn').classList.toggle('show',id!=='Dash');
+  _page=id;
+  window.scrollTo(0,0);
+}
+function goBack(){showPage('Dash');}
 
 function toggleIntros(){
   var w=document.getElementById('introsWrap');
-  var c=document.querySelector('.caret');
-  if(w.classList.contains('hidden')){w.classList.remove('hidden');c.textContent='▾ ocultar';}
-  else{w.classList.add('hidden');c.textContent='▸ mostrar';}
+  var btn=w.previousElementSibling;
+  if(w.style.display==='none'){w.style.display='';btn.textContent='▾ Ocultar intros';}
+  else{w.style.display='none';btn.textContent='▸ Mostrar intros aprendidas';}
 }
 
-function renderDashboard(d){
-  document.getElementById('ver').textContent=d.version;
-  document.getElementById('sub').textContent='Actualizado '+new Date().toLocaleTimeString('es');
-  document.getElementById('cards').innerHTML=
-    '<div class="card"><div class="n">'+fmt(d.encendidoHace)+'</div><div class="t">Encendido</div></div>'
-    +'<div class="card"><div class="n">'+d.memoriaMb+' MB</div><div class="t">Memoria</div></div>'
-    +'<div class="card"><div class="n">'+d.salasActivas+'</div><div class="t">Salas</div></div>'
-    +'<div class="card"><div class="n">'+d.usuarios+'</div><div class="t">Usuarios</div></div>';
-}
-
-function renderFuentes(stats){
-  var fuentes=stats.fuentes||{};
-  var colors={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8'};
-  var totalActivas=0;
-  var html='';
-  for(var k in fuentes){
-    var f=fuentes[k];var c=colors[k]||'#efeaf7';
-    var act=f.activas>0?f.activas:0;
-    totalActivas+=act;
-    var pct=f.total?Math.round(act*100/f.total):0;
-    html+='<div class="fuente-row" onclick="clickFuente(\''+k+'\')">'
-      +'<div class="fuente-color" style="background:'+c+'"></div>'
-      +'<div class="fuente-info"><div class="name" style="color:'+c+'">'+f.nombre+'</div>'
-      +'<div class="sub2">'+f.total+' total · '+f.ocultas+' ocultas</div></div>'
-      +'<div class="fuente-n" style="color:'+c+'">'+act+'</div>'
-      +'<span class="caret">▸</span></div>'
-      +'<div id="fd-'+k+'" class="fuente-detail hidden"></div>';
-  }
-  document.getElementById('fuentesList').innerHTML=html;
-  document.getElementById('fuentesBadge').textContent=totalActivas+' activas';
-}
-
-function clickFuente(k){
-  var el=document.getElementById('fd-'+k);
-  if(_openFuente&&_openFuente!==k){document.getElementById('fd-'+_openFuente).classList.add('hidden');}
-  if(el.classList.contains('hidden')){
-    el.classList.remove('hidden');
-    _openFuente=k;
-    // render detail
-    var f=(window._statsData&&window._statsData.fuentes)?window._statsData.fuentes[k]:null;
-    if(!f)return;
-    var act=f.activas>0?f.activas:0;
-    var pct=f.total?Math.round(act*100/f.total):0;
-    var c={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8'}[k]||'#efeaf7';
-    el.innerHTML='<div class="bar-sm"><span style="width:'+pct+'%;background:'+c+'"></span></div>'
-      +'<div>Activas: <b>'+act+'</b> de '+f.total+' ('+pct+'%)</div>'
-      +'<div>Ocultas (caídas): <b>'+f.ocultas+'</b></div>'
-      +'<div>Verificadas: <b>'+(f.vistas||0)+'</b></div>';
-  }else{el.classList.add('hidden');_openFuente=null;}
-}
-
-function renderCatalogo(estado,stats){
-  var ca=estado.catalogos||{};
-  var fuentes=stats.fuentes||{};
-  var totalPelis=0;for(var k in fuentes)totalPelis+=(fuentes[k].activas>0?fuentes[k].activas:0);
-  var totalSeries=(ca.animes||0)+(ca.danimados||0);
-  var totalCari=(ca.caricaturas||0)+(ca.cartoons||0)+(ca.liveaction||0);
-  var gran=totalPelis+totalSeries+totalCari;
-  document.getElementById('catGrid').innerHTML=
-    '<div class="card"><div class="n" style="color:#38e08a">'+totalPelis+'</div><div class="t">Películas</div></div>'
-    +'<div class="card"><div class="n" style="color:#8a5cf6">'+totalSeries+'</div><div class="t">Series</div></div>'
-    +'<div class="card"><div class="n" style="color:#38bdf8">'+totalCari+'</div><div class="t">Caricaturas</div></div>'
-    +'<div class="card"><div class="n" style="color:#ffb020">'+gran+'</div><div class="t">Total</div></div>';
+function renderDash(d){
+  _estado=d;
+  document.getElementById('navVer').textContent=d.version;
+  document.getElementById('dashCards').innerHTML=
+    '<div class="card noclick"><div class="n">'+fmt(d.encendidoHace)+'</div><div class="t">Encendido</div></div>'
+    +'<div class="card noclick"><div class="n">'+d.memoriaMb+' MB</div><div class="t">Memoria</div></div>'
+    +'<div class="card noclick"><div class="n">'+d.salasActivas+'</div><div class="t">Salas</div></div>'
+    +'<div class="card" onclick="showPage(\'Users\')"><div class="n">'+d.usuarios+'</div><div class="t">Usuarios ▸</div></div>';
+  // Catalogo
+  var ca=d.catalogos||{};
+  var f=_stats?_stats.fuentes:{};
+  var tp=0;for(var k in f)tp+=(f[k].activas>0?f[k].activas:0);
+  var ts=(ca.animes||0)+(ca.danimados||0);
+  var tc=(ca.caricaturas||0)+(ca.cartoons||0)+(ca.liveaction||0);
+  var gt=tp+ts+tc;
+  document.getElementById('catCards').innerHTML=
+    '<div class="card noclick"><div class="n" style="color:#38e08a">'+tp+'</div><div class="t">Películas</div></div>'
+    +'<div class="card noclick"><div class="n" style="color:#8a5cf6">'+ts+'</div><div class="t">Series</div></div>'
+    +'<div class="card noclick"><div class="n" style="color:#38bdf8">'+tc+'</div><div class="t">Caricaturas</div></div>'
+    +'<div class="card noclick"><div class="n" style="color:#ffb020">'+gt+'</div><div class="t">Total</div></div>';
   document.getElementById('catDetail').innerHTML=
-    'Caricaturas: <b>'+ca.caricaturas+'</b> · Cartoons: <b>'+ca.cartoons+'</b> · Live Action: <b>'+ca.liveaction+'</b><br>'
-    +'Danimados: <b>'+ca.danimados+'</b> · Animes: <b>'+ca.animes+'</b>';
-  document.getElementById('catBadge').textContent=gran+' títulos';
-}
-
-function renderIntros(estado){
-  var ii=estado.intros||{};
+    'Caricaturas: <b>'+ca.caricaturas+'</b> · Cartoons: <b>'+ca.cartoons+'</b> · Live Action: <b>'+ca.liveaction+'</b> · Danimados: <b>'+ca.danimados+'</b> · Animes: <b>'+ca.animes+'</b>';
+  // Intros
+  var ii=d.intros||{};
   var pct=ii.total?Math.round(ii.analizados*100/ii.total):0;
-  var html='<div class="barra"><i style="width:'+pct+'%;background:linear-gradient(90deg,#8a5cf6,#38e08a)"></i></div>'
-    +'<div style="display:flex;justify-content:space-between;font-size:12px;color:#9d93b5;margin-bottom:10px">'
+  var ih='<div class="barra"><i style="width:'+pct+'%;background:linear-gradient(90deg,#8a5cf6,#38e08a)"></i></div>'
+    +'<div style="display:flex;justify-content:space-between;font-size:12px;color:#9d93b5;margin-bottom:8px">'
     +'<span>'+ii.analizados+' de '+ii.total+' episodios</span><span>'+pct+'%</span></div>'
     +'<div class="chips">'
     +'<span class="chip ok">Aprendidas <b>'+ii.aprendidas+'</b></span>'
     +'<span class="chip warn">Sin intro <b>'+ii.sinIntro+'</b></span>'
-    +'<span class="chip">En cola <b>'+ii.enCola+'</b></span>'
-    +'</div>';
+    +'<span class="chip">En cola <b>'+ii.enCola+'</b></span></div>';
   if(ii.muestra&&ii.muestra.length){
-    html+='<table><thead><tr><th>Sitio</th><th>Serie</th><th>Temp</th><th>Seg</th></tr></thead><tbody>';
-    ii.muestra.forEach(function(m){html+='<tr><td>'+m.sitio+'</td><td>'+m.serie+'</td><td>T'+m.temporada+'</td><td>'+m.inicio+'→'+m.fin+'</td></tr>';});
-    html+='</tbody></table>';
+    ih+='<table><thead><tr><th>Sitio</th><th>Serie</th><th>Temp</th><th>Seg</th></tr></thead><tbody>';
+    ii.muestra.forEach(function(m){ih+='<tr><td>'+m.sitio+'</td><td>'+m.serie+'</td><td>T'+m.temporada+'</td><td>'+m.inicio+'→'+m.fin+'</td></tr>';});
+    ih+='</tbody></table>';
   }
-  document.getElementById('introsWrap').innerHTML=html;
-  document.getElementById('introBadge').textContent=pct+'%';
+  document.getElementById('introsWrap').innerHTML=ih;
+  document.getElementById('pie').textContent='Actualizado '+new Date().toLocaleTimeString('es');
 }
 
-function renderUsers(d){
-  var usuarios=d.usuarios||[];
-  var now=Date.now(),W2=14*86400000,W3=21*86400000;
-  var sorted=usuarios.slice().sort(function(a,b){return(b.lastSeenAt||0)-(a.lastSeenAt||0)});
+function renderFuentes(stats){
+  _stats=stats;
+  var f=stats.fuentes||{};
+  var colors={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8'};
+  var totalAct=0;
+  var html='';
+  for(var k in f){
+    var s=f[k];var c=colors[k]||'#efeaf7';
+    var act=s.activas>0?s.activas:0;
+    totalAct+=act;
+    var pct=s.total?Math.round(act*100/s.total):0;
+    html+='<div class="fcard" onclick="showFuente(\''+k+'\')">'
+      +'<div class="fhead"><div><div class="fname" style="color:'+c+'">'+s.nombre+'</div>'
+      +'<div class="fsub">'+s.total+' total · '+s.ocultas+' ocultas</div></div>'
+      +'<div class="fcount" style="color:'+c+'">'+act+'</div></div>'
+      +'<div class="bar"><i style="width:'+pct+'%;background:'+c+'"></i></div></div>';
+  }
+  document.getElementById('fuentesCards').innerHTML=html;
+}
+
+function showFuente(k){
+  var f=_stats?_stats.fuentes[k]:null;
+  if(!f)return;
+  var colors={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8'};
+  var c=colors[k]||'#efeaf7';
+  var act=f.activas>0?f.activas:0;
+  var pct=f.total?Math.round(act*100/f.total):0;
+  var html='<div class="detail-section">'
+    +'<h3 style="color:'+c+'">'+f.nombre+'</h3>'
+    +'<div class="barra"><i style="width:'+pct+'%;background:'+c+'"></i></div>'
+    +'<div style="display:flex;justify-content:space-between;font-size:12px;color:#9d93b5;margin:6px 0">'
+    +'<span>'+act+' activas de '+f.total+'</span><span>'+pct+'%</span></div>'
+    +'<div class="chips">'
+    +'<span class="chip ok">Activas <b>'+act+'</b></span>'
+    +'<span class="chip bad">Ocultas <b>'+f.ocultas+'</b></span>'
+    +'<span class="chip">Verificadas <b>'+(f.vistas||0)+'</b></span></div>'
+    +'</div>';
+  html+='<div class="detail-section"><h3>Estado de la sonda</h3>'
+    +'<div style="font-size:12px;color:#9d93b5;line-height:1.8">'
+    +'<div>La sonda revisa automáticamente películas cada ~6 horas.</div>'
+    +'<div>Ocultas encontradas: <b style="color:#ff5c7a">'+f.ocultas+'</b></div>'
+    +'<div>Ya verificadas: <b>'+f.vistas+'</b></div>'
+    +'<div>Pendientes por verificar: <b>'+(f.total-f.vistas)+'</b></div>'
+    +'</div></div>';
+  document.getElementById('fuenteContent').innerHTML=html;
+  showPage('Fuente');
+}
+
+function renderUsers(data){
+  var users=data.usuarios||[];
+  var sorted=users.slice().sort(function(a,b){return(b.lastSeenAt||0)-(a.lastSeenAt||0)});
   var html='';
   sorted.forEach(function(u){
-    var age=u.lastSeenAt?now-u.lastSeenAt:Infinity;
-    var cls=age<W2?'green':(age<W3?'yellow':'white');
-    var lbl=age<W2?'Activo':(age<W3?'Inactivo':'Desactivado');
+    var cls=dotClass(u.lastSeenAt);
+    var lbl=dotLabel(u.lastSeenAt);
     var dt=u.lastSeenAt?new Date(u.lastSeenAt).toLocaleDateString('es'):'—';
-    html+='<div class="user-row">'
-      +'<div class="user-dot '+cls+'" title="'+lbl+'"></div>'
-      +'<div class="user-name">'+u.name+'</div>'
-      +'<div class="user-date">'+dt+'</div>'
-      +'<button class="btn-del" onclick="eliminarUser(\''+u.name.replace(/'/g,"\\'")+'\')">Eliminar</button></div>';
+    html+='<div class="urow">'
+      +'<div class="udot '+cls+'" title="'+lbl+'"></div>'
+      +'<div class="uname">'+u.name+'</div>'
+      +'<div class="udate">'+dt+'</div>'
+      +'<button class="ubtn" onclick="eliminarUser(\''+u.name.replace(/'/g,"\\'")+'\')">Eliminar</button></div>';
   });
-  document.getElementById('usersList').innerHTML=html||'<div style="color:#9d93b5;font-size:13px">Sin usuarios</div>';
-  document.getElementById('userBadge').textContent=usuarios.length;
+  document.getElementById('usersList').innerHTML=html||'<div style="color:#9d93b5;font-size:13px;padding:20px 0">Sin usuarios</div>';
+  document.getElementById('userCount').textContent=users.length+' usuarios';
 }
 
 function tic(){
-  document.getElementById('pie').textContent='actualizando…';
-  fetch('/api/estado').then(function(r){return r.json()}).then(function(d){
-    renderDashboard(d);renderIntros(d);
-    if(window._statsData)renderCatalogo(d,window._statsData);
-    document.getElementById('pie').textContent='OK '+new Date().toLocaleTimeString('es');
-  }).catch(function(e){document.getElementById('pie').textContent='Error: '+(e&&e.message||e);});
-  fetch('/api/stats').then(function(r){return r.json()}).then(function(d){
-    window._statsData=d;renderFuentes(d);
-    fetch('/api/estado').then(function(r){return r.json()}).then(function(ed){renderCatalogo(ed,d);}).catch(function(){});
-  }).catch(function(){});
+  fetch('/api/estado').then(function(r){return r.json()}).then(renderDash).catch(function(e){
+    document.getElementById('pie').textContent='Error: '+(e&&e.message||e);
+  });
+  fetch('/api/stats').then(function(r){return r.json()}).then(renderFuentes).catch(function(){});
   fetch('/api/users').then(function(r){return r.json()}).then(renderUsers).catch(function(){});
 }
 tic();setInterval(tic,5000);
