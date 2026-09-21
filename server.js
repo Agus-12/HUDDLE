@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v247'; // 247: fix TDZ LOGO_V · heal front roto v246 + sonda intros
+const UI_VERSION = 'v248'; // 248: fix TDZ LOGO_V · heal front roto v246 + sonda intros
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
@@ -463,8 +463,8 @@ async function laRevizar() { /* apelaciones: ocultadas hace <7 días, una a una 
     console.log('[podredumbre] revisión terminada: ' + vivas2 + ' revivieron de ' + cands.length);
   } finally { laReviviendo = false; }
 }
-setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); sondaNovelas().catch(() => {}); }, 90 * 1000);
-setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); sondaNovelas().catch(() => {}); }, 6 * 3600 * 1000);
+setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); sondaNovelas().catch(() => {}); sondaD23().catch(() => {}); }, 90 * 1000);
+setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); sondaNovelas().catch(() => {}); sondaD23().catch(() => {}); }, 6 * 3600 * 1000);
 
 /* v234: SONDA PELISXD — revisa películas ocultas para ver si volvieron */
 /* v234: SONDA PELISXD COMPLETA — 3 frentes:
@@ -919,6 +919,20 @@ function cariOcultar(slug) {
 function daniPerdonar(slug) { falloPerdonar(FALLOS_DANI, 'fallos-dani.json', slug); }
 function lctPerdonar(slug) { falloPerdonar(FALLOS_LCT, 'fallos-lct.json', slug); }
 function cariPerdonar(slug) { falloPerdonar(FALLOS_CARI, 'fallos-cari.json', slug); }
+function d23Ocultar(slug){
+  falloRegistrar(FALLOS_D23,'fallos-d23.json',slug,(k2)=>{
+    if(D23_OCULTAS.has(k2)) return;
+    D23_OCULTAS.add(k2); ocultasReescribir(D23_OCULTAS,'d23-ocultas.txt');
+    console.log('[podredumbre] d23: '+k2+' ocultada tras 3 fallos');
+  });
+}
+function d23Perdonar(slug){
+  falloPerdonar(FALLOS_D23,'fallos-d23.json',slug);
+  if(slug && D23_OCULTAS.has(slug)){
+    D23_OCULTAS.delete(slug); ocultasReescribir(D23_OCULTAS,'d23-ocultas.txt');
+    console.log('[lázaro] d23: '+slug+' volvió — fuera de ocultas');
+  }
+}
 const nvTituloBonito = (slug) => String(slug).replace(/-/g, ' ').replace(/\b[a-z]/g, (c) => c.toUpperCase()).slice(0, 80);
 const nvdCache = { at: 0, items: [] };
 async function nvCatalogo() {
@@ -1943,6 +1957,15 @@ try {
   } catch {} /* v240: vistas de la sonda de Latanime */
   console.log('[latanime] ' + LA_TODOS.size + ' series (' + LA_OCULTAS_SET.size + ' cast/dup, ' + LA_MUERTAS_SET.size + ' muertas, ' + LA_VISTAS.size + ' vistas)');
 } catch {}
+/* v248: ANIMED23 — 229 animes (directorio /anime/, 12 páginas). Latino+Sub+Cast, cadena JWT vía animed23.online */
+const D23_TODOS = new Set(), D23_OCULTAS = new Set(), D23_VISTAS = new Set();
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'd23-slugs.txt'), 'utf8').split('\n')) if (l.trim()) D23_TODOS.add(l.trim()); } catch {}
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'animed23-slugs.txt'), 'utf8').split('\n')) if (l.trim()) D23_TODOS.add(l.trim()); } catch {} /* alias */
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'd23-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) D23_OCULTAS.add(l.trim()); } catch {}
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'd23-vistas.txt'), 'utf8').split('\n')) if (l.trim()) D23_VISTAS.add(l.trim()); } catch {}
+const FALLOS_D23 = new Map();
+try { for (const [k,v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR,'fallos-d23.json'),'utf8'))||{})) FALLOS_D23.set(k,v); } catch {}
+console.log('[d23] '+D23_TODOS.size+' animes ('+D23_OCULTAS.size+' ocultas, '+D23_VISTAS.size+' vistas)');
 /* v178: portadas de IMDB (el usuario las pidió «tal y como los jóvenes
  * titanles»... como Teen Titans) — mapa slug → m.media-amazon generado con
  * la API de sugerencias de IMDb; cubre 818 series + los reemplazos nuestros */
@@ -5231,6 +5254,110 @@ async function sondaAnimeflv() {
     console.log('[sonda] af (' + el + 's): ' + ((vm || mv) ? ('vivas→muertas=' + vm + ' muertas→vivas=' + mv) : 'sin cambios'));
     try { fs.appendFileSync(path.join(__dirname, 'sonda-animeflv.log'), '[' + new Date().toISOString() + '] ' + el + 's vivas→muertas=' + vm + ' muertas→vivas=' + mv + ' muertas=' + AF_OCULTAS.size + ' vistas=' + AF_VISTAS.size + '\n'); } catch {}
   } catch (e) { console.warn('[sonda] af error: ' + String(e).slice(0, 60)); }
+}
+/* v248: ANIMED23 — probe cadena JWT: /anime/<slug>/ → /capitulo/<ep> → iframe opciones/options.php → player.php → multiplayer/contenedor.php → videoTabs */
+async function d23Probe(slug){
+  try{
+    const r = await fetchSeguro('https://animed23.com/anime/'+slug+'/', 12000);
+    if(!r || !r.ok) return false;
+    const html = await r.text();
+    const eps = [...new Set([...html.matchAll(/\/capitulo\/([a-z0-9-]+)\//g)].map(m=>m[1]))].slice(0,2);
+    if(!eps.length) return false;
+    for(const epSlug of eps){
+      try{
+        const r2 = await fetchSeguro('https://animed23.com/capitulo/'+epSlug+'/', 12000);
+        if(!r2 || !r2.ok) continue;
+        const html2 = await r2.text();
+        // Caso directo: container.php?id=D23-xxx
+        const direct = /container\.php\?id=([A-Za-z0-9_-]+)/.exec(html2);
+        if(direct){
+          const curl='https://animed23.online/container.php?id='+direct[1]+'&open=1';
+          const r5=await fetchSeguro(curl, 12000).catch(()=>null);
+          if(r5 && r5.ok){
+            const h5=await r5.text();
+            if(/bysesukior|ok\.ru|rpmvid|archive\.org|mega\.nz|abyssplayer|data-player-url/i.test(h5)) return true;
+            if(h5.length>2000 && /embed-player|embed-tabs/i.test(h5)) return true;
+          } else if(r5 && r5.status===200) return true;
+          continue;
+        }
+        // Caso JWT: opciones/options.php
+        let mOpt = /<iframe[^>]+src="([^"]*opciones\/options\.php[^"]*)"/i.exec(html2) || /src="([^"]*animed23\.online\/opciones\/options\.php[^"]*)"/i.exec(html2);
+        if(!mOpt) continue;
+        let optUrl = mOpt[1].replace(/&#038;/g,'&').replace(/&amp;/g,'&');
+        if(optUrl.startsWith('//')) optUrl='https:'+optUrl;
+        const r3 = await fetchSeguro(optUrl, 12000).catch(()=>null);
+        if(!r3 || !r3.ok) continue;
+        const html3 = await r3.text();
+        // si options.php responde con portada/select ya es señal de vida
+        if(/d23-portada|d23-selector|Reproducir episodio|Seleccionar versi/i.test(html3)) {
+          // intentar seguir a player.php para confirmar cadena, pero no exigir contenedor final
+          let playerM = /href="([^"]*player\.php\?data=[^"]*)"/i.exec(html3);
+          if(!playerM) { const pm=/player\.php\?data=[A-Za-z0-9%_\-\.]+/.exec(html3); if(pm) playerM=[pm[0],pm[0]]; }
+          if(playerM){
+            let pUrl = playerM[1] || playerM[0];
+            pUrl = pUrl.replace(/&#038;/g,'&').replace(/&amp;/g,'&');
+            if(pUrl.startsWith('/')) pUrl='https://animed23.online/opciones/'+pUrl.replace(/^\//,'');
+            else if(!/^https?:/i.test(pUrl)) pUrl='https://animed23.online/opciones/'+pUrl;
+            const r4 = await fetchSeguro(pUrl, 12000).catch(()=>null);
+            if(r4 && r4.ok){
+              const html4 = await r4.text();
+              if(/d23-selector|d23-portada|contenedor\.php|bysesukior|data-player-url/i.test(html4)) return true;
+              const contM = /multiplayer\/contenedor\.php\?id=([A-Za-z0-9_-]+)/i.exec(html4) || /contenedor\.php\?id=([A-Za-z0-9_-]+)/i.exec(html4);
+              if(contM){
+                const curl='https://animed23.online/multiplayer/contenedor.php?id='+contM[1];
+                const r5=await fetchSeguro(curl,12000).catch(()=>null);
+                if(r5 && r5.ok){
+                  const h5=await r5.text();
+                  if(/bysesukior|ok\.ru|rpmvid|videoTabs|data-player-url/i.test(h5)) return true;
+                }
+              } else {
+                // player respondió pero sin contenedor directo; aun así el chain es válido
+                return true;
+              }
+            } else {
+              // options dio player link aunque player falló, sigue siendo vivo (red intermitente)
+              return true;
+            }
+          } else {
+            // options sin player pero con portada => vivo
+            return true;
+          }
+        }
+      }catch{}
+    }
+    return false;
+  }catch{ return false; }
+}
+/* v248: SONDA D23 — 5 vivas + 3 muertas por ciclo (arranque + 6h), pausa 1.5-2s, log sonda-animed23.log */
+async function sondaD23(){
+  try{
+    const memMB = process.memoryUsage().heapUsed/1024/1024;
+    if(memMB>350){ console.warn('[sonda] d23 saltado — memoria alta: '+memMB.toFixed(0)+'MB'); return; }
+    const t0=Date.now(); let vm=0,mv=0;
+    const sh=(arr)=>{ const a=[...arr]; for(let k=a.length-1;k>0;k--){ const z=Math.floor(Math.random()*(k+1)); [a[k],a[z]]=[a[z],a[k]]; } return a; };
+    for(const slug of sh([...D23_TODOS].filter(x=>!D23_OCULTAS.has(x))).slice(0,5)){
+      try{
+        D23_VISTAS.add(slug);
+        if(await d23Probe(slug)) d23Perdonar(slug);
+        else{ const era=D23_OCULTAS.has(slug); d23Ocultar(slug); if(!era && D23_OCULTAS.has(slug)){ vm++; sondaNotify('AnimeD23','muerto',slug,slug+' murio — sin servidores (D23)'); } }
+      }catch{}
+      await new Promise(r=>setTimeout(r,1800));
+    }
+    for(const slug of sh([...D23_OCULTAS]).slice(0,3)){
+      try{
+        if(await d23Probe(slug)){ D23_OCULTAS.delete(slug); ocultasReescribir(D23_OCULTAS,'d23-ocultas.txt'); d23Perdonar(slug); mv++; sondaNotify('AnimeD23','revivio',slug,slug+' revivio — servidores otra vez'); }
+      }catch{}
+      await new Promise(r=>setTimeout(r,1800));
+    }
+    try{ fs.writeFileSync(path.join(__dirname,'public','d23-vistas.txt'), [...D23_VISTAS].join('\n')+'\n'); }catch{}
+    try{ fs.writeFileSync(path.join(__dirname,'public','d23-ocultas.txt'), [...D23_OCULTAS].sort().join('\n')+'\n'); }catch{}
+    // alias animed23
+    try{ fs.writeFileSync(path.join(__dirname,'public','animed23-ocultas.txt'), [...D23_OCULTAS].sort().join('\n')+'\n'); }catch{}
+    try{ fs.writeFileSync(path.join(__dirname,'public','animed23-vistas.txt'), [...D23_VISTAS].join('\n')+'\n'); }catch{}
+    const el=((Date.now()-t0)/1000).toFixed(1);
+    console.log('[sonda] d23 ('+el+'s): '+((vm||mv)?('vivas→muertas='+vm+' muertas→vivas='+mv):'sin cambios'));
+    try{ fs.appendFileSync(path.join(__dirname,'sonda-animed23.log'),'['+new Date().toISOString()+'] '+el+'s vivas→muertas='+vm+' muertas→vivas='+mv+' muertas='+D23_OCULTAS.size+' vistas='+D23_VISTAS.size+'\n'); }catch{}
+  }catch(e){ console.warn('[sonda] d23 error: '+String(e).slice(0,60)); }
 }
 async function buscarAnimeflv(q) {
   const r = await fetchSeguro('https://vww.animeflv.one/animes?buscar=' + encodeURIComponent(q), 9000);
@@ -11019,6 +11146,13 @@ async function cuevanaLatest() {
             vistas: [...CARI_VISTAS].filter((x) => x.startsWith('cari:')).length,
             activas: CARI_ORDEN.length - CARI_MUERTAS.size,
           },
+          animed23: {
+            nombre: 'AnimeD23',
+            total: D23_TODOS.size,
+            ocultas: D23_OCULTAS.size,
+            vistas: D23_VISTAS.size,
+            activas: D23_TODOS.size - D23_OCULTAS.size,
+          },
         },
         usuarios: users.size,
         memoria: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
@@ -11129,8 +11263,8 @@ async function cuevanaLatest() {
         espejos: MOVIE_ESPEJOS,
         espejoPreferido: movieEspejoPreferido() || null,
         intros: { analizados: CRAWL.hechas || 0, total: CRAWL.total || 0, enCola: CRAWL.pend.length, aprendidas: Object.keys(INTROS).length, sinIntro: (CRAWL.sinIntro || []).length, muestra },
-        moderacion: { animesMuertos: LA_MUERTAS_SET.size, animesCastDup: LA_OCULTAS_SET.size, pelisxd: PXD_OCULTAS.size, animeflv: AF_OCULTAS.size, cuevana: CV_OCULTAS_RT.size, novelas: NV_OCULTAS.size, caricaturasMuertas: DANI_MUERTAS.size + LCT_MUERTAS.size + CARI_MUERTAS.size, protegidas: CV_PROTEGIDAS.size, epsOcultos: EPS_MUERTOS.size, fallosEnCurso: [FALLOS_PXD, FALLOS_AF, FALLOS_CV, FALLOS_NV, FALLOS_DANI, FALLOS_LCT, FALLOS_CARI, EPS_FALLOS].reduce((a2, mm2) => a2 + [...mm2.values()].filter((x2) => x2.f >= 1 && !x2.h).length, 0) },
-        catalogos: { caricaturas: cariFeedCache.items.length, cartoons: cariFeedCache.toons.length, liveaction: cariFeedCache.live.length, danimados: DANI_CAT.size, animes: LA_TODOS.size - LA_OCULTAS_SET.size - LA_MUERTAS_SET.size, novelas: nvdCache.items.length, animeflv: AF_TODOS.size - AF_OCULTAS.size },
+        moderacion: { animesMuertos: LA_MUERTAS_SET.size, animesCastDup: LA_OCULTAS_SET.size, pelisxd: PXD_OCULTAS.size, animeflv: AF_OCULTAS.size, animed23: D23_OCULTAS.size, cuevana: CV_OCULTAS_RT.size, novelas: NV_OCULTAS.size, caricaturasMuertas: DANI_MUERTAS.size + LCT_MUERTAS.size + CARI_MUERTAS.size, protegidas: CV_PROTEGIDAS.size, epsOcultos: EPS_MUERTOS.size, fallosEnCurso: [FALLOS_PXD, FALLOS_AF, FALLOS_CV, FALLOS_NV, FALLOS_DANI, FALLOS_LCT, FALLOS_CARI, FALLOS_D23, EPS_FALLOS].reduce((a2, mm2) => a2 + [...mm2.values()].filter((x2) => x2.f >= 1 && !x2.h).length, 0) },
+        catalogos: { caricaturas: cariFeedCache.items.length, cartoons: cariFeedCache.toons.length, liveaction: cariFeedCache.live.length, danimados: DANI_CAT.size, animes: LA_TODOS.size - LA_OCULTAS_SET.size - LA_MUERTAS_SET.size, novelas: nvdCache.items.length, animeflv: AF_TODOS.size - AF_OCULTAS.size, animed23: D23_TODOS.size - D23_OCULTAS.size },
         cosecha,
         movie: (() => { /* v207: estado del mapa local del app Movie */
           movieRecargar();
