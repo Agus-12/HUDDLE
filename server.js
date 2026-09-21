@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v253'; // 253: Panel Huddle premium — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v254'; // 254: Auditoría persistente + panel arriba (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -64,6 +64,28 @@ function auditoriaActualizarPct(){
   pp.pct = pp.total ? Math.round(pp.verificadas*100/pp.total) : 0;
   ps.pct = ps.total ? Math.round(ps.verificadas*100/ps.total) : 0;
 }
+
+// v254: persistencia — la auditoría corre en el SERVIDOR, no en el panel.
+// Si el servidor se reinicia, se restaura el estado desde disco y sigue.
+// Así refrescar, cerrar el panel o salir no la detiene nunca.
+try{
+  const _ap = JSON.parse(require('fs').readFileSync(AUDITORIA_PROGRESO_FILE,'utf8'));
+  if(_ap && (_ap.estado==='ejecutando' || _ap.estado==='pausado')){
+    HUDDLE_AUDITORIA.activo = true;
+    HUDDLE_AUDITORIA.pausado = _ap.estado==='pausado';
+    HUDDLE_AUDITORIA.iniciadoEn = Date.now();
+    if(_ap.alcance){
+      // mezcla profunda de alcance para no perder claves nuevas
+      if(typeof _ap.alcance.peliculas==='boolean') HUDDLE_AUDITORIA.alcance.peliculas=_ap.alcance.peliculas;
+      if(typeof _ap.alcance.series==='boolean') HUDDLE_AUDITORIA.alcance.series=_ap.alcance.series;
+      if(_ap.alcance.fuentes) for(const k of Object.keys(HUDDLE_AUDITORIA.alcance.fuentes)) if(typeof _ap.alcance.fuentes[k]==='boolean') HUDDLE_AUDITORIA.alcance.fuentes[k]=_ap.alcance.fuentes[k];
+    }
+    if(_ap.progreso) HUDDLE_AUDITORIA.progreso = _ap.progreso;
+    if(Array.isArray(_ap.logs)) HUDDLE_AUDITORIA.logs = _ap.logs.slice(0,200);
+    console.log('[auditoria] restaurada desde disco: '+_ap.estado+' — se reanuda en 10s');
+    setTimeout(()=>{ if(HUDDLE_AUDITORIA.activo && !HUDDLE_AUDITORIA.pausado){ try{ sondaHuddleGeneral().catch(()=>{}); }catch{} } }, 10000);
+  }
+}catch(e){ /* primera vez sin archivo */ }
 
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
