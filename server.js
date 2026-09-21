@@ -7148,6 +7148,7 @@ async function buscarCineCalidad(q) {
       img: p.featured_image || '',
       site: 'CineCalidad',
       extra: esSerie ? 'Serie · Latino' : 'Película · Latino',
+      _apiFresh: true, /* v236.9: bypass cvOcultaUrl — la API ya refleja contenido activo */
     };
   }).filter((p) => p.title && p.url);
 }
@@ -10248,7 +10249,7 @@ async function cuevanaLatest() {
         return json(res, 200, { ok: true, resultados: [], sugiere: null });
       }
       if (!_sc || Date.now() - _sc.at >= globalThis._searchCacheTTL) { globalThis._searchCacheEvict(); globalThis._searchCache.set(q, { at: Date.now(), data: r }); } /* v234: caché 5 min con límite */
-      r.resultados = r.resultados.filter((x) => !cvOcultaUrl(x.url)); /* v191: sin series muertas de cine-calidad */
+      r.resultados = r.resultados.filter((x) => x._apiFresh || !cvOcultaUrl(x.url)); /* v191: sin series muertas; v236.9: API fresca pasa */
       /* v198: latanime en limpio — sin versiones castellanas ni duplicados;
        * AnimeFLV cede cuando latanime tiene la serie (mandan las latino) */
       r.resultados = r.resultados.filter((x) => !laOcultaUrl(x.url));
