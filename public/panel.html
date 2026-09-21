@@ -238,7 +238,7 @@ function renderFuentes(stats){
     var act=Math.max(0,s.activas||0);
     totalAct+=act;
     var pct=s.total?Math.round(act*100/s.total):0;
-    var logo=logos[k]?'<img src="/sites/'+logos[k]+'?v=2406" alt="" style="width:40px;height:40px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 0 6px '+c+'66)" onerror="this.style.display=\'none\'">':'';
+    var logo=logos[k]?'<img src="/sites/'+logos[k]+'?v=242" alt="" style="width:40px;height:40px;object-fit:contain;flex-shrink:0;filter:drop-shadow(0 0 6px '+c+'66)" onerror="this.style.display=\'none\'">':'';
     html+='<div class="fcard" onclick="showFuente(\''+k+'\')">'
       +'<div class="fhead"><div style="display:flex;align-items:center;gap:10px">'+logo+'<div><div class="fname" style="color:'+c+'">'+s.nombre+'</div>'
       +'<div class="fsub">'+s.total+' total · '+s.ocultas+' ocultas</div></div></div>'
@@ -254,7 +254,7 @@ function showFuente(k){
   var names={cuevana:'Cuevana',pelisxd:'PelisXD',cinecalidad:'CineCalidad',latanime:'Latanime',danimados:'Danimados',lacartoons:'Lacartoons',miscaricaturas:'MisCaricaturas'};
   var c=colors[k]||'#efeaf7';
   var logos={cuevana:'cuevana.png',pelisxd:'pelisxd.png',cinecalidad:'cinecalidad.png',latanime:'latanime.png',danimados:'danimados.png',lacartoons:'lacartoons.png',miscaricaturas:'caricaturas.png'};
-  var logo=logos[k]?'<img src="/sites/'+logos[k]+'?v=2406" alt="" style="width:48px;height:48px;object-fit:contain;vertical-align:middle;margin-right:10px;filter:drop-shadow(0 0 8px '+c+'66)" onerror="this.style.display=\'none\'">':'';
+  var logo=logos[k]?'<img src="/sites/'+logos[k]+'?v=242" alt="" style="width:48px;height:48px;object-fit:contain;vertical-align:middle;margin-right:10px;filter:drop-shadow(0 0 8px '+c+'66)" onerror="this.style.display=\'none\'">':'';
   var act=Math.max(0,f.activas||0);
   var pct=f.total?Math.round(act*100/f.total):0;
   var html='<div class="detail-section"><h3 style="color:'+c+'">'+logo+f.nombre+'</h3>'
