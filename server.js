@@ -7115,15 +7115,32 @@ function buscarMovieCosecha(q) {
   return hits;
 }
 
+
+/* v236.7: búsqueda en CineCalidad API */
+async function buscarCineCalidad(q) {
+  const r = await fetchSeguro('https://cine-calidad.mx/wp-json/mycustom/v1/search/?s=' + encodeURIComponent(q) + '&page=1', 10000);
+  if (!r.ok) return [];
+  const d = await r.json();
+  const posts = d.posts || d || [];
+  return posts.map((p) => ({
+    title: p.title || '',
+    url: p.url || '',
+    img: p.featured_image || '',
+    site: 'CineCalidad',
+    extra: (/\/serie\//.test(p.url || '') ? 'Serie · Latino' : 'Película · Latino'),
+  })).filter((p) => p.title && p.url);
+}
+
 async function buscarEnSitios(q) {
   const nq = normalizarTxt(q);
-  const [cuevana, cuevanaMov, latanime, animeflv, pelisxd, cari, catalogo, movieCosecha] = await Promise.all([
+  const [cuevana, cuevanaMov, latanime, animeflv, pelisxd, cari, cineCalidad, catalogo, movieCosecha] = await Promise.all([
     buscarCuevana(q).catch(() => []),
     buscarCuevanaMov(q).catch(() => []), /* v235: cuevana.mov — 8k películas latinas */
     buscarLatanime(q).catch(() => []),
     buscarAnimeflv(q).catch(() => []), /* v97 */
     buscarPelisxd(q).catch(() => []), /* v98: el catálogo grande de pelis */
     buscarMiscaricaturas(q).catch(() => []), /* v102: caricaturas nick/CN */
+    buscarCineCalidad(q).catch(() => []), /* v236.7: CineCalidad (pelis + series) */
     catalogoLocal().catch(() => []), /* v121 */
     Promise.resolve(buscarMovieCosecha(q)), /* v228: catálogo cosechado 37k */
   ]);
@@ -7147,6 +7164,7 @@ async function buscarEnSitios(q) {
     ...puntuar(latanime),
     ...puntuar(animeflv),
     ...puntuar(cari),
+    ...puntuar(cineCalidad), /* v236.7: CineCalidad pelis + series */
     ...(NOVELAS_EXTERNAS_ON ? puntuar(await buscarNovelas(q).catch(() => [])) : []), /* v206 — v208: ocultas */
     ...(NOVELAS_EXTERNAS_ON ? puntuar(await nv2Buscar(q).catch(() => [])) : []), /* v206.2 — v208: ocultas */
     ...puntuar(movieCosecha), /* v228: 37k títulos cosechados */
