@@ -4868,7 +4868,7 @@ async function resolverCuevanaMov(pageUrl) {
       let m3u8 = null;
       if (/goodstream\.one/i.test(host)) {
         /* m3u8 directo en HTML */
-        const er = await fetchSeguro(embed.url, 12000);
+        const er = CDN_RELAY ? await fetchRelay(embed.url, 15000) : await fetchSeguro(embed.url, 12000);
         if (!er.ok) continue;
         const html = await er.text();
         const m = /file\s*[:=]\s*["'](https?:\/\/[^"']+master\.m3u8[^"']*?)["']/i.exec(html)
@@ -4876,7 +4876,7 @@ async function resolverCuevanaMov(pageUrl) {
         if (m) m3u8 = m[1];
       } else if (/vimeos\.net|hlswish\.com/i.test(host)) {
         /* JS packed → m3u8 */
-        const er = await fetchSeguro(embed.url, 12000);
+        const er = CDN_RELAY ? await fetchRelay(embed.url, 15000) : await fetchSeguro(embed.url, 12000);
         if (!er.ok) continue;
         const html = await er.text();
         const pm = /eval\(function\(p,a,c,k,e,d\)\{.+?\}\('(.+?)',(\d+),(\d+),'([^']*)'\.split/.exec(html);
@@ -4893,7 +4893,7 @@ async function resolverCuevanaMov(pageUrl) {
         }
       } else if (/videoapp\.zip/i.test(host)) {
         /* videoapp.zip redirige a vimeos.net — intentar igual */
-        const er = await fetchSeguro(embed.url, 12000);
+        const er = CDN_RELAY ? await fetchRelay(embed.url, 15000) : await fetchSeguro(embed.url, 12000);
         if (!er.ok) continue;
         const html = await er.text();
         const pm = /eval\(function\(p,a,c,k,e,d\)\{.+?\}\('(.+?)',(\d+),(\d+),'([^']*)'\.split/.exec(html);
@@ -4911,7 +4911,7 @@ async function resolverCuevanaMov(pageUrl) {
       }
       if (m3u8) {
         /* Verificar que el m3u8 sirve */
-        const vr = await fetchSeguro(m3u8, 8000).catch(() => null);
+        const vr = CDN_RELAY ? await fetchRelay(m3u8, 10000).catch(() => null) : await fetchSeguro(m3u8, 8000).catch(() => null);
         if (vr && vr.ok) {
           const txt = await vr.text().catch(() => '');
           if (txt.includes('#EXTM3U')) {
