@@ -75,10 +75,11 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
   <button class="back" id="backBtn" onclick="goBack()">←</button>
   <h1><span class="dot"></span> Huddle</h1>
   <div class="right">
-    <button class="bell" id="bellBtn" onclick="toggleNotifs()">
-      🔔<span class="badge" id="bellBadge" style="display:none">0</span>
-    </button>
     <span class="clock" id="clock"></span>
+    <button class="bell" id="bellBtn" onclick="toggleNotifs()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="badge" id="bellBadge" style="display:none">0</span>
+    </button>
   </div>
 </div>
 
@@ -161,10 +162,10 @@ function renderNotifs(){
   var html='';
   if(!_notifs.length){html='<div style="color:#9d93b5;font-size:12px;padding:8px 0">Sin notificaciones</div>';}
   _notifs.slice(0,30).forEach(function(n){
-    var icon=n.tipo==='muerto'?'💀':'💚';
+    var icon=n.tipo==='muerto'?'✕':'✓';
     var color=n.tipo==='muerto'?'#ff5c7a':'#38e08a';
     html+='<div class="log-entry">'
-      +'<div class="log-icon">'+icon+'</div>'
+      +'<div class="log-icon" style="color:'+color+';font-weight:800">'+icon+'</div>'
       +'<div class="log-msg"><b style="color:'+color+'">'+n.fuente+'</b> '+n.msg+'</div>'
       +'<div class="log-time">'+timeAgo(n.ts)+'</div></div>';
   });
@@ -271,10 +272,10 @@ function showFuente(k){
       if(!d.items||!d.items.length){el.innerHTML='<div style="color:#9d93b5;font-size:12px">Sin movimientos recientes</div>';return;}
       var lh='';
       d.items.forEach(function(n){
-        var icon=n.tipo==='muerto'?'💀':'💚';
+        var icon=n.tipo==='muerto'?'✕':'✓';
         var col=n.tipo==='muerto'?'#ff5c7a':'#38e08a';
         lh+='<div class="log-entry">'
-          +'<div class="log-icon">'+icon+'</div>'
+          +'<div class="log-icon" style="color:'+color+';font-weight:800">'+icon+'</div>'
           +'<div class="log-msg" style="color:'+col+'">'+n.msg+'</div>'
           +'<div class="log-time">'+timeAgo(n.ts)+'</div></div>';
       });
