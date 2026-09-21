@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v240.6'; // 240.6: PelisXD hacia arriba + iconos proporcionados
+const UI_VERSION = 'v241'; // 241: Auditoria caricaturas + sonda + fix 31-minutos
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
@@ -270,7 +270,7 @@ function tituloBonitoEp(titulo, num) {
 /* v144: ¿qué episodio es esta URL? (de la ruta o del índice en la serie) */
 function epNumDeUrl(url, sc) {
   const u = String(url || '');
-  let m = /-(\d{2})x(\d{2})([ab])?(?:-|$)/i.exec(u);
+  let m = /-(\d{1,2})x(\d{2})([ab])?(?:-|$)/i.exec(u); /* v241: 31-minutos usa 1xNN */
   if (m) return +m[1] + 'x' + +m[2];
   m = /-episodio-(\d+)/i.exec(u);
   if (m) return '1x' + (+m[1]);
@@ -464,8 +464,8 @@ async function laRevizar() { /* apelaciones: ocultadas hace <7 días, una a una 
     console.log('[podredumbre] revisión terminada: ' + vivas2 + ' revivieron de ' + cands.length);
   } finally { laReviviendo = false; }
 }
-setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); }, 90 * 1000);
-setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); }, 6 * 3600 * 1000);
+setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); }, 90 * 1000);
+setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); }, 6 * 3600 * 1000);
 
 /* v234: SONDA PELISXD — revisa películas ocultas para ver si volvieron */
 /* v234: SONDA PELISXD COMPLETA — 3 frentes:
@@ -740,10 +740,10 @@ function falloRegistrar(mapa, arch, clave, alOcultar) {
   fallosGuardar(mapa, arch);
 }
 function falloPerdonar(mapa, arch, clave) { if (clave && mapa.delete(clave)) fallosGuardar(mapa, arch); }
-let ocT = null;
+const ocT = new Map(); /* v241: timer por archivo (el unico global perdia escrituras) */
 function ocultasReescribir(set, archivo) {
-  clearTimeout(ocT);
-  ocT = setTimeout(() => { try { fs.writeFileSync(path.join(__dirname, 'public', archivo), [...set].sort().join('\n') + '\n'); } catch {} }, 3000);
+  clearTimeout(ocT.get(archivo));
+  ocT.set(archivo, setTimeout(() => { ocT.delete(archivo); try { fs.writeFileSync(path.join(__dirname, 'public', archivo), [...set].sort().join('\n') + '\n'); } catch {} }, 3000));
 }
 /* GoPelis — ocultar en vivo por ID (el catálogo filtra por clave slug vía
  * GP_ID_REV id→clave, el mismo mapa de su Lázaro) */
@@ -924,6 +924,38 @@ function nvPerdonar(slug) {
     console.log('[lázaro] nv: ' + slug + ' volvió a la vida — fuera de ocultas');
   }
 }
+/* v241: SONDA CARICATURAS — muertas por sonda (separado de curaduria DANI_OCULTAS/LCT_OCULTAS) */
+const DANI_MUERTAS = new Set(), LCT_MUERTAS = new Set(), CARI_MUERTAS = new Set();
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'dani-muertas.txt'), 'utf8').split('\n')) if (l.trim()) DANI_MUERTAS.add(l.trim()); } catch {}
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'lct-muertas.txt'), 'utf8').split('\n')) if (l.trim()) LCT_MUERTAS.add(l.trim()); } catch {}
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'cari-muertas.txt'), 'utf8').split('\n')) if (l.trim()) CARI_MUERTAS.add(l.trim()); } catch {}
+const CARI_VISTAS = new Set(); /* claves dani:|lct:|cari: ya verificadas */
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'cari-vistas.txt'), 'utf8').split('\n')) if (l.trim()) CARI_VISTAS.add(l.trim()); } catch {}
+const FALLOS_DANI = new Map(), FALLOS_LCT = new Map(), FALLOS_CARI = new Map();
+try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'fallos-dani.json'), 'utf8')) || {})) FALLOS_DANI.set(k, v); } catch {}
+try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'fallos-lct.json'), 'utf8')) || {})) FALLOS_LCT.set(k, v); } catch {}
+try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'fallos-cari.json'), 'utf8')) || {})) FALLOS_CARI.set(k, v); } catch {}
+function daniOcultar(slug) {
+  falloRegistrar(FALLOS_DANI, 'fallos-dani.json', slug, (k2) => {
+    if (DANI_MUERTAS.has(k2)) return;
+    DANI_MUERTAS.add(k2); ocultasReescribir(DANI_MUERTAS, 'dani-muertas.txt');
+  });
+}
+function lctOcultar(slug) {
+  falloRegistrar(FALLOS_LCT, 'fallos-lct.json', slug, (k2) => {
+    if (LCT_MUERTAS.has(k2)) return;
+    LCT_MUERTAS.add(k2); ocultasReescribir(LCT_MUERTAS, 'lct-muertas.txt');
+  });
+}
+function cariOcultar(slug) {
+  falloRegistrar(FALLOS_CARI, 'fallos-cari.json', slug, (k2) => {
+    if (CARI_MUERTAS.has(k2)) return;
+    CARI_MUERTAS.add(k2); ocultasReescribir(CARI_MUERTAS, 'cari-muertas.txt');
+  });
+}
+function daniPerdonar(slug) { falloPerdonar(FALLOS_DANI, 'fallos-dani.json', slug); }
+function lctPerdonar(slug) { falloPerdonar(FALLOS_LCT, 'fallos-lct.json', slug); }
+function cariPerdonar(slug) { falloPerdonar(FALLOS_CARI, 'fallos-cari.json', slug); }
 const nvTituloBonito = (slug) => String(slug).replace(/-/g, ' ').replace(/\b[a-z]/g, (c) => c.toUpperCase()).slice(0, 80);
 const nvdCache = { at: 0, items: [] };
 async function nvCatalogo() {
@@ -1919,6 +1951,7 @@ const DANI_OCULTAS = new Set([
   'agallas-el-perro-cobarde', 'el-laboratorio-de-dexter', 'invasor-zim', 'johnny-bravo',
   'las-chicas-superpoderosas', 'los-padrinos-magicos', 'mucha-lucha', 'oye-arnold',
   'rocket-power', 'time-squad', 'vaca-y-pollo',
+  'george-de-la-jungla', /* v241: auditoria — pagina sin episodios */
 ]);
 /* v180: duplicados INTERNOS (lacartoons + miscaricaturas a la vez) — en el
  * buscador solo sale la de miscaricaturas (trae más capítulos) */
@@ -2737,7 +2770,7 @@ async function serieCtxFromUrl(u) {
      * T1-5, Ben 10 T3+) para los botones de siguiente/anterior. */
     if (host.endsWith('miscaricaturas.com')) {
       const slugEp = cariSlugDe(u);
-      const mE = /^(.+)-(\d{2})x(\d{2})([ab])?(?:-|$)/.exec(slugEp);
+      const mE = /^(.+)-(\d{1,2})x(\d{2})([ab])?(?:-|$)/.exec(slugEp); /* v241: 1xNN */
       const serie = mE ? (cariSerieDeEp(mE[1]) || '') : (cariEsSerie(slugEp) ? slugEp : '');
       if (serie) {
         const d = await datosCaricatura(serie);
@@ -6020,7 +6053,7 @@ try {
   if (nCari || nSerie) console.log('[cache] del disco: ' + nCari + ' caricaturas, ' + nSerie + ' series/animes, ' + cariMeta.size + ' metas' + (cariFeedCache.items.length ? ', feed listo' : ''));
 } catch {}
 function cariSlugDe(u) { return ((/miscaricaturas\.com\/([a-z0-9-]+)/i.exec(u || '') || [])[1] || '').toLowerCase(); }
-function cariEsSerie(slug) { return !!slug && !/temporada/i.test(slug) && !/\d{2}x\d{2}/i.test(slug); }
+function cariEsSerie(slug) { return !!slug && !/temporada/i.test(slug) && !/\d{1,2}x\d{2}/i.test(slug); } /* v241: 1xNN */
 function cariBonito(slug) { return slug.replace(/-+/g, ' ').replace(/\b(capitulos completos|completos|ver|latino|online)\b/gi, '').trim(); }
 /* v109: el prefijo del slug de un EPISODIO («el-chavo-del-8-1978»,
  * «las-sombrias-aventuras-de-billy-y-mandy») NO es el slug de la serie:
@@ -6313,7 +6346,7 @@ async function buscarMiscaricaturas(q) {
     const series = [];
     for (const m of html.matchAll(/<h2 class="entry-title[^"]*"><a href="(https:\/\/miscaricaturas\.com\/[a-z0-9-]+\/?)"[^>]*>([^<]+)<\/a>/gi)) {
       const slug = cariSlugDe(m[1]);
-      if (!cariEsSerie(slug) || vistos.has(slug)) continue;
+      if (!cariEsSerie(slug) || vistos.has(slug) || CARI_MUERTAS.has(slug)) continue;
       vistos.add(slug);
       series.push({ slug, title: m[2].replace(/&#\d+;|&amp;|&\w+;/g, '').trim() });
       if (series.length >= 5) break;
@@ -6366,8 +6399,8 @@ async function refrescarCariFeed() {
   if (!home.size) return { caricaturas: cariFeedCache.items, cartoons: cariFeedCache.toons, liveaction: cariFeedCache.live };
   const enHome = [...home.keys()];
   const slugs = [
-    ...CARI_ORDEN.filter((s) => home.has(s)),
-    ...enHome.filter((s) => !CARI_ORDEN.includes(s) && cariEsSerie(s)),
+    ...CARI_ORDEN.filter((s) => home.has(s) && !CARI_MUERTAS.has(s)),
+    ...enHome.filter((s) => !CARI_ORDEN.includes(s) && cariEsSerie(s) && !CARI_MUERTAS.has(s)),
   ].slice(0, 18); /* v107: 18 — entran Sabrina y Kenan y Kel */
   if (!slugs.length) return { caricaturas: cariFeedCache.items, cartoons: cariFeedCache.toons, liveaction: cariFeedCache.live };
   const mapearCari = async (slug) => {
@@ -6391,7 +6424,7 @@ async function refrescarCariFeed() {
    * en bloques de 16 en vez de todas a la vez (que no nos racione el
    * sitio por ráfaga); el arranque en frío tarda unos segundos más pero
    * queda en cache 1 h y después se sirve al instante. */
-  const lctLista = [...LCT_SERIES.values()];
+  const lctLista = [...LCT_SERIES.values()].filter((x) => !LCT_MUERTAS.has(x.slug)); /* v241 */
   const toons = [];
   const liveToons = []; /* v205: iCarly, Drake & Josh, Power Rangers… apartado propio */
   for (let i = 0; i < lctLista.length; i += 16) {
@@ -6425,7 +6458,7 @@ async function refrescarCariFeed() {
 async function cariEpsDeHtml(html) {
   const eps = [];
   const vistosEp = new Set();
-  for (const m of html.matchAll(/<a href="(https:\/\/miscaricaturas\.com\/([a-z0-9-]+?)-(\d{2})x(\d{2})([ab])?(?:-[a-z0-9-]*)?\/?)"[^>]*>\s*([^<]+?)\s*<\/a>/gi)) {
+  for (const m of html.matchAll(/<a href="(https:\/\/miscaricaturas\.com\/([a-z0-9-]+?)-(\d{1,2})x(\d{2})([ab])?(?:-[a-z0-9-]*)?\/?)"[^>]*>\s*([^<]+?)\s*<\/a>/gi)) {
     const url = m[1];
     if (vistosEp.has(url)) continue;
     vistosEp.add(url);
@@ -6619,7 +6652,7 @@ async function resolverCaricatura(epUrl) {
   if (!slug) throw new Error('Capítulo de caricatura no válido');
   /* v109/v110: capítulos o temporadas ocultas por estar solo en inglés — mensaje claro */
   {
-    const mE = /^([a-z0-9-]+?)-(\d{2})x(\d{2})([ab])?(?:-|$)/i.exec(slug);
+    const mE = /^([a-z0-9-]+?)-(\d{1,2})x(\d{2})([ab])?(?:-|$)/i.exec(slug); /* v241: 1xNN */
     if (mE) {
       const serie = cariSerieDeEp(mE[1]) || mE[1];
       const k = serie + '|' + (+mE[2]) + 'x' + (+mE[3]) + (mE[4] || '').toLowerCase();
@@ -7380,6 +7413,117 @@ async function sondaLatanime() {
     console.log('[sonda] la (' + elapsed + 's): ' + (parts.join(', ') || 'sin cambios') + ' muertas=' + LA_MUERTAS_SET.size + ' vistas=' + LA_VISTAS.size);
     try { fs.appendFileSync(path.join(__dirname, 'sonda-latanime.log'), logLine); } catch {}
   } catch (e) { console.warn('[sonda] la error: ' + String(e).slice(0, 60)); }
+}
+
+/* v241: probes de pagina (NO resuelven video; despacio por rate-limit 429) */
+async function daniProbe(slug) {
+  try {
+    const r = await fetchSeguro(DANI_BASE + '/series/' + slug + '/', 15000);
+    if (!r.ok) return false;
+    return /href='https:\/\/danimados\.cc\/episodios\/[^']+'/.test(await r.text());
+  } catch { return false; }
+}
+async function lctProbe(lctId) {
+  try {
+    const r = await fetchSeguro(LCT_BASE + 'serie/' + lctId, 15000);
+    if (!r.ok) return false;
+    return /href="\/serie\/capitulo\/\d+\?t=\d+"/i.test(await r.text());
+  } catch { return false; }
+}
+async function cariProbe(slug) {
+  try {
+    const r = await fetchSeguro(CARI_BASE + slug + '/', 12000);
+    if (!r.ok) return false;
+    const html = await r.text();
+    if (/<a href="https:\/\/miscaricaturas\.com\/[a-z0-9-]+?-\d{1,2}x\d{2}/i.test(html)) return true;
+    const base = slug.replace(/-(capitulos-completos[a-z]*|capitulos-y-canciones|completos|ver|latino|online)$/, '');
+    return new RegExp('miscaricaturas\\.com/' + base + '-temporada-\\d+', 'i').test(html);
+  } catch { return false; }
+}
+
+/* v241: SONDA CARICATURAS — muestras chicas y despacio (429 en rafaga) */
+async function sondaCaricaturas() {
+  try {
+    const memMB = process.memoryUsage().heapUsed / 1024 / 1024;
+    if (memMB > 350) { console.warn('[sonda] cari saltado — memoria alta: ' + memMB.toFixed(0) + 'MB'); return; }
+    const start = Date.now();
+    const POR_FUENTE = 5, POR_MUERTAS = 5, PAUSA = 2000;
+    let vivas_muertas = 0, muertas_vivas = 0;
+    const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    const pausa = () => new Promise(r => setTimeout(r, PAUSA));
+    /* DANI vivas */
+    try {
+      const vis = [...DANI_CAT.keys()].filter(x => !DANI_OCULTAS.has(x) && !DANI_MUERTAS.has(x));
+      for (const slug of shuffle(vis).slice(0, POR_FUENTE)) {
+        try {
+          CARI_VISTAS.add('dani:' + slug);
+          if (await daniProbe(slug)) daniPerdonar(slug);
+          else {
+            const era = DANI_MUERTAS.has(slug);
+            daniOcultar(slug);
+            if (!era && DANI_MUERTAS.has(slug)) { vivas_muertas++; sondaNotify("Danimados", "muerto", slug, slug + " murio — sin episodios"); }
+          }
+        } catch {}
+        await pausa();
+      }
+    } catch (e) { console.warn('[sonda] cari dani error: ' + String(e).slice(0, 60)); }
+    /* LCT vivas */
+    try {
+      const vis = [...LCT_SERIES.values()].filter(x => !LCT_MUERTAS.has(x.slug));
+      for (const x of shuffle(vis).slice(0, POR_FUENTE)) {
+        try {
+          CARI_VISTAS.add('lct:' + x.lctId);
+          if (await lctProbe(x.lctId)) lctPerdonar(x.slug);
+          else {
+            const era = LCT_MUERTAS.has(x.slug);
+            lctOcultar(x.slug);
+            if (!era && LCT_MUERTAS.has(x.slug)) { vivas_muertas++; sondaNotify("Lacartoons", "muerto", x.slug, x.slug + " murio — sin capitulos"); }
+          }
+        } catch {}
+        await pausa();
+      }
+    } catch (e) { console.warn('[sonda] cari lct error: ' + String(e).slice(0, 60)); }
+    /* CARI vivas */
+    try {
+      for (const slug of shuffle(CARI_ORDEN.filter(x => !CARI_MUERTAS.has(x))).slice(0, POR_FUENTE)) {
+        try {
+          CARI_VISTAS.add('cari:' + slug);
+          if (await cariProbe(slug)) cariPerdonar(slug);
+          else {
+            const era = CARI_MUERTAS.has(slug);
+            cariOcultar(slug);
+            if (!era && CARI_MUERTAS.has(slug)) { vivas_muertas++; sondaNotify("MisCaricaturas", "muerto", slug, slug + " murio — sin capitulos"); }
+          }
+        } catch {}
+        await pausa();
+      }
+    } catch (e) { console.warn('[sonda] cari misc error: ' + String(e).slice(0, 60)); }
+    /* MUERTAS: revivieron? */
+    try {
+      const pool = [...DANI_MUERTAS].map(x => ({ f: 'dani', k: x })).concat([...LCT_MUERTAS].map(x => ({ f: 'lct', k: x }))).concat([...CARI_MUERTAS].map(x => ({ f: 'cari', k: x })));
+      for (const it of shuffle(pool).slice(0, POR_MUERTAS)) {
+        try {
+          let vive = false;
+          if (it.f === 'dani') vive = await daniProbe(it.k);
+          else if (it.f === 'cari') vive = await cariProbe(it.k);
+          else { const lct = [...LCT_SERIES.values()].find(x => x.slug === it.k); vive = lct ? await lctProbe(lct.lctId) : false; }
+          if (vive) {
+            if (it.f === 'dani') { DANI_MUERTAS.delete(it.k); ocultasReescribir(DANI_MUERTAS, 'dani-muertas.txt'); daniPerdonar(it.k); }
+            if (it.f === 'lct') { LCT_MUERTAS.delete(it.k); ocultasReescribir(LCT_MUERTAS, 'lct-muertas.txt'); lctPerdonar(it.k); }
+            if (it.f === 'cari') { CARI_MUERTAS.delete(it.k); ocultasReescribir(CARI_MUERTAS, 'cari-muertas.txt'); cariPerdonar(it.k); }
+            muertas_vivas++;
+            sondaNotify(it.f === 'dani' ? "Danimados" : it.f === 'lct' ? "Lacartoons" : "MisCaricaturas", "revivio", it.k, it.k + " revivio — episodios encontrados");
+          }
+        } catch {}
+        await pausa();
+      }
+    } catch (e) { console.warn('[sonda] cari muertas error: ' + String(e).slice(0, 60)); }
+    try { fs.writeFileSync(path.join(__dirname, 'public', 'cari-vistas.txt'), [...CARI_VISTAS].join('\n') + '\n'); } catch {}
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    const logLine = `[${new Date().toISOString()}] ${elapsed}s vivas→muertas=${vivas_muertas} muertas→vivas=${muertas_vivas} muertas=${DANI_MUERTAS.size + LCT_MUERTAS.size + CARI_MUERTAS.size} vistas=${CARI_VISTAS.size}\n`;
+    console.log('[sonda] cari (' + elapsed + 's): ' + ((vivas_muertas || muertas_vivas) ? ('vivas→muertas=' + vivas_muertas + ' muertas→vivas=' + muertas_vivas) : 'sin cambios'));
+    try { fs.appendFileSync(path.join(__dirname, 'sonda-caricaturas.log'), logLine); } catch {}
+  } catch (e) { console.warn('[sonda] cari error: ' + String(e).slice(0, 60)); }
 }
 
 async function buscarEnSitios(q) {
@@ -10340,7 +10484,7 @@ async function cuevanaLatest() {
       if (!/^[a-z0-9-]{2,90}$/.test(slug) && !/^[0-9]{1,3}$/.test(slug)) return json(res, 400, { ok: false, error: 'Caricatura inválida' }); /* v119: ids de lacartoons de 1 dígito */
       /* v177: danimados primero — series nuestras ROTAS (reemplazos) y las
      * que SOLO están en danimados. Lo demás sigue en nuestra fuente. */
-      const daniSlug = DANI_REEMPLAZAS.get(slug) || (!DANI_OCULTAS.has(slug) && DANI_CAT.has(slug) ? slug : ''); /* v180: manda danimados… salvo las ocultas (ahí gana la nuestra) */
+      const daniSlug = DANI_REEMPLAZAS.get(slug) || (!DANI_OCULTAS.has(slug) && !DANI_MUERTAS.has(slug) && DANI_CAT.has(slug) ? slug : ''); /* v180: manda danimados… salvo las ocultas (ahí gana la nuestra) */
       if (daniSlug) {
         const eps = await daniLista(daniSlug).catch(() => []);
         if (!eps.length) return json(res, 502, { ok: false, error: 'No pude leer danimados — intenta luego' });
@@ -10570,7 +10714,7 @@ async function cuevanaLatest() {
         const daniHits = [];
         for (const [sl, v] of DANI_CAT_ARR) {
           const tn = normalizarTxt(v.t);
-          if (qD.every((w) => tn.includes(w)) && !DANI_OCULTAS.has(sl) && !r.resultados.some((x) => String(x.url || '').includes('/' + sl))) { /* v180: sin duplicados contra las nuestras */
+          if (qD.every((w) => tn.includes(w)) && !DANI_OCULTAS.has(sl) && !DANI_MUERTAS.has(sl) && !r.resultados.some((x) => String(x.url || '').includes('/' + sl))) { /* v180: sin duplicados contra las nuestras */
             daniHits.push([sl, v]);
             if (daniHits.length >= 6) break;
           }
@@ -10582,7 +10726,7 @@ async function cuevanaLatest() {
           if (m2) return ([...LCT_SERIES.values()].find((x) => String(x.lctId) === m2[1]) || {}).slug || '';
           return '';
         }; /* v180: la purga también aplica a las tarjetas de lacartoons */
-        r.resultados = r.resultados.filter((x) => { const s2 = slugDeTarjeta(x.url); return !DANI_REEMPLAZAS.has(s2) && !(/lacartoons/i.test(x.url || '') && LCT_OCULTAS.has(s2)); });
+        r.resultados = r.resultados.filter((x) => { const s2 = slugDeTarjeta(x.url); return !DANI_REEMPLAZAS.has(s2) && !(/lacartoons/i.test(x.url || '') && (LCT_OCULTAS.has(s2) || LCT_MUERTAS.has(s2))); });
         for (const [sl, v] of daniHits.reverse()) {
           r.resultados.unshift({ title: String(v.t).replace(/\xa0/g, ' '), url: 'https://danimados.cc/serie/' + sl, img: '/api/dani/poster/' + sl, site: 'Caricaturas', extra: 'Danimados' }); /* v178 */
         }
@@ -10590,7 +10734,7 @@ async function cuevanaLatest() {
          * (con su portada curada de IMDb; fuera ocultas y duplicadas dani) */
         const lctHits = [];
         for (const [sl, lct] of LCT_SERIES) {
-          if (LCT_OCULTAS.has(sl) || DANI_REEMPLAZAS.get(sl)) continue;
+          if (LCT_OCULTAS.has(lct.slug) || LCT_MUERTAS.has(lct.slug) || DANI_REEMPLAZAS.get(sl)) continue; /* v241: slug no id */
           const tn = normalizarTxt(lct.titulo);
           if (qD.every((w) => tn.includes(w)) && !r.resultados.some((x) => String(x.url || '').includes('/serie/' + lct.lctId))) {
             lctHits.push([sl, lct]);
@@ -11004,6 +11148,13 @@ async function cuevanaLatest() {
             vistas: LA_VISTAS.size,
             activas: LA_TODOS.size - LA_OCULTAS_SET.size - LA_MUERTAS_SET.size,
           },
+          caricaturas: {
+            nombre: 'Caricaturas',
+            total: DANI_CAT.size + LCT_SERIES.size + CARI_ORDEN.length,
+            ocultas: DANI_OCULTAS.size + LCT_OCULTAS.size + DANI_MUERTAS.size + LCT_MUERTAS.size + CARI_MUERTAS.size,
+            vistas: CARI_VISTAS.size,
+            activas: DANI_CAT.size + LCT_SERIES.size + CARI_ORDEN.length - DANI_OCULTAS.size - LCT_OCULTAS.size - DANI_MUERTAS.size - LCT_MUERTAS.size - CARI_MUERTAS.size,
+          },
         },
         usuarios: users.size,
         memoria: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
@@ -11090,7 +11241,8 @@ async function cuevanaLatest() {
       const fuente = url.searchParams.get('fuente') || '';
       const limit = Math.min(200, Math.max(1, parseInt(url.searchParams.get('limit') || '50') || 50));
       let items = SONDALOG;
-      if (fuente) items = items.filter(e => e.fuente === fuente);
+      if (fuente === 'Caricaturas') items = items.filter(e => e.fuente === 'Danimados' || e.fuente === 'Lacartoons' || e.fuente === 'MisCaricaturas');
+      else if (fuente) items = items.filter(e => e.fuente === fuente);
       return json(res, 200, { ok: true, total: items.length, items: items.slice(0, limit) });
     }
     if (url.pathname === '/api/estado') { /* v205.4: todo el estado en un JSON para el panel; v223: + cosecha; v227: + llave CDN */
@@ -11113,7 +11265,7 @@ async function cuevanaLatest() {
         espejos: MOVIE_ESPEJOS,
         espejoPreferido: movieEspejoPreferido() || null,
         intros: { analizados: CRAWL.hechas || 0, total: CRAWL.total || 0, enCola: CRAWL.pend.length, aprendidas: Object.keys(INTROS).length, sinIntro: (CRAWL.sinIntro || []).length, muestra },
-        moderacion: { animesMuertos: LA_MUERTAS_SET.size, animesCastDup: LA_OCULTAS_SET.size, gopelis: GP_OCULTAS_SET.size, pelisxd: PXD_OCULTAS.size, animeflv: AF_OCULTAS.size, cuevana: CV_OCULTAS_RT.size, novelas: NV_OCULTAS.size, protegidas: CV_PROTEGIDAS.size, epsOcultos: EPS_MUERTOS.size, fallosEnCurso: [FALLOS_GP, FALLOS_PXD, FALLOS_AF, FALLOS_CV, FALLOS_NV, EPS_FALLOS].reduce((a2, mm2) => a2 + [...mm2.values()].filter((x2) => x2.f >= 1 && !x2.h).length, 0) },
+        moderacion: { animesMuertos: LA_MUERTAS_SET.size, animesCastDup: LA_OCULTAS_SET.size, gopelis: GP_OCULTAS_SET.size, pelisxd: PXD_OCULTAS.size, animeflv: AF_OCULTAS.size, cuevana: CV_OCULTAS_RT.size, novelas: NV_OCULTAS.size, caricaturasMuertas: DANI_MUERTAS.size + LCT_MUERTAS.size + CARI_MUERTAS.size, protegidas: CV_PROTEGIDAS.size, epsOcultos: EPS_MUERTOS.size, fallosEnCurso: [FALLOS_GP, FALLOS_PXD, FALLOS_AF, FALLOS_CV, FALLOS_NV, FALLOS_DANI, FALLOS_LCT, FALLOS_CARI, EPS_FALLOS].reduce((a2, mm2) => a2 + [...mm2.values()].filter((x2) => x2.f >= 1 && !x2.h).length, 0) },
         catalogos: { caricaturas: cariFeedCache.items.length, cartoons: cariFeedCache.toons.length, liveaction: cariFeedCache.live.length, danimados: DANI_CAT.size, animes: LA_TODOS.size - LA_OCULTAS_SET.size - LA_MUERTAS_SET.size, novelas: nvdCache.items.length },
         cosecha,
         movie: (() => { /* v207: estado del mapa local del app Movie */
@@ -11210,7 +11362,7 @@ let crawlOcupado = false;
 
 async function crawlConstruir() {
   const items = [];
-  try { for (const sl of DANI_CAT.keys()) if (!DANI_OCULTAS.has(sl)) items.push({ u: 'dani:' + sl }); } catch {}
+  try { for (const sl of DANI_CAT.keys()) if (!DANI_OCULTAS.has(sl) && !DANI_MUERTAS.has(sl)) items.push({ u: 'dani:' + sl }); } catch {}
   try {
     for (const sm of ['tvshow-sitemap.xml', 'tvshow-sitemap2.xml']) {
       const r = await fetchSeguro('https://cine-calidad.mx/' + sm, 15000).catch(() => null);
