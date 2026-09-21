@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v265'; // 265: Prioriza vimeos/hlswish>goodstream (goodstream colgado timeout/403), solo goodstream no-cache (vimeos reutilizable cache 5h) + fresca siempre
+const UI_VERSION = 'v265'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -4680,7 +4680,7 @@ function mismaPagina(a, b) {
 }
 const FETCH_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'; /* v199: compartida — vimeos amarra el token a ESTA UA */
 let CDN_RELAY = ''; /* v236: Mac Mini relay para CDNs que bloquean datacenter. Set via /api/set-relay?url=... */
-try { const _rl = require('fs').readFileSync('/tmp/huddle-relay.txt', 'utf8').trim(); if (_rl) { CDN_RELAY = _rl; console.log('[relay] Cargado de disco:', _rl); } } catch {} /* v236.8: persistir relay */
+try { const _rl = require('fs').readFileSync('/tmp/huddle-relay.txt', 'utf8').trim(); if (_rl) { if (_rl.includes('lhr.life') || _rl.includes('localhost')) { console.log('[relay] ignorado (lento) ' + _rl); } else { CDN_RELAY = _rl; console.log('[relay] Cargado de disco:', _rl); } } } catch {} /* v236.8: persistir relay */
 async function fetchRelay(url, ms) { /* v236: fetch a través del relay — NUNCA cae al directo (el token se liga a la IP) */
   if (!CDN_RELAY) return fetchSeguro(url, ms);
   const relayUrl = CDN_RELAY + '/?u=' + encodeURIComponent(url);
@@ -4825,7 +4825,7 @@ const CUEVANA_CACHE_TTL = 5*3600*1000; // 5h híbrido
 
 const CUEVANA_POSTS_API = 'https://cuevana.mov/wp-json/wpreact/v1/postsapi';
 const CUEVANA_SITEMAPS = Array.from({length: 9}, (_, i) => `https://cuevana.mov/pelicula-sitemap${i ? i+1 : ''}.xml`);
-const CUEVANA_HOSTS_OK = ['vimeos.net', 'hlswish.com', 'videoapp.zip', 'goodstream.one'];
+const CUEVANA_HOSTS_OK = ['goodstream.one', 'vimeos.net', 'hlswish.com', 'videoapp.zip'];
 let cuevanaIdx = { slugs: [], at: 0 };
 const CUEVANA_IDX_TTL = 24 * 3600 * 1000;
 const cuevanaMetaCache = new Map(); /* slug → {at, data} */
@@ -4900,7 +4900,7 @@ async function resolverCuevanaMov(pageUrl) {
   const slugM = /\/pelicula\/\d+\/([^/?#]+)/i.exec(pageUrl) || /\/pelicula\/+([^/?#]+)/i.exec(pageUrl);
   if (!slugM) throw new Error('URL de Cuevana no válida: ' + pageUrl);
   const slug = slugM[1];
-  // v265: solo goodstream no-cache (single-use), vimeos/hlswish cache 5h, otros 5h
+  // v261: goodstream/vimeos no cache (single-use, siempre fresco), otros 5h
   const cc = CUEVANA_M3U8_CACHE.get(slug);
   if (cc && !cc.isGood && Date.now() - cc.at < CUEVANA_CACHE_TTL) {
     return { m3u8: cc.m3u8, subs: cc.subs||[], proxy: !!cc.proxy, mp4: !!cc.mp4 };
@@ -4941,7 +4941,8 @@ async function resolverCuevanaMov(pageUrl) {
           }
         } catch {}
         if (!er || !er.ok) {
-          try { er = CDN_RELAY ? await fetchRelay(embed.url, 15000) : await fetchSeguro(embed.url, 12000); } catch { try { er = await fetchSeguro(embed.url, 12000); } catch {} }
+          try { er = await fetchSeguro(embed.url, 12000); } catch {}
+          if (!er || !er.ok) { try { er = CDN_RELAY ? await fetchRelay(embed.url, 8000) : null; } catch {} }
         }
         if (!er || !er.ok) continue;
         if (!er.ok) continue;
@@ -4952,7 +4953,8 @@ async function resolverCuevanaMov(pageUrl) {
       } else if (/vimeos\.net|hlswish\.com/i.test(host)) {
         /* JS packed → m3u8 */
         let er = null;
-        try { er = CDN_RELAY ? await fetchRelay(embed.url, 15000) : await fetchSeguro(embed.url, 12000); } catch { try { er = await fetchSeguro(embed.url, 12000); } catch {} }
+        try { er = await fetchSeguro(embed.url, 12000); } catch {}
+        if (!er || !er.ok) { try { er = CDN_RELAY ? await fetchRelay(embed.url, 10000) : null; } catch {} }
         if (!er || !er.ok) continue;
         if (!er.ok) continue;
         const html = await er.text();
@@ -4971,7 +4973,8 @@ async function resolverCuevanaMov(pageUrl) {
       } else if (/videoapp\.zip/i.test(host)) {
         /* videoapp.zip redirige a vimeos.net — intentar igual */
         let er = null;
-        try { er = CDN_RELAY ? await fetchRelay(embed.url, 15000) : await fetchSeguro(embed.url, 12000); } catch { try { er = await fetchSeguro(embed.url, 12000); } catch {} }
+        try { er = await fetchSeguro(embed.url, 12000); } catch {}
+        if (!er || !er.ok) { try { er = CDN_RELAY ? await fetchRelay(embed.url, 10000) : null; } catch {} }
         if (!er || !er.ok) continue;
         if (!er.ok) continue;
         const html = await er.text();
@@ -4991,8 +4994,8 @@ async function resolverCuevanaMov(pageUrl) {
       if (m3u8) {
         /* Verificar que el m3u8 sirve */
         let vr = null;
-        // v264: no verificar master para goodstream (single-use token) — devolver directo, el HLS proxy lo verificará
-        if (/goodstream\.one/i.test(host) || /hls.*\.goodstream\.one/i.test(m3u8)) {
+        // v265: no verificar master para hosts de un solo uso (goodstream/vimeos/hlswish/videoapp) — el HLS proxy lo verificará
+        if (/goodstream|vimeos|hlswish|videoapp/i.test(host) || /goodstream|vimeos|hlswish|videoapp/i.test(m3u8)) {
           // no verificar, token de un solo uso
           vr = { ok: true, text: async()=> '#EXTM3U' };
         } else {
@@ -5005,7 +5008,7 @@ async function resolverCuevanaMov(pageUrl) {
             const cdnHost = new URL(m3u8).hostname;
             if (!hlsReferers.has(cdnHost)) hlsReferers.set(cdnHost, embed.url);
             try { hlsUAs.set(cdnHost, FETCH_UA); hlsALs.set(cdnHost, 'es-MX,es;q=0.9,en;q=0.8'); } catch {}
-            const isGood = /goodstream/i.test(host);
+            const isGood = /goodstream|vimeos|hlswish/i.test(host);
             const resObj = { m3u8, subs: [], proxy: true, mp4: false };
             if (!isGood) {
               CUEVANA_M3U8_CACHE.set(slug, { ...resObj, at: Date.now(), isGood });
