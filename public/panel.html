@@ -197,7 +197,8 @@ function renderDash(d){
     +'<div class="card" onclick="showPage(\'Users\')"><div class="n">'+d.usuarios+'</div><div class="t">Usuarios ▸</div></div>';
   var ca=d.catalogos||{};
   var f=_stats?_stats.fuentes:{};
-  var tp=0;for(var k in f)tp+=Math.max(0,f[k].activas||0);
+  var tp=0;for(var k in f){if(k!=='latanime')tp+=Math.max(0,f[k].activas||0);}
+  var laAct=f.latanime?Math.max(0,f.latanime.activas||0):0;
   var ts=(ca.animes||0)+(ca.danimados||0);
   var tc=(ca.caricaturas||0)+(ca.cartoons||0)+(ca.liveaction||0);
   var gt=tp+ts+tc;
@@ -229,7 +230,7 @@ function renderDash(d){
 function renderFuentes(stats){
   _stats=stats;
   var f=stats.fuentes||{};
-  var colors={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8'};
+  var colors={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8',latanime:'#ffb020'};
   var totalAct=0,html='';
   for(var k in f){
     var s=f[k];var c=colors[k]||'#efeaf7';
@@ -247,8 +248,8 @@ function renderFuentes(stats){
 
 function showFuente(k){
   var f=_stats?_stats.fuentes[k]:null;if(!f)return;
-  var colors={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8'};
-  var names={cuevana:'Cuevana',pelisxd:'PelisXD',cinecalidad:'CineCalidad'};
+  var colors={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8',latanime:'#ffb020'};
+  var names={cuevana:'Cuevana',pelisxd:'PelisXD',cinecalidad:'CineCalidad',latanime:'Latanime'};
   var c=colors[k]||'#efeaf7';
   var act=Math.max(0,f.activas||0);
   var pct=f.total?Math.round(act*100/f.total):0;
@@ -275,7 +276,7 @@ function showFuente(k){
         var icon=n.tipo==='muerto'?'✕':'✓';
         var col=n.tipo==='muerto'?'#ff5c7a':'#38e08a';
         lh+='<div class="log-entry">'
-          +'<div class="log-icon" style="color:'+color+';font-weight:800">'+icon+'</div>'
+          +'<div class="log-icon" style="color:'+col+';font-weight:800">'+icon+'</div>'
           +'<div class="log-msg" style="color:'+col+'">'+n.msg+'</div>'
           +'<div class="log-time">'+timeAgo(n.ts)+'</div></div>';
       });

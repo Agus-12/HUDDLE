@@ -391,6 +391,7 @@ const DANI_STREAMS = new Map(); /* url ep → { nat, at } */
 let DANI_CAT = new Map();
 const LA_TODOS = new Set(), LA_OCULTAS_SET = new Set(); /* v198 */
 const LA_MUERTAS_SET = new Set(); /* v200: auditadas con video caído */
+const LA_VISTAS = new Set(); /* v240: series verificadas por la sonda de Latanime */
 const GP_OCULTAS_SET = new Set(); /* v200: gopelis sin servidores vivos */
 /* v203: PODREDUMBRE — mp4upload borra archivos a diario (Akame ga Kill
  * murió en vivo en una sesión). 3 fallos espaciados ≥10 min → se oculta
@@ -462,8 +463,8 @@ async function laRevizar() { /* apelaciones: ocultadas hace <7 días, una a una 
     console.log('[podredumbre] revisión terminada: ' + vivas2 + ' revivieron de ' + cands.length);
   } finally { laReviviendo = false; }
 }
-setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); }, 90 * 1000);
-setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); }, 6 * 3600 * 1000);
+setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); }, 90 * 1000);
+setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); }, 6 * 3600 * 1000);
 
 /* v234: SONDA PELISXD — revisa películas ocultas para ver si volvieron */
 /* v234: SONDA PELISXD COMPLETA — 3 frentes:
@@ -538,9 +539,8 @@ async function sondaPelisxd() {
             PXD_OCULTAS.add(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt');
             pxdOcultar(slug); /* registrar fallo para el sistema de podredumbre */
             vivas_muertas++;
-          sondaNotify("Cuevana", "muerto", slug, slug + " murio — sin servidores");
+            sondaNotify("PelisXD", "muerto", slug, slug + " murio — sin Byse");
             console.log('[sonda] pxd MURIÓ: ' + slug);
-              sondaNotify("PelisXD", "muerto", slug, slug + " murio — sin Byse");
           }
         } catch {}
       }
@@ -558,9 +558,8 @@ async function sondaPelisxd() {
               PXD_OCULTAS.delete(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt');
               pxdPerdonar(slug);
               muertas_vivas++;
-          sondaNotify("Cuevana", "revivio", slug, slug + " revivio — servidores encontrados");
-              console.log('[sonda] pxd REVIVIÓ: ' + slug);
               sondaNotify("PelisXD", "revivio", slug, slug + " revivio — Byse encontrado");
+              console.log('[sonda] pxd REVIVIÓ: ' + slug);
             }
           } catch {}
         }
@@ -1826,7 +1825,10 @@ try {
     for (const l of fs.readFileSync(path.join(__dirname, 'public', 'latanime-muertas.txt'), 'utf8').split('\n')) if (l.trim()) LA_MUERTAS_SET.add(l.trim());
     for (const l of fs.readFileSync(path.join(__dirname, 'public', 'gopelis-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) GP_OCULTAS_SET.add(l.trim());
   } catch {}
-  console.log('[latanime] ' + LA_TODOS.size + ' series (' + LA_OCULTAS_SET.size + ' cast/dup, ' + LA_MUERTAS_SET.size + ' muertas) | [gopelis] ' + GP_OCULTAS_SET.size + ' ocultas');
+  try {
+    for (const l of fs.readFileSync(path.join(__dirname, 'public', 'latanime-vistas.txt'), 'utf8').split('\n')) if (l.trim()) LA_VISTAS.add(l.trim());
+  } catch {} /* v240: vistas de la sonda de Latanime */
+  console.log('[latanime] ' + LA_TODOS.size + ' series (' + LA_OCULTAS_SET.size + ' cast/dup, ' + LA_MUERTAS_SET.size + ' muertas, ' + LA_VISTAS.size + ' vistas) | [gopelis] ' + GP_OCULTAS_SET.size + ' ocultas');
 } catch {}
 /* v199: inventario de PELÍCULAS que ya tenemos (cine-calidad) — para no
  * duplicar las de GoPelis en el buscador */
@@ -7297,6 +7299,80 @@ async function sondaCineCalidad() {
   } catch (e) { console.warn('[sonda] cc error: ' + String(e.message || e).slice(0, 100)); }
 }
 
+/* v240: SONDA LATANIME — verifica series visibles y muertas
+ * 3 frentes como las demás:
+ * 1. VIVAS: muestra de series visibles → ¿siguen teniendo mp4upload vivo?
+ * 2. MUERTAS: muestra de series muertas → ¿revivieron?
+ * 3. OCULTAS: muestra de castellano/duplicados → se saltan (ya están filtradas)
+ *
+ * Usa laProbe() que ya existe: abre episodio-1, extrae mp4upload y verifica
+ * que el mp4 sirve. Cada ciclo (~6h) hace un barrido de ~30 series.
+ * Si una viva muere → se registra fallo (podredumbre). Si una muerta revive → se quita de muertas.
+ */
+async function sondaLatanime() {
+  try {
+    const memMB = process.memoryUsage().heapUsed / 1024 / 1024;
+    if (memMB > 350) { console.warn('[sonda] la saltado — memoria alta: ' + memMB.toFixed(0) + 'MB'); return; }
+    const start = Date.now();
+    const POR_CICLO = 15;
+    let vivas_muertas = 0, muertas_vivas = 0;
+    const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+    /* ─── 1. VIVAS: ¿siguen funcionando? ─── */
+    try {
+      const visibles = [...LA_TODOS].filter(s => !LA_OCULTAS_SET.has(s) && !LA_MUERTAS_SET.has(s));
+      const muestra = shuffle(visibles).slice(0, POR_CICLO);
+      for (const slug of muestra) {
+        try {
+          const vive = await laProbe(slug);
+          LA_VISTAS.add(slug);
+          if (!vive) {
+            const estabaViva = !LA_MUERTAS_SET.has(slug);
+            laFallosRegistrar(slug);
+            if (estabaViva && LA_MUERTAS_SET.has(slug)) {
+              vivas_muertas++;
+              sondaNotify("Latanime", "muerto", slug, slug + " murio — mp4upload caido");
+            }
+          } else {
+            laFallosPerdonar(slug);
+          }
+        } catch {}
+        await new Promise(r => setTimeout(r, 3000)); /* pausa entre series */
+      }
+    } catch (e) { console.warn('[sonda] la vivas error: ' + String(e).slice(0, 60)); }
+
+    /* ─── 2. MUERTAS: ¿revivieron? ─── */
+    try {
+      const muertas = shuffle([...LA_MUERTAS_SET]).slice(0, POR_CICLO);
+      for (const slug of muertas) {
+        try {
+          const vive = await laProbe(slug);
+          if (vive) {
+            laMuertaQuitar(slug);
+            LA_FALLOS.delete(slug);
+            laFallosGuardar();
+            muertas_vivas++;
+            sondaNotify("Latanime", "revivio", slug, slug + " revivio — mp4upload encontrado");
+          }
+        } catch {}
+        await new Promise(r => setTimeout(r, 3000));
+      }
+    } catch (e) { console.warn('[sonda] la muertas error: ' + String(e).slice(0, 60)); }
+
+    /* ─── Persistir vistas ─── */
+    try { fs.writeFileSync(path.join(__dirname, 'public', 'latanime-vistas.txt'), [...LA_VISTAS].join('\n') + '\n'); } catch {}
+
+    /* ─── Log ─── */
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    const parts = [];
+    if (vivas_muertas) parts.push('vivas→muertas=' + vivas_muertas);
+    if (muertas_vivas) parts.push('muertas→vivas=' + muertas_vivas);
+    const logLine = `[${new Date().toISOString()}] ${elapsed}s vivas→muertas=${vivas_muertas} muertas→vivas=${muertas_vivas} muertas=${LA_MUERTAS_SET.size} vistas=${LA_VISTAS.size}\n`;
+    console.log('[sonda] la (' + elapsed + 's): ' + (parts.join(', ') || 'sin cambios') + ' muertas=' + LA_MUERTAS_SET.size + ' vistas=' + LA_VISTAS.size);
+    try { fs.appendFileSync(path.join(__dirname, 'sonda-latanime.log'), logLine); } catch {}
+  } catch (e) { console.warn('[sonda] la error: ' + String(e).slice(0, 60)); }
+}
+
 async function buscarEnSitios(q) {
   const nq = normalizarTxt(q);
   const [cuevana, cuevanaMov, latanime, animeflv, pelisxd, cari, cineCalidad, catalogo, movieCosecha] = await Promise.all([
@@ -10912,6 +10988,13 @@ async function cuevanaLatest() {
             vistas: CC_VISTAS.size,
             activas: CC_KNOWN_TOTAL - CC_OCULTAS.size,
           },
+          latanime: {
+            nombre: 'Latanime',
+            total: LA_TODOS.size,
+            ocultas: LA_OCULTAS_SET.size + LA_MUERTAS_SET.size,
+            vistas: LA_VISTAS.size,
+            activas: LA_TODOS.size - LA_OCULTAS_SET.size - LA_MUERTAS_SET.size,
+          },
         },
         usuarios: users.size,
         memoria: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
@@ -11022,7 +11105,7 @@ async function cuevanaLatest() {
         espejoPreferido: movieEspejoPreferido() || null,
         intros: { analizados: CRAWL.hechas || 0, total: CRAWL.total || 0, enCola: CRAWL.pend.length, aprendidas: Object.keys(INTROS).length, sinIntro: (CRAWL.sinIntro || []).length, muestra },
         moderacion: { animesMuertos: LA_MUERTAS_SET.size, animesCastDup: LA_OCULTAS_SET.size, gopelis: GP_OCULTAS_SET.size, pelisxd: PXD_OCULTAS.size, animeflv: AF_OCULTAS.size, cuevana: CV_OCULTAS_RT.size, novelas: NV_OCULTAS.size, protegidas: CV_PROTEGIDAS.size, epsOcultos: EPS_MUERTOS.size, fallosEnCurso: [FALLOS_GP, FALLOS_PXD, FALLOS_AF, FALLOS_CV, FALLOS_NV, EPS_FALLOS].reduce((a2, mm2) => a2 + [...mm2.values()].filter((x2) => x2.f >= 1 && !x2.h).length, 0) },
-        catalogos: { caricaturas: cariFeedCache.items.length, cartoons: cariFeedCache.toons.length, liveaction: cariFeedCache.live.length, danimados: DANI_CAT.size, animes: LA_TODOS.size, novelas: nvdCache.items.length },
+        catalogos: { caricaturas: cariFeedCache.items.length, cartoons: cariFeedCache.toons.length, liveaction: cariFeedCache.live.length, danimados: DANI_CAT.size, animes: LA_TODOS.size - LA_OCULTAS_SET.size - LA_MUERTAS_SET.size, novelas: nvdCache.items.length },
         cosecha,
         movie: (() => { /* v207: estado del mapa local del app Movie */
           movieRecargar();
