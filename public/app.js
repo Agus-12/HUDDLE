@@ -1957,10 +1957,10 @@ function renderPageDrop() {
     b.className = 'page-opt';
     b.type = 'button';
     b.dataset.url = s.url;
-    b.dataset.logo = s.logo;
+    b.dataset.logo = logoPara(s.url, s.name);
     b.dataset.name = s.name;
     const im = document.createElement('img');
-    im.src = s.logo; im.className = 'site-logo'; im.alt = '';
+    im.src = logoPara(s.url, s.name); im.className = 'site-logo'; im.alt = '';
     const sp = document.createElement('span');
     sp.textContent = s.full || s.name;
     b.append(im, sp);
@@ -2032,7 +2032,7 @@ function renderPageDrop() {
     if (!chip) return;
     const s = SITES.find((x) => url && url.startsWith(x.url.replace(/\/$/, '')));
     if (s) {
-      im.src = s.logo; im.hidden = false;
+      im.src = logoPara(s.url, s.name); im.hidden = false;
       nm.textContent = s.name;
       chip.hidden = false;
     } else if (url) {
@@ -2702,18 +2702,12 @@ $('#btnSwitch').addEventListener('click', () => {
 
 /* ---- salas en vivo con preview (estilo Rave) ---- */
 /* v32: logo del sitio espejado para la tarjeta (o null si no lo tenemos) */
-const SITE_LOGOS = {
-  'cuevana.mov': '/sites/cuevana.png',
-  'cine-calidad.mx': '/sites/cinecalidad.png', /* v235: separado de Cuevana */
-  'youtube.com': '/sites/youtube.png',
-  'animed23.com': '/sites/animed23.png',
-  'danimados.cc': '/sites/danimados.png', 'lacartoons.com': '/sites/lacartoons.png', 'miscaricaturas.com': '/sites/caricaturas.png', /* v242 */
-};
 function siteLogoFor(host) {
   const h = String(host || '').replace(/^www\./, '').toLowerCase();
-  if (SITE_LOGOS[h]) return SITE_LOGOS[h];
-  for (const k of Object.keys(SITE_LOGOS)) if (h.endsWith('.' + k)) return SITE_LOGOS[k];
-  return null;
+  if (!h) return null;
+  if (h === 'animed23.com') return '/sites/animed23.png?v=' + LOGO_V;
+  const l = logoPara('https://' + h, '');
+  return l === '/carita.png' ? null : l;
 }
 let roomsTimer = null;
 async function pollRooms() {
@@ -2897,7 +2891,7 @@ function crearCardSitio(s, removable) {
   card.setAttribute('role', 'button');
   card.innerHTML = `
     <span class="sc-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
-    <img class="sc-logo" src="${s.logo || ''}" alt="">
+    <img class="sc-logo" src="${s.logo ? logoPara(s.url, s.name) : ''}" alt="">
     <span class="sc-name"></span>
     <span class="sc-desc"></span>`;
   card.querySelector('.sc-name').textContent = s.name;
@@ -3022,10 +3016,35 @@ $('#btnCreateGo').addEventListener('click', () => {
  * resultados listos para crear la sala o navegar el espejo */
 /* v50: resultados como cartelera — filas horizontales deslizables por página,
  * carátula grande, nombre abajo y el logo de la página en la esquina */
-function logoDeSitio(nombre) {
+/* v244: autoridad única de logos — por DOMINIO (los mismos archivos del panel).
+ * Antes el badge buscaba por nombre en SITES: 'Caricaturas'/'Cartoons'/'Movie'/
+ * 'Novelas'/'AnimeFLV' no existían ahí y caían a la carita o a favicons viejos
+ * del servidor. Ahora el dominio manda; ?v= rompe el caché del navegador. */
+const LOGO_V = '244';
+const LOGOS_DOMINIO = {
+  'latanime.org': 'latanime.png',
+  'cuevana.mov': 'cuevana.png',
+  'cine-calidad.mx': 'cinecalidad.png',
+  'pelisxd.com': 'pelisxd.png', 'lisxd.com': 'pelisxd.png',
+  'danimados.cc': 'danimados.png',
+  'lacartoons.com': 'lacartoons.png',
+  'miscaricaturas.com': 'caricaturas.png',
+  'animeflv.one': 'animeflv.png', 'animeflv.net': 'animeflv.png', 'animeflv.io': 'animeflv.png',
+  'novelas360.com': 'novelas.png', 'enpantallatv.com': 'novelas.png',
+  'youtube.com': 'youtube.png', 'youtu.be': 'youtube.png',
+};
+function logoPara(url, nombre) {
+  try {
+    const h = String(new URL(url || 'x:', location.origin).hostname || '').replace(/^www\./, '').toLowerCase();
+    if (h === 'movie.huddle') return '/carita.png'; /* catálogo propio: la carita */
+    for (const k of Object.keys(LOGOS_DOMINIO)) if (h === k || h.endsWith('.' + k)) return '/sites/' + LOGOS_DOMINIO[k] + '?v=' + LOGO_V;
+  } catch {}
   const s = (typeof SITES !== 'undefined' ? SITES : []).find((x) => x.name === nombre);
-  if (s && s.logo) return s.logo;
+  if (s && s.logo) return s.logo.includes('?') ? s.logo : s.logo + '?v=' + LOGO_V;
   return '/carita.png'; /* v105: si no hay logo, la carita de Huddle */
+}
+function logoDeSitio(nombre, url) {
+  return logoPara(url, nombre);
 }
 
 function crearTarjetaResultado(res, alElegir) {
@@ -3037,10 +3056,10 @@ function crearTarjetaResultado(res, alElegir) {
      * en algunos teléfonos/compañías la página bloquea la imagen directa */
     const srcImg = imgPorProxy(res.img || ''); /* v91: nunca dos veces */
     card.innerHTML = `
-      <span class="sr-badge"><img src="${logoDeSitio(res.site)}" alt=""></span>
+      <span class="sr-badge"><img src="${logoDeSitio(res.site, res.url)}" alt=""></span>
       ${srcImg
         ? `<img class="sr-cover" src="${srcImg}" alt="" loading="lazy" referrerpolicy="no-referrer">`
-        : `<span class="sr-cover sr-cover-anime"><img src="${logoDeSitio(res.site)}" alt=""></span>`}
+        : `<span class="sr-cover sr-cover-anime"><img src="${logoDeSitio(res.site, res.url)}" alt=""></span>`}
       <span class="sr-nombre"></span>
       ${res.extra ? '<span class="sr-extra"></span>' : ''}`;
     card.querySelector('.sr-nombre').textContent = res.title;
