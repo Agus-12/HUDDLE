@@ -9240,6 +9240,12 @@ async function proxearHls(req, res, target) {
     return;
   }
   if (!esProxeable(target)) return json(res, 403, { ok: false, error: 'No permitido' }); /* v90: allowlist ampliada */
+  /* v236.6: goodstream/vimeos/videoapp → ir directo por relay si está disponible */
+  let useRelayDirect = false;
+  try {
+    const _hUp = new URL(target).hostname;
+    if (CDN_RELAY && /goodstream\.(one|uno)|vimeos\.(net|zip)|hlswish\.com|videoapp\.zip/i.test(_hUp)) useRelayDirect = true;
+  } catch {}
   /* el origen de goodstream a veces suelta 403 transitorios (cache-miss):
    * reintentamos un par de veces antes de rendirnos */
   let ref = 'https://goodstream.one/';
@@ -9261,7 +9267,22 @@ async function proxearHls(req, res, target) {
   if (ref) cabUp.Referer = ref;
   if (req.headers.range) cabUp.Range = String(req.headers.range);
   let upstream = null;
-  for (let intento = 0; intento < 3; intento++) {
+  if (useRelayDirect && CDN_RELAY) {
+    /* v236.6: saltar intentos directos — estos CDNs bloquean IPs de datacenter */
+    try {
+      const relayUrl = CDN_RELAY + '/?u=' + encodeURIComponent(target);
+      const ctl2 = new AbortController();
+      const t2 = setTimeout(() => ctl2.abort(), 15000);
+      upstream = await fetch(relayUrl, { signal: ctl2.signal, redirect: 'follow' });
+      clearTimeout(t2);
+      if (upstream.ok) console.log('[hls-proxy] relay directo OK:', decodeURIComponent(target).slice(0, 60));
+      else { try { upstream.body && upstream.body.cancel(); } catch {} upstream = null; }
+    } catch (relayErr) {
+      console.warn('[hls-proxy] relay directo falló:', String(relayErr.message || relayErr).slice(0, 80));
+      upstream = null;
+    }
+  }
+  for (let intento = 0; !upstream && intento < 3; intento++) {
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 30000);
     try {
