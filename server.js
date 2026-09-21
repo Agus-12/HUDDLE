@@ -22,7 +22,8 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v249'; // 249: logo AnimeD23 256 transparente neon sutil (A purpura/cyan) + sonda panel
+const UI_VERSION = 'v251'; // 251: buscar muestra TODO curatorial (muertas siempre ocultas hasta revivir, novelas apagadas)
+const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
@@ -849,7 +850,7 @@ function epsPerdonar(u) {
     console.log('[eps] episodio revivió — de vuelta al picker: ' + String(u).slice(0, 90));
   }
 }
-const epsVivos = (eps) => (eps || []).filter((e) => e && e.url && !EPS_MUERTOS.has(e.url));
+const epsVivos = (eps) => (eps || []).filter((e) => e && e.url && !EPS_MUERTOS.has(e.url)); /* v251 muertas siempre ocultas */
 
 /* v206: NOVELAS — novelas360.com (telenovelas por capítulos, HTTP puro).
  * Catálogo = tab «Todos» de /series/ (portada en data-src, título en
@@ -2070,7 +2071,7 @@ const DANI_TITULO_FIX = new Map([['daria', 'Daria'], ['kenan-kel', 'Kenan y Kel'
 function laOcultaUrl(u) {
   const m = /latanime\.org\/anime\/([a-z0-9-]+)/i.exec(u || '');
   if (!m) return false;
-  return LA_OCULTAS_SET.has(m[1]) || LA_MUERTAS_SET.has(m[1]); /* v200: también las de video caído */
+  return LA_OCULTAS_SET.has(m[1]) || LA_MUERTAS_SET.has(m[1]); /* v200: tambien las de video caido */
 }
 /* v198: bases de latanime (para que AnimeFLV ceda los duplicados) */
 function laBaseNorm(slug) {
@@ -4774,7 +4775,7 @@ async function buscarCuevanaMov(q) {
   const top = cand.slice(0, 12);
   const hits = [];
   for (const c of top) {
-    if (CVM_OCULTAS.has(c.s)) continue; /* v235: sin muertas */
+    if (CVM_OCULTAS.has(c.s)) continue; /* v235: sin muertas — v251 muertas siempre ocultas */
     const meta = await cuevanaMeta(c.s);
     if (meta) hits.push(meta);
   }
@@ -5118,7 +5119,7 @@ async function cuevanaPorGenero(slug) {
     const r = await fetchSeguro(`https://cuevana.mov/wp-json/wpreact/v1/postsapi?per_page=15&page=1&genre=${cvSlug}`, 12000);
     if (!r.ok) return [];
     const d = await r.json().catch(() => ({}));
-    const items = (d.posts || []).filter(p => p.type === 'pelicula' && !CVM_OCULTAS.has(p.slug)).slice(0, 12).map(p => ({
+    const items = (d.posts || []).filter(p => p.type === 'pelicula' && !CVM_OCULTAS.has(p.slug)).slice(0, 12).map(p => ({ /* v251 muertas siempre ocultas */
       title: p.title || '',
       url: 'https://cuevana.mov/pelicula/' + (p.tmdb_id || '0') + '/' + p.slug,
       img: p.featured_image || '',
@@ -5374,7 +5375,7 @@ async function buscarAnimeflv(q) {
     if (vistos.has(url)) continue;
     vistos.add(url);
     const afSl = (/anime\/([a-z0-9-]+)/.exec(href) || [])[1] || ''; /* v205.2: ocultadas fuera · v243: era /ver/ y nunca matcheaba */
-    if (AF_OCULTAS.has(afSl)) continue;
+    if (AF_OCULTAS.has(afSl)) continue; /* v251 muertas siempre ocultas */
     out.push({
       title: h3.replace(/&#0?39;/g, "'").replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim(),
       url,
@@ -5500,7 +5501,7 @@ async function buscarPelisxd(q) {
   const metas = await Promise.all(top.map((c) => pelisxdMeta(c.s).catch(() => null)));
   return top
     .map((c, i) => ({ c, m: metas[i] }))
-    .filter((x) => x.m && x.m.alive && !PXD_OCULTAS.has(x.c.s)) /* v205.2: ocultadas por podredumbre fuera */
+    .filter((x) => x.m && x.m.alive && !PXD_OCULTAS.has(x.c.s)) /* v205.2: ocultadas por podredumbre fuera — v251 muertas siempre ocultas */
     .slice(0, 6)
     .map((x) => ({
       title: x.m.title,
@@ -6362,7 +6363,7 @@ async function buscarMiscaricaturas(q) {
     const series = [];
     for (const m of html.matchAll(/<h2 class="entry-title[^"]*"><a href="(https:\/\/miscaricaturas\.com\/[a-z0-9-]+\/?)"[^>]*>([^<]+)<\/a>/gi)) {
       const slug = cariSlugDe(m[1]);
-      if (!cariEsSerie(slug) || vistos.has(slug) || CARI_MUERTAS.has(slug)) continue;
+      if (!cariEsSerie(slug) || vistos.has(slug) || CARI_MUERTAS.has(slug)) continue; /* v251 muertas siempre ocultas */
       vistos.add(slug);
       series.push({ slug, title: m[2].replace(/&#\d+;|&amp;|&\w+;/g, '').trim() });
       if (series.length >= 5) break;
@@ -6415,8 +6416,8 @@ async function refrescarCariFeed() {
   if (!home.size) return { caricaturas: cariFeedCache.items, cartoons: cariFeedCache.toons, liveaction: cariFeedCache.live };
   const enHome = [...home.keys()];
   const slugs = [
-    ...CARI_ORDEN.filter((s) => home.has(s) && !CARI_MUERTAS.has(s)),
-    ...enHome.filter((s) => !CARI_ORDEN.includes(s) && cariEsSerie(s) && !CARI_MUERTAS.has(s)),
+    ...CARI_ORDEN.filter((s) => home.has(s) && !CARI_MUERTAS.has(s)), /* v251 muertas siempre ocultas */
+    ...enHome.filter((s) => !CARI_ORDEN.includes(s) && cariEsSerie(s) && !CARI_MUERTAS.has(s)), /* v251 */
   ].slice(0, 18); /* v107: 18 — entran Sabrina y Kenan y Kel */
   if (!slugs.length) return { caricaturas: cariFeedCache.items, cartoons: cariFeedCache.toons, liveaction: cariFeedCache.live };
   const mapearCari = async (slug) => {
@@ -6440,7 +6441,7 @@ async function refrescarCariFeed() {
    * en bloques de 16 en vez de todas a la vez (que no nos racione el
    * sitio por ráfaga); el arranque en frío tarda unos segundos más pero
    * queda en cache 1 h y después se sirve al instante. */
-  const lctLista = [...LCT_SERIES.values()].filter((x) => !LCT_MUERTAS.has(x.slug)); /* v241 */
+  const lctLista = [...LCT_SERIES.values()].filter((x) => !LCT_MUERTAS.has(x.slug)); /* v241 — v251 muertas siempre ocultas */
   const toons = [];
   const liveToons = []; /* v205: iCarly, Drake & Josh, Power Rangers… apartado propio */
   for (let i = 0; i < lctLista.length; i += 16) {
@@ -7119,7 +7120,7 @@ async function catAnimes(pag) {
   for (const m of crudos) {
     if (items.length >= 24) break;
     const slug = m[2];
-    if (LA_OCULTAS_SET.has(slug) || LA_MUERTAS_SET.has(slug)) continue; /* v198/v200: cast/dup y muertas fuera */
+    if (LA_OCULTAS_SET.has(slug) || LA_MUERTAS_SET.has(slug)) continue; /* v198/v200: cast/dup y muertas fuera — v251 browse mantiene curaduría */
     const im = /<img[^>]+class="[^"]*lozad[^"]*"[^>]+src="(https:\/\/latanime\.org\/thumbs\/[^"]+)"/.exec(m[3]); /* la visible, no la comentada */
     const title = m[4].replace(/\s+/g, ' ').trim().replace(/\s+(latino|castellano|espa\u00f1ol|sub(?:titulado)?)\s*$/i, '').slice(0, 80);
     if (!title) continue;
@@ -7378,7 +7379,7 @@ async function sondaLatanime() {
 
     /* ─── 1. VIVAS: ¿siguen funcionando? ─── */
     try {
-      const visibles = [...LA_TODOS].filter(s => !LA_OCULTAS_SET.has(s) && !LA_MUERTAS_SET.has(s));
+      const visibles = [...LA_TODOS].filter(s => !LA_OCULTAS_SET.has(s) && !LA_MUERTAS_SET.has(s)); /* v251 sonda: muertas siempre ocultas */
       const muestra = shuffle(visibles).slice(0, POR_CICLO);
       for (const slug of muestra) {
         try {
@@ -9219,7 +9220,7 @@ const CV_PELIS_OCULTAS = new Set([
 ]);
 const cvOcultaUrl = (u) => {
   const mS = /cine-calidad\.mx\/(?:serie|pelicula)\/([a-z0-9-]+)/i.exec(u || '');
-  return !!(mS && (CVM_OCULTAS.has(mS[1]) || CV_PELIS_OCULTAS.has(mS[1]) || CV_OCULTAS_RT.has(mS[1])));
+  return !!(mS && (CVM_OCULTAS.has(mS[1]) || CV_PELIS_OCULTAS.has(mS[1]) || CV_OCULTAS_RT.has(mS[1]))); /* v251 muertas siempre ocultas */
 };
 
 /* ===================== v81: modo individual =====================
@@ -10625,8 +10626,14 @@ async function cuevanaLatest() {
       r.resultados = r.resultados.filter((x) => x._apiFresh || !cvOcultaUrl(x.url)); /* v191: sin series muertas; v236.9: API fresca pasa */
       /* v198: latanime en limpio — sin versiones castellanas ni duplicados;
        * AnimeFLV cede cuando latanime tiene la serie (mandan las latino) */
-      r.resultados = r.resultados.filter((x) => !laOcultaUrl(x.url));
-      r.resultados = r.resultados.filter((x) => {
+      if (HUDDLE_MOSTRAR_TODO) {
+        // v251 buscar muestra TODO curatorial: solo muertas ocultas
+        r.resultados = r.resultados.filter((x) => {
+          const m = /latanime\.org\/anime\/([a-z0-9-]+)/i.exec(x.url || '');
+          return !m || !LA_MUERTAS_SET.has(m[1]);
+        });
+      } else r.resultados = r.resultados.filter((x) => !laOcultaUrl(x.url));
+      if (!HUDDLE_MOSTRAR_TODO) r.resultados = r.resultados.filter((x) => {
         if (!/animeflv\./.test(x.url || '')) return true;
         const sl = (/animeflv\.[a-z.]+\/anime\/([a-z0-9-]+)/i.exec(x.url) || [])[1];
         if (!sl) return true;
@@ -10678,7 +10685,7 @@ async function cuevanaLatest() {
         const daniHits = [];
         for (const [sl, v] of DANI_CAT_ARR) {
           const tn = normalizarTxt(v.t);
-          if (qD.every((w) => tn.includes(w)) && !DANI_OCULTAS.has(sl) && !DANI_MUERTAS.has(sl) && !r.resultados.some((x) => String(x.url || '').includes('/' + sl))) { /* v180: sin duplicados contra las nuestras */
+          if (qD.every((w) => tn.includes(w)) && !DANI_MUERTAS.has(sl) && (HUDDLE_MOSTRAR_TODO || !DANI_OCULTAS.has(sl)) && !r.resultados.some((x) => String(x.url || '').includes('/' + sl))) { /* v180: v251 muertas siempre ocultas, curaduría visible en buscar */
             daniHits.push([sl, v]);
             if (daniHits.length >= 6) break;
           }
@@ -10690,7 +10697,7 @@ async function cuevanaLatest() {
           if (m2) return ([...LCT_SERIES.values()].find((x) => String(x.lctId) === m2[1]) || {}).slug || '';
           return '';
         }; /* v180: la purga también aplica a las tarjetas de lacartoons */
-        r.resultados = r.resultados.filter((x) => { const s2 = slugDeTarjeta(x.url); return !DANI_REEMPLAZAS.has(s2) && !(/lacartoons/i.test(x.url || '') && (LCT_OCULTAS.has(s2) || LCT_MUERTAS.has(s2))); });
+        if (!HUDDLE_MOSTRAR_TODO) r.resultados = r.resultados.filter((x) => { const s2 = slugDeTarjeta(x.url); return !DANI_REEMPLAZAS.has(s2) && !(/lacartoons/i.test(x.url || '') && (LCT_OCULTAS.has(s2) || LCT_MUERTAS.has(s2))); }); else { /* v250 mostrar todo: sin purge dani/lct */ }
         for (const [sl, v] of daniHits.reverse()) {
           r.resultados.unshift({ title: String(v.t).replace(/\xa0/g, ' '), url: 'https://danimados.cc/serie/' + sl, img: '/api/dani/poster/' + sl, site: 'Caricaturas', extra: 'Danimados' }); /* v178 */
         }
@@ -10698,7 +10705,7 @@ async function cuevanaLatest() {
          * (con su portada curada de IMDb; fuera ocultas y duplicadas dani) */
         const lctHits = [];
         for (const [sl, lct] of LCT_SERIES) {
-          if (LCT_OCULTAS.has(lct.slug) || LCT_MUERTAS.has(lct.slug) || DANI_REEMPLAZAS.get(sl)) continue; /* v241: slug no id */
+          if (LCT_MUERTAS.has(lct.slug) || (!HUDDLE_MOSTRAR_TODO && LCT_OCULTAS.has(lct.slug)) || DANI_REEMPLAZAS.get(sl)) continue; /* v241 — v251 muertas siempre, LCT_OCULTAS solo si no mostrarTodo */
           const tn = normalizarTxt(lct.titulo);
           if (qD.every((w) => tn.includes(w)) && !r.resultados.some((x) => String(x.url || '').includes('/serie/' + lct.lctId))) {
             lctHits.push([sl, lct]);
@@ -11061,7 +11068,7 @@ async function cuevanaLatest() {
         });
       return json(res, 200, { ok: true, rooms: list, srvVersion: UI_VERSION });
     }
-    if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION, introCrawl: { pend: CRAWL.pend.length, hechas: CRAWL.hechas || 0, total: CRAWL.total || 0 }, laMuertas: LA_MUERTAS_SET.size, pxdOcultas: PXD_OCULTAS.size, afOcultas: AF_OCULTAS.size, ccOcultas: CC_OCULTAS.size, ccTotal: ccIdx.slugs.length }); /* v122+190+v205.2+v238 */
+    if (url.pathname === '/api/health') return json(res, 200, { ok: true, rooms: rooms.size, version: UI_VERSION, mostrarTodo: HUDDLE_MOSTRAR_TODO, novelasOn: NOVELAS_EXTERNAS_ON, introCrawl: { pend: CRAWL.pend.length, hechas: CRAWL.hechas || 0, total: CRAWL.total || 0 }, laMuertas: LA_MUERTAS_SET.size, pxdOcultas: PXD_OCULTAS.size, afOcultas: AF_OCULTAS.size, ccOcultas: CC_OCULTAS.size, ccTotal: ccIdx.slugs.length }); /* v122+190+v205.2+v238 — v250 mostrarTodo */
     if (url.pathname === '/api/set-relay') { /* v236: actualizar CDN relay URL del Mac Mini */
       const newUrl = (url.searchParams.get('url') || '').trim().replace(/\/+$/, '');
       if (!newUrl) return json(res, 400, { ok: false, error: 'Falta ?url=' });
