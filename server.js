@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v265'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v266'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -4825,7 +4825,7 @@ const CUEVANA_CACHE_TTL = 5*3600*1000; // 5h híbrido
 
 const CUEVANA_POSTS_API = 'https://cuevana.mov/wp-json/wpreact/v1/postsapi';
 const CUEVANA_SITEMAPS = Array.from({length: 9}, (_, i) => `https://cuevana.mov/pelicula-sitemap${i ? i+1 : ''}.xml`);
-const CUEVANA_HOSTS_OK = ['goodstream.one', 'vimeos.net', 'hlswish.com', 'videoapp.zip'];
+const CUEVANA_HOSTS_OK = ['vimeos.net', 'hlswish.com', 'videoapp.zip', 'goodstream.one'];
 let cuevanaIdx = { slugs: [], at: 0 };
 const CUEVANA_IDX_TTL = 24 * 3600 * 1000;
 const cuevanaMetaCache = new Map(); /* slug → {at, data} */
