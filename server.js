@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v248'; // 248: fix TDZ LOGO_V · heal front roto v246 + sonda intros
+const UI_VERSION = 'v249'; // 249: logo AnimeD23 256 transparente neon sutil (A purpura/cyan) + sonda panel
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
