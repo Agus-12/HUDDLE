@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v244'; // 244: Logos por dominio en feed + auditoria AnimeD23
+const UI_VERSION = 'v245'; // 245: Novelas auditadas + fichas enp + sonda + panel
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
@@ -463,8 +463,8 @@ async function laRevizar() { /* apelaciones: ocultadas hace <7 días, una a una 
     console.log('[podredumbre] revisión terminada: ' + vivas2 + ' revivieron de ' + cands.length);
   } finally { laReviviendo = false; }
 }
-setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); }, 90 * 1000);
-setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); }, 6 * 3600 * 1000);
+setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); sondaNovelas().catch(() => {}); }, 90 * 1000);
+setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); sondaNovelas().catch(() => {}); }, 6 * 3600 * 1000);
 
 /* v234: SONDA PELISXD — revisa películas ocultas para ver si volvieron */
 /* v234: SONDA PELISXD COMPLETA — 3 frentes:
@@ -868,6 +868,9 @@ setInterval(() => { nv2Recientes().then((it) => { if (it && it.length) { nv2Reci
 setTimeout(() => { nv2Recientes().then((it) => { if (it && it.length) { nv2RecientesCache.items = it; nv2RecientesCache.at = Date.now(); } }).catch(() => {}); }, 20 * 1000);
 const NV_OCULTAS = new Set();
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'nv-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) NV_OCULTAS.add(l.trim()); } catch {}
+const NV_VISTAS = new Set(); /* v245: claves nv:|enp: verificadas por sonda */
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'nv-vistas.txt'), 'utf8').split('\n')) if (l.trim()) NV_VISTAS.add(l.trim()); } catch {}
+const NV_STATS = { nv: 0, enp: 0 }; /* v245: últimos tamaños conocidos (catálogos vivos) */
 const FALLOS_NV = new Map();
 try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'fallos-nv.json'), 'utf8')) || {})) FALLOS_NV.set(k, v); } catch {}
 function nvOcultar(slug) {
@@ -935,7 +938,7 @@ async function nvCatalogo() {
       items.push({ title: nvLimpiarTexto(m[3]) || nvTituloBonito(slug), url: NV_BASE + 'categories/' + slug + '/', img, site: 'Novelas', extra: '' });
     }
   }
-  if (items.length) { nvdCache.at = Date.now(); nvdCache.items = items; }
+  if (items.length) { nvdCache.at = Date.now(); nvdCache.items = items; NV_STATS.nv = items.length; }
   return items;
 }
 const nvLimpiarTexto = (t) => String(t || '').replace(/\s+/g, ' ').replace(/\s*[\u2013-]\s*novelas360.*$/i, '').replace(/^\s*Ver\s+/i, '').trim().slice(0, 80);
@@ -963,6 +966,71 @@ async function nvFicha(slug) {
   const enCat = (await cat).find((x) => x.url.endsWith('/categories/' + slug + '/'));
   return { ok: eps.length > 0, slug, titulo: enCat ? enCat.title : nvTituloBonito(slug), poster: enCat ? enCat.img : '', episodios: eps };
 }
+/* v245: probes novelas — la ficha trae ≥1 capítulo */
+async function nv360Probe(slug) {
+  try {
+    const r = await fetchSeguro(NV_BASE + 'categories/' + slug + '/', 15000).catch(() => null);
+    if (!r || !r.ok) return false;
+    return /\/video\/[a-z0-9-]+?-capitulo-\d+/i.test(await r.text());
+  } catch { return false; }
+}
+async function enpProbe(pref) {
+  try {
+    const r = await fetchSeguro(EP_BASE + '?s=' + encodeURIComponent(pref.replace(/-/g, ' ')), 15000).catch(() => null);
+    if (r && r.ok) {
+      const hit = nv2TarjetasDeHtml(await r.text()).some((c) => { const info = epPrefijo(c.slug); return c.esCap && info && info.pref === pref; });
+      if (hit) return true;
+    }
+    const hub = await nv2HijosDelHub(pref).catch(() => null);
+    return !!(hub && hub.eps.length);
+  } catch { return false; }
+}
+/* v245: SONDA NOVELAS — 3+3 vivas, 4 muertas (vigila aunque las externas estén apagadas) */
+async function sondaNovelas() {
+  try {
+    const memMB = process.memoryUsage().heapUsed / 1024 / 1024;
+    if (memMB > 350) { console.warn('[sonda] nv saltado — memoria alta: ' + memMB.toFixed(0) + 'MB'); return; }
+    const t0 = Date.now();
+    let vm = 0, mv = 0;
+    const sh = (arr) => { const a = [...arr]; for (let k = a.length - 1; k > 0; k--) { const z = Math.floor(Math.random() * (k + 1)); [a[k], a[z]] = [a[z], a[k]]; } return a; };
+    const pausa = () => new Promise((r) => setTimeout(r, 1500));
+    let catNv = [], catEnp = [];
+    try { catNv = await nvCatalogo(); } catch {}
+    try { catEnp = await nv2Recientes(); } catch {}
+    for (const x of sh(catNv).slice(0, 3)) {
+      const slug = (/categories\/([a-z0-9-]+)\//.exec(x.url || '') || [])[1] || '';
+      if (!slug || NV_OCULTAS.has(slug)) continue;
+      try {
+        NV_VISTAS.add('nv:' + slug);
+        if (await nv360Probe(slug)) nvPerdonar(slug);
+        else { const era = NV_OCULTAS.has(slug); nvOcultar(slug); if (!era && NV_OCULTAS.has(slug)) { vm++; sondaNotify('Novelas', 'muerto', slug, slug + ' murió — sin capítulos (360)'); } }
+      } catch {}
+      await pausa();
+    }
+    for (const x of sh(catEnp).slice(0, 3)) {
+      const pref = (/enpantallatv\.com\/([a-z0-9-]+)\/?/.exec(x.url || '') || [])[1] || '';
+      const key = 'enp:' + pref;
+      if (!pref || NV_OCULTAS.has(key)) continue;
+      try {
+        NV_VISTAS.add(key);
+        if (await enpProbe(pref)) nvPerdonar(key);
+        else { const era = NV_OCULTAS.has(key); nvOcultar(key); if (!era && NV_OCULTAS.has(key)) { vm++; sondaNotify('Novelas', 'muerto', pref, pref + ' murió — sin capítulos (enpantalla)'); } }
+      } catch {}
+      await pausa();
+    }
+    for (const key of sh([...NV_OCULTAS]).slice(0, 4)) {
+      try {
+        const vive = key.startsWith('enp:') ? await enpProbe(key.slice(4)) : await nv360Probe(key);
+        if (vive) { nvPerdonar(key); mv++; sondaNotify('Novelas', 'revivio', key, key + ' revivió — capítulos otra vez'); }
+      } catch {}
+      await pausa();
+    }
+    try { fs.writeFileSync(path.join(__dirname, 'public', 'nv-vistas.txt'), [...NV_VISTAS].join('\n') + '\n'); } catch {}
+    const el = ((Date.now() - t0) / 1000).toFixed(1);
+    console.log('[sonda] nv (' + el + 's): ' + ((vm || mv) ? ('vivas→muertas=' + vm + ' muertas→vivas=' + mv) : 'sin cambios'));
+    try { fs.appendFileSync(path.join(__dirname, 'sonda-novelas.log'), '[' + new Date().toISOString() + '] ' + el + 's vivas→muertas=' + vm + ' muertas→vivas=' + mv + ' muertas=' + NV_OCULTAS.size + ' vistas=' + NV_VISTAS.size + '\n'); } catch {}
+  } catch (e) { console.warn('[sonda] nv error: ' + String(e).slice(0, 60)); }
+}
 async function buscarNovelas(q) {
   const items = await nvCatalogo().catch(() => []);
   const sinA = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -980,7 +1048,7 @@ async function buscarNovelas(q) {
   const extra = [...serie.entries()]
     .filter(([pref, tit]) => !fuera.some((x) => x.url.endsWith('/categories/' + pref + '/')) && (sinA(tit).includes(nq) || nq.split(' ').filter((w) => w.length > 2).every((w) => sinA(tit).includes(w))))
     .map(([pref, tit]) => ({ title: tit, url: NV_BASE + 'categories/' + pref + '/', img: '', site: 'Novelas', extra: '' }));
-  return [...fuera, ...extra];
+  return [...fuera, ...extra].filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url || '') || [])[1] || '')); /* v245: ocultas fuera */
 }
 /* resolutor: página del capítulo → iframe del player → m3u8/mp4 */
 async function resolverNovela(pageUrl) {
@@ -1089,6 +1157,7 @@ async function nv2Buscar(q, pags) {
       const info = epPrefijo(c.slug) || { pref: c.slug };
       if (vistos.has(info.pref)) continue;
       vistos.add(info.pref);
+      if (NV_OCULTAS.has('enp:' + info.pref)) continue; /* v245 */
       fuera.push({
         title: nvTituloBonito(info.pref),
         url: EP_BASE + info.pref + '/',
@@ -1117,11 +1186,50 @@ async function nv2Recientes() {
     let img = m[3];
     if (img.startsWith('//')) img = 'https:' + img;
     if (!/^https:\/\/.*wp-content/.test(img)) continue;
-    serie.set(slug, { title: nvTituloBonito(slug), url: EP_BASE + slug + '/', img, site: 'Novelas', extra: '' });
+    if (!NV_OCULTAS.has('enp:' + slug)) serie.set(slug, { title: nvTituloBonito(slug), url: EP_BASE + slug + '/', img, site: 'Novelas', extra: '' });
   }
   const items = [...serie.values()];
-  if (items.length) catCache.set('enp-rec', { at: Date.now(), items });
+  if (items.length) { catCache.set('enp-rec', { at: Date.now(), items }); NV_STATS.enp = items.length; }
   return items;
+}
+/* v245: hijos del HUB — rescata prefs-basura (…-hd-online, …-gg-vv) y
+ * episodios sin '-capitulo-' (X-N-junk, X-YYYY-N-junk). Contextual al hub:
+ * el pref ganador debe emparentar con el pedido. */
+async function nv2HijosDelHub(pref) {
+  const r = await fetchSeguro(EP_BASE + pref + '/', 15000).catch(() => null);
+  const html = r && r.ok ? await r.text().catch(() => '') : '';
+  if (!html) return { eps: [], pref };
+  const kids = [...new Set([...html.matchAll(/href="(https:\/\/enpantallatv\.com\/([a-z0-9-]+)\/?)"/gi)].map((m) => m[2]).filter((x) => x !== pref))];
+  const grupos = new Map();
+  for (const k of kids) {
+    let base = '', temp = 0, ep = 0;
+    const info = epPrefijo(k);
+    if (info) { base = info.pref; const te = epTempEp(k); temp = te.temp; ep = te.ep; }
+    else {
+      let m = /^(.+?)-(\d{4})-(\d{1,3})(?:-[a-z0-9-]+)?$/.exec(k);
+      if (m && +m[3] > 0) { base = m[1]; ep = +m[3]; }
+      else {
+        m = /^(.+?)-(\d{1,3})(?:-[a-z0-9-]+)?$/.exec(k);
+        if (m && +m[2] > 0 && +m[2] < 500 && !/-(temporada|season|parte|vol|volumen|capitulo)$/.test(m[1])) { base = m[1]; ep = +m[2]; }
+      }
+    }
+    if (!base || !ep) continue;
+    if (!(pref === base || pref.startsWith(base + '-') || base.startsWith(pref + '-') || base.endsWith('-' + pref))) continue; /* v245.1: sufijo (garra-vs-veneno-guerreros-mundiales) */
+    if (!grupos.has(base)) grupos.set(base, []);
+    grupos.get(base).push({ slug: k, temp, ep });
+  }
+  let ganador = '', gk = [];
+  for (const [b, arr] of grupos) if (arr.length > gk.length || (arr.length === gk.length && b.length > ganador.length)) { ganador = b; gk = arr; }
+  if (!ganador || !gk.length) return { eps: [], pref };
+  const seen = new Set(), eps = [];
+  for (const e of gk) {
+    const key = e.temp + 'x' + e.ep;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    eps.push({ temporada: e.temp || 1, ep: e.ep, url: EP_BASE + e.slug + '/', titulo: 'T' + (e.temp || 1) + ' · Capítulo ' + e.ep });
+  }
+  eps.sort((a, b) => (a.temporada - b.temporada) || (a.ep - b.ep));
+  return { eps, pref: ganador };
 }
 async function nv2Ficha(pref) {
   const eps = [];
@@ -1147,10 +1255,17 @@ async function nv2Ficha(pref) {
     if (!nuevos) break;
   }
   eps.sort((a, b) => (a.temporada - b.temporada) || (a.ep - b.ep));
+  let titulo = nvTituloBonito(pref);
+  if (!eps.length) {
+    try {
+      const hub = await nv2HijosDelHub(pref);
+      if (hub.eps.length) { eps.push(...hub.eps); titulo = nvTituloBonito(hub.pref); }
+    } catch {}
+  }
   if (!img) {
     try { const rh = await fetchSeguro(EP_BASE + pref + '/', 12000); const hh = rh && rh.ok ? await rh.text() : ''; const og = /property="og:image"\s+content="([^"]+)"/i.exec(hh); if (og) img = og[1]; } catch {}
   }
-  return { ok: eps.length > 0, slug: pref, titulo: nvTituloBonito(pref), poster: img, episodios: eps };
+  return { ok: eps.length > 0, slug: pref, titulo, poster: img, episodios: eps };
 }
 async function resolverEnp(pageUrl) {
   const r = await fetchSeguro(pageUrl, 18000).catch(() => null);
@@ -9881,6 +9996,7 @@ async function cuevanaLatest() {
     if (url.pathname.startsWith('/api/enp/')) { /* v206.2: ficha de novela de EnPantallaTV (por prefijo) */
       const pref = decodeURIComponent(url.pathname.split('/')[3] || '').toLowerCase();
       if (!/^[a-z0-9-]{3,100}$/.test(pref)) return json(res, 400, { ok: false, error: 'Serie inválida' });
+      if (NV_OCULTAS.has('enp:' + pref)) return json(res, 404, { ok: false, error: 'Esa novela ya no está disponible' });
       const d = await nv2Ficha(pref).catch(() => null);
       if (!d || !d.ok) return json(res, 502, { ok: false, error: 'No pude leer esa novela — intenta luego' });
       d.episodios = epsVivos(d.episodios); /* v205.5 */
@@ -10888,6 +11004,13 @@ async function cuevanaLatest() {
             ocultas: AF_OCULTAS.size,
             vistas: AF_VISTAS.size,
             activas: AF_TODOS.size - AF_OCULTAS.size,
+          },
+          novelas: {
+            nombre: 'Novelas',
+            total: (NV_STATS.nv || 73) + (NV_STATS.enp || 120), /* auditoría sept 2026 hasta primer fetch */
+            ocultas: NV_OCULTAS.size,
+            vistas: NV_VISTAS.size,
+            activas: (NV_STATS.nv || 73) + (NV_STATS.enp || 120) - NV_OCULTAS.size,
           },
           miscaricaturas: {
             nombre: 'MisCaricaturas',
