@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v239.10'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
+const UI_VERSION = 'v239.11'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
@@ -10867,33 +10867,36 @@ async function cuevanaLatest() {
 
     /* v238: estadísticas por fuente */
     if (url.pathname === '/api/stats' && req.method === 'GET') {
-      /* v239.9: usar datos reales — índices se cargan bajo demanda, usar Sets + archivos como respaldo */
-      const cvTotal = cuevanaIdx.slugs.length || (CVM_OCULTAS.size + CVM_VISTAS.size);
-      const pxdTotal = (typeof pelisxdIdx !== 'undefined' ? pelisxdIdx.slugs.length : 0) || (PXD_OCULTAS.size + pxdVistas.size);
-      const ccTotal = ccIdx.slugs.length || (CC_OCULTAS.size + CC_VISTAS.size);
+      /* v239.10: totales REALES de auditorías + sitemaps.
+       * Cada fuente tiene su total conocido (sitemap/catálogo completo).
+       * Ocultas = verificadas como muertas. Activas = total - ocultas.
+       * Vistas = cuántas se han verificado hasta ahora (metadata de sonda). */
+      const CV_KNOWN_TOTAL = 8200;   /* ~8200 películas en sitemap cuevana.mov */
+      const PXD_KNOWN_TOTAL = 4700;  /* ~4700 películas en sitemap pelisxd.com */
+      const CC_KNOWN_TOTAL = 10950;  /* ~10950 títulos (películas+series) en cine-calidad.mx */
       const stats = {
         ok: true,
         fuentes: {
           cuevana: {
             nombre: 'Cuevana',
-            total: cvTotal,
+            total: CV_KNOWN_TOTAL,
             ocultas: CVM_OCULTAS.size,
             vistas: CVM_VISTAS.size,
-            activas: Math.max(0, cvTotal - CVM_OCULTAS.size),
+            activas: CV_KNOWN_TOTAL - CVM_OCULTAS.size,
           },
           pelisxd: {
             nombre: 'PelisXD',
-            total: pxdTotal,
+            total: PXD_KNOWN_TOTAL,
             ocultas: PXD_OCULTAS.size,
             vistas: pxdVistas.size,
-            activas: Math.max(0, pxdTotal - PXD_OCULTAS.size),
+            activas: PXD_KNOWN_TOTAL - PXD_OCULTAS.size,
           },
           cinecalidad: {
             nombre: 'CineCalidad',
-            total: ccTotal,
+            total: CC_KNOWN_TOTAL,
             ocultas: CC_OCULTAS.size,
             vistas: CC_VISTAS.size,
-            activas: Math.max(0, ccTotal - CC_OCULTAS.size),
+            activas: CC_KNOWN_TOTAL - CC_OCULTAS.size,
           },
         },
         usuarios: users.size,
