@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v240.5'; // 240.5: Iconos pegados al original, fondo transparente
+const UI_VERSION = 'v240.6'; // 240.6: PelisXD hacia arriba + iconos proporcionados
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
