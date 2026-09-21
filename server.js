@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v240'; // 240: Sonda Latanime + panel fix
+const UI_VERSION = 'v240.2'; // 240.2: Sonda log persistente + notifs en todas las sondas
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
@@ -456,6 +456,7 @@ async function laRevizar() { /* apelaciones: ocultadas hace <7 días, una a una 
         laMuertaQuitar(slug);
         LA_FALLOS.delete(slug);
         laFallosGuardar();
+        sondaNotify("Latanime", "revivio", slug, slug + " revivio — apelacion aceptada");
         console.log('[podredumbre] la: ' + slug + ' REVIVIÓ — visible otra vez');
       }
       await new Promise((r2) => setTimeout(r2, 12000));
@@ -707,7 +708,7 @@ function sondaNotify(fuente, tipo, slug, msg) {
   SONDALOG.unshift({ ts: Date.now(), fuente, tipo, slug, msg: String(msg || '').slice(0, 200) });
   if (SONDALOG.length > SONDALOG_MAX) SONDALOG.length = SONDALOG_MAX;
   clearTimeout(sondaLogTimer);
-  sondaLogTimer = setTimeout(() => { try { fs.writeFileSync(SONDALOG_FILE, JSON.stringify(SONDALOG)); } catch {} }, 3000);
+  sondaLogTimer = setTimeout(() => { try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(SONDALOG_FILE, JSON.stringify(SONDALOG)); } catch {} }, 3000);
   const sym = tipo === 'muerto' ? 'x' : tipo === 'revivio' ? '+' : '?';
   console.log(`[sonda-notif] ${sym} ${fuente}: ${msg}`);
 }
@@ -809,7 +810,7 @@ async function revivirGeneral() {
         const ep0 = ficha && ficha.episodios && ficha.episodios[0];
         if (ep0 && ep0.url) url = ep0.url;
       }
-      if (url) { await resolverGopelis(url); gpOcultaQuitar(key); probados.push('gp:' + key + ' REVIVIÓ'); }
+      if (url) { await resolverGopelis(url); gpOcultaQuitar(key); probados.push('gp:' + key + ' REVIVIÓ'); sondaNotify("GoPelis", "revivio", key, key + " revivio — resuelve otra vez"); }
     } catch {}
   }
   revGiro.gp += 2;
@@ -817,7 +818,7 @@ async function revivirGeneral() {
   const pxdKeys = [...PXD_OCULTAS];
   if (pxdKeys.length) {
     const slug = pxdKeys[revGiro.pxd % pxdKeys.length]; revGiro.pxd++;
-    try { await resolverPelisxd('https://www.pelisxd.com/pelicula/' + slug); PXD_OCULTAS.delete(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt'); probados.push('pxd:' + slug + ' REVIVIÓ'); } catch {}
+    try { await resolverPelisxd('https://www.pelisxd.com/pelicula/' + slug); PXD_OCULTAS.delete(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt'); probados.push('pxd:' + slug + ' REVIVIÓ'); sondaNotify("PelisXD", "revivio", slug, slug + " revivio — resuelve otra vez"); } catch {}
   }
   /* AnimeFLV: POST /flv + mp4upload vivo (2 por vuelta, sin navegador) */
   const afKeys = [...AF_OCULTAS];
@@ -835,7 +836,7 @@ async function revivirGeneral() {
         const mU = tx.match(/["'](https?:\/\/[^"'\s<>]*mp4upload[^"'\s<>]*\.mp4[^"'\s<>]*)["']/i);
         if (mU && await sirveElVideo(mU[1], emb)) { vive = true; break; }
       }
-      if (vive) { AF_OCULTAS.delete(slug); ocultasReescribir(AF_OCULTAS, 'af-ocultas.txt'); probados.push('af:' + slug + ' REVIVIÓ'); }
+      if (vive) { AF_OCULTAS.delete(slug); ocultasReescribir(AF_OCULTAS, 'af-ocultas.txt'); probados.push('af:' + slug + ' REVIVIÓ'); sondaNotify("AnimeFLV", "revivio", slug, slug + " revivio — mp4upload vivo"); }
     } catch {}
   }
   revGiro.af += 2;
@@ -850,7 +851,7 @@ async function revivirGeneral() {
         if (r && r.ok) { html = await r.text(); break; }
       }
       if (html && (/goodstream\.one\/embed/i.test(html) || /vimeos?\.(net|zip)/i.test(html))) {
-        CV_OCULTAS_RT.delete(slug); cvPerdonarFile(); probados.push('cv:' + slug + ' REVIVIÓ');
+        CV_OCULTAS_RT.delete(slug); cvPerdonarFile(); probados.push('cv:' + slug + ' REVIVIÓ'); sondaNotify("Cuevana", "revivio", slug, slug + " revivio — servidores encontrados");
       }
     } catch {}
   }
@@ -7301,7 +7302,9 @@ async function sondaCineCalidad() {
     if (nuevas_fail) parts.push('nuevas_fail=' + nuevas_fail);
     if (vivas_muertas) parts.push('vivas→muertas=' + vivas_muertas);
     if (muertas_vivas) parts.push('muertas→vivas=' + muertas_vivas);
+    const logLine = `[${new Date().toISOString()}] ${elapsed}s nuevas_ok=${nuevas_ok} nuevas_fail=${nuevas_fail} vivas→muertas=${vivas_muertas} muertas→vivas=${muertas_vivas} ocultas=${CC_OCULTAS.size} vistas=${CC_VISTAS.size}\n`;
     console.log('[sonda] cc (' + elapsed + 's): ' + (parts.join(', ') || 'sin cambios') + ' ocultas=' + CC_OCULTAS.size + ' vistas=' + CC_VISTAS.size);
+    try { fs.appendFileSync(path.join(__dirname, 'sonda-cinecalidad.log'), logLine); } catch {}
   } catch (e) { console.warn('[sonda] cc error: ' + String(e.message || e).slice(0, 100)); }
 }
 
