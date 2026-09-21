@@ -22,20 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-/* v238: admin auth helper */
-function checkAdminAuth(req, res) {
-  const adminUser = 'Admin';
-  const adminPass = 'Samuelito8';
-  const auth = req.headers.authorization || '';
-  if (!auth.startsWith('Basic ') || Buffer.from(auth.slice(6), 'base64').toString() !== adminUser + ':' + adminPass) {
-    res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Huddle Admin"', 'Content-Type': 'text/plain' });
-    res.end('Credenciales requeridas');
-    return false;
-  }
-  return true;
-}
-
-const UI_VERSION = 'v239.2'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
+const UI_VERSION = 'v239.3'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
@@ -10952,16 +10939,16 @@ async function cuevanaLatest() {
         titulosCheckpoint: cosecha && cosecha.meta ? cosecha.meta.hits : 0,
       };
       if (!/text\/html/i.test(req.headers.accept || '') || url.searchParams.get('json') === '1') return json(res, 200, datos);
-      /* v238: auth básica para el panel */
-      const adminUser = 'Admin';
+      /* v239.3: auth via cookie */
       const adminPass = 'Samuelito8';
-      const auth = req.headers.authorization || '';
-      if (!auth.startsWith('Basic ') || Buffer.from(auth.slice(6), 'base64').toString() !== adminUser + ':' + adminPass) {
-        res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Huddle Admin"', 'Content-Type': 'text/plain' });
-        return res.end('Credenciales requeridas');
+      const cookies = (req.headers.cookie || '').split(';').reduce((acc, c) => { const [k,v] = c.trim().split('='); if(k) acc[k]=v; return acc; }, {});
+      const urlPass = url.searchParams.get('pass');
+      if (cookies.huddle_admin === 'ok' || urlPass === adminPass) {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Set-Cookie': 'huddle_admin=ok; Path=/; HttpOnly' });
+        return res.end(panelHtml());
       }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-      return res.end(panelHtml());
+      return res.end('<!DOCTYPE html><html><head><meta charset="utf-8"><title>Huddle Admin</title><style>body{background:#0d0b14;color:#efeaf7;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}.box{background:#17131f;border:1px solid #2a2338;border-radius:16px;padding:30px;text-align:center;max-width:300px}input{background:#0d0b14;border:1px solid #2a2338;border-radius:8px;padding:10px;color:#efeaf7;width:100%;margin:10px 0;font-size:16px}button{background:#8a5cf6;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:16px;cursor:pointer;width:100%}h2{margin:0 0 20px}</style></head><body><div class="box"><h2>Huddle Admin</h2><form method="GET"><input type="password" name="pass" placeholder="Contrasena" autofocus><button type="submit">Entrar</button></form></div></body></html>');
     }
     if (url.pathname === '/api/estado') { /* v205.4: todo el estado en un JSON para el panel; v223: + cosecha; v227: + llave CDN */
       
