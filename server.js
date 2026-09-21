@@ -11292,6 +11292,7 @@ function panelHtml() {
   }
   function chip(clase, txt, n) { return '<span class="chip ' + clase + '">' + txt + ' <b>' + n + '</b></span>'; }
   function pintar(d) {
+    try {
     document.getElementById('ver').textContent = d.version;
     document.getElementById('cards').innerHTML =
       '<div class="card"><div class="n">' + fmtSeg(d.encendidoHace) + '</div><div class="t">Encendido</div></div>' +
@@ -11329,6 +11330,7 @@ function panelHtml() {
       return '<tr><td>' + m.sitio + '</td><td>' + m.serie + '</td><td>T' + m.temporada + '</td><td>' + m.inicio + ' → ' + m.fin + '</td></tr>';
     }).join('') || '<tr><td colspan="4">Aún no hay intros aprendidas</td></tr>';
     document.getElementById('pie').textContent = 'Actualizado ' + new Date().toLocaleTimeString('es');
+    } catch(e) { document.getElementById('pie').textContent = 'Error: ' + e.message; }
   }
   function tic() {
     fetch('/api/estado').then(function (r) { return r.json(); }).then(pintar).catch(function () {
