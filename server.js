@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v263'; // 263: Master 410 re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v264'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -4991,25 +4991,14 @@ async function resolverCuevanaMov(pageUrl) {
       if (m3u8) {
         /* Verificar que el m3u8 sirve */
         let vr = null;
-        // para goodstream, probar directo con cookie primero (sin relay)
+        // v264: no verificar master para goodstream (single-use token) — devolver directo, el HLS proxy lo verificará
         if (/goodstream\.one/i.test(host) || /hls.*\.goodstream\.one/i.test(m3u8)) {
-          try {
-            const ctl = new AbortController(); const tm=setTimeout(()=>ctl.abort(), 8000);
-            const ck = goodCookie('goodstream.one');
-            const r = await fetch(m3u8, { signal: ctl.signal, redirect: 'follow', headers: { 'User-Agent': FETCH_UA, 'Referer': embed.url, 'Accept': '*/*', ...(ck?{Cookie: ck}:{}) } });
-            clearTimeout(tm);
-            if(r.ok){
-              const txt = await r.clone().text().catch(()=> '');
-              if(txt.includes('#EXTM3U')) vr = r;
-              else {
-                const sc = r.headers.get('set-cookie');
-                if(sc) goodSetCookie('goodstream.one', sc);
-              }
-            }
-          } catch {}
+          // no verificar, token de un solo uso
+          vr = { ok: true, text: async()=> '#EXTM3U' };
+        } else {
+          if (!vr) try { vr = CDN_RELAY ? await fetchRelay(m3u8, 10000).catch(() => null) : await fetchSeguro(m3u8, 8000).catch(() => null); } catch {}
+          if (!vr || !vr.ok) { try { vr = await fetchSeguro(m3u8, 8000).catch(()=>null); } catch {} }
         }
-        if (!vr) try { vr = CDN_RELAY ? await fetchRelay(m3u8, 10000).catch(() => null) : await fetchSeguro(m3u8, 8000).catch(() => null); } catch {}
-        if (!vr || !vr.ok) { try { vr = await fetchSeguro(m3u8, 8000).catch(()=>null); } catch {} }
         if (vr && vr.ok) {
           const txt = await vr.text().catch(() => '');
           if (txt.includes('#EXTM3U')) {
@@ -5018,11 +5007,12 @@ async function resolverCuevanaMov(pageUrl) {
             try { hlsUAs.set(cdnHost, FETCH_UA); hlsALs.set(cdnHost, 'es-MX,es;q=0.9,en;q=0.8'); } catch {}
             const isGood = /goodstream|vimeos|hlswish/i.test(host);
             const resObj = { m3u8, subs: [], proxy: true, mp4: false };
-            CUEVANA_M3U8_CACHE.set(slug, { ...resObj, at: Date.now(), isGood });
-            // limpiar mapa si crece
-            if (CUEVANA_M3U8_CACHE.size > 400) {
-              const entries = [...CUEVANA_M3U8_CACHE.entries()].sort((a,b)=>a[1].at-b[1].at);
-              for(let i=0;i<entries.length-300;i++) CUEVANA_M3U8_CACHE.delete(entries[i][0]);
+            if (!isGood) {
+              CUEVANA_M3U8_CACHE.set(slug, { ...resObj, at: Date.now(), isGood });
+              if (CUEVANA_M3U8_CACHE.size > 400) {
+                const entries = [...CUEVANA_M3U8_CACHE.entries()].sort((a,b)=>a[1].at-b[1].at);
+                for(let i=0;i<entries.length-300;i++) CUEVANA_M3U8_CACHE.delete(entries[i][0]);
+              }
             }
             return resObj;
           }
