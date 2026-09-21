@@ -223,7 +223,7 @@ function renderUsers(data){
     else if(age<TWO_W){cls='yellow';yellow++;}
     else{cls='red';red++;}
     var dt=u.lastSeenAt?new Date(u.lastSeenAt).toLocaleDateString('es'):'—';
-    var status=u.online?'🟢 En sala':'';
+    var status=u.online?'- en linea':'';
     html+='<div class="urow">'
       +'<div class="udot '+cls+'"></div>'
       +'<div class="uname">'+u.name+(status?' <span style="font-size:10px;color:#38e08a">'+status+'</span>':'')+'</div>'
