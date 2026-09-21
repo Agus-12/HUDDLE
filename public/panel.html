@@ -15,19 +15,16 @@ h1 .ver{font-size:11px;color:#9d93b5;font-weight:400;margin-left:auto}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px}
 .card{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:14px}
 .card .n{font-size:26px;font-weight:800}
-.card .t{color:#9d93b5;font-size:10px;margin-top:3px;text-transform:uppercase;letter-spacing:0.6px}
+.card .t{color:#9d93b5;font-size:10px;margin-top:3px;text-transform:uppercase;letter-spacing:.6px}
 .section{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:16px;margin-bottom:14px}
-.section h2{font-size:14px;color:#efeaf7;margin:0 0 12px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
-.section h2 .arrow{transition:transform .2s;font-size:12px;color:#9d93b5}
-.section h2 .arrow.open{transform:rotate(90deg)}
+.section h2{font-size:14px;color:#efeaf7;margin:0 0 12px;display:flex;align-items:center;gap:8px}
 .section h2 .badge{background:#2a2338;border-radius:99px;padding:2px 10px;font-size:11px;color:#b8aed0;margin-left:auto}
 .hidden{display:none}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.chip{background:#0d0b14;border:1px solid #2a2338;border-radius:99px;padding:6px 12px;font-size:12px}
+.chip b{font-weight:800}.chip.ok b{color:#38e08a}.chip.warn b{color:#ffb020}.chip.bad b{color:#ff5c7a}
 .barra{background:#241d31;border-radius:99px;height:10px;overflow:hidden;margin:6px 0}
 .barra i{display:block;height:100%;border-radius:99px;transition:width .6s}
-.chips{display:flex;flex-wrap:wrap;gap:8px}
-.chip{background:#0d0b14;border:1px solid #2a2338;border-radius:99px;padding:6px 12px;font-size:12px}
-.chip b{font-weight:800}
-.chip.ok b{color:#38e08a}.chip.warn b{color:#ffb020}.chip.bad b{color:#ff5c7a}
 /* Usuarios */
 .user-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #221c2e}
 .user-row:last-child{border-bottom:0}
@@ -38,138 +35,142 @@ h1 .ver{font-size:11px;color:#9d93b5;font-weight:400;margin-left:auto}
 .user-name{flex:1;font-size:13px}
 .user-date{font-size:11px;color:#9d93b5;min-width:70px}
 .btn-del{background:#ff5c7a;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer}
-/* Fuentes fuente-card */
-.fuente-card{background:#0d0b14;border:1px solid #2a2338;border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;transition:border-color .2s}
-.fuente-card:hover{border-color:#8a5cf6}
-.fuente-head{display:flex;align-items:center;justify-content:space-between}
-.fuente-head .name{font-size:15px;font-weight:700}
-.fuente-head .count{font-size:22px;font-weight:800}
-.fuente-detail{margin-top:10px;padding-top:10px;border-top:1px solid #221c2e;font-size:12px;color:#9d93b5;line-height:1.7}
+/* Fuentes */
+.fuente-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #221c2e;cursor:pointer}
+.fuente-row:last-child{border-bottom:0}
+.fuente-color{width:4px;height:36px;border-radius:2px;flex-shrink:0}
+.fuente-info{flex:1}
+.fuente-info .name{font-size:14px;font-weight:700}
+.fuente-info .sub2{font-size:11px;color:#9d93b5}
+.fuente-n{font-size:22px;font-weight:800;min-width:50px;text-align:right}
+.fuente-detail{padding:12px 0 6px;border-bottom:1px solid #221c2e;font-size:12px;color:#9d93b5;line-height:1.8}
+.fuente-detail b{color:#efeaf7}
 .bar-sm{height:6px;border-radius:99px;background:#241d31;overflow:hidden;margin:4px 0}
-.bar-sm i{display:block;height:100%;border-radius:99px}
+.bar-sm span{display:block;height:100%;border-radius:99px}
 .pie{color:#9d93b5;font-size:11px;text-align:center;margin-top:18px}
+table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+th{text-align:left;color:#9d93b5;font-size:10px;text-transform:uppercase;padding:6px 4px;border-bottom:1px solid #2a2338}
+td{padding:5px 4px;border-bottom:1px solid #1a1625}
+.caret{color:#9d93b5;font-size:11px;cursor:pointer;margin-left:auto}
 @media(max-width:480px){.grid{grid-template-columns:1fr 1fr}.card .n{font-size:20px}}
 </style>
 </head>
 <body>
 <div class="wrap">
-
 <h1><span class="dot"></span> Huddle <span class="ver" id="ver"></span></h1>
 <p class="sub" id="sub">conectando…</p>
 
-<!-- Dashboard -->
+<!-- Dashboard siempre visible -->
 <div class="grid" id="cards"></div>
+
+<!-- Fuentes de video siempre visible -->
+<div class="section">
+  <h2>Fuentes de video <span class="badge" id="fuentesBadge">—</span></h2>
+  <div id="fuentesList"></div>
+  <div id="fuentesDetail" class="hidden"></div>
+</div>
+
+<!-- Catálogo total siempre visible -->
+<div class="section">
+  <h2>Catálogo total <span class="badge" id="catBadge">—</span></h2>
+  <div id="catGrid" class="grid" style="margin-bottom:0"></div>
+  <div id="catDetail" style="font-size:12px;color:#9d93b5;line-height:1.8;margin-top:10px"></div>
+</div>
+
+<!-- Rastreador de intros OCULTO por defecto -->
+<div class="section">
+  <h2>Rastreador de intros <span class="badge" id="introBadge">—</span> <span class="caret" onclick="toggleIntros()">▸ mostrar</span></h2>
+  <div id="introsWrap" class="hidden"></div>
+</div>
 
 <!-- Usuarios -->
 <div class="section">
-  <h2 onclick="toggle('secUsers')"><span class="arrow" id="arrUsers">▶</span> Usuarios <span class="badge" id="userBadge">0</span></h2>
-  <div id="secUsers" class="hidden"></div>
-</div>
-
-<!-- Fuentes de video -->
-<div class="section">
-  <h2 onclick="toggle('secFuentes')"><span class="arrow" id="arrFuentes">▶</span> Fuentes de video <span class="badge" id="fuentesBadge">0</span></h2>
-  <div id="secFuentes" class="hidden"></div>
-</div>
-
-<!-- Catálogo total -->
-<div class="section">
-  <h2 onclick="toggle('secCat')"><span class="arrow" id="arrCat">▶</span> Catálogo total <span class="badge" id="catBadge">0</span></h2>
-  <div id="secCat" class="hidden"></div>
-</div>
-
-<!-- Rastreador de intros -->
-<div class="section">
-  <h2 onclick="toggle('secIntros')"><span class="arrow" id="arrIntros">▶</span> Rastreador de intros <span class="badge" id="introBadge">0%</span></h2>
-  <div id="secIntros" class="hidden"></div>
+  <h2>Usuarios <span class="badge" id="userBadge">—</span></h2>
+  <div id="usersList"></div>
 </div>
 
 <p class="pie" id="pie">conectando…</p>
 </div>
 
 <script>
-function toggle(id){
-  var el=document.getElementById(id);
-  var arr=document.getElementById('arr'+id.replace('sec',''));
-  if(el.classList.contains('hidden')){el.classList.remove('hidden');if(arr)arr.classList.add('open');}
-  else{el.classList.add('hidden');if(arr)arr.classList.remove('open');}
-}
+var _openFuente=null;
 
 function fmt(s){var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return(d?d+'d ':'')+(h?h+'h ':'')+m+'m'}
 
-function renderUsers(usuarios){
-  var now=Date.now(),TWO_WEEKS=14*86400000,THREE_WEEKS=21*86400000;
-  var sorted=usuarios.slice().sort(function(a,b){return(b.lastSeenAt||0)-(a.lastSeenAt||0)});
-  var html='';
-  sorted.forEach(function(u){
-    var age=u.lastSeenAt?now-u.lastSeenAt:Infinity;
-    var cls=age<TWO_WEEKS?'green':(age<THREE_WEEKS?'yellow':'white');
-    var label=age<TWO_WEEKS?'Activo':(age<THREE_WEEKS?'Inactivo':'Desactivado');
-    var date=u.lastSeenAt?new Date(u.lastSeenAt).toLocaleDateString('es'):'—';
-    html+='<div class="user-row">'
-      +'<div class="user-dot '+cls+'" title="'+label+'"></div>'
-      +'<div class="user-name">'+u.name+'</div>'
-      +'<div class="user-date">'+date+'</div>'
-      +'<button class="btn-del" onclick="eliminarUser(\''+u.name.replace(/'/g,"\\'")+'\')">Eliminar</button>'
-      +'</div>';
-  });
-  document.getElementById('secUsers').innerHTML=html||'<div style="color:#9d93b5;font-size:13px">Sin usuarios</div>';
-  document.getElementById('userBadge').textContent=usuarios.length;
+function toggleIntros(){
+  var w=document.getElementById('introsWrap');
+  var c=document.querySelector('.caret');
+  if(w.classList.contains('hidden')){w.classList.remove('hidden');c.textContent='▾ ocultar';}
+  else{w.classList.add('hidden');c.textContent='▸ mostrar';}
 }
 
-function renderFuentes(stats,estado){
+function renderDashboard(d){
+  document.getElementById('ver').textContent=d.version;
+  document.getElementById('sub').textContent='Actualizado '+new Date().toLocaleTimeString('es');
+  document.getElementById('cards').innerHTML=
+    '<div class="card"><div class="n">'+fmt(d.encendidoHace)+'</div><div class="t">Encendido</div></div>'
+    +'<div class="card"><div class="n">'+d.memoriaMb+' MB</div><div class="t">Memoria</div></div>'
+    +'<div class="card"><div class="n">'+d.salasActivas+'</div><div class="t">Salas</div></div>'
+    +'<div class="card"><div class="n">'+d.usuarios+'</div><div class="t">Usuarios</div></div>';
+}
+
+function renderFuentes(stats){
   var fuentes=stats.fuentes||{};
-  var html='';
   var colors={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8'};
-  var names={cuevana:'Cuevana',pelisxd:'PelisXD',cinecalidad:'CineCalidad'};
   var totalActivas=0;
+  var html='';
   for(var k in fuentes){
-    var f=fuentes[k];
-    var color=colors[k]||'#efeaf7';
-    var activas=f.activas>0?f.activas:0;
-    totalActivas+=activas;
-    var pct=f.total?Math.round(activas*100/f.total):0;
-    html+='<div class="fuente-card" onclick="this.querySelector(\'.fuente-detail\').classList.toggle(\'hidden\')">'
-      +'<div class="fuente-head">'
-      +'<div><div class="name" style="color:'+color+'">'+f.nombre+'</div>'
-      +'<div style="font-size:11px;color:#9d93b5">'+f.total+' total · '+f.ocultas+' ocultas</div></div>'
-      +'<div class="count" style="color:'+color+'">'+activas+'</div>'
-      +'</div>'
-      +'<div class="bar-sm"><i style="width:'+pct+'%;background:'+color+'"></i></div>'
-      +'<div class="fuente-detail hidden">'
-      +'<div>Total en catálogo: <b>'+f.total+'</b></div>'
-      +'<div>Activas: <b>'+activas+'</b> ('+pct+'%)</div>'
-      +'<div>Ocultas (muertas): <b>'+f.ocultas+'</b></div>'
-      +'<div>Verificadas (vistas): <b>'+(f.vistas||0)+'</b></div>'
-      +'</div></div>';
+    var f=fuentes[k];var c=colors[k]||'#efeaf7';
+    var act=f.activas>0?f.activas:0;
+    totalActivas+=act;
+    var pct=f.total?Math.round(act*100/f.total):0;
+    html+='<div class="fuente-row" onclick="clickFuente(\''+k+'\')">'
+      +'<div class="fuente-color" style="background:'+c+'"></div>'
+      +'<div class="fuente-info"><div class="name" style="color:'+c+'">'+f.nombre+'</div>'
+      +'<div class="sub2">'+f.total+' total · '+f.ocultas+' ocultas</div></div>'
+      +'<div class="fuente-n" style="color:'+c+'">'+act+'</div>'
+      +'<span class="caret">▸</span></div>'
+      +'<div id="fd-'+k+'" class="fuente-detail hidden"></div>';
   }
-  document.getElementById('secFuentes').innerHTML=html;
+  document.getElementById('fuentesList').innerHTML=html;
   document.getElementById('fuentesBadge').textContent=totalActivas+' activas';
+}
+
+function clickFuente(k){
+  var el=document.getElementById('fd-'+k);
+  if(_openFuente&&_openFuente!==k){document.getElementById('fd-'+_openFuente).classList.add('hidden');}
+  if(el.classList.contains('hidden')){
+    el.classList.remove('hidden');
+    _openFuente=k;
+    // render detail
+    var f=(window._statsData&&window._statsData.fuentes)?window._statsData.fuentes[k]:null;
+    if(!f)return;
+    var act=f.activas>0?f.activas:0;
+    var pct=f.total?Math.round(act*100/f.total):0;
+    var c={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8'}[k]||'#efeaf7';
+    el.innerHTML='<div class="bar-sm"><span style="width:'+pct+'%;background:'+c+'"></span></div>'
+      +'<div>Activas: <b>'+act+'</b> de '+f.total+' ('+pct+'%)</div>'
+      +'<div>Ocultas (caídas): <b>'+f.ocultas+'</b></div>'
+      +'<div>Verificadas: <b>'+(f.vistas||0)+'</b></div>';
+  }else{el.classList.add('hidden');_openFuente=null;}
 }
 
 function renderCatalogo(estado,stats){
   var ca=estado.catalogos||{};
   var fuentes=stats.fuentes||{};
-  var totalPeliculas=0;
-  for(var k in fuentes)totalPeliculas+=(fuentes[k].activas||0);
+  var totalPelis=0;for(var k in fuentes)totalPelis+=(fuentes[k].activas>0?fuentes[k].activas:0);
   var totalSeries=(ca.animes||0)+(ca.danimados||0);
-  var totalCaricaturas=(ca.caricaturas||0)+(ca.cartoons||0)+(ca.liveaction||0);
-  var granTotal=totalPeliculas+totalSeries+totalCaricaturas;
-  var html='<div class="grid">'
-    +'<div class="card"><div class="n" style="color:#38e08a">'+totalPeliculas+'</div><div class="t">Películas activas</div></div>'
+  var totalCari=(ca.caricaturas||0)+(ca.cartoons||0)+(ca.liveaction||0);
+  var gran=totalPelis+totalSeries+totalCari;
+  document.getElementById('catGrid').innerHTML=
+    '<div class="card"><div class="n" style="color:#38e08a">'+totalPelis+'</div><div class="t">Películas</div></div>'
     +'<div class="card"><div class="n" style="color:#8a5cf6">'+totalSeries+'</div><div class="t">Series</div></div>'
-    +'<div class="card"><div class="n" style="color:#38bdf8">'+totalCaricaturas+'</div><div class="t">Caricaturas</div></div>'
-    +'<div class="card"><div class="n" style="color:#ffb020">'+granTotal+'</div><div class="t">Total Huddle</div></div>'
-    +'</div>';
-  html+='<div style="font-size:12px;color:#9d93b5;line-height:1.8">';
-  html+='Caricaturas: <b>'+ca.caricaturas+'</b> · ';
-  html+='Cartoons: <b>'+ca.cartoons+'</b> · ';
-  html+='Live Action: <b>'+ca.liveaction+'</b><br>';
-  html+='Danimados: <b>'+ca.danimados+'</b> · ';
-  html+='Animes latanime: <b>'+ca.animes+'</b>';
-  html+='</div>';
-  document.getElementById('secCat').innerHTML=html;
-  document.getElementById('catBadge').textContent=granTotal+' títulos';
+    +'<div class="card"><div class="n" style="color:#38bdf8">'+totalCari+'</div><div class="t">Caricaturas</div></div>'
+    +'<div class="card"><div class="n" style="color:#ffb020">'+gran+'</div><div class="t">Total</div></div>';
+  document.getElementById('catDetail').innerHTML=
+    'Caricaturas: <b>'+ca.caricaturas+'</b> · Cartoons: <b>'+ca.cartoons+'</b> · Live Action: <b>'+ca.liveaction+'</b><br>'
+    +'Danimados: <b>'+ca.danimados+'</b> · Animes: <b>'+ca.animes+'</b>';
+  document.getElementById('catBadge').textContent=gran+' títulos';
 }
 
 function renderIntros(estado){
@@ -183,56 +184,55 @@ function renderIntros(estado){
     +'<span class="chip warn">Sin intro <b>'+ii.sinIntro+'</b></span>'
     +'<span class="chip">En cola <b>'+ii.enCola+'</b></span>'
     +'</div>';
-  html+='<table style="width:100%;margin-top:12px;font-size:12px"><thead><tr style="color:#9d93b5;text-align:left"><th>Sitio</th><th>Serie</th><th>Temp</th><th>Seg</th></tr></thead><tbody>';
-  (ii.muestra||[]).forEach(function(m){
-    html+='<tr><td>'+m.sitio+'</td><td>'+m.serie+'</td><td>T'+m.temporada+'</td><td>'+m.inicio+'→'+m.fin+'</td></tr>';
-  });
-  html+='</tbody></table>';
-  document.getElementById('secIntros').innerHTML=html;
+  if(ii.muestra&&ii.muestra.length){
+    html+='<table><thead><tr><th>Sitio</th><th>Serie</th><th>Temp</th><th>Seg</th></tr></thead><tbody>';
+    ii.muestra.forEach(function(m){html+='<tr><td>'+m.sitio+'</td><td>'+m.serie+'</td><td>T'+m.temporada+'</td><td>'+m.inicio+'→'+m.fin+'</td></tr>';});
+    html+='</tbody></table>';
+  }
+  document.getElementById('introsWrap').innerHTML=html;
   document.getElementById('introBadge').textContent=pct+'%';
 }
 
-function renderDashboard(d){
-  document.getElementById('cards').innerHTML=
-    '<div class="card"><div class="n">'+fmt(d.encendidoHace)+'</div><div class="t">Encendido</div></div>'
-    +'<div class="card"><div class="n">'+d.memoriaMb+' MB</div><div class="t">Memoria</div></div>'
-    +'<div class="card"><div class="n">'+d.salasActivas+'</div><div class="t">Salas</div></div>'
-    +'<div class="card"><div class="n">'+d.usuarios+'</div><div class="t">Usuarios</div></div>';
+function renderUsers(d){
+  var usuarios=d.usuarios||[];
+  var now=Date.now(),W2=14*86400000,W3=21*86400000;
+  var sorted=usuarios.slice().sort(function(a,b){return(b.lastSeenAt||0)-(a.lastSeenAt||0)});
+  var html='';
+  sorted.forEach(function(u){
+    var age=u.lastSeenAt?now-u.lastSeenAt:Infinity;
+    var cls=age<W2?'green':(age<W3?'yellow':'white');
+    var lbl=age<W2?'Activo':(age<W3?'Inactivo':'Desactivado');
+    var dt=u.lastSeenAt?new Date(u.lastSeenAt).toLocaleDateString('es'):'—';
+    html+='<div class="user-row">'
+      +'<div class="user-dot '+cls+'" title="'+lbl+'"></div>'
+      +'<div class="user-name">'+u.name+'</div>'
+      +'<div class="user-date">'+dt+'</div>'
+      +'<button class="btn-del" onclick="eliminarUser(\''+u.name.replace(/'/g,"\\'")+'\')">Eliminar</button></div>';
+  });
+  document.getElementById('usersList').innerHTML=html||'<div style="color:#9d93b5;font-size:13px">Sin usuarios</div>';
+  document.getElementById('userBadge').textContent=usuarios.length;
 }
-
-var estadoData=null, statsData=null, usersData=null;
 
 function tic(){
   document.getElementById('pie').textContent='actualizando…';
   fetch('/api/estado').then(function(r){return r.json()}).then(function(d){
-    estadoData=d;
-    document.getElementById('ver').textContent=d.version;
-    document.getElementById('sub').textContent='Actualizado '+new Date().toLocaleTimeString('es');
-    renderDashboard(d);
-    if(statsData)renderCatalogo(d,statsData);
-    renderIntros(d);
+    renderDashboard(d);renderIntros(d);
+    if(window._statsData)renderCatalogo(d,window._statsData);
     document.getElementById('pie').textContent='OK '+new Date().toLocaleTimeString('es');
-  }).catch(function(e){
-    document.getElementById('pie').textContent='Error: '+(e&&e.message||e);
-  });
+  }).catch(function(e){document.getElementById('pie').textContent='Error: '+(e&&e.message||e);});
   fetch('/api/stats').then(function(r){return r.json()}).then(function(d){
-    statsData=d;
-    if(estadoData)renderFuentes(d,estadoData);
-    if(estadoData)renderCatalogo(estadoData,d);
+    window._statsData=d;renderFuentes(d);
+    fetch('/api/estado').then(function(r){return r.json()}).then(function(ed){renderCatalogo(ed,d);}).catch(function(){});
   }).catch(function(){});
-  fetch('/api/users').then(function(r){return r.json()}).then(function(d){
-    renderUsers(d.usuarios||[]);
-  }).catch(function(){});
+  fetch('/api/users').then(function(r){return r.json()}).then(renderUsers).catch(function(){});
 }
-tic();
-setInterval(tic,5000);
+tic();setInterval(tic,5000);
 
 function eliminarUser(name){
-  if(!confirm('Eliminar usuario "'+name+'"?\nAlguien mas podra usar ese nombre.'))return;
+  if(!confirm('Eliminar "'+name+'"?\nAlguien más podrá usar ese nombre.'))return;
   fetch('/api/users',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name})})
-  .then(function(r){return r.json()}).then(function(d){
-    if(d.ok){alert('Eliminado: '+name);tic();}else alert(d.error||'Error');
-  }).catch(function(){alert('Error de conexion');});
+  .then(function(r){return r.json()}).then(function(d){if(d.ok){alert('Eliminado');tic();}else alert(d.error||'Error');})
+  .catch(function(){alert('Error');});
 }
 </script>
 </body>
