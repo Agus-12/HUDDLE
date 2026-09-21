@@ -4655,6 +4655,7 @@ function mismaPagina(a, b) {
 }
 const FETCH_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'; /* v199: compartida — vimeos amarra el token a ESTA UA */
 let CDN_RELAY = ''; /* v236: Mac Mini relay para CDNs que bloquean datacenter. Set via /api/set-relay?url=... */
+try { const _rl = require('fs').readFileSync('/tmp/huddle-relay.txt', 'utf8').trim(); if (_rl) { CDN_RELAY = _rl; console.log('[relay] Cargado de disco:', _rl); } } catch {} /* v236.8: persistir relay */
 async function fetchRelay(url, ms) { /* v236: fetch a través del relay — NUNCA cae al directo (el token se liga a la IP) */
   if (!CDN_RELAY) return fetchSeguro(url, ms);
   const relayUrl = CDN_RELAY + '/?u=' + encodeURIComponent(url);
@@ -7122,13 +7123,18 @@ async function buscarCineCalidad(q) {
   if (!r.ok) return [];
   const d = await r.json();
   const posts = d.posts || d || [];
-  return posts.map((p) => ({
-    title: p.title || '',
-    url: p.url || '',
-    img: p.featured_image || '',
-    site: 'CineCalidad',
-    extra: (/\/serie\//.test(p.url || '') ? 'Serie · Latino' : 'Película · Latino'),
-  })).filter((p) => p.title && p.url);
+  return posts.map((p) => {
+    const slug = p.slug || '';
+    const esSerie = (p.type || '').toLowerCase().includes('series');
+    const url = slug ? 'https://cine-calidad.mx/' + (esSerie ? 'serie/' : 'pelicula/') + slug + '/' : '';
+    return {
+      title: p.title || '',
+      url,
+      img: p.featured_image || '',
+      site: 'CineCalidad',
+      extra: esSerie ? 'Serie · Latino' : 'Película · Latino',
+    };
+  }).filter((p) => p.title && p.url);
 }
 
 async function buscarEnSitios(q) {
@@ -10707,6 +10713,7 @@ async function cuevanaLatest() {
       if (!newUrl) return json(res, 400, { ok: false, error: 'Falta ?url=' });
       CDN_RELAY = newUrl;
       console.log('[relay] CDN relay actualizado:', CDN_RELAY);
+      try { require('fs').writeFileSync('/tmp/huddle-relay.txt', newUrl); } catch {} /* v236.8: persistir relay */
       return json(res, 200, { ok: true, relay: CDN_RELAY });
     }
     if (url.pathname === '/api/intros') { /* v205.3: estado del rastreador — v205.4: en navegador pinta el PANEL; ?json=1 o curl → JSON; v223: + cosecha Movie */
