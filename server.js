@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v257'; // 257: Fluidez Cuevana (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v258'; // 258: Cuevana directo sin relay (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -4808,6 +4808,19 @@ async function buscarCuevana(q) {
 
 const CUEVANA_API = 'https://cuevana.mov/wp-json/wpreact/v1/movie/';
 const CUEVANA_M3U8_CACHE = new Map(); // slug -> {m3u8, subs, proxy, mp4, at}
+const GOOD_COOKIES = new Map(); // host -> cookie string
+function goodCookie(host){ return GOOD_COOKIES.get(host)||''; }
+function goodSetCookie(host, setCookie){
+  if(!setCookie) return;
+  const cookies = Array.isArray(setCookie) ? setCookie : [setCookie];
+  const jar = cookies.map(c=>c.split(';')[0].trim()).join('; ');
+  if(jar) GOOD_COOKIES.set(host, jar);
+  // limpiar si crece
+  if(GOOD_COOKIES.size>50){
+    const it=[...GOOD_COOKIES.keys()][0];
+    GOOD_COOKIES.delete(it);
+  }
+}
 const CUEVANA_CACHE_TTL = 5*3600*1000; // 5h híbrido
 
 const CUEVANA_POSTS_API = 'https://cuevana.mov/wp-json/wpreact/v1/postsapi';
@@ -4911,9 +4924,25 @@ async function resolverCuevanaMov(pageUrl) {
     try {
       let m3u8 = null;
       if (/goodstream\.one/i.test(host)) {
-        /* m3u8 directo en HTML */
+        /* m3u8 directo en HTML — con cookie */
         let er = null;
-        try { er = CDN_RELAY ? await fetchRelay(embed.url, 15000) : await fetchSeguro(embed.url, 12000); } catch { try { er = await fetchSeguro(embed.url, 12000); } catch {} }
+        let cookie = '';
+        try {
+          const ctl = new AbortController(); const tm=setTimeout(()=>ctl.abort(), 12000);
+          const r = await fetch(embed.url, { signal: ctl.signal, redirect: 'follow', headers: { 'User-Agent': FETCH_UA, 'Referer': 'https://goodstream.one/', 'Accept': '*/*' } });
+          clearTimeout(tm);
+          if(r.ok){
+            const sc = r.headers.get('set-cookie');
+            if(sc) goodSetCookie('goodstream.one', sc);
+            // también probar getSetCookie
+            try{ const all = r.headers.getSetCookie ? r.headers.getSetCookie() : null; if(all && all.length) goodSetCookie('goodstream.one', all); }catch{}
+            er = r;
+            cookie = goodCookie('goodstream.one');
+          }
+        } catch {}
+        if (!er || !er.ok) {
+          try { er = CDN_RELAY ? await fetchRelay(embed.url, 15000) : await fetchSeguro(embed.url, 12000); } catch { try { er = await fetchSeguro(embed.url, 12000); } catch {} }
+        }
         if (!er || !er.ok) continue;
         if (!er.ok) continue;
         const html = await er.text();
@@ -4961,7 +4990,25 @@ async function resolverCuevanaMov(pageUrl) {
       }
       if (m3u8) {
         /* Verificar que el m3u8 sirve */
-        let vr = null; try { vr = CDN_RELAY ? await fetchRelay(m3u8, 10000).catch(() => null) : await fetchSeguro(m3u8, 8000).catch(() => null); } catch {}
+        let vr = null;
+        // para goodstream, probar directo con cookie primero (sin relay)
+        if (/goodstream\.one/i.test(host) || /hls.*\.goodstream\.one/i.test(m3u8)) {
+          try {
+            const ctl = new AbortController(); const tm=setTimeout(()=>ctl.abort(), 8000);
+            const ck = goodCookie('goodstream.one');
+            const r = await fetch(m3u8, { signal: ctl.signal, redirect: 'follow', headers: { 'User-Agent': FETCH_UA, 'Referer': embed.url, 'Accept': '*/*', ...(ck?{Cookie: ck}:{}) } });
+            clearTimeout(tm);
+            if(r.ok){
+              const txt = await r.clone().text().catch(()=> '');
+              if(txt.includes('#EXTM3U')) vr = r;
+              else {
+                const sc = r.headers.get('set-cookie');
+                if(sc) goodSetCookie('goodstream.one', sc);
+              }
+            }
+          } catch {}
+        }
+        if (!vr) try { vr = CDN_RELAY ? await fetchRelay(m3u8, 10000).catch(() => null) : await fetchSeguro(m3u8, 8000).catch(() => null); } catch {}
         if (!vr || !vr.ok) { try { vr = await fetchSeguro(m3u8, 8000).catch(()=>null); } catch {} }
         if (vr && vr.ok) {
           const txt = await vr.text().catch(() => '');
@@ -10099,6 +10146,10 @@ async function proxearHls(req, res, target) {
     'Accept-Language': (hostUp && hlsALs.get(hostUp)) || 'es-MX,es;q=0.9,en;q=0.6',
   };
   if (ref) cabUp.Referer = ref;
+  if (/goodstream\.one/i.test(hostUp) || /hls.*\.goodstream\.one/i.test(hostUp)) {
+    const ck = goodCookie('goodstream.one');
+    if(ck) cabUp.Cookie = ck;
+  }
   if (req.headers.range) cabUp.Range = String(req.headers.range);
   let upstream = null;
   // v257: para fluidez, probar directo primero para segmentos HLS (aunque sea goodstream), solo master va por relay si hace falta
