@@ -35,12 +35,12 @@ body{background:#0d0b14;color:#efeaf7;font-family:-apple-system,'Segoe UI',Robot
 .udot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 .udot.green{background:#38e08a;box-shadow:0 0 5px #38e08a}
 .udot.yellow{background:#ffb020;box-shadow:0 0 5px #ffb020}
-.udot.gray{background:#555}
+.udot.red{background:#ff5c7a;box-shadow:0 0 5px #ff5c7a}
 .uname{flex:1;font-size:13px}
 .udate{font-size:11px;color:#9d93b5;min-width:80px;text-align:right}
 .ubtn{background:#ff5c7a;color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer}
 .detail-section{background:#17131f;border:1px solid #2a2338;border-radius:14px;padding:16px;margin-bottom:12px}
-.detail-section h3{font-size:14px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.detail-section h3{font-size:14px;margin-bottom:10px}
 .barra{height:10px;background:#241d31;border-radius:99px;overflow:hidden;margin:6px 0}
 .barra i{display:block;height:100%;border-radius:99px;transition:width .6s}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
@@ -52,6 +52,8 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
 .toggle-btn{background:none;border:1px solid #2a2338;border-radius:8px;color:#9d93b5;padding:6px 14px;font-size:12px;cursor:pointer;margin:6px 0}
 .toggle-btn:hover{border-color:#8a5cf6;color:#efeaf7}
 .pie{color:#9d93b5;font-size:11px;text-align:center;padding:16px}
+.user-legend{display:flex;gap:12px;font-size:11px;color:#9d93b5;margin-bottom:10px}
+.user-legend span{display:flex;align-items:center;gap:4px}
 </style>
 </head>
 <body>
@@ -79,6 +81,11 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
 <!-- USUARIOS -->
 <div class="page" id="pageUsers">
   <div class="sec-title">Usuarios <span id="userCount" style="float:right"></span></div>
+  <div class="user-legend">
+    <span><div class="udot green"></div> En sala ahora</span>
+    <span><div class="udot yellow"></div> Inactivo &lt;2 sem</span>
+    <span><div class="udot red"></div> Inactivo &gt;3 sem</span>
+  </div>
   <div id="usersList"></div>
 </div>
 
@@ -91,7 +98,13 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
 var _estado=null,_stats=null;
 var TWO_W=14*86400000, THREE_W=21*86400000;
 
-function fmt(s){if(!s&&s!==0)return'--';var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return(d?d+'d ':'')+(h?h+'h ':'')+m+'m';}
+function fmt(s){
+  if(s===null||s===undefined)return'--';
+  var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
+  if(d>0)return d+'d '+h+'h';
+  if(h>0)return h+'h '+m+'m';
+  return m+'m';
+}
 
 function updateClock(){
   var now=new Date();
@@ -99,23 +112,6 @@ function updateClock(){
   document.getElementById('clock').textContent=(h<10?'0':'')+h+':'+(m<10?'0':'')+m+':'+(s<10?'0':'')+s;
 }
 updateClock();setInterval(updateClock,1000);
-
-function dotClass(ts){
-  if(!ts)return'gray';
-  var age=Date.now()-ts;
-  if(age<TWO_W)return'green';
-  if(age<THREE_W)return'yellow';
-  return'gray';
-}
-function dotLabel(ts){
-  if(!ts)return'Nunca entro';
-  var age=Date.now()-ts;
-  var days=Math.floor(age/86400000);
-  if(days<1)return'Hoy';
-  if(days<14)return days+' dias activo';
-  if(days<21)return days+' dias inactivo';
-  return days+' dias - desactivado';
-}
 
 function showPage(id){
   document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
@@ -141,7 +137,7 @@ function renderDash(d){
     +'<div class="card" onclick="showPage(\'Users\')"><div class="n">'+d.usuarios+'</div><div class="t">Usuarios ▸</div></div>';
   var ca=d.catalogos||{};
   var f=_stats?_stats.fuentes:{};
-  var tp=0;for(var k in f)tp+=(f[k].activas>0?f[k].activas:0);
+  var tp=0;for(var k in f)tp+=Math.max(0,f[k].activas||0);
   var ts=(ca.animes||0)+(ca.danimados||0);
   var tc=(ca.caricaturas||0)+(ca.cartoons||0)+(ca.liveaction||0);
   var gt=tp+ts+tc;
@@ -206,8 +202,8 @@ function showFuente(k){
     +'<div class="detail-section"><h3>Estado de la sonda</h3>'
     +'<div style="font-size:12px;color:#9d93b5;line-height:1.8">'
     +'<div>La sonda revisa automáticamente cada ~6 horas.</div>'
-    +'<div>Ocultas encontradas: <b style="color:#ff5c7a">'+f.ocultas+'</b></div>'
-    +'<div>Ya verificadas: <b>'+f.vistas+'</b></div>'
+    +'<div>Ocultas: <b style="color:#ff5c7a">'+f.ocultas+'</b></div>'
+    +'<div>Verificadas: <b>'+f.vistas+'</b></div>'
     +'<div>Pendientes: <b>'+(f.total-f.vistas)+'</b></div></div></div>';
   document.getElementById('fuenteContent').innerHTML=html;
   showPage('Fuente');
@@ -215,21 +211,30 @@ function showFuente(k){
 
 function renderUsers(data){
   var users=data.usuarios||[];
-  var sorted=users.slice().sort(function(a,b){return(b.lastSeenAt||0)-(a.lastSeenAt||0)});
-  var green=0,yellow=0,gray=0,html='';
+  var sorted=users.slice().sort(function(a,b){
+    if(a.online&&!b.online)return-1;
+    if(!a.online&&b.online)return 1;
+    return(b.lastSeenAt||0)-(a.lastSeenAt||0);
+  });
+  var green=0,yellow=0,red=0,html='';
   sorted.forEach(function(u){
-    var cls=dotClass(u.lastSeenAt);
-    if(cls==='green')green++;else if(cls==='yellow')yellow++;else gray++;
-    var lbl=dotLabel(u.lastSeenAt);
+    var cls,age=u.lastSeenAt?Date.now()-u.lastSeenAt:Infinity;
+    if(u.online){cls='green';green++;}
+    else if(age<TWO_W){cls='yellow';yellow++;}
+    else{cls='red';red++;}
     var dt=u.lastSeenAt?new Date(u.lastSeenAt).toLocaleDateString('es'):'—';
+    var status=u.online?'🟢 En sala':'';
     html+='<div class="urow">'
-      +'<div class="udot '+cls+'" title="'+lbl+'"></div>'
-      +'<div class="uname">'+u.name+'</div>'
+      +'<div class="udot '+cls+'"></div>'
+      +'<div class="uname">'+u.name+(status?' <span style="font-size:10px;color:#38e08a">'+status+'</span>':'')+'</div>'
       +'<div class="udate">'+dt+'</div>'
       +'<button class="ubtn" onclick="eliminarUser(\''+u.name.replace(/'/g,"\\'")+'\')">Eliminar</button></div>';
   });
   document.getElementById('usersList').innerHTML=html||'<div style="color:#9d93b5;font-size:13px;padding:20px 0">Sin usuarios</div>';
-  document.getElementById('userCount').innerHTML='<span style="color:#38e08a">'+green+'</span> / <span style="color:#ffb020">'+yellow+'</span> / <span style="color:#555">'+gray+'</span> de '+users.length;
+  document.getElementById('userCount').innerHTML=
+    '<span style="color:#38e08a">'+green+'</span> en sala · '
+    +'<span style="color:#ffb020">'+yellow+'</span> inactivos · '
+    +'<span style="color:#ff5c7a">'+red+'</span> desactivados';
 }
 
 function tic(){
