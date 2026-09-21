@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v236.8'; // 236.8: buscarCineCalidad + relay persistente + memory guard
+const UI_VERSION = 'v237'; // 237: buscarCineCalidad bypass cvOcultaUrl + relay persistente + memory guard
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
