@@ -35,7 +35,7 @@ function checkAdminAuth(req, res) {
   return true;
 }
 
-const UI_VERSION = 'v239'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
+const UI_VERSION = 'v239.1'; // 238: CineCalidad sonda + stats por fuente + gestión usuarios
 
 /* v236.8: guardián de memoria — fuerza GC cada 30s si heap > 300MB */
 if (typeof global.gc === 'function') {
@@ -703,6 +703,9 @@ const CC_VISTAS = new Set();
 const CC_OCULTAS = new Set();
 try { for (const l of fs.readFileSync(path.join(__dirname, 'cc-vistas.txt'), 'utf8').split('\n')) if (l.trim()) CC_VISTAS.add(l.trim()); } catch {}
 try { for (const l of fs.readFileSync(path.join(__dirname, 'cc-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) CC_OCULTAS.add(l.trim()); } catch {}
+/* v239: muertas de auditoría inicial */
+const CC_AUDIT_DEAD = new Set(["motor-city", "brainbugs", "end-of-the-rope", "la-pelicula-de-heffalump", "the-group", "efsunlu-ayin", "guadalupe-madre-de-la-humanidad", "vampira-humanista-busca-suicida", "mi-perfecto-ex", "corina", "vera-y-el-placer-de-los-otros", "angeles-caidos-guerreros-de-paz", "rift", "thundercats", "krypto-saves-the-day"]);
+for (const s of CC_AUDIT_DEAD) if (!CC_OCULTAS.has(s)) CC_OCULTAS.add(s);
 let ccIdx = { slugs: [], at: 0, buscando: null };
 const CC_IDX_TTL = 12 * 3600 * 1000;
 console.log('[boot] CVM_OCULTAS=' + CVM_OCULTAS.size + ' Cuevana mov ocultas');
@@ -7228,7 +7231,20 @@ async function verificarCC(slug, tipo) {
     const r = await fetchSeguro(url, 12000);
     if (!r.ok) return { ok: false, reason: 'HTTP ' + r.status };
     const html = await r.text();
-    const hasEmbed = /goodstream\.one|vimeos\.(net|zip)|hlswish\.com|videoapp\.zip/i.test(html);
+    if (esSerie) {
+      /* v239: para series, verificar episodios individualmente */
+      const eps = [...html.matchAll(/href="https?:\/\/cine-calidad\.mx\/episode\/([^/"]+)\//g)];
+      if (!eps.length) return { ok: false, reason: 'sin-episodios' };
+      /* Verificar primer episodio — si tiene embed, la serie sirve */
+      const epUrl = 'https://cine-calidad.mx/episode/' + eps[0][1] + '/';
+      const er = await fetchSeguro(epUrl, 10000);
+      if (!er.ok) return { ok: false, reason: 'ep-http-' + er.status };
+      const epHtml = await er.text();
+      const hasEmbed = /goodstream\.one|vimeos\.(net|zip)|hlswish\.com|videoapp\.zip|data-domain="/i.test(epHtml);
+      return { ok: hasEmbed, reason: hasEmbed ? 'ep-embed' : 'ep-no-embed', eps: eps.length };
+    }
+    /* Películas: verificar embed directo */
+    const hasEmbed = /goodstream\.one|vimeos\.(net|zip)|hlswish\.com|videoapp\.zip|data-domain="/i.test(html);
     return { ok: hasEmbed, reason: hasEmbed ? 'embed' : 'no-embed' };
   } catch (e) { return { ok: false, reason: String(e.message || e).slice(0, 60) }; }
 }
