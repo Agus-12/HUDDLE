@@ -1,3 +1,14 @@
+## ESTADO ACTUAL — 22 SEP 2026 — v289: falso positivo Cloudflare en AnimeD23
+
+- Producción verificada en v288: ficha `mushoku-tensei-isekai-ittara-honki-dasu` devuelve 502 genérico.
+- La misma página obtenida por HTTP desde el sandbox respondió 200 con dos capítulos (ep-1, ep-2).
+- Causa reproducida localmente: regex `challenge-platform` detecta el script PASIVO `/cdn-cgi/challenge-platform/scripts/jsd/main.js` que acompaña HTML válido y descarta la ficha.
+- v289 usa `d23EsChallenge`: título de intersticial o formulario challenge-form. Cambia ficha, búsqueda, resolver y diagnóstico D23. No modifica portadas ni transporte HLS.
+- Verificado: función real extraída de server.js contra HTML real devuelve ficha con 2 capítulos. Tres pruebas: intersticial por título y formulario detectados; script pasivo aceptado. `node --check` OK.
+- Pendiente tras despliegue: confirmar ficha desde producción y reproducción de episodios. No se ha verificado video extremo a extremo; no afirmar que todo D23 reproduce.
+- Corrección a notas anteriores: presencia del script Cloudflare NO demuestra bloqueo. La respuesta upstream de Oracle no está disponible en el error público, así que no se descarta otro fallo simultáneo allí.
+- Usuario despliega: `cd ~/huddle && bash actualizar.sh`.
+
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
 > **🔴 PARA REANUDAR EN OTRO CHAT: lee PRIMERO la sección de AQUÍ ABAJO (22 SEP 2026 — v288, tarjeta muerta = fuera del buscador al primer clic — es el estado ACTUAL). El bloque 20 SEP sigue vigente para el capítulo "Movie", ya CERRADO.**

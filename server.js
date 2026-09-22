@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v288'; // v288: tarjetas muertas se ocultan al momento (AF/D23/LA: página 404 o vacía de episodios); v287: podredumbre de episodios
+const UI_VERSION = 'v289'; // v288: tarjetas muertas se ocultan al momento (AF/D23/LA: página 404 o vacía de episodios); v287: podredumbre de episodios
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -2553,6 +2553,13 @@ console.log('[d23] '+D23_TODOS.size+' animes ('+D23_OCULTAS.size+' ocultas, '+D2
  * que Latanime: {ok, slug, titulo, poster, episodios:[{n,url,titulo}]}).
  * Portada: preferencia de la copia local de IMDb; si la página no entrega
  * imagen, queda el fallback existente (og:image de la ficha). */
+/* v289: el script pasivo /challenge-platform/scripts/jsd/ también aparece
+ * en páginas válidas. No es prueba de un bloqueo de acceso. */
+function d23EsChallenge(html) {
+  const title = (/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html) || [])[1] || '';
+  return /Just a moment|One moment, please|Attention Required.*Cloudflare/i.test(title)
+    || /<form\b[^>]*\bid=["']challenge-form["']/i.test(html);
+}
 async function datosAnimeD23(slug) {
   if (D23_OCULTAS.has(slug)) return null;
   const c = serieCache.get('d23:' + slug);
@@ -2561,7 +2568,7 @@ async function datosAnimeD23(slug) {
   if (r && r.status === 404) return { ok: false, dead: '404', slug, titulo: '', poster: '', episodios: [] }; /* v288: el sitio la borró */
   if (!r || !r.ok) return null;
   const html = await r.text();
-  if (/One moment, please|challenge-platform|Just a moment/i.test(html)) return null;
+  if (d23EsChallenge(html)) return null;
   const og = (p) => {
     const a1 = new RegExp(`<meta[^>]+property=["']${p}["'][^>]+content=["']([^"']+)`, 'i').exec(html);
     const a2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${p}["']`, 'i').exec(html);
@@ -2591,7 +2598,7 @@ async function buscarAnimeD23(q) {
   const r = await fetchSeguro('https://animed23.com/?s=' + encodeURIComponent(q), 10000);
   if (!r || !r.ok) return [];
   const html = await r.text();
-  if (/One moment, please|challenge-platform|Just a moment/i.test(html)) return [];
+  if (d23EsChallenge(html)) return [];
   const vistos = new Set();
   const out = [];
   for (const m of html.matchAll(/<a[^>]+href="https?:\/\/animed23\.com\/anime\/([a-z0-9-]+)\/"[^>]*>([\s\S]*?)<\/a>/gi)) {
@@ -7160,7 +7167,7 @@ async function resolverD23(epUrl) {
   const r = await fetchSeguro(epUrl, 15000);
   if (!r || !r.ok) throw new Error('No pude abrir ese capítulo en AnimeD23 — intenta luego');
   const html = await r.text();
-  if (/One moment, please|challenge-platform|Just a moment/i.test(html)) throw new Error('AnimeD23 está con protección anti-robot en este momento — intenta de nuevo en unos minutos');
+  if (d23EsChallenge(html)) throw new Error('AnimeD23 está con protección anti-robot en este momento — intenta de nuevo en unos minutos');
   const serie = d23SlugDeEp(epUrl);
   const tabs = await d23TabsDeHtml(html, epUrl);
   return resolverD23ConTabs(tabs, epUrl, serie, true);
@@ -11931,7 +11938,7 @@ async function estrenosMezclados(){
           const r = await fetchSeguro(u, 15000);
           if (!r || !r.ok) return json(res, 200, { ok: false, error: 'la página del capítulo respondió ' + (r && r.status) });
           const html = await r.text();
-          if (/One moment, please|challenge-platform|Just a moment/i.test(html)) return json(res, 200, { ok: false, error: 'challenge anti-robot de la fuente (no es Huddle) — reintentar luego' });
+          if (d23EsChallenge(html)) return json(res, 200, { ok: false, error: 'challenge anti-robot de la fuente (no es Huddle) — reintentar luego' });
           tabs = await d23TabsDeHtml(html, u);
         } else if (/animed23\.online\/(container\.php|multiplayer\/contenedor\.php)/i.test(u)) {
           const hC = await (await fetchSeguro(u, 12000)).text();
