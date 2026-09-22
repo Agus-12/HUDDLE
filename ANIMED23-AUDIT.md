@@ -395,3 +395,11 @@ api/solo | resolverNativoInterno (sala)
    `{body,url}` (se cachea después) → Byse fallaba en silencio y siempre ganaba OK.
 3. El endpoint /probar con `u=` no codificada perdía la query interna del container
    (se re-une `id` desde el query externo como respaldo).
+
+## §17 (v290, 22 SEP 2026) — Flujo NUEVO "multi" (token rotativo)
+Convive con los dos flujos anteriores. Detectado en BAKI-DOU: The Invincible Samurai (2026):
+1. El `/capitulo/<slug>-ep-N/` trae `<iframe class="d23-player-frame" src="https://play.animed23.com/multiplayer/options.php?server=multi&value=TOKEN">`.
+2. Esa página es un splash ("Jugar") cuyo JS hace `iframe.src='https://<host>/multiplayer/contenedor.php?id=TOKEN'` (host visto: mytsumi.com; el mismo token sirve de id).
+3. El contenedor devuelve los `videoTabs` de siempre (Byse/Moon, Mytsumi, Mega, OK, Epsilon, Abyss, rpmvid).
+- **El TOKEN rota** (minutos/horas): un token viejo responde "Contenedor no encontrado". Extraerlo SIEMPRE fresco del HTML del episodio; nunca cachear tokens ni URLs del splash.
+- `d23TabsDeHtml` y `d23Probe` ya lo siguen (v290). Verificado ep-1/ep-2 de punta a punta (Byse → master 1080p → .ts real).

@@ -1,4 +1,47 @@
-## ESTADO ACTUAL — 22 SEP 2026 — v289: falso positivo Cloudflare en AnimeD23
+## ESTADO ACTUAL — 22 SEP 2026 — v290: AnimeD23 flujo "multi" (BAKI-DOU ya reproduce)
+
+### Lo que pedía el usuario
+- BAKI-DOU: The Invincible Samurai (2026) en AnimeD23 decía "sin fuente disponible".
+- Diagnóstico pedido: ¿no se puede por HTTP puro o es error de Huddle?
+
+### Diagnóstico verificado (respuesta: era ERROR DE HUDDLE, el stream SÍ existe)
+- La ficha responde bien en producción (13+ eps). El capítulo carga sin challenge.
+- PERO el iframe del player cambió de formato para esta serie:
+  ANTES (lo que v286 entiende): `animed23.online/container.php?id=D23-…` o `opciones/options.php` (JWT).
+  AHORA: `https://play.animed23.com/multiplayer/options.php?server=multi&value=TOKEN`
+  → página splash cuyo JS carga `iframe.src='<host>/multiplayer/contenedor.php?id=TOKEN'`
+  → ese contenedor trae los videoTabs de siempre (Byse/Moon, Mytsumi, OK, rpmvid, Mega…).
+- El TOKEN **rota** con el tiempo (se vio `X2R0PhuViuz` → `X2R0PlViuz` en minutos; el token
+  viejo responde "Contenedor no encontrado"). Siempre extraerlo fresco de la página del ep,
+  nunca cachear. El host del contenedor también varía (mytsumi.com en la prueba).
+- Huddle no reconocía el iframe nuevo → "sin reproductores" → error en la UI.
+- Otros episodios actuales (Black Torch, Ghost Meets Gal, Futsutsuka…) siguen con el flujo
+  viejo y funcionan igual. El flujo multi convive con el viejo, no lo reemplazó.
+
+### Qué hace v290
+- `d23TabsDeHtml`: rama nueva — detecta `multiplayer/options.php?...&value=` en el iframe,
+  sigue el splash, extrae la URL `contenedor.php?id=…` del JS (`iframe.src='…'`) y lee los
+  videoTabs con `d23TabsDeContenedor` (sin cambios). Aplica a Solo, Juntos y /api/d23/probar.
+- `d23Probe` (sonda/podredumbre): misma rama para que estos episodios cuenten como vivos.
+- `UI_VERSION v290`.
+
+### Verificado en vivo (server local en sandbox, 22 SEP; animed23.com alcanzable desde aquí hoy)
+- BAKI-DOU ep-1: 6 tabs → gana Byse → master 480p/1080p → **segmento .ts real 1.28 MB (sync 0x47)** ✓ 4.6 s
+- BAKI-DOU ep-2: ok, 6 tabs ✓ (token rotativo fresco)
+- Regresión flujo viejo: Black Torch ep-12 → 6 tabs + m3u8 ✓; ficha Ghost Meets Gal ✓
+- `node --check` OK.
+
+### Pendiente tras despliegue
+- Usuario: `cd ~/huddle && bash actualizar.sh` y probar BAKI-DOU en la app (Solo y Juntos).
+- No verificado desde producción (Oracle) todavía; si allí diera fallo, revisar referer/CF.
+
+### Archivos tocados
+- `server.js`: rama multi en `d23TabsDeHtml` + `d23Probe` + UI_VERSION.
+- `CONTINUACION.md` (esta nota).
+
+---
+
+## ESTADO ANTERIOR — 22 SEP 2026 — v289: falso positivo Cloudflare en AnimeD23
 
 - Producción verificada en v288: ficha `mushoku-tensei-isekai-ittara-honki-dasu` devuelve 502 genérico.
 - La misma página obtenida por HTTP desde el sandbox respondió 200 con dos capítulos (ep-1, ep-2).

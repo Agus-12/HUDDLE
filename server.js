@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v289'; // v288: tarjetas muertas se ocultan al momento (AF/D23/LA: página 404 o vacía de episodios); v287: podredumbre de episodios
+const UI_VERSION = 'v290'; // v290: AnimeD23 flujo "multi" (options.php token rotativo → contenedor → videoTabs); v288: tarjetas muertas se ocultan al momento; v287: podredumbre de episodios
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -6177,6 +6177,24 @@ async function d23Probe(slug){
           } else if(r5 && r5.status===200) return true;
           continue;
         }
+        // v290: flujo "multi" (options.php con token rotativo → contenedor.php → videoTabs)
+        let mMulti = /<iframe[^>]+src="([^"]*multiplayer\/options\.php[^"]*)"/i.exec(html2);
+        if(mMulti){
+          let mUrl = mMulti[1].replace(/&#038;/g,'&').replace(/&amp;/g,'&');
+          const r3 = await fetchSeguro(mUrl, 12000).catch(()=>null);
+          if(r3 && r3.ok){
+            const html3 = await r3.text();
+            const mCont = /iframe\.src='([^']+multiplayer\/contenedor\.php\?id=[A-Za-z0-9_-]+)'/i.exec(html3) || /src="([^"]*multiplayer\/contenedor\.php\?id=[A-Za-z0-9_-]+)"/i.exec(html3);
+            if(mCont){
+              const r5 = await fetchSeguro(mCont[1].startsWith('//') ? 'https:'+mCont[1] : mCont[1], 12000).catch(()=>null);
+              if(r5 && r5.ok){
+                const h5 = await r5.text();
+                if(/bysesukior|ok\.ru|rpmvid|videoTabs|data-player-url/i.test(h5)) return true;
+              }
+            } else if(/contenedor\.php/i.test(html3)) return true;
+          }
+          continue;
+        }
         // Caso JWT: opciones/options.php
         let mOpt = /<iframe[^>]+src="([^"]*opciones\/options\.php[^"]*)"/i.exec(html2) || /src="([^"]*animed23\.online\/opciones\/options\.php[^"]*)"/i.exec(html2);
         if(!mOpt) continue;
@@ -7115,6 +7133,28 @@ async function d23TabsDeHtml(html, referer) {
             const h5 = await (await fetchSeguro('https://animed23.online/multiplayer/contenedor.php?id=' + contM[1], 12000, { Referer: pUrl })).text().catch(() => '');
             for (const t of d23TabsDeContenedor(h5)) tabs.push(t);
           }
+        }
+      } catch {}
+    }
+  }
+  /* v290: flujo NUEVO "multi" (p. ej. BAKI-DOU): el iframe del capítulo apunta a
+   * https://play.animed23.com/multiplayer/options.php?server=multi&value=TOKEN
+   * (el TOKEN rota con el tiempo — siempre se extrae fresco de la página del ep).
+   * Esa página es un splash cuyo JS carga iframe.src='<host>/multiplayer/contenedor.php?id=TOKEN'
+   * y ese contenedor trae los videoTabs de siempre (Byse/Moon, OK, Mytsumi...). */
+  if (!tabs.length) {
+    const mMulti = /<iframe[^>]+src="([^"]*multiplayer\/options\.php[^"]*)"/i.exec(html);
+    if (mMulti) {
+      let mUrl = mMulti[1].replace(/&#038;/g, '&').replace(/&amp;/g, '&');
+      if (mUrl.startsWith('//')) mUrl = 'https:' + mUrl;
+      try {
+        const hOpt = await (await fetchSeguro(mUrl, 12000, { Referer: referer })).text();
+        const mCont = /iframe\.src='([^']+multiplayer\/contenedor\.php\?id=[A-Za-z0-9_-]+)'/i.exec(hOpt)
+                   || /src="([^"]*multiplayer\/contenedor\.php\?id=[A-Za-z0-9_-]+)"/i.exec(hOpt);
+        if (mCont) {
+          const cUrl = mCont[1].startsWith('//') ? 'https:' + mCont[1] : mCont[1];
+          const hC = await (await fetchSeguro(cUrl, 12000, { Referer: mUrl })).text().catch(() => '');
+          for (const t of d23TabsDeContenedor(hC)) tabs.push(t);
         }
       } catch {}
     }
