@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v283'; // v278.6: fix Betty para TODOS — solo auto-heal token (no más Perfil no válido tras restart), login force reclaim, frontend re-login automático + Betty 335 garantizada
+const UI_VERSION = 'v284'; // v284 HTTP-only: hls.js 1.7.3 + correcciones PTS para audio AAC VK; sin iframe ni reproductor remoto
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -1522,8 +1522,9 @@ async function resolverEnp(pageUrl) {
 }
 
 /* v278.4: ENNOVELAS-TV — Betty la Fea 335 y demás novelas latinas gratis sin Cloudflare.
- * Ficha = /series/<slug>/ (lista con href="...-capitulo-N/"), episodio = /<slug>-capitulo-N/
- * con iframe directo a hls/mp4. Todo por HTTP puro con fetchSeguro. */
+ * Ficha = /series/<slug>/ (lista con href="...-capitulo-N/"), episodio = /<slug>-capitulo-N/.
+ * La resolución es HTTP-only: se consulta el endpoint/HTML de VK, se extrae
+ * su propiedad hls y después el master, playlists y segmentos pasan por /api/hls. */
 const ENN_BASE = 'https://l.ennovelas-tv.com/';
 const ennFichaCache = new Map(); // slug -> {at, data}
 async function ennFicha(slug){
@@ -1566,29 +1567,59 @@ async function ennProbe(slug){
   try{ const d=await ennFicha(slug); return !!(d && d.ok && d.episodios && d.episodios.length); }catch{ return false; }
 }
 async function resolverVk(vkEmbedUrl, pageUrl){
-  try{
-    let m = /video_ext\.php\?oid=(\d+).*?id=(\d+).*?hash=([a-z0-9]+)/i.exec(vkEmbedUrl);
-    let oid, vid, hash='';
-    if(m){ oid=m[1]; vid=m[2]; hash=m[3]; } else {
-      m = /video_ext\.php\?oid=(\d+).*?id=(\d+)/i.exec(vkEmbedUrl);
-      if(!m) throw new Error('vk sin ids');
-      oid=m[1]; vid=m[2];
+  let m = /video_ext\.php\?oid=(\d+).*?id=(\d+).*?hash=([a-z0-9]+)/i.exec(vkEmbedUrl);
+  let oid, vid, hash='';
+  if(m){ oid=m[1]; vid=m[2]; hash=m[3]; } else {
+    m = /video_ext\.php\?oid=(\d+).*?id=(\d+)/i.exec(vkEmbedUrl);
+    if(!m) throw new Error('vk sin ids');
+    oid=m[1]; vid=m[2];
+  }
+  const alUrl = 'https://vk.com/al_video.php?act=show&al=1&video='+oid+'_'+vid + (hash ? '&hash='+hash : '');
+  const cleanUrl = (u) => String(u || '')
+    .replace(/\\u002f/gi, '/').replace(/\\u0026/gi, '&')
+    .replace(/\\\//g, '/').replace(/\\/g, '').replace(/&amp;/g, '&').trim();
+  /* VK alterna entre JSON embebido y HTML reducido. Primero se busca la
+   * propiedad hls; las expresiones amplias quedan solo como fallback HTTP. */
+  const extraerHls = (raw) => {
+    const txt = String(raw || '').replace(/\\u002f/gi, '/').replace(/\\u0026/gi, '&').replace(/\\\//g, '/');
+    const hallados = [];
+    const poner = (x) => {
+      const u = cleanUrl(x);
+      if (!/^https?:\/\//i.test(u) || !/\.m3u8(?:[?#]|$)/i.test(u)) return;
+      try { new URL(u); } catch { return; }
+      if (!hallados.includes(u)) hallados.push(u);
+    };
+    for (const re of [
+      /["']hls["']\s*:\s*["']([^"']+\.m3u8[^"']*)["']/i,
+      /["'](?:url|src|file)["']\s*:\s*["']([^"']+\.m3u8[^"']*)["']/i,
+      /(https?:\/\/[^"'<>\s]+\.m3u8(?:\?[^"'<>\s]*)?)/i,
+    ]) {
+      const x = re.exec(txt);
+      if (x) poner(x[1]);
     }
-    const alUrl = 'https://vk.com/al_video.php?act=show&al=1&video='+oid+'_'+vid + (hash ? '&hash='+hash : '');
-    const r = await fetchSeguro(alUrl, 15000, {Referer: vkEmbedUrl, 'X-Requested-With':'XMLHttpRequest'}).catch(()=>null);
-    const txt = r && r.ok ? await r.text().catch(()=> '') : '';
-    // helper to clean escaped VK urls: \/ -> / and &amp; -> &
-    const cleanUrl = (u)=> u ? u.replace(/\\\//g,'/').replace(/\\/g,'').replace(/&amp;/g,'&') : u;
-    let m3u8 = (/https:[^"']+video\.m3u8[^"']*/i.exec(txt)||[])[0];
-    if(m3u8){ m3u8 = cleanUrl(m3u8); try{ hlsReferers.set(new URL(m3u8).hostname, vkEmbedUrl); }catch{} return {m3u8, mp4:false, proxy:true, subs:[]}; }
-    let m3u82 = (/https:[^"']+\.m3u8[^"']*/i.exec(txt)||[])[0];
-    if(m3u82){ m3u82 = cleanUrl(m3u82); try{ hlsReferers.set(new URL(m3u82).hostname, vkEmbedUrl);}catch{}; return {m3u8: m3u82, mp4:false, proxy:true, subs:[]}; }
-    const r2 = await fetchSeguro(vkEmbedUrl, 15000, {Referer: pageUrl}).catch(()=>null);
-    const t2 = r2 && r2.ok ? await r2.text().catch(()=> '') : '';
-    let m3u83 = (/https:[^"']+\.m3u8[^"']*/i.exec(t2)||[])[0];
-    if(m3u83){ m3u83=cleanUrl(m3u83); try{ hlsReferers.set(new URL(m3u83).hostname, vkEmbedUrl);}catch{}; return {m3u8: m3u83, mp4:false, proxy:true, subs:[]}; }
-    throw new Error('vk sin m3u8');
-  }catch(e){ throw e; }
+    return hallados[0] || '';
+  };
+  const intentos = [
+    { url: alUrl, extra: { Referer: vkEmbedUrl, 'X-Requested-With':'XMLHttpRequest' } },
+    { url: vkEmbedUrl, extra: { Referer: pageUrl || vkEmbedUrl } },
+  ];
+  let ultimo = '';
+  /* v284.1: reintento HTTP acotado para la respuesta reducida/transitoria de VK. */
+  for(let vuelta=0; vuelta<3; vuelta++){
+    for(const origen of intentos){
+      const r = await fetchSeguro(origen.url, 15000, origen.extra).catch((e)=>{ ultimo=String(e && e.message || e); return null; });
+      if(!r || !r.ok) { ultimo = 'HTTP '+(r ? r.status : 'sin respuesta'); continue; }
+      const txt = await r.text().catch(()=> '');
+      const m3u8 = extraerHls(txt);
+      if(m3u8){
+        try{ hlsReferers.set(new URL(m3u8).hostname, vkEmbedUrl); }catch{}
+        return {m3u8, mp4:false, proxy:true, subs:[]};
+      }
+      ultimo = 'respuesta sin hls';
+    }
+    if(vuelta<2) await new Promise((resolve)=>setTimeout(resolve, 350*(vuelta+1)));
+  }
+  throw new Error('vk sin m3u8 ('+ultimo+')');
 }
 
 async function resolverEnnovelas(pageUrl){

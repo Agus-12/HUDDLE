@@ -593,7 +593,7 @@ function montarNativo(porProxy) {
  * tiraba el video y volvía al inicio; ahora se SALTA el hueco (30 s) y sigue. */
 function esFlujoMovie(url) { return /^\/api\/movie\//.test(String(url || '')); }
 function cfgHls(src) {
-  const base = { maxBufferLength: 60, maxMaxBufferLength: 120, capLevelToPlayerSize: false, startLevel: -1, abrEwmaDefaultEstimate: 6000000, abrBandWidthFactor: 0.95, abrBandWidthUpFactor: 0.7 };
+  const base = { maxBufferLength: 60, maxMaxBufferLength: 120, capLevelToPlayerSize: false, startLevel: -1, abrEwmaDefaultEstimate: 6000000, abrBandWidthFactor: 0.95, abrBandWidthUpFactor: 0.7, maxAudioFramesDrift: 2 };
   return esFlujoMovie(src)
     ? { ...base, fragLoadingMaxRetry: 6, fragLoadingRetryDelay: 1000, fragLoadingMaxRetryTimeoutMs: 30000, manifestLoadingMaxRetry: 4, levelLoadingMaxRetry: 4 }
     : base;
