@@ -442,6 +442,89 @@ function posEsperada() {
     ? S.nativo.position + Math.max(0, (Date.now() + (S.offset || 0) - S.nativo.updatedAt) / 1000)
     : S.nativo.position;
 }
+/* v284: VK oficial para Ennovelas.
+ * El m3u8 que obtiene el servidor está ligado a su IP y, al re-servirlo con
+ * hls.js, Betty/Capo sonaban robóticos. El iframe obtiene el CDN desde el
+ * navegador de cada espectador y la API oficial permite mantener play/pausa
+ * y seek de la sala sin tocar ni convertir el audio. */
+function vkFrameSrc(url, autoplay) {
+  try {
+    const u = new URL(url, location.href);
+    u.searchParams.set('js_api', '1');
+    u.searchParams.set('autoplay', autoplay ? '1' : '0');
+    u.searchParams.set('hd', u.searchParams.get('hd') || '2');
+    return u.toString();
+  } catch { return String(url || ''); }
+}
+function vkFrameCommand(method, extra) {
+  const f = $('#roomFrame');
+  if (!f || !f.contentWindow || !S.nativo || !S.nativo.iframe) return;
+  try { f.contentWindow.postMessage(Object.assign({ method }, extra || {}), '*'); } catch {}
+}
+function vkFrameEventData(data) {
+  if (!data) return null;
+  if (typeof data === 'object') return data;
+  if (typeof data !== 'string') return null;
+  try { return JSON.parse(data); } catch { return null; }
+}
+window.addEventListener('message', (ev) => {
+  const f = $('#roomFrame');
+  if (!f || !S.nativo || !S.nativo.iframe || ev.source !== f.contentWindow) return;
+  const d = vkFrameEventData(ev.data);
+  if (!d) return;
+  const evn = String(d.event || '');
+  if (Number.isFinite(+d.time)) S.nativo.frameTime = Math.max(0, +d.time);
+  if (Number.isFinite(+d.duration) && +d.duration > 0) S.nativo.frameDuration = +d.duration;
+  if (S.nativo.frameDuration > 0) {
+    S.mirrorTime = { t: S.nativo.frameTime || 0, d: S.nativo.frameDuration };
+    pintarSeekBar();
+  }
+  if (evn === 'inited') {
+    S.nativo.frameReady = true;
+    nativoListo();
+    setTimeout(() => {
+      if (!S.nativo || !S.nativo.iframe) return;
+      if (S.nativo.isPlaying) vkFrameCommand('play');
+      else vkFrameCommand('pause');
+    }, 120);
+    return;
+  }
+  if (evn === 'started' || evn === 'resumed') {
+    S.nativo.framePlaying = true;
+    if (!S.nativo.isPlaying && S.canControl) sendAction({ type: 'play' }).catch(() => {});
+    ocultarPeliLoadingSuave(); ocultarPlayBtn();
+  } else if (evn === 'paused') {
+    S.nativo.framePlaying = false;
+    if (S.nativo.isPlaying && S.canControl) sendAction({ type: 'pause' }).catch(() => {});
+  } else if (evn === 'ended') {
+    S.nativo.framePlaying = false;
+    sendAction({ type: 'ended', position: S.nativo.frameTime || 0 }).catch(() => {});
+  }
+  if (evn === 'timeupdate') evaluaIntro();
+});
+function montarVkFrame() {
+  const f = $('#roomFrame');
+  if (!f || !S.nativo) return;
+  const embed = S.nativo.embed || S.nativo.m3u8;
+  if (!embed) return;
+  S.nativo.frameReady = false;
+  S.nativo.framePlaying = false;
+  S.nativo.frameTime = 0;
+  S.nativo.frameDuration = 0;
+  f.onload = () => {
+    if (!S.nativo || !S.nativo.iframe) return;
+    /* La API de VK arranca con init; el resto de comandos queda en cola en
+       el iframe hasta que responde «inited». */
+    try { f.contentWindow.postMessage({ method: 'init' }, '*'); } catch {}
+  };
+  f.src = vkFrameSrc(embed, false);
+  f.title = S.salaTitulo || 'Video de Ennovelas';
+  f.classList.remove('hidden');
+  $('#roomVideo').classList.add('hidden');
+  $('#mirrorImg').classList.add('hidden');
+  $('#mirrorLoading').classList.remove('hidden');
+}
+
 function activarNativo(st) {
   /* v156: sin stream no hay nada que activar — el estado puede llegar a
    * medio resolver y antes reventaba leyendo .m3u8 de algo vacío */
@@ -452,13 +535,16 @@ function activarNativo(st) {
     S.nativo = {
       url: st.videoUrl, m3u8: st.native.m3u8, mp4: !!st.native.mp4,
       proxy: !!st.native.proxy, subs: st.native.subs || [],
+      iframe: !!st.native.iframe, embed: st.native.embed || '',
+      frameReady: false, framePlaying: false, frameTime: 0, frameDuration: 0,
       isPlaying: !!st.isPlaying, position: +st.position || 0,
       updatedAt: +st.updatedAt || Date.now(), hls: null,
     };
     /* la capa del espejo nos sirve de marco: canvas fuera, video dentro */
     S.mirror.active = false; S.mirror.ready = false; S.mirror.playing = false; S.mirror.gotFrame = true;
     $('#mirrorImg').classList.add('hidden');
-    $('#roomVideo').classList.remove('hidden');
+    $('#roomVideo').classList.toggle('hidden', !!st.native.iframe);
+    $('#roomFrame').classList.toggle('hidden', !st.native.iframe);
     $('#mirrorLayer').classList.remove('hidden');
     $('#mirrorLoading').classList.add('hidden');
     $('#videoEmpty').classList.add('hidden');
@@ -506,6 +592,7 @@ function prefiereEspanol(video, hls) {
   }
 }
 function montarNativo(porProxy) {
+  if (S.nativo && S.nativo.iframe) { montarVkFrame(); return; }
   const v = $('#roomVideo');
   const usaProxy = !!porProxy || !!S.nativo.proxy;
   /* v98: las pelis de PelisXD traen un playlist NUESTRO (/api/xd/…) — tal cual */
@@ -649,9 +736,20 @@ function saltarHuecoMovie(hls, video, estado, aviso) {
   return true;
 }
 function sincronizarNativo() {
-  const v = $('#roomVideo');
-  if (!v || !S.nativo) return;
+  if (!S.nativo) return;
   const esp = posEsperada();
+  if (S.nativo.iframe) {
+    if (!S.nativo.frameReady) return;
+    const cur = +S.nativo.frameTime || 0;
+    const dur = +S.nativo.frameDuration || 0;
+    if (Math.abs(cur - esp) > 2 && (!dur || esp < dur - 1)) vkFrameCommand('seek', { time: esp });
+    if (S.nativo.isPlaying) {
+      if (!S.nativo.framePlaying) vkFrameCommand('play');
+    } else if (S.nativo.framePlaying) vkFrameCommand('pause');
+    return;
+  }
+  const v = $('#roomVideo');
+  if (!v) return;
   if (S.nativo.isPlaying) {
     if (Math.abs(v.currentTime - esp) > 2 && isFinite(v.duration) && esp < v.duration - 1) { try { v.currentTime = esp; } catch {} }
     if (v.paused) v.play().catch(() => { mostrarPlayBtn(); });
@@ -669,7 +767,8 @@ function nativoListo() {
   if (S.nativo && !S.nativo.isPlaying) mostrarPlayBtn();
   /* v128: reportar la duración (el server detecta el fin y salta solo) */
   const v = $('#roomVideo');
-  if (v && isFinite(v.duration) && v.duration > 1) sendAction({ type: 'videoMeta', duration: v.duration }).catch(() => {});
+  const dur = S.nativo && S.nativo.iframe ? (+S.nativo.frameDuration || 0) : (v && isFinite(v.duration) ? v.duration : 0);
+  if (dur > 1 && S.nativo && !S.nativo.metaSent) { S.nativo.metaSent = true; sendAction({ type: 'videoMeta', duration: dur }).catch(() => {}); }
   if (S.nativo && S.nativo.url !== S.introUrl) cargarIntro(S.nativo.url); /* v128 */
 }
 $('#roomVideo').addEventListener('canplay', () => { if (S.nativo) nativoListo(); });
@@ -710,6 +809,7 @@ function ventanaIntro() {
     return null;
   }
   if (S.nativo && S.nativoListo) {
+    if (S.nativo.iframe && S.nativo.frameDuration > 1) return { t: S.nativo.frameTime || 0, dur: S.nativo.frameDuration };
     const v = $('#roomVideo');
     if (v && isFinite(v.duration) && v.duration > 1) return { t: v.currentTime, dur: v.duration };
     return null;
@@ -741,7 +841,7 @@ function evaluaIntro() {
     const fin = +S.introData.end || (ini + 75);
     let vaSonando = false;
     if (SOLO && !SOLO.cerrado) { const sv = $('#soloVideo'); vaSonando = !!(sv && !sv.paused); } /* v130 */
-    else if (S.nativo) vaSonando = ($('#roomVideo') && !$('#roomVideo').paused);
+    else if (S.nativo) vaSonando = S.nativo.iframe ? !!S.nativo.framePlaying : ($('#roomVideo') && !$('#roomVideo').paused);
     else vaSonando = S.mirror.playing;
     if (w.t >= ini && w.t < fin && vaSonando) mostrar = true;
     if (mostrar && S.introVistoEn == null) S.introVistoEn = w.t; /* v132: inicio real de la intro */
@@ -797,12 +897,15 @@ function desmontarNativo() {
   const v = $('#roomVideo');
   if (S.nativo && S.nativo.hls) { try { S.nativo.hls.destroy(); } catch {} }
   if (v) { try { v.pause(); v.removeAttribute('src'); v.load(); } catch {} }
+  const f = $('#roomFrame');
+  if (f) { try { f.src = 'about:blank'; } catch {} f.classList.add('hidden'); }
   S.nativo = null;
 }
 function desactivarNativo() {
   desmontarNativo();
   S.serieSala = null; /* v118 */
   $('#roomVideo').classList.add('hidden');
+  $('#roomFrame').classList.add('hidden');
   $('#mirrorImg').classList.remove('hidden');
   $('#mirrorLayer').classList.add('hidden');
   $('#videoEmpty').classList.remove('hidden');
@@ -1423,6 +1526,8 @@ function pintarSeekBar(previewT) {
     /* v92: sala nativa — mover por el reloj de la sala */
     if (S.nativo) {
       S.nativo.position = t; S.nativo.updatedAt = Date.now() + (S.offset || 0); S.nativo.isPlaying = true;
+      if (S.nativo.iframe) vkFrameCommand('seek', { time: t });
+      else { const v = $('#roomVideo'); try { if (v) v.currentTime = t; } catch {} }
       sendAction({ type: 'seek', position: t }).catch(() => {});
     } else sendAction({ type: 'mirror', op: 'seekTo', time: t }).catch(() => {});
   };
@@ -1435,10 +1540,11 @@ function moverPelicula(delta) {
   /* v92: sala nativa — ±N segundos por el reloj de la sala */
   if (S.nativo) {
     const v = $('#roomVideo');
-    const base = (v && isFinite(v.duration)) ? v.currentTime : posEsperada();
+    const base = S.nativo.iframe ? (+S.nativo.frameTime || posEsperada()) : ((v && isFinite(v.duration)) ? v.currentTime : posEsperada());
     const t = Math.max(0, Math.round(base + delta));
     S.nativo.position = t; S.nativo.updatedAt = Date.now() + (S.offset || 0); S.nativo.isPlaying = true;
-    if (v) { try { v.currentTime = t; } catch {} }
+    if (S.nativo.iframe) vkFrameCommand('seek', { time: t });
+    else if (v) { try { v.currentTime = t; } catch {} }
     sendAction({ type: 'seek', position: t }).catch(() => {});
     return;
   }
@@ -1908,8 +2014,11 @@ function tocarPantallaCine() {
   if ($('#ctrlLayer').classList.contains('visible')) {
     ocultarCtrls();
     /* v92: en sala nativa el play/pausa va por el reloj de la sala */
-    if (S.nativo) sendAction({ type: S.nativo.isPlaying ? 'pause' : 'play' }).catch(() => {});
-    else sendAction({ type: 'mirror', op: S.mirror.playing ? 'pause' : 'play' }).catch(() => {});
+    if (S.nativo) {
+      const op = S.nativo.isPlaying ? 'pause' : 'play';
+      if (S.nativo.iframe) vkFrameCommand(op);
+      sendAction({ type: op }).catch(() => {});
+    } else sendAction({ type: 'mirror', op: S.mirror.playing ? 'pause' : 'play' }).catch(() => {});
   } else mostrarCtrls5s();
 }
 
@@ -1925,8 +2034,10 @@ function ocultarPlayBtn() {
 $('#playBtn').addEventListener('click', () => {
   ocultarPlayBtn();
   /* v92: sala nativa — play por el reloj de la sala */
-  if (S.nativo) sendAction({ type: 'play' }).catch(() => {});
-  else sendAction({ type: 'mirror', op: 'play' }).catch(() => {});
+  if (S.nativo) {
+    if (S.nativo.iframe) vkFrameCommand('play');
+    sendAction({ type: 'play' }).catch(() => {});
+  } else sendAction({ type: 'mirror', op: 'play' }).catch(() => {});
 });
 
 /* v60: si la peli tarda demasiado, te dejamos entrar igual (sin quedarte atascado) */
@@ -3498,6 +3609,9 @@ async function abrirSolo(pageUrl, info, opts) {
   $('#soloTime').textContent = '0:00 / 0:00';
   $('#soloCC').classList.remove('activa');
   const video = $('#soloVideo');
+  const frame = $('#soloFrame');
+  if (frame) { frame.classList.add('hidden'); try { frame.src = 'about:blank'; } catch {} }
+  video.classList.remove('hidden');
   video.removeAttribute('src');
   video.querySelectorAll('track').forEach((t) => t.remove());
   try { video.load(); } catch {}
@@ -3605,6 +3719,7 @@ function quitarTarjeta(url) {
  * sí sirve. Sonda honesta: pedimos el master por AMBOS caminos a la vez y
  * montamos el que traiga un playlist primero (default: proxy). */
 async function elegirModoSolo(d) {
+  if (d.iframe) return false; /* v284: VK se reproduce dentro de su iframe oficial */
   if (!d.proxy || d.mp4) return !!d.proxy; /* mp4/playlist propio: sin carrera */
   if (/^\/api\//.test(d.m3u8 || '')) return true; /* playlist local ya */
   const sondeo = async (url) => {
@@ -3624,7 +3739,38 @@ async function elegirModoSolo(d) {
   return true; /* proxy gana, o nadie contestó a tiempo */
 }
 
+function montarSoloFrame(d) {
+  const video = $('#soloVideo');
+  const frame = $('#soloFrame');
+  if (!frame) { toast('Este navegador no permite el reproductor de VK'); return; }
+  if (SOLO && SOLO.hls) { try { SOLO.hls.destroy(); } catch {} SOLO.hls = null; }
+  try { video.pause(); video.removeAttribute('src'); video.load(); } catch {}
+  video.classList.add('hidden');
+  frame.classList.remove('hidden');
+  SOLO.viaProxy = false;
+  SOLO.vkFrame = true;
+  $('#soloQ').classList.add('hidden');
+  $('#soloCC').classList.add('hidden');
+  $('#soloCargando').classList.remove('hidden');
+  $('#soloCtrls').classList.add('oculto');
+  const embed = d.embed || d.m3u8;
+  frame.onload = () => {
+    try { frame.contentWindow.postMessage({ method: 'init' }, '*'); } catch {}
+    /* en Solo el gesto de abrir el capítulo autoriza el autoplay del iframe;
+       si el navegador lo bloquea, VK deja visible su botón Play */
+    setTimeout(() => {
+      if (!SOLO || SOLO.cerrado || !frame.contentWindow) return;
+      try { frame.contentWindow.postMessage({ method: 'play' }, '*'); } catch {}
+      $('#soloCargando').classList.add('hidden');
+    }, 180);
+  };
+  frame.src = vkFrameSrc(embed, true);
+  $('#soloCargando').classList.add('hidden');
+  $('#soloTop').classList.remove('oculto');
+}
+
 function montarSolo(d, viaProxy) {
+  if (d && d.iframe) { montarSoloFrame(d); return; }
   const video = $('#soloVideo');
   /* v98: las pelis de PelisXD traen un playlist NUESTRO (/api/xd/…) — tal cual */
   const src = /^\/api\//.test(d.m3u8) ? d.m3u8
@@ -3853,6 +3999,9 @@ function cerrarSolo() {
   video.removeAttribute('src');
   video.querySelectorAll('track').forEach((t) => t.remove());
   try { video.load(); } catch {}
+  const frame = $('#soloFrame');
+  if (frame) { try { frame.src = 'about:blank'; } catch {} frame.classList.add('hidden'); }
+  video.classList.remove('hidden');
   if (document.fullscreenElement) { try { document.exitFullscreen(); } catch {} }
   $('#soloPlayer').classList.add('hidden');
   SOLO = null;

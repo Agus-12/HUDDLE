@@ -377,6 +377,11 @@
             <!-- v92: sala nativa — el video directo (como el modo Solo) cuando
                  la peli se puede resolver sin navegador remoto -->
             <video id="roomVideo" playsinline class="hidden"></video>
+            <!-- v284: VK oficial para Ennovelas; evita el HLS re-proxieado que
+                 dañaba el audio. La API js_api permite play/pausa/seek de sala. -->
+            <iframe id="roomFrame" class="hidden" title="Reproductor de video"
+              allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+              allowfullscreen referrerpolicy="origin"></iframe>
             <div id="mirrorLoading" class="mirror-loading">
               <div class="spinner"></div>
               <p>Abriendo la página en el navegador remoto…<br>
@@ -575,6 +580,10 @@
   <!-- v81: modo individual — reproductor propio, sin sala ni espejo -->
   <div id="soloPlayer" class="solo-player hidden">
     <video id="soloVideo" playsinline crossorigin="anonymous"></video>
+    <!-- v284: VK oficial en modo individual, sin re-proxy HLS -->
+    <iframe id="soloFrame" class="hidden" title="Reproductor de video"
+      allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+      allowfullscreen referrerpolicy="origin"></iframe>
     <div id="soloCargando" class="solo-cargando">
       <div class="spinner"></div>
       <p>Resolviendo el video…</p>

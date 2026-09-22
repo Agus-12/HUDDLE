@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v283'; // v278.6: fix Betty para TODOS — solo auto-heal token (no más Perfil no válido tras restart), login force reclaim, frontend re-login automático + Betty 335 garantizada
+const UI_VERSION = 'v284'; // v278.6: fix Betty para TODOS — solo auto-heal token (no más Perfil no válido tras restart), login force reclaim, frontend re-login automático + Betty 335 garantizada
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -431,13 +431,31 @@ function cambiarYtNativo(room, url, userId) {
   return true;
 }
 
+/* v284: forma única del estado nativo; los videos VK de Ennovelas se
+ * reproducen en el iframe oficial para conservar su decodificación de audio.
+ * Los demás streams siguen usando m3u8/mp4 como antes. */
+function nativeState(nat) {
+  if (!nat) return null;
+  const embed = String(nat.embed || nat.vkEmbed || '');
+  const m3u8 = String(nat.m3u8 || embed || '');
+  if (!m3u8 && !embed) return null;
+  return {
+    m3u8,
+    mp4: !!nat.mp4,
+    proxy: !!nat.proxy,
+    subs: nat.subs || [],
+    iframe: !!nat.iframe || !!embed,
+    embed: embed || (nat.iframe ? m3u8 : ''),
+  };
+}
+
 async function ponerYoutubeNativo(room, watchUrl, userId) {
   const id = idYoutubeDe(watchUrl);
   const nat = await resolverYoutube(watchUrl);
   if (mirrors.has(room.code)) await stopMirror(room);
   room.videoUrl = watchUrl;
   room.videoTitle = 'YouTube: ' + (YT_TITULOS.get(id) || 'video');
-  room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
+  room.native = nativeState(nat);
   room.videoImg = '';
   room.position = 0;
   room.isPlaying = false;
@@ -1566,6 +1584,20 @@ async function ennProbe(slug){
   try{ const d=await ennFicha(slug); return !!(d && d.ok && d.episodios && d.episodios.length); }catch{ return false; }
 }
 async function resolverVk(vkEmbedUrl, pageUrl){
+  /* v284: el reproductor oficial de VK entrega el audio correcto. El HLS
+   * extraído/proxieado por el servidor sonaba robótico en Chrome; no
+   * transcodificamos ni reempaquetamos VK: cada navegador carga el iframe
+   * oficial, con su propio CDN/IP y su decodificador de audio. */
+  try {
+    const u = new URL(vkEmbedUrl);
+    if (/^(?:www\.)?vk\.com$/i.test(u.hostname) && /^\/video_ext\.php$/i.test(u.pathname)) {
+      u.searchParams.set('js_api', '1');
+      u.searchParams.set('autoplay', '0');
+      u.searchParams.set('hd', u.searchParams.get('hd') || '2');
+      const embed = u.toString();
+      return { m3u8: embed, mp4: false, proxy: false, subs: [], iframe: true, embed };
+    }
+  } catch {}
   try{
     let m = /video_ext\.php\?oid=(\d+).*?id=(\d+).*?hash=([a-z0-9]+)/i.exec(vkEmbedUrl);
     let oid, vid, hash='';
@@ -2705,7 +2737,7 @@ async function ponerDaniNativo(room, urlEp, userId) {
   } catch {}
   room.videoUrl = urlEp;
   room.videoTitle = titulo.slice(0, 80);
-  room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
+  room.native = nativeState(nat);
   room.videoImg = daniCoverDe(slugD);
   room.position = 0;
   room.isPlaying = false;
@@ -2731,6 +2763,7 @@ async function resolverNativoInterno(url) {
   if (/danimados\.cc\/episodios\//i.test(url)) return resolverDani(url); /* v172 */
   if (/youtube\.com\/(watch|shorts)|youtu\.be\//i.test(url)) return resolverYoutube(url); /* v164 */
   if (/lacartoons\.com\/serie\/capitulo\//i.test(url)) return resolverLacartoons(url); /* v116: sin esto, los capítulos de lacartoons en SALA caían al espejo de navegador (abría la página web en vez de reproducir nativo) */
+  if (/ennovelas-tv\.com\/[a-z0-9-]+-capitulo-\d+/i.test(url)) return resolverEnnovelas(url); /* v284: Ennovelas también va por iframe VK oficial */
   return resolverSolo(url);
 }
 
@@ -3150,7 +3183,7 @@ async function autoSiguienteNativo(room) {
   room.videoUrl = elegido.cand.url; programarPrefetchEp(room);
   room.videoTitle = tituloBonitoEp(sc.titulo, elegido.cand.num); /* v144 */
   if (sc.poster) room.videoImg = sc.poster.slice(0, 400);
-  room.native = { m3u8: elegido.nat.m3u8, mp4: !!elegido.nat.mp4, proxy: !!elegido.nat.proxy, subs: elegido.nat.subs || [] };
+  room.native = nativeState(elegido.nat);
   sc.idx = elegido.idx;
   room.position = 0;
   room.videoDuration = 0;
@@ -4504,7 +4537,7 @@ async function handleAction(req, res, body) {
             const idYT = idYoutubeDe(urlNat); /* v164: título real del video si la instancia lo dio */
             room.videoTitle = String((idYT && YT_TITULOS.get(idYT)) || action.title || guessTitle(urlNat)).slice(0, 80);
             room.videoImg = String(action.img || '').slice(0, 400);
-            room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
+            room.native = nativeState(nat);
             room.position = 0;
             room.isPlaying = false; /* v127: SIEMPRE pausado — «Toca para empezar» lo arranca para todos a la vez */
             room.videoDuration = 0; room.autoNextKey = null; /* v128 */
@@ -4659,7 +4692,7 @@ async function handleAction(req, res, body) {
           room.videoUrl = elegido.cand.url; programarPrefetchEp(room);
           room.videoTitle = tituloBonitoEp(sc.titulo, elegido.cand.num); /* v144 */
           if (sc.poster) room.videoImg = sc.poster.slice(0, 400);
-          room.native = { m3u8: nat.m3u8, mp4: !!nat.mp4, proxy: !!nat.proxy, subs: nat.subs || [] };
+          room.native = nativeState(nat);
           sc.idx = elegido.idx;
           room.position = 0;
           room.isPlaying = false; /* v127: el episodio entra PAUSADO */
@@ -12138,7 +12171,7 @@ async function estrenosMezclados(){
         let r;
         try { r = await (esMovie ? resolverMovie(target) : esEpAnime ? resolverAnime(target) : esCuevanaMov ? resolverCuevanaMov(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esNv ? resolverNovela(target) : esEnp ? resolverEnp(target) : esEnn ? resolverEnnovelas(target) : resolverSolo(target)); epsPerdonar(target); } /* v205.5 + v206 + v206.2 + v207 + v235 cuevana.mov */
         catch (e2r) { epsFallo(target); throw e2r; } /* v205.5: episodios muertos al contador */
-        const out2 = { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy };
+        const out2 = { ok: true, m3u8: r.m3u8, subs: r.subs || [], mp4: !!r.mp4, proxy: !!r.proxy, iframe: !!r.iframe || !!r.embed || !!r.vkEmbed, embed: r.embed || r.vkEmbed || '' };
         if (healedToken) out2.newToken = healedToken;
         return json(res, 200, out2);
       } catch (e) {
