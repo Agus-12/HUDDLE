@@ -311,13 +311,15 @@ sonda-animed23.log              [ISO] Xs vivas→muertas=M muertas→vivas=N mue
 - [x] Persistencia (ocultas/vistas/fallos)
 - [x] Ficha técnica (este documento)
 
-### Pendiente (próxima sesión)
+### Pendiente (próxima sesión) — ✅ RESUELTO EN v286 (22 SEP)
 
-- [ ] **Resolver nativo** `resolverD23(epUrl)` → elige Byse/OK/rpmvid, `hlsReferers` + `servirPlaylist` (como `resolverCineCalidad` / `resolverAnime`)
-- [ ] Hilo `epNumDeUrl` / `serieCtx` para "Sig. ▸" y autoNext nativo
-- [ ] Búsqueda `buscarAnimeD23(q)` → `https://animed23.com/?s=` (parser de cards)
-- [ ] Feed home `animesDelMomento()` sumar AnimeD23 junto a Latanime/AnimeFLV (alternar como caricaturas)
-- [ ] `buscarEnSitios` filtrar `D23_OCULTAS` y respetar `d23Probe` en resultados
+- [x] **Resolver nativo** `resolverD23(epUrl)` → elige Byse/OK/rpmvid, `hlsReferers` + `servirPlaylist` (vía caché `/api/xd/`, como PelisXD)
+- [x] Hilo `serieCtxFromUrl` para "Sig. ▸" en sala (rama animed23, regex no-aviesa)
+- [x] Búsqueda `buscarAnimeD23(q)` → `https://animed23.com/?s=` (parser de cards + portadas IMDb locales)
+- [x] Feed home: `animesMezclados()` ya sumaba `d23Latest()` (existente desde v248)
+- [x] `buscarEnSitios` filtra `D23_OCULTAS` (dentro de `buscarAnimeD23`)
+
+Detalle completo en §16.
 
 ---
 
@@ -347,3 +349,49 @@ open https://129.80.212.92:3000/panel.html   # tarjeta verde AnimeD23
 ---
 
 *Documento generado: v248 — 21 septiembre 2026 · Probe validado con 5 slugs (3 directos + 2 JWT) y 8 aleatorios (7/8 vivos) · Sonda 90s+6h activa*
+
+---
+
+## 16. Resolución nativa — v286 (22 SEP 2026)
+
+### Cadena implementada (HTTP puro)
+```
+api/solo | resolverNativoInterno (sala)
+   └─ resolverD23(epUrl)                     animed23.com/capitulo/… (fetch simple, 15 s)
+        ├─ detección de challenge Cloudflare → error amable ("intenta luego")
+        ├─ d23TabsDeHtml(html, referer)      → tabs (6 hosts)
+        │    ├─ cadena DIRECTA: container.php?id=D23-…&open=1 → data-player-url
+        │    └─ cadena JWT: opciones/options.php → player.php?data= → multiplayer/contenedor.php → videoTabs
+        └─ resolverD23ConTabs(tabs, ep, serie, contabilidad)
+             prioridad 0  Byse   extraerByse          AES-256-GCM (version n: parts[n-1]+parts[31-n-1])
+             prioridad 1  OK     resolverOkRu(id)     ok.ru/videoembed → mp4 okcdn (existente)
+             prioridad 2  rpmvid resolverRpmvidD23    ytplay /api/v1/video hex → AES-128-CBC
+                                                             (Lacartoons keys) → TikTok hls (params.v) / cf
+             Byse y rpmvid → caché pelisxdStreams → /api/xd/<tok>/index.m3u8 (servirPlaylist)
+             éxito → d23Perdonar(serie) · fallo total → d23Ocultar(serie) + mensaje con los fallos
+```
+
+### Complementos
+- `datosAnimeD23(slug)`: ficha `/api/anime/<slug>?site=animed23` — capítulos
+  (`/capitulo/<slug>-ep-<n>/`), poster local IMDb primero, cache 30 min, respeta `D23_OCULTAS`.
+- `buscarAnimeD23(q)`: búsqueda WP `?s=` → cards → `site:'AnimeD23'` → `buscarEnSitios`.
+- `serieCtxFromUrl` rama animed23 → "Sig. ▸" en sala (regex `…/capitulo/(.*?)-(ep|capitulo)-<n>`).
+- `/api/d23/probar?u=<capitulo|container>`: diagnóstico sin contabilidad (útil desde el panel).
+- Frontend: 1 línea en `abrirSeriePicker` (`?site=animed23` para tarjetas `animed23.com/anime/`).
+
+### Verificado en vivo (sandbox, 22 SEP)
+- Byse completo: container D23-4BF9E96C1C19 → decrypt → master → variant → **.ts 3.2 MB, sync 0x47** ✓
+- Byse con sufijo (`/e/<code>/<x>`) ✓ (el code es el segmento DESPUÉS de `/e/`, no el último).
+- OK: mp4 okcdn por proxy (206) ✓ · rpmvid: master TikTok 720p/1080p ✓.
+- ⚠️ `animed23.com` da challenge a la IP del sandbox (NO a la de Oracle; auditado 21 SEP
+  con fetch simple OK). El primer salto solo se valida en producción tras el despliegue.
+
+### Bugs corregidos en el camino (no repetir)
+1. `datosAnimeD23`/`buscarAnimeD23` declaradas DENTRO del bloque `if (/api/trending)` —
+   con `'use strict'` eran invisibles desde otros handlers (`ReferenceError` en
+   /api/anime y /api/search). **Sondear siempre el alcance: las funciones de feed viven
+   adentro de ese if histórico; las que usan otros handlers van a nivel módulo.**
+2. El chequeo de éxito de `resolverD23ConTabs` exigía `out.m3u8`, pero Byse devuelve
+   `{body,url}` (se cachea después) → Byse fallaba en silencio y siempre ganaba OK.
+3. El endpoint /probar con `u=` no codificada perdía la query interna del container
+   (se re-une `id` desde el query externo como respaldo).

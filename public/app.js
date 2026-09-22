@@ -1550,6 +1550,7 @@ function abrirSeriePicker(res, enSala, esAnime) {
   if (!slugM || !slugM[1]) { toast('No pude leer esa serie'); return; }
   const slug = slugM[1];
   const esLat = /latanime\./i.test(res.url || ''); /* v63: anime de Latanime */
+  const esD23 = /animed23\.com\/anime\//i.test(res.url || ''); /* v286: anime de AnimeD23 */
   const pk = $('#seriePicker');
   pk.classList.remove('hidden');
   $('#spTitle').textContent = res.title || '';
@@ -1559,7 +1560,7 @@ function abrirSeriePicker(res, enSala, esAnime) {
   if (poster0) { po.src = poster0; po.style.display = ''; } else po.style.display = 'none';
   $('#spTemporadas').innerHTML = '';
   $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">Buscando episodios…</div>';
-  fetch((esEnn ? '/api/ennovelas/' + slug : esMovie ? '/api/movie/ficha/' + (/movie\.huddle\/v\//i.test(res.url || '') ? 'v' : '') + slug : esEnp ? '/api/enp/' + slug : esNv ? '/api/novelas/' + slug : esAnime ? ('/api/anime/' + slug + (esLat ? '?site=latanime' : '')) : '/api/serie/' + slug)).then((r) => r.json()).then((d) => { /* v278.4 + v206 + v206.2 + v207 · v216: el catálogo vivo pide ficha v<vod> */
+  fetch((esEnn ? '/api/ennovelas/' + slug : esMovie ? '/api/movie/ficha/' + (/movie\.huddle\/v\//i.test(res.url || '') ? 'v' : '') + slug : esEnp ? '/api/enp/' + slug : esNv ? '/api/novelas/' + slug : esAnime ? ('/api/anime/' + slug + (esLat ? '?site=latanime' : esD23 ? '?site=animed23' : '')) : '/api/serie/' + slug)).then((r) => r.json()).then((d) => { /* v278.4 + v206 + v206.2 + v207 · v216: el catálogo vivo pide ficha v<vod> · v286: AnimeD23 */
     /* v62: animes → una sola lista de episodios, sin miniaturas */
     const eps = esAnime
       ? (d.episodios || []).map((e) => ({ temporada: 1, ep: e.n, url: e.url, titulo: e.titulo || ('Episodio ' + e.n), img: '' }))

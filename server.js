@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v285'; // v285 HTTP-only: Ennovelas auditada, allowlist persistente y portada canónica de Betty; sin iframe ni reproductor remoto
+const UI_VERSION = 'v286'; // v286: AnimeD23 REPRODUCE — ficha + resolver HTTP puro (Byse→OK→rpmvid) + búsqueda global; portadas/stills y reproducción HTTP/HLS intactas
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -2407,6 +2407,62 @@ try {
 const FALLOS_D23 = new Map();
 try { for (const [k,v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR,'fallos-d23.json'),'utf8'))||{})) FALLOS_D23.set(k,v); } catch {}
 console.log('[d23] '+D23_TODOS.size+' animes ('+D23_OCULTAS.size+' ocultas, '+D23_VISTAS.size+' vistas)');
+
+/* v286: ficha de AnimeD23 — lista de capítulos para el picker (misma forma
+ * que Latanime: {ok, slug, titulo, poster, episodios:[{n,url,titulo}]}).
+ * Portada: preferencia de la copia local de IMDb; si la página no entrega
+ * imagen, queda el fallback existente (og:image de la ficha). */
+async function datosAnimeD23(slug) {
+  if (D23_OCULTAS.has(slug)) return null;
+  const c = serieCache.get('d23:' + slug);
+  if (c && Date.now() - c.at < 30 * 60 * 1000) return c.d;
+  const r = await fetchSeguro('https://animed23.com/anime/' + slug + '/', 15000);
+  if (!r || !r.ok) return null;
+  const html = await r.text();
+  if (/One moment, please|challenge-platform|Just a moment/i.test(html)) return null;
+  const og = (p) => {
+    const a1 = new RegExp(`<meta[^>]+property=["']${p}["'][^>]+content=["']([^"']+)`, 'i').exec(html);
+    const a2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${p}["']`, 'i').exec(html);
+    return (a1 || a2 || [])[1] || '';
+  };
+  const vistos = new Set();
+  const eps = [];
+  for (const m of html.matchAll(/href="https?:\/\/animed23\.com\/capitulo\/([a-z0-9-]+)\/?"/gi)) {
+    const epSlug = m[1];
+    if (vistos.has(epSlug) || !epSlug.startsWith(slug + '-')) continue;
+    const numM = /-(?:ep|capitulo)-(\d+)/i.exec(epSlug);
+    if (!numM) continue;
+    vistos.add(epSlug);
+    eps.push({ n: +numM[1], url: 'https://animed23.com/capitulo/' + epSlug + '/', titulo: 'Episodio ' + numM[1] });
+  }
+  eps.sort((a, b) => a.n - b.n);
+  if (!eps.length) return null;
+  const cov = D23_IMDB_COVERS.get(slug);
+  const titulo = (og('og:title') || '').replace(/\s*(Anime|Ver online|online|sub español|español)\b.*$/i, '').replace(/\s*[|─✔★].*$/, '').replace(/\s{2,}/g, ' ').trim().slice(0, 80) || (cov && cov.title) || slug;
+  const out = { ok: true, slug, titulo, poster: (cov && cov.poster) || og('og:image') || '', episodios: eps };
+  serieCache.set('d23:' + slug, { at: Date.now(), d: out });
+  return out;
+}
+/* v286: AnimeD23 en la búsqueda global — búsqueda WP (?s=) + portadas
+ * locales de IMDb; las series que la sonda marcó muertas no entran. */
+async function buscarAnimeD23(q) {
+  const r = await fetchSeguro('https://animed23.com/?s=' + encodeURIComponent(q), 10000);
+  if (!r || !r.ok) return [];
+  const html = await r.text();
+  if (/One moment, please|challenge-platform|Just a moment/i.test(html)) return [];
+  const vistos = new Set();
+  const out = [];
+  for (const m of html.matchAll(/<a[^>]+href="https?:\/\/animed23\.com\/anime\/([a-z0-9-]+)\/"[^>]*>([\s\S]*?)<\/a>/gi)) {
+    const slug = m[1];
+    if (vistos.has(slug) || D23_OCULTAS.has(slug)) continue;
+    vistos.add(slug);
+    const texto = m[2].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const cov = D23_IMDB_COVERS.get(slug);
+    out.push({ title: texto || (cov && cov.title) || slug, url: 'https://animed23.com/anime/' + slug + '/', img: (cov && cov.poster) || '', site: 'AnimeD23', extra: 'Latino' });
+    if (out.length >= 12) break;
+  }
+  return out;
+}
 /* v178: portadas de IMDB (el usuario las pidió «tal y como los jóvenes
  * titanles»... como Teen Titans) — mapa slug → m.media-amazon generado con
  * la API de sugerencias de IMDb; cubre 818 series + los reemplazos nuestros */
@@ -2871,6 +2927,7 @@ async function resolverNativoInterno(url) {
   if (esStreamPropioUS(url)) return { m3u8: url, mp4: false, proxy: false, subs: [] };
   if (new RegExp(MOVIE_HOST_VIRTUAL.replace(/\./g, '\\.') + '\\/ver\\/', 'i').test(url)) return resolverMovie(url); /* v207: Movie nativo en sala (playlist local) */
   if (/latanime\.org\/ver\//i.test(url)) return resolverAnime(url);
+  if (/animed23\.com\/capitulo\//i.test(url)) return resolverD23(url); /* v286: AnimeD23 nativo en sala (mismo que en Solo) */
   if (/pelisxd\.com\/pelicula\//i.test(url)) return resolverPelisxd(url); /* v98 */
   if (/miscaricaturas\.com\//i.test(url)) return resolverCaricatura(url); /* v102 */
   if (/danimados\.cc\/episodios\//i.test(url)) return resolverDani(url); /* v172 */
@@ -3166,6 +3223,14 @@ async function serieCtxFromUrl(u) {
       const idx = d.episodios.findIndex((e) => e.n === +m[2]);
       if (idx < 0) return null;
       return { tipo: 'latanime', titulo: d.titulo, poster: d.poster, idx, eps: d.episodios.map((e) => ({ url: e.url, num: 'Episodio ' + e.n })) };
+    }
+    m = /\/capitulo\/(.*?)-(?:ep|capitulo)-(\d+)/i.exec(url.pathname); /* v286: AnimeD23 — cadena de capítulos para "Sig. ▸" en sala */
+    if (m && /animed23\.com$/.test(host)) {
+      const d = await datosAnimeD23(m[1]);
+      if (!d || !d.episodios.length) return null;
+      const idx = d.episodios.findIndex((e) => e.n === +m[2]);
+      if (idx < 0) return null;
+      return { tipo: 'animed23', titulo: d.titulo, poster: d.poster, idx, eps: d.episodios.map((e) => ({ url: e.url, num: 'Episodio ' + e.n })) };
     }
     m = /\/ver\/([a-z0-9-]+)-(\d+)(?:\/|$)/i.exec(url.pathname);
     if (m && /animeflv\./.test(host)) {
@@ -6776,6 +6841,188 @@ async function extraerStreamwishPeli(pageUrl) {
   throw new Error('Ningún reproductor entregó el video — la peli puede estar caída');
 }
 
+/* v286: BYSE (bysesukior/byseqekaho) — extractor compartido (PelisXD lo trae
+ * inline; AnimeD23 lo reusa). API /api/videos/<code> → AES-256-GCM → m3u8.
+ * code = el segmento DESPUÉS de /e/ (funciona con /e/<code> y con
+ * /e/<code>/<sufijo>). */
+async function extraerByse(embedUrl) {
+  const u = new URL(embedUrl);
+  const partes = u.pathname.split('/').filter(Boolean);
+  const iE = partes.indexOf('e');
+  const code = (iE >= 0 && iE + 1 < partes.length) ? partes[iE + 1] : partes[partes.length - 1];
+  const rApi = await fetchSeguro('https://' + u.hostname + '/api/videos/' + code, 12000, { Referer: embedUrl });
+  if (!rApi.ok) throw new Error('Byse respondió ' + rApi.status);
+  const j = await rApi.json().catch(() => null);
+  if (!j || !j.playback || !j.playback.payload) throw new Error('Byse sin playback');
+  const pb = j.playback;
+  const n = parseInt(pb.version);
+  const b64url = (s) => { let b = s.replace(/-/g, '+').replace(/_/g, '/'); while (b.length % 4) b += '='; return Buffer.from(b, 'base64'); };
+  const keyBuf = Buffer.concat([n, 31 - n].filter((i) => i >= 1 && i <= pb.key_parts.length).map((i) => b64url(pb.key_parts[i - 1])));
+  if (keyBuf.length !== 32) throw new Error('Byse clave inválida');
+  const ivBuf = b64url(pb.iv), payloadBuf = b64url(pb.payload);
+  const d = crypto.createDecipheriv('aes-256-gcm', keyBuf, ivBuf);
+  d.setAuthTag(payloadBuf.slice(-16));
+  const dec = Buffer.concat([d.update(payloadBuf.slice(0, -16)), d.final()]).toString('utf8');
+  const src = JSON.parse(dec).sources && JSON.parse(dec).sources[0];
+  if (!src || !src.url) throw new Error('Byse sin video');
+  const ref = 'https://' + u.hostname + '/';
+  const chk = await fetchSeguro(src.url, 10000, { Referer: ref }).catch(() => null);
+  if (!chk || !chk.ok) throw new Error('Byse m3u8 respondió ' + (chk && chk.status));
+  const body = await chk.text();
+  if (!body.includes('#EXTM3U')) throw new Error('Byse playlist inválida');
+  try { hlsReferers.set(new URL(src.url).hostname, ref); } catch {}
+  return { body, url: src.url, ref, mp4: false };
+}
+
+/* v286: RPMVID (ytplay/cubeembed) para AnimeD23 — la API /api/v1/video
+ * responde hex + AES-128-CBC (misma familia que Lacartoons) y da la fuente
+ * TikTok (hlsVideoTiktok + token v) y la Cloudflare (cf). HTTP puro: ni
+ * navegador ni iframe; el master queda cacheado como los demás en /api/xd/. */
+async function resolverRpmvidD23(embedUrl, id) {
+  const host = new URL(embedUrl).hostname;
+  let j = null, ultimoErr = '';
+  for (let intento = 0; intento < 3 && !j; intento++) {
+    if (intento) await new Promise((r2) => setTimeout(r2, 900));
+    try {
+      const r2 = await fetchSeguro('https://' + host + '/api/v1/video?id=' + encodeURIComponent(id) + '&w=1280&h=720', 10000);
+      if (!r2.ok) { ultimoErr = 'el player rpmvid respondió ' + r2.status; if (r2.status === 404 || r2.status === 410) ultimoErr = 'borrado'; continue; }
+      const hex = String(await r2.text() || '').trim();
+      if (!/^[0-9a-f]+$/i.test(hex) || hex.length % 2) { ultimoErr = 'rpmvid cambió su cifrado'; continue; }
+      const d = crypto.createDecipheriv('aes-128-cbc', Buffer.from('kiemtienmua911ca', 'utf8'), Buffer.from('1234567890oiuytr', 'utf8'));
+      j = JSON.parse(Buffer.concat([d.update(Buffer.from(hex, 'hex')), d.final()]).toString('utf8'));
+    } catch (e) { ultimoErr = String(e.message || e).slice(0, 60); }
+  }
+  if (!j) throw new Error(ultimoErr === 'borrado' ? 'Ese capítulo ya no está disponible en AnimeD23 (el player lo borró)' : (ultimoErr || 'el player rpmvid no respondió'));
+  let cfg = {}; try { cfg = JSON.parse(j.streamingConfig || '{}'); } catch {}
+  const ttA = cfg.adjust && cfg.adjust.Tiktok;
+  const cand = [];
+  if (ttA && !ttA.disabled && j.hlsVideoTiktok) {
+    try {
+      const u = new URL(j.hlsVideoTiktok, 'https://' + host + '/');
+      if (ttA.params && ttA.params.v) u.searchParams.set('v', ttA.params.v);
+      cand.push(u.href);
+    } catch {}
+  }
+  if (j.cf) cand.push(j.cf);
+  if (!cand.length) throw new Error('sin fuente conocida en el player rpmvid');
+  let body = '', master = '';
+  for (const mUrl of cand) {
+    try {
+      const r3 = await fetchSeguro(mUrl, 10000, { Referer: 'https://' + host + '/' });
+      if (!r3.ok) { ultimoErr = 'el master respondió ' + r3.status; continue; }
+      const b = await r3.text();
+      if (/^#EXTM3U/m.test(b)) { body = b; master = mUrl; break; }
+      ultimoErr = 'master inválido';
+    } catch (e) { ultimoErr = String(e.message || e).slice(0, 60); }
+  }
+  if (!body) throw new Error(ultimoErr || 'el master no respondió');
+  try { hlsReferers.set(new URL(master).hostname, 'https://' + host + '/'); } catch {}
+  const ahora = Date.now();
+  const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
+  pelisxdStreams.set(tok, { body, base: master, ref: 'https://' + host + '/', slug: 'd23-' + id, at: ahora });
+  console.log('[d23] rpmvid (' + host + ' id ' + id + ') → master ' + master.slice(0, 60));
+  return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
+}
+
+/* v286: AnimeD23 — página del episodio → lista de tabs (6 hosts por ep).
+ * Dos cadenas: DIRECTA (container.php?id=D23-…&open=1 con botones
+ * data-player-url) y JWT (opciones/options.php → player.php?data= →
+ * multiplayer/contenedor.php → videoTabs). Misma lectura que d23Probe. */
+/* lee los hosts de una página de contenedor (data-player-url + videoTabs) */
+function d23TabsDeContenedor(html) {
+  const tabs = [];
+  for (const mm of html.matchAll(/data-player-url="([^"]+)"/g)) tabs.push(mm[1]);
+  const vt = /videoTabs\s*=\s*(\[[\s\S]*?\])\s*;/.exec(html);
+  if (vt) { try { for (const t of JSON.parse(vt[1].replace(/\\\//g, '/'))) if (t && t.url) tabs.push(t.url); } catch {} }
+  return [...new Set(tabs)];
+}
+async function d23TabsDeHtml(html, referer) {
+  const tabs = [];
+  const direct = /container\.php\?id=([A-Za-z0-9_-]+)/.exec(html);
+  if (direct) {
+    const esDirecto = /^D23-/i.test(direct[1]);
+    const curl = esDirecto
+      ? 'https://animed23.online/container.php?id=' + direct[1] + '&open=1'
+      : 'https://animed23.online/multiplayer/contenedor.php?id=' + direct[1];
+    const h5 = await (await fetchSeguro(curl, 12000, { Referer: referer })).text().catch(() => '');
+    for (const t of d23TabsDeContenedor(h5)) tabs.push(t);
+  }
+  if (!tabs.length) {
+    const mOpt = /<iframe[^>]+src="([^"]*opciones\/options\.php[^"]*)"/i.exec(html) || /src="([^"]*animed23\.online\/opciones\/options\.php[^"]*)"/i.exec(html);
+    if (mOpt) {
+      let optUrl = mOpt[1].replace(/&#038;/g, '&').replace(/&amp;/g, '&');
+      if (optUrl.startsWith('//')) optUrl = 'https:' + optUrl;
+      try {
+        const h3 = await (await fetchSeguro(optUrl, 12000, { Referer: referer })).text();
+        const playerM = /href="([^"]*player\.php\?data=[^"]*)"/i.exec(h3) || /player\.php\?data=[A-Za-z0-9%_.\-]+/.exec(h3);
+        if (playerM) {
+          let pUrl = (playerM[1] || playerM[0]).replace(/&#038;/g, '&').replace(/&amp;/g, '&');
+          if (pUrl.startsWith('/')) pUrl = 'https://animed23.online/opciones/' + pUrl.replace(/^\//, '');
+          else if (!/^https?:/i.test(pUrl)) pUrl = 'https://animed23.online/opciones/' + pUrl;
+          const h4 = await (await fetchSeguro(pUrl, 12000, { Referer: optUrl })).text().catch(() => '');
+          const contM = /multiplayer\/contenedor\.php\?id=([A-Za-z0-9_-]+)/i.exec(h4) || /contenedor\.php\?id=([A-Za-z0-9_-]+)/i.exec(h4);
+          if (contM) {
+            const h5 = await (await fetchSeguro('https://animed23.online/multiplayer/contenedor.php?id=' + contM[1], 12000, { Referer: pUrl })).text().catch(() => '');
+            for (const t of d23TabsDeContenedor(h5)) tabs.push(t);
+          }
+        }
+      } catch {}
+    }
+  }
+  return [...new Set(tabs)];
+}
+function d23SlugDeEp(epUrl) {
+  const m = /animed23\.com\/capitulo\/([a-z0-9-]+)/i.exec(epUrl || '');
+  if (!m) return '';
+  return m[1].replace(/-(?:ep|capitulo)-\d+[a-z0-9-]*$/i, '');
+}
+/* v286: resolver D23 — el corazón. Tabs → probamos en orden de confiabilidad
+ * (auditoría): Byse → OK (ok.ru) → rpmvid. Byse cachea el cuerpo en /api/xd/
+ * (playlist de un solo uso); OK y rpmvid ya traen su m3u8/playlist lista.
+ * Concontabilidad = contar fallos/podredumbre por serie (el /probar no lo hace). */
+async function resolverD23ConTabs(tabs, epLabel, serie, conContabilidad) {
+  const t0 = Date.now();
+  const prio = { Byse: 0, OK: 1, rpmvid: 2 };
+  const intentos = [];
+  for (const tUrl of tabs) {
+    if (/bysesukior|byseqekaho/i.test(tUrl)) intentos.push(['Byse', () => extraerByse(tUrl)]);
+    else if (/ok\.ru\/videoembed\/(\d+)/i.test(tUrl)) { const id = (/ok\.ru\/videoembed\/(\d+)/i.exec(tUrl))[1]; intentos.push(['OK', () => resolverOkRu(id)]); }
+    else if (/rpmvid\.com\/#([a-z0-9]+)/i.test(tUrl)) { const id = (/rpmvid\.com\/#([a-z0-9]+)/i.exec(tUrl))[1]; intentos.push(['rpmvid', () => resolverRpmvidD23(tUrl, id)]); }
+  }
+  intentos.sort((a, b) => (prio[a[0]] ?? 9) - (prio[b[0]] ?? 9));
+  if (!intentos.length) throw new Error('Este episodio no trae reproductores que Huddle pueda abrir en AnimeD23');
+  const fallos = [];
+  for (const [nombre, fn] of intentos) {
+    try {
+      const out = await fn();
+      /* Byse entrega {body,url} (se cachea en /api/xd/ abajo); el resto trae m3u8 directo */
+      if (!out || !(out.m3u8 || (out.body && out.url))) { fallos.push(nombre + ' (sin stream)'); continue; }
+      if (conContabilidad) d23Perdonar(serie);
+      console.log('[d23] ' + epLabel.slice(-40) + ' → ' + nombre + ' en ' + ((Date.now() - t0) / 1000).toFixed(1) + 's');
+      /* Byse entrega el cuerpo descifrado — cachearlo (su m3u8 original es
+       * de un solo uso) y servirlo por /api/xd/ como hace PelisXD */
+      if (out.body && out.url) {
+        const tok = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+        pelisxdStreams.set(tok, { body: out.body, base: out.url, ref: out.ref || 'https://animed23.com/', slug: 'd23-' + (serie || 'x'), at: Date.now() });
+        for (const u of out.body.match(/https?:\/\/[^\s"']+\.ts[^\s"']*/gi) || []) { try { hlsReferers.set(new URL(u).hostname, out.ref); } catch {} }
+        return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
+      }
+      return out;
+    } catch (e) { fallos.push(nombre + ' (' + String(e.message || e).slice(0, 48) + ')'); console.log('[d23] ' + epLabel.slice(-40) + ' — ' + nombre + ' falló: ' + String(e.message || e).slice(0, 120)); }
+  }
+  if (conContabilidad) d23Ocultar(serie); /* lázara: d23Perdonar lo reviva */
+  throw new Error('Los servidores de este episodio de AnimeD23 están caídos (probé: ' + (fallos.join(', ') || 'ninguno') + '). Prueba otro capítulo');
+}
+async function resolverD23(epUrl) {
+  const r = await fetchSeguro(epUrl, 15000);
+  if (!r || !r.ok) throw new Error('No pude abrir ese capítulo en AnimeD23 — intenta luego');
+  const html = await r.text();
+  if (/One moment, please|challenge-platform|Just a moment/i.test(html)) throw new Error('AnimeD23 está con protección anti-robot en este momento — intenta de nuevo en unos minutos');
+  const serie = d23SlugDeEp(epUrl);
+  const tabs = await d23TabsDeHtml(html, epUrl);
+  return resolverD23ConTabs(tabs, epUrl, serie, true);
+}
+
 async function resolverPelisxd(pageUrl) {
   const slug = (/\/pelicula\/([a-z0-9-]+)/i.exec(pageUrl) || [])[1];
   if (!slug) throw new Error('Peli de PelisXD no válida');
@@ -8691,11 +8938,12 @@ async function sondaCaricaturas() {
 
 async function buscarEnSitios(q) {
   const nq = normalizarTxt(q);
-  const [cuevana, cuevanaMov, latanime, animeflv, pelisxd, cari, cineCalidad, catalogo, movieCosecha] = await Promise.all([
+  const [cuevana, cuevanaMov, latanime, animeflv, d23Anime, pelisxd, cari, cineCalidad, catalogo, movieCosecha] = await Promise.all([
     buscarCuevana(q).catch(() => []),
     buscarCuevanaMov(q).catch(() => []), /* v235: cuevana.mov — 8k películas latinas */
     buscarLatanime(q).catch(() => []),
     buscarAnimeflv(q).catch(() => []), /* v97 */
+    buscarAnimeD23(q).catch(() => []), /* v286: AnimeD23 (169 títulos únicos, portadas IMDb locales) */
     buscarPelisxd(q).catch(() => []), /* v98: el catálogo grande de pelis */
     buscarMiscaricaturas(q).catch(() => []), /* v102: caricaturas nick/CN */
     buscarCineCalidad(q).catch(() => []), /* v236.7: CineCalidad (pelis + series) */
@@ -8723,6 +8971,7 @@ async function buscarEnSitios(q) {
     ...puntuar(pelisxd),
     ...puntuar(latanime),
     ...puntuar(animeflv),
+    ...puntuar(d23Anime), /* v286 */
     ...puntuar(cari),
     ...puntuar(cineCalidad), /* v236.7: CineCalidad pelis + series */
     ...(NOVELAS_EXTERNAS_ON ? puntuar(await buscarNovelas(q).catch(() => [])) : []), /* v206 — v208: ocultas */
@@ -11528,6 +11777,32 @@ async function estrenosMezclados(){
       const d = await ennFicha('yo-soy-betty-la-fea').catch(()=>null);
       return json(res,200,d||{ok:false});
     }
+    if (url.pathname === '/api/d23/probar' && req.method==='GET') { /* v286: sonda de un episodio AnimeD23 (sin contabilidad de podredumbre) */
+      let u = String(url.searchParams.get('u') || '');
+      const qId = url.searchParams.get('id'); /* si el cliente no codificó la query interna, se re-une aquí */
+      if (qId && !/id=/.test(u)) u += (u.includes('?') ? '&' : '?') + 'id=' + encodeURIComponent(qId);
+      try {
+        let tabs = [], serie = '';
+        if (/animed23\.com\/capitulo\//i.test(u)) {
+          serie = d23SlugDeEp(u);
+          const r = await fetchSeguro(u, 15000);
+          if (!r || !r.ok) return json(res, 200, { ok: false, error: 'la página del capítulo respondió ' + (r && r.status) });
+          const html = await r.text();
+          if (/One moment, please|challenge-platform|Just a moment/i.test(html)) return json(res, 200, { ok: false, error: 'challenge anti-robot de la fuente (no es Huddle) — reintentar luego' });
+          tabs = await d23TabsDeHtml(html, u);
+        } else if (/animed23\.online\/(container\.php|multiplayer\/contenedor\.php)/i.test(u)) {
+          const hC = await (await fetchSeguro(u, 12000)).text();
+          tabs = d23TabsDeContenedor(hC);
+        } else {
+          return json(res, 400, { ok: false, error: 'u= debe ser un /capitulo/ de animed23.com o un container de animed23.online' });
+        }
+        if (!tabs.length) return json(res, 200, { ok: false, error: 'sin reproductores', serie });
+        const out = await resolverD23ConTabs(tabs, u, serie, false);
+        return json(res, 200, { ok: true, serie, tabs, ...out });
+      } catch (e) {
+        return json(res, 200, { ok: false, serie, error: String(e.message || e).slice(0, 200) });
+      }
+    }
       if (url.pathname === '/api/movie/v-ficha') { /* v211: ficha EN VIVO de la API Movie (catalogo completo) */
         const vod = (url.searchParams.get('vod') || '').replace(/[^0-9]/g, '');
         if (!vod) return json(res, 400, { ok: false, error: 'Falta vod' });
@@ -11928,6 +12203,12 @@ async function estrenosMezclados(){
         precargarIntroDeSerie(dL.episodios); /* v135 */
         return json(res, 200, dL);
       }
+      if ((url.searchParams.get('site') || '').toLowerCase() === 'animed23') { /* v286: ficha AnimeD23 (misma forma que Latanime) */
+        const dD = await datosAnimeD23(slug);
+        if (!dD) return json(res, 502, { ok: false, error: 'No pude leer el anime en AnimeD23 — intenta luego' });
+        dD.episodios = epsVivos(dD.episodios); /* v205.5 */
+        return json(res, 200, dD);
+      }
       const c = serieCache.get('anime:' + slug);
       if (c && Date.now() - c.at < 30 * 60 * 1000) return json(res, 200, c.d);
       try {
@@ -12300,9 +12581,10 @@ async function estrenosMezclados(){
         const esNv = /novelas360\.com\/video\//i.test(target); /* v206 novelas */
         const esEnp = /enpantallatv\.com\/[a-z0-9-]*capitulo/i.test(target); /* v206.2 */
         const esEnn = /ennovelas-tv\.com\/[a-z0-9-]+-capitulo-\d+/i.test(target); /* v278.4 */
+        const esD23 = /animed23\.com\/capitulo\//i.test(target); /* v286: AnimeD23 (Byse→OK→rpmvid, HTTP puro) */
         const esMovie = new RegExp(MOVIE_HOST_VIRTUAL.replace(/\./g, '\\.') + '\\/ver\\/', 'i').test(target); /* v207: Movie (mapa local) */
         let r;
-        try { r = await (esMovie ? resolverMovie(target) : esEpAnime ? resolverAnime(target) : esCuevanaMov ? resolverCuevanaMov(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esNv ? resolverNovela(target) : esEnp ? resolverEnp(target) : esEnn ? resolverEnnovelas(target) : resolverSolo(target)); epsPerdonar(target); } /* v205.5 + v206 + v206.2 + v207 + v235 cuevana.mov */
+        try { r = await (esMovie ? resolverMovie(target) : esEpAnime ? resolverAnime(target) : esD23 ? resolverD23(target) : esCuevanaMov ? resolverCuevanaMov(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esNv ? resolverNovela(target) : esEnp ? resolverEnp(target) : esEnn ? resolverEnnovelas(target) : resolverSolo(target)); epsPerdonar(target); } /* v205.5 + v206 + v206.2 + v207 + v235 + v286 d23 */
         catch (e2r) { epsFallo(target); throw e2r; } /* v205.5: episodios muertos al contador */
         const out2 = { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy };
         if (healedToken) out2.newToken = healedToken;

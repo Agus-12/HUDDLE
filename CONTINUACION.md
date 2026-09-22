@@ -1,6 +1,53 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
-> **🔴 PARA REANUDAR EN OTRO CHAT: lee PRIMERO la sección de AQUÍ ABAJO (20 SEP 2026 — es el estado ACTUAL y la hoja de ruta). Todo lo demás hacia abajo es bitácora histórica del capítulo "Movie", ya CERRADO.**
+> **🔴 PARA REANUDAR EN OTRO CHAT: lee PRIMERO la sección de AQUÍ ABAJO (22 SEP 2026 — v286, AnimeD23 nativo — es el estado ACTUAL). El bloque 20 SEP sigue vigente para el capítulo "Movie", ya CERRADO.**
+
+---
+
+## ✅ ESTADO ACTUAL — 22 SEP 2026 (v286): ANIMED23 NATIVO — 169 animes reproducibles en Solo Y Juntos
+
+### Qué se entregó (todo HTTP puro — ni navegador, ni iframe, ni reproductor remoto)
+AnimeD23 ya **se reproduce dentro de la app**, tal como el resto de las fuentes:
+- **`resolverD23(epUrl)`**: página del capítulo → tabs (6 hosts) → intenta en orden
+  **Byse (HLS) → OK (ok.ru, mp4) → rpmvid (ytplay, HLS TikTok)**. El que funcione gana.
+  Byse y rpmvid se cachean en `/api/xd/` (patrón PelisXD) y todo se sirve por el proxy
+  propio con Referer (`hlsReferers`). Si todos caen: mensaje claro + contabilidad de
+  podredumbre (`d23Ocultar`/`d23Perdonar`, como la sonda).
+- **Ficha** `/api/anime/<slug>?site=animed23`: capítulos + portada (preferencia de la
+  copia local de IMDb). Misma forma que Latanime → el picker genérico ya la pinta.
+- **Búsqueda global** `buscarAnimeD23(q)` (`animed23.com/?s=`) con portadas locales y
+  filtro de ocultas — entró a `buscarEnSitios`.
+- **Cadena de episodios en sala**: `serieCtxFromUrl` rama animed23 → botón "Sig. ▸"
+  funciona en modo Juntos. `resolverNativoInterno` rama animed23 (nativo en sala).
+- **`/api/d23/probar?u=<capitulo|container>`**: sonda de diagnóstico (sin contabilidad).
+
+### Verificado en vivo (server local, 22 SEP)
+- Container `D23-4BF9E96C1C19` (Black Torch EP12) → **Byse gana**: decrypt AES-256-GCM →
+  master → `/api/xd/<tok>/index.m3u8` → variant 720p → **segmento .ts real (3.2 MB, sync 0x47)** ✓
+- Fallback **OK**: mp4 okcdn servido por proxy (206, bytes reales) ✓ · **rpmvid**: master
+  TikTok 720p+1080p ✓ (verificado en la cadena completa cada uno).
+- Búsqueda global OK (42 resultados "dragon"), ficha y /api/solo responden con mensaje
+  amable cuando la fuente está con challenge. App carga (index+app.js 200).
+- ⚠️ **Desde este sandbox de trabajo, `animed23.com` responde con challenge de Cloudflare**
+  (IP de datacenter) — por eso la ficha/ep no se pudieron probar de punta a punta AQUÍ.
+  En el server de Oracle el fetch simple sí abre (auditado 21 SEP: 158 KB en 300 ms).
+  El código detecta el challenge y falla suave ("intenta luego"), sin rotos.
+- Bug cazado y corregido en el camino: `datosAnimeD23`/`buscarAnimeD23` quedaron dentro
+  del bloque `if (/api/trending)` (el archivo usa `'use strict'` → invisibles afuera);
+  movidas a nivel módulo. Y `extraerByse` devolvía `{body,url}` pero el chequeo exigió
+  `m3u8` → Byse fallaba en silencio y siempre ganaba OK; corregido (ahora Byse gana).
+
+### Archivos tocados
+- `server.js`: v286 + funciones `extraerByse`, `resolverRpmvidD23`, `d23TabsDeContenedor`,
+  `d23TabsDeHtml`, `d23SlugDeEp`, `resolverD23ConTabs`, `resolverD23`, `datosAnimeD23`,
+  `buscarAnimeD23` + rama en `/api/anime`, `/api/solo`, `resolverNativoInterno`,
+  `serieCtxFromUrl`, `buscarEnSitios` + endpoint `/api/d23/probar`.
+- `public/app.js`: 1 línea en `abrirSeriePicker` (`?site=animed23` cuando la tarjeta es D23).
+- Docs: `ANIMED23-AUDIT.md` §14 (pendientes → hechos) + §16 (nueva).
+
+### Despliegue
+`cd ~/huddle && bash actualizar.sh` — y listo. Probable prueba rápida en el panel:
+buscar "Black Torch" → picar → episodio. Si algún ep viene sin Byse, cae a OK/rpmvid solo.
 
 ---
 
