@@ -11330,7 +11330,7 @@ async function d23Latest() {
       if (img && /placeholder|no-image|logo/i.test(img)) img = '';
       const imdbCover=D23_IMDB_COVERS.get(slug);
       if(imdbCover && imdbCover.poster) img=imdbCover.poster;
-      items.push({ title: m[3].trim().slice(0,80), url: 'https://animed23.com/anime/' + slug + '/', img, site: 'AnimeD23', extra: 'Latino' });
+      items.push({ title: (imdbCover&&imdbCover.title)||m[3].trim().slice(0,80), url: 'https://animed23.com/anime/' + slug + '/', img, site: 'AnimeD23', extra: 'Latino' });
     }
     if (!items.length) {
       const re2 = /href="https:\/\/animed23\.com\/anime\/([a-z0-9-]+)\/"/g;
@@ -11346,20 +11346,21 @@ async function d23Latest() {
       const d23Slug=(/animed23\.com\/anime\/([a-z0-9-]+)/i.exec(it.url||'')||[])[1];
       const imdbCover=d23Slug&&D23_IMDB_COVERS.get(d23Slug);
       if(imdbCover&&imdbCover.poster) it.img=imdbCover.poster;
-      if (!it.img) {
+      if (!it.img || /placeholder|no-image|logo/i.test(it.img)) {
+        // Si no hay IMDb, conserva primero la portada de la ficha AnimeD23.
+        try{
+          const pageSlug=(/animed23\.com\/anime\/([a-z0-9-]+)/i.exec(it.url||'')||[])[1];
+          const r2 = pageSlug && await fetchSeguro('https://animed23.com/anime/'+pageSlug+'/', 8000);
+          if(r2 && r2.ok){
+            const h2 = await r2.text();
+            const og = /property="og:image" content="([^"]+)"/i.exec(h2) || /content="([^"]+)" property="og:image"/i.exec(h2);
+            if(og && !/placeholder|no-image|logo/i.test(og[1])) it.img = og[1];
+          }
+        }catch{}
+      }
+      if (!it.img || /placeholder|no-image|logo/i.test(it.img)) {
         const cov = await aniListCover(it.title).catch(()=> '');
         if (cov) it.img = cov;
-        else {
-          // intenta sacar de página del anime directa (og:image)
-          try{
-            const r2 = await fetchSeguro('https://animed23.com/anime/'+it.url.split('/')[4]+'/', 8000);
-            if(r2 && r2.ok){
-              const h2 = await r2.text();
-              const og = /property="og:image" content="([^"]+)"/.exec(h2);
-              if(og) it.img = og[1];
-            }
-          }catch{}
-        }
       }
     }
     if (items.length) { d23LatestCache.at = Date.now(); d23LatestCache.items = items.filter(x=> x.img); }
