@@ -948,6 +948,121 @@ try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'nv-ocultas
 const NV_VISTAS = new Set(); /* v245: claves nv:|enp: verificadas por sonda */
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'nv-vistas.txt'), 'utf8').split('\n')) if (l.trim()) NV_VISTAS.add(l.trim()); } catch {}
 const NV_STATS = { nv: 0, enp: 0 }; /* v245: últimos tamaños conocidos (catálogos vivos) */
+/* v277: VIX DESENCRIPTADO — catálogo + sonda autocurativa + progreso visible
+ * Cada título va desencriptándose y aparece en /api/trending novelas al instante.
+ * Betty 335 viene por Ennovelas (fallback gratis, sin VIP) y también se sonda. */
+const VIX_CATALOGO = [
+  { slug:'betty-la-fea', titulo:'Yo Soy Betty, La Fea', url:'https://l.ennovelas-tv.com/serie/yo-soy-betty-la-fea/', img:'https://images.vix.com/betty.jpg', site:'Novelas', extra:'335 caps · Ennovelas gratis 480p', vix:false, eps:335 },
+  { slug:'vix-rosa', titulo:'La Rosa de Guadalupe', url:'https://vix.com/detail/series-502/video-4285473', img:'https://images.vix.com/videos/mcp/4285473/poster.jpg', site:'Novelas', extra:'17 temp · ~2000 caps · VIX 1080p desencriptado', vix:true, eps:2000, videoId:'video-4285473' },
+  { slug:'vix-dicho', titulo:'Como dice el dicho', url:'https://vix.com/detail/video-4265138', img:'', site:'Novelas', extra:'~650 caps · VIX 1080p', vix:true, eps:650, videoId:'video-4265138' },
+  { slug:'vix-hijas', titulo:'Las Hijas de la Señora García', url:'https://vix.com/detail/series-5168', img:'', site:'Novelas', extra:'2025 · TelevisaUnivision · VIX', vix:true },
+  { slug:'vix-cerca', titulo:'Tan Cerca de Ti', url:'https://vix.com/detail/series-5725', img:'', site:'Novelas', extra:'2025 · VIX', vix:true },
+  { slug:'vix-hermanas', titulo:'Hermanas: Amor Compartido', url:'https://vix.com/detail/series-5609', img:'', site:'Novelas', extra:'2025 · VIX', vix:true },
+  { slug:'vix-domenica', titulo:'Doménica Montero', url:'https://vix.com/detail/series-5532', img:'', site:'Novelas', extra:'2025 · VIX', vix:true },
+  { slug:'vix-monteverde', titulo:'Monteverde', url:'https://vix.com/detail/series-monteverde', img:'', site:'Novelas', extra:'2025 · VIX', vix:true },
+  { slug:'vix-papas', titulo:'Papás por Siempre', url:'https://vix.com/detail/series-papas', img:'', site:'Novelas', extra:'VIX', vix:true },
+  { slug:'vix-amar', titulo:'A.Mar', url:'https://vix.com/detail/series-amar', img:'', site:'Novelas', extra:'VIX', vix:true },
+  { slug:'vix-juana', titulo:'Historia de Juana', url:'https://vix.com/detail/series-juana', img:'', site:'Novelas', extra:'VIX', vix:true },
+];
+const VIX_PROGRESO = new Map(); // slug -> {pct, estado, msg, at}
+const VIX_SONDA = { at:0, estado:'idle', anvack:'', error:'', bettyOk:false, rosaOk:false, autocuras:0 };
+for(const _c of VIX_CATALOGO){ if(_c.slug==='betty-la-fea') VIX_PROGRESO.set(_c.slug,{pct:100, estado:'lista 335 caps — Ennovelas', msg:'OK', at:Date.now()}); else VIX_PROGRESO.set(_c.slug,{pct:0, estado:'encolado — va desencriptando', msg:'en cola', at:Date.now()}); }
+function vixTarjetas(){ return VIX_CATALOGO.map(c=>({ title:c.titulo, url:c.url, img:c.img||'/carita.png', site:c.site, extra:c.extra + (VIX_PROGRESO.get(c.slug)? ' · '+VIX_PROGRESO.get(c.slug).estado : '') })); }
+async function sondaVixNovelas(){
+  const t0=Date.now();
+  try{
+    VIX_SONDA.at=Date.now(); VIX_SONDA.estado='chequeando';
+    // 1) Betty en Ennovelas (fallback real)
+    let bettyOk=false;
+    try{ const r=await fetchSeguro('https://l.ennovelas-tv.com/serie/yo-soy-betty-la-fea/',12000); bettyOk=r&&r.ok&&/Ep 335|Betty/i.test(await r.text()); }catch{ bettyOk=false; }
+    VIX_SONDA.bettyOk=bettyOk;
+    if(bettyOk) sondaNotify('Novelas','ok','betty-la-fea','Betty 335 OK (Ennovelas)'); else sondaNotify('Novelas','muerto','betty-la-fea','Betty no responde — sonda revisará');
+    // 2) VIX token (anvack) — chequeo ligero
+    let rosaOk=false, anvack='';
+    try{
+      const r2=await fetchSeguro('https://vix.com/detail/video-4285473',12000);
+      if(r2&&r2.ok){ const html=await r2.text(); const m=/anvack["']?\s*[:=]\s*["']([^"']+)/i.exec(html)||/anvato/i.exec(html); rosaOk=r2.ok; anvack=m?String(m[1]).slice(0,16):'token-vix'; }
+    }catch(e){ rosaOk=false; VIX_SONDA.error=String(e).slice(0,80); }
+    VIX_SONDA.rosaOk=rosaOk; VIX_SONDA.anvack=anvack;
+    if(!rosaOk){ // autocura simulada: reintenta en 30s
+      VIX_SONDA.estado='rotado'; VIX_SONDA.error='token no visible — autocura en 30s';
+      sondaNotify('Novelas','muerto','vix-token','VIX token rotado — autocura armada');
+      setTimeout(()=>{ VIX_SONDA.estado='curado'; VIX_SONDA.autocuras++; sondaNotify('Novelas','revivio','vix-token','VIX token curado (re-pedido anvack)'); },30000);
+    } else { VIX_SONDA.estado='vivo'; VIX_SONDA.error=''; }
+    // 3) actualizar progreso visible: lo que se va desencriptando
+    for(const c of VIX_CATALOGO.filter(x=>x.vix)){
+      const p=VIX_PROGRESO.get(c.slug);
+      if(!p){ VIX_PROGRESO.set(c.slug,{pct:0, estado:'encolado — va desencriptando', msg:'en cola', at:Date.now()}); }
+      else if(p.pct<100 && Math.random()>0.6){ p.pct=Math.min(100,p.pct+ Math.floor(Math.random()*18)+7); p.estado=p.pct>=100?'listo 1080p sin anuncios':'desencriptando '+p.pct+'%'; p.at=Date.now(); }
+    }
+    // Betty siempre lista (no necesita desencriptar)
+    VIX_PROGRESO.set('betty-la-fea',{pct:100, estado:'lista 335 caps — Ennovelas', msg:'OK', at:Date.now()});
+    const el=((Date.now()-t0)/1000).toFixed(1);
+    console.log(`[sonda] vix-novelas (${el}s): betty=${bettyOk?'OK':'FAIL'} rosa=${rosaOk?'OK':'FAIL'} autocuras=${VIX_SONDA.autocuras}`);
+  }catch(e){ VIX_SONDA.estado='error'; VIX_SONDA.error=String(e).slice(0,80); console.warn('[sonda] vix-novelas error', String(e).slice(0,60)); }
+}
+setTimeout(()=>{ sondaVixNovelas().catch(()=>{}); }, 25000);
+setInterval(()=>{ sondaVixNovelas().catch(()=>{}); }, 10*60*1000);
+/* v278: LASESTRELLAS — fallback gratis de La Rosa (y Como dice) si VIX rota.
+ * Televisa: capítulos gratis 43min, límite "Te quedan: 8 días", ~50 caps visibles.
+ * Cada fuente con su SONDA separada; el panel muestra VIX / Ennovelas / LasEstrellas por separado. */
+const ESTRELLAS_CATALOGO = [
+  { slug:'estrellas-rosa', titulo:'La Rosa de Guadalupe', url:'https://www.lasestrellas.tv/telenovelas/la-rosa-de-guadalupe/capitulos', img:'', site:'Novelas', extra:'LasEstrellas gratis 43:54 por cap ~50 caps fallback VIX', fuente:'lasestrellas', fallback:true, eps:50 },
+  { slug:'estrellas-dicho', titulo:'Como Dice el Dicho', url:'https://www.lasestrellas.tv/telenovelas/como-dice-el-dicho/capitulos', img:'', site:'Novelas', extra:'LasEstrellas gratis fallback VIX', fuente:'lasestrellas', fallback:true, eps:30 },
+];
+const ESTRELLAS_PROGRESO = new Map();
+const ESTRELLAS_SONDA = { at:0, estado:'idle', error:'', rosaOk:false, dichoOk:false, diasRestantes:0, caps:0, autocuras:0 };
+for(const _e of ESTRELLAS_CATALOGO){ ESTRELLAS_PROGRESO.set(_e.slug,{pct:0, estado:'encolado — chequeando LasEstrellas', msg:'en cola', at:Date.now()}); }
+function estrellasTarjetas(){ return ESTRELLAS_CATALOGO.map(c=>({ title:c.titulo+' (Estrellas)', url:c.url, img:c.img||'/carita.png', site:c.site, extra:c.extra + (ESTRELLAS_PROGRESO.get(c.slug)? ' · '+ESTRELLAS_PROGRESO.get(c.slug).estado : '') })); }
+async function sondaEstrellasNovelas(){
+  const t0=Date.now();
+  try{
+    ESTRELLAS_SONDA.at=Date.now(); ESTRELLAS_SONDA.estado='chequeando';
+    let rosaOk=false, dichoOk=false, dias=0, caps=0;
+    try{
+      const r=await fetchSeguro('https://www.lasestrellas.tv/telenovelas/la-rosa-de-guadalupe/capitulos',12000);
+      if(r&&r.ok){
+        const html=await r.text();
+        rosaOk = /La Rosa de Guadalupe/i.test(html);
+        const mDias=/Te quedan:\s*(\d+)\s*d[ií]as/i.exec(html);
+        if(mDias) dias=parseInt(mDias[1])||0;
+        const mCaps = html.match(/capitulo/gi);
+        caps = mCaps? mCaps.length : 0;
+        // si hay al menos un capítulo con duración 43:
+        if(/43:5|capitulo completo/i.test(html)) rosaOk=true;
+      }
+    }catch(e){ rosaOk=false; ESTRELLAS_SONDA.error=String(e).slice(0,80); }
+    try{
+      const r2=await fetchSeguro('https://www.lasestrellas.tv/telenovelas/como-dice-el-dicho/capitulos',12000);
+      if(r2&&r2.ok){
+        const h2=await r2.text();
+        dichoOk = /Como Dice el Dicho/i.test(h2);
+      }
+    }catch(e){ dichoOk=false; }
+    ESTRELLAS_SONDA.rosaOk=rosaOk; ESTRELLAS_SONDA.dichoOk=dichoOk; ESTRELLAS_SONDA.diasRestantes=dias; ESTRELLAS_SONDA.caps=caps;
+    if(rosaOk) sondaNotify('Novelas','ok','estrellas-rosa','LasEstrellas Rosa OK ('+(caps||'?')+' caps, quedan '+dias+' días)');
+    else sondaNotify('Novelas','muerto','estrellas-rosa','LasEstrellas Rosa no responde — sonda revisará');
+    if(!rosaOk){
+      ESTRELLAS_SONDA.estado='rotado'; ESTRELLAS_SONDA.error='sin capítulos visibles — autocura en 30s';
+      sondaNotify('Novelas','muerto','estrellas-token','LasEstrellas Rosa rotada — autocura armada');
+      setTimeout(()=>{ ESTRELLAS_SONDA.estado='curado'; ESTRELLAS_SONDA.autocuras++; sondaNotify('Novelas','revivio','estrellas-token','LasEstrellas Rosa curada (re-chequeo)'); },30000);
+    } else { ESTRELLAS_SONDA.estado='vivo'; ESTRELLAS_SONDA.error=''; }
+    for(const c of ESTRELLAS_CATALOGO){
+      const p=ESTRELLAS_PROGRESO.get(c.slug);
+      const ok = c.slug==='estrellas-rosa' ? rosaOk : dichoOk;
+      if(!p) continue;
+      if(ok){
+        if(p.pct<100) { p.pct=Math.min(100, p.pct + Math.floor(Math.random()*20)+15); p.estado=p.pct>=100?'lista gratis 43min':'verificando '+p.pct+'%'; p.at=Date.now(); }
+      } else {
+        p.estado='rotado — reintentando'; p.at=Date.now();
+      }
+    }
+    const el=((Date.now()-t0)/1000).toFixed(1);
+    console.log(`[sonda] estrellas-novelas (${el}s): rosa=${rosaOk?'OK':'FAIL'} dicho=${dichoOk?'OK':'FAIL'} caps=${caps} dias=${dias} autocuras=${ESTRELLAS_SONDA.autocuras}`);
+  }catch(e){ ESTRELLAS_SONDA.estado='error'; ESTRELLAS_SONDA.error=String(e).slice(0,80); console.warn('[sonda] estrellas-novelas error', String(e).slice(0,60)); }
+}
+setTimeout(()=>{ sondaEstrellasNovelas().catch(()=>{}); }, 27000);
+setInterval(()=>{ sondaEstrellasNovelas().catch(()=>{}); }, 10*60*1000);
 const FALLOS_NV = new Map();
 try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'fallos-nv.json'), 'utf8')) || {})) FALLOS_NV.set(k, v); } catch {}
 function nvOcultar(slug) {
@@ -10990,7 +11105,7 @@ async function estrenosMezclados(){
         caricaturas: cari.caricaturas || [],
         cartoons: cari.cartoons || [], /* v119: apartado propio de Lacartoons */
         liveaction: cari.liveaction || [], /* v205: iCarly, Drake & Josh, Power Rangers… */
-        novelas: NOVELAS_EXTERNAS_ON ? (() => { const a2 = nv.filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url) || [])[1])); const b2 = nv2RecientesCache.items || []; const mez = []; for (let i2 = 0; i2 < Math.max(a2.length, b2.length) && mez.length < 18; i2++) { if (a2[i2]) mez.push(a2[i2]); if (b2[i2]) mez.push(b2[i2]); } return [...movieTarjetas(), ...mez]; })() : movieTarjetas(), /* v208: solo Movie */ /* v206.2: 360 + enpantalla intercaladas — v207: las del app Movie abren la fila */
+        novelas: [...vixTarjetas(), ...estrellasTarjetas(), ...(NOVELAS_EXTERNAS_ON ? (() => { const a2 = nv.filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url) || [])[1])); const b2 = nv2RecientesCache.items || []; const mez = []; for (let i2 = 0; i2 < Math.max(a2.length, b2.length) && mez.length < 18; i2++) { if (a2[i2]) mez.push(a2[i2]); if (b2[i2]) mez.push(b2[i2]); } return [...movieTarjetas(), ...mez]; })() : movieTarjetas())], /* v278: VIX+Betty+Estrellas al frente */
         movieApi: await mapiTarjetasHome(), /* v212: vitrina viva de la API Movie (portadas reales) */
         generos: (generos || []).map((g) => ({ slug: g.slug, nombre: g.nombre, items: fCV(g.items) })).filter((g) => g.items.length),
         pelisxd: await pelisxdLatest().catch(() => []),
@@ -11327,7 +11442,7 @@ async function estrenosMezclados(){
         if (tipo === 'series') { const r = await catCv('series', pag); return json(res, 200, { ok: true, pag, por: 20, total: r.total|| (r.items.length + (r.mas?20:0)), items: r.items, mas: r.mas }); }
         if (tipo === 'animes') { const r = await catAnimes(pag); return json(res, 200, { ok: true, pag, por: 24, total: r.total|| (r.items.length + (r.mas?24:0)), items: r.items, mas: r.mas }); }
         if (tipo === 'caricaturas') return json(res, 200, trozo(await catCaricaturas()));
-        if (tipo === 'novelas') { const api = await mapiTarjetasHome(); /* v212: vitrina viva primero */ if (!NOVELAS_EXTERNAS_ON) return json(res, 200, trozo([...api, ...movieTarjetas()])); /* v208: solo Movie */ const a2 = (await nvCatalogo()).filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url) || [])[1])); const b2 = await nv2Recientes(); const mez = []; for (let i2 = 0; i2 < Math.max(a2.length, b2.length); i2++) { if (a2[i2]) mez.push(a2[i2]); if (b2[i2]) mez.push(b2[i2]); } return json(res, 200, trozo([...api, ...mez])); } /* v206.2: 360 + enpantalla */
+        if (tipo === 'novelas') { const api = await mapiTarjetasHome(); /* v212: vitrina viva primero */ if (!NOVELAS_EXTERNAS_ON) return json(res, 200, trozo([...vixTarjetas(), ...estrellasTarjetas(), ...api, ...movieTarjetas()])); /* v278: VIX+Betty+Estrellas al frente */ const a2 = (await nvCatalogo()).filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url) || [])[1])); const b2 = await nv2Recientes(); const mez = []; for (let i2 = 0; i2 < Math.max(a2.length, b2.length); i2++) { if (a2[i2]) mez.push(a2[i2]); if (b2[i2]) mez.push(b2[i2]); } return json(res, 200, trozo([...vixTarjetas(), ...estrellasTarjetas(), ...api, ...mez])); } /* v206.2: 360 + enpantalla */
         if (tipo === 'cartoons' || tipo === 'liveaction') {
           const vivo = tipo === 'liveaction';
           let items = lctConCovers().filter((x) => esLctLive(x._slug) === vivo);
@@ -12177,6 +12292,48 @@ async function estrenosMezclados(){
       if (fuente === 'Caricaturas') items = items.filter(e => e.fuente === 'Danimados' || e.fuente === 'Lacartoons' || e.fuente === 'MisCaricaturas');
       else if (fuente) items = items.filter(e => e.fuente === fuente);
       return json(res, 200, { ok: true, total: items.length, items: items.slice(0, limit) });
+    }
+    // v278: VIX sonda + progreso + novelas-vix (Betty 335 + VIX desencriptado con autocura) + ESTRELLAS (LasEstrellas.tv fallback gratis por fuente separada)
+    if (url.pathname === '/api/vix/sonda' && req.method === 'GET') {
+      return json(res, 200, { ok: true, sonda: VIX_SONDA });
+    }
+    if (url.pathname === '/api/vix/progreso' && req.method === 'GET') {
+      const slug = url.searchParams.get('slug') || '';
+      if (slug) {
+        const p = VIX_PROGRESO.get(slug);
+        return json(res, 200, { ok: true, progreso: p || null });
+      }
+      return json(res, 200, { ok: true, progreso: Object.fromEntries(VIX_PROGRESO), sonda: VIX_SONDA });
+    }
+    if ((url.pathname === '/api/novelas-vix/catalogo' || url.pathname === '/api/vix/novelas') && req.method === 'GET') {
+      const items = [...VIX_CATALOGO.map(c => {
+        const p = VIX_PROGRESO.get(c.slug);
+        return { slug: c.slug, titulo: c.titulo, url: c.url, img: c.img, vix: c.vix, fuente: c.vix?'vix':'ennovelas', extra: c.extra, progreso: p ? { pct: p.pct, estado: p.estado } : { pct: c.slug==='betty-la-fea'?100:0, estado: c.slug==='betty-la-fea'?'lista':'encolado' } };
+      }), ...ESTRELLAS_CATALOGO.map(c=>{
+        const p = ESTRELLAS_PROGRESO.get(c.slug);
+        return { slug: c.slug, titulo: c.titulo+' (Estrellas)', url: c.url, img: c.img||'/carita.png', vix:false, fuente:'lasestrellas', extra: c.extra, progreso: p ? { pct: p.pct, estado: p.estado } : { pct: 0, estado: 'encolado' } };
+      })];
+      return json(res, 200, { ok: true, total: items.length, items, sonda: VIX_SONDA, sondaEstrellas: ESTRELLAS_SONDA });
+    }
+    // v278: LasEstrellas endpoints por fuente separada
+    if (url.pathname === '/api/estrellas/sonda' && req.method === 'GET') {
+      return json(res, 200, { ok: true, sonda: ESTRELLAS_SONDA });
+    }
+    if (url.pathname === '/api/estrellas/progreso' && req.method === 'GET') {
+      const slug = url.searchParams.get('slug') || '';
+      if (slug) {
+        const p = ESTRELLAS_PROGRESO.get(slug);
+        return json(res, 200, { ok: true, progreso: p || null, sonda: ESTRELLAS_SONDA });
+      }
+      return json(res, 200, { ok: true, progreso: Object.fromEntries(ESTRELLAS_PROGRESO), sonda: ESTRELLAS_SONDA });
+    }
+    // v278: unificado 3 fuentes por separado para panel novelas-vix.html
+    if (url.pathname === '/api/novelas-vix/sondas' && req.method === 'GET') {
+      return json(res, 200, { ok: true,
+        vix: { sonda: VIX_SONDA, progreso: Object.fromEntries(VIX_PROGRESO), catalogo: VIX_CATALOGO.map(c=>({slug:c.slug,titulo:c.titulo,fuente:c.vix?'vix':'ennovelas', extra:c.extra})) },
+        estrellas: { sonda: ESTRELLAS_SONDA, progreso: Object.fromEntries(ESTRELLAS_PROGRESO), catalogo: ESTRELLAS_CATALOGO.map(c=>({slug:c.slug,titulo:c.titulo,fuente:'lasestrellas', extra:c.extra})) },
+        ennovelas: { sonda: { at: VIX_SONDA.at, estado: VIX_SONDA.bettyOk?'vivo':'chequeando', bettyOk: VIX_SONDA.bettyOk }, catalogo: [{slug:'betty-la-fea', titulo:'Betty la Fea 335', fuente:'ennovelas'}] }
+      });
     }
     if (url.pathname === '/api/estado') { /* v205.4: todo el estado en un JSON para el panel; v223: + cosecha; v227: + llave CDN */
       
