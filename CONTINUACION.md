@@ -1,8 +1,76 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
-> **🔴 PARA REANUDAR EN OTRO CHAT: lee PRIMERO la sección de AQUÍ ABAJO (22 SEP 2026 — v287, auditoría Latanime+AnimeFLV y podredumbre de episodios — es el estado ACTUAL). El bloque 20 SEP sigue vigente para el capítulo "Movie", ya CERRADO.**
+> **🔴 PARA REANUDAR EN OTRO CHAT: lee PRIMERO la sección de AQUÍ ABAJO (22 SEP 2026 — v288, tarjeta muerta = fuera del buscador al primer clic — es el estado ACTUAL). El bloque 20 SEP sigue vigente para el capítulo "Movie", ya CERRADO.**
 
 ---
+
+## ✅ ESTADO ACTUAL — 22 SEP 2026 (v288): TARJETA MUERTA = FUERA DEL BUSCADOR AL PRIMER CLIC (Latanime, AnimeD23, AnimeFLV)
+
+### Lo que pedía el usuario
+- "En animeFLV todavía me siguen saliendo series sin capítulos" (+ screenshot D23
+  "Ushiro no Shoumen Kamui-san (2026)" con error "No pude leer el anime en AnimeD23 — intenta luego").
+- La regla del 22 SEP sigue vigente: si algo no funciona de verdad, **QUITARLO**.
+
+### Diagnóstico (por qué v287 no bastaba)
+1. v287 solo ocultaba el AF con **página 404**. El hueco real: **página 200 con 0
+   episodios** (el sitio deja la página colgada pero la serie ya no trae eps, o se
+   borraron) NUNCA se ocultaba: la ficha abría, el picker decía "no encontré
+   episodios" y la tarjeta seguía saliendo del buscador para siempre. Lo mismo en
+   D23 (0 capítulos) y en Latanime (0 eps).
+2. `datosAnimeD23`/`datosAnimeLatanime` devolvían `null` indistintamente por "página
+   muerta" y por "challenge Cloudflare / red" → mensaje genérico, sin distinguir,
+   sin ocultar. (Desde el sandbox D23 SIEMPRE parece muerta — challenge CF —; el
+   server del usuario la lee normal. Por eso la muerte debe ir etiquetada, nunca por null.)
+
+### Qué hace v288
+- `datosAnimeLatanime` y `datosAnimeD23` ahora devuelven
+  `{ok:false, dead:'404'|'empty', slug, titulo:'', poster:'', episodios:[]}` cuando la
+  página del sitio es 404 o llega sin episodios/capítulos (challenge/red = `null` como antes).
+  **IMPORTANTE: `episodios:[]` es obligatorio** — el picker "Sig. ▸" (~línea 3372) hace
+  `d.episodios.length` sin guard; un objeto muerto sin esa propiedad tiraba.
+- **Rama Latanime** (`/api/anime/<slug>?site=latanime`): si `dL.dead` → `LA_MUERTAS_SET`
+  + `latanime-muertas.txt` + `LA_FALLOS` (f:3, h:now → la cola `laRevizar` la re-prueba)
+  + `sondaNotify('Latanime','muerto',…)`. Mensaje:
+  "Esta serie ya no está disponible en Latanime (la tarjeta se ocultará)".
+- **Rama AnimeD23** (`?site=animed23`): si `dD.dead` → `D23_OCULTAS` + `d23-ocultas.txt`
+  (la `sondaD23`/`d23Probe` la re-prueba: 3 por ciclo, exige página + 2 capítulos +
+  container jugable). Mensaje: "Esta serie ya no está disponible en AnimeD23 (la tarjeta se ocultará)".
+- **Rama AnimeFLV** (sin `site`): el 404 de v287 sigue; NUEVO — página 200 con 0 eps →
+  `AF_OCULTAS` + `af-ocultas.txt` (la `sondaAnimeflv`/`afProbe` la re-prueba: ep-1 con
+  embed playable). Mensaje: "Esta serie ya no trae episodios en AnimeFLV (la tarjeta se ocultará)".
+- **Fuera del buscador al momento**: `buscarAnimeflv` ya filtraba `AF_OCULTAS` (v243),
+  `buscarAnimeD23` ya filtraba `D23_OCULTAS`, y Latanime sale por `laOcultaUrl`
+  (incluye `LA_MUERTAS_SET`) → nada nuevo que agregar: la oculta que ya existía
+  para las muertas auditadas ahora se alimenta también del primer clic.
+- Challenge/red sigue dando el mensaje genérico "No pude leer el anime…" **sin ocultar**
+  (anti-falso-positivo: desde el sandbox D23 siempre da challenge; ocultar por eso
+  mataría el 100% del catálogo en el primer ciclo).
+- `UI_VERSION v288`.
+
+### Verificado en vivo (server local, 22 SEP)
+- LA 404 real (`serie-que-no-existe-abc`) → 502 mensaje específico + persistida en
+  `latanime-muertas.txt` ✓
+- AF 404 real (`jujutsu-kaisen-tv-b`) → 502 mensaje específico (regresión v287) ✓
+- AF vivo (`one-piece`) y LA viva (`ergo-proxy-castellano`, 23 eps) → ficha normal ✓
+- D23 desde el sandbox (challenge CF) → mensaje genérico y **NO se oculta** ✓
+  (anti-falso-positivo comprobado)
+- D23/LA "200 + 0 eps": no verificado directamente. D23 bloquea al sandbox con CF;
+  no se ha confirmado la causa del fallo de Mushoku Tensei en producción.
+  v288 no garantiza corregir ese caso: requiere diagnóstico adicional.
+- AF "200 + 0 eps" contra el sitio real: escaneo de 220 slugs del sitemap (7,182
+  únicos) → 217 con eps, 2 en 404, **1 con página 200 y 0 eps**:
+  `quan-zhi-gao-shou-2-the-kings-avatar-2` (caso encontrado en esta muestra, justo el
+  tipo que v287 dejaba colgado). Con él, test E2E real: clic → 502 mensaje específico
+  + persistida en `af-ocultas.txt` + la tarjeta **desaparece del buscador** ✓
+- `node --check` OK en server.js.
+
+### Archivos tocados
+- `server.js`: getters `datosAnimeLatanime`/`datosAnimeD23` (objeto `dead` etiquetado)
+  + ramas LA/D23/AF del handler `/api/anime` + `UI_VERSION`.
+- `CONTINUACION.md` (esta nota).
+
+### Despliegue
+El usuario: `cd ~/huddle && bash actualizar.sh`.
 
 ## ✅ ESTADO ACTUAL — 22 SEP 2026 (v287): AUDITORÍA LATANIME + ANIMEFLV — LOS EPISODIOS CAÍDOS SE QUITAN SOLOS DE LA TEMPORADA
 

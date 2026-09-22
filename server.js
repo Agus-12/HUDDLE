@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v287'; // v286: AnimeD23 REPRODUCE — ficha + resolver HTTP puro (Byse→OK→rpmvid) + búsqueda global; portadas/stills y reproducción HTTP/HLS intactas
+const UI_VERSION = 'v288'; // v288: tarjetas muertas se ocultan al momento (AF/D23/LA: página 404 o vacía de episodios); v287: podredumbre de episodios
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -2558,6 +2558,7 @@ async function datosAnimeD23(slug) {
   const c = serieCache.get('d23:' + slug);
   if (c && Date.now() - c.at < 30 * 60 * 1000) return c.d;
   const r = await fetchSeguro('https://animed23.com/anime/' + slug + '/', 15000);
+  if (r && r.status === 404) return { ok: false, dead: '404', slug, titulo: '', poster: '', episodios: [] }; /* v288: el sitio la borró */
   if (!r || !r.ok) return null;
   const html = await r.text();
   if (/One moment, please|challenge-platform|Just a moment/i.test(html)) return null;
@@ -2577,7 +2578,7 @@ async function datosAnimeD23(slug) {
     eps.push({ n: +numM[1], url: 'https://animed23.com/capitulo/' + epSlug + '/', titulo: 'Episodio ' + numM[1] });
   }
   eps.sort((a, b) => a.n - b.n);
-  if (!eps.length) return null;
+  if (!eps.length) return { ok: false, dead: 'empty', slug, titulo: '', poster: '', episodios: [] }; /* v288: página viva sin capítulos */
   const cov = D23_IMDB_COVERS.get(slug);
   const titulo = (og('og:title') || '').replace(/\s*(Anime|Ver online|online|sub español|español)\b.*$/i, '').replace(/\s*[|─✔★].*$/, '').replace(/\s{2,}/g, ' ').trim().slice(0, 80) || (cov && cov.title) || slug;
   const out = { ok: true, slug, titulo, poster: (cov && cov.poster) || og('og:image') || '', episodios: eps };
@@ -3283,6 +3284,7 @@ async function datosAnimeLatanime(slug) {
   if (cL && Date.now() - cL.at < 30 * 60 * 1000) return cL.d;
   try {
     const rL = await fetchSeguro(`https://latanime.org/anime/${slug}`, 10000);
+    if (rL.status === 404) return { ok: false, dead: '404', slug, titulo: '', poster: '', episodios: [] }; /* v288: el sitio la borró */
     if (!rL.ok) return null;
     const htmlL = await rL.text();
     const epsL = [];
@@ -3296,7 +3298,7 @@ async function datosAnimeLatanime(slug) {
       epsL.push({ n: nL, url: mL[1], titulo: 'Episodio ' + nL });
     }
     epsL.sort((a, b) => a.n - b.n);
-    if (!epsL.length) return null;
+    if (!epsL.length) return { ok: false, dead: 'empty', slug, titulo: '', poster: '', episodios: [] }; /* v288: página viva sin episodios */
     const ogL = (p) => {
       const a1 = new RegExp(`<meta[^>]+property=["']${p}["'][^>]+content=["']([^"']+)`, 'i').exec(htmlL);
       const a2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${p}["']`, 'i').exec(htmlL);
@@ -12339,6 +12341,17 @@ async function estrenosMezclados(){
       if (!/^[a-z0-9-]{2,90}$/.test(slug)) return json(res, 400, { ok: false, error: 'Anime inválido' });
       if ((url.searchParams.get('site') || '').toLowerCase() === 'latanime') {
         const dL = await datosAnimeLatanime(slug); /* v74: compartida con los botones de episodio */
+        if (dL && dL.dead) { /* v288: el sitio la borró o vació sus episodios → fuera del buscador (laRevizar la re-prueba) */
+          if (!LA_MUERTAS_SET.has(slug)) {
+            LA_MUERTAS_SET.add(slug);
+            try { fs.writeFileSync(path.join(__dirname, 'public', 'latanime-muertas.txt'), [...LA_MUERTAS_SET].sort().join('\n') + '\n'); } catch {}
+            const eL = LA_FALLOS.get(slug) || { f: 0, last: 0, h: 0 };
+            eL.f = 3; eL.last = Date.now(); eL.h = Date.now();
+            LA_FALLOS.set(slug, eL); laFallosGuardar();
+            sondaNotify('Latanime', 'muerto', slug, slug + ' — página sin episodios en el sitio (se oculta)');
+          }
+          return json(res, 502, { ok: false, error: 'Esta serie ya no está disponible en Latanime (la tarjeta se ocultará)' });
+        }
         if (!dL) return json(res, 502, { ok: false, error: 'No pude leer el anime' });
         dL.episodios = epsVivos(dL.episodios); /* v205.5 */
         precargarIntroDeSerie(dL.episodios); /* v135 */
@@ -12346,6 +12359,10 @@ async function estrenosMezclados(){
       }
       if ((url.searchParams.get('site') || '').toLowerCase() === 'animed23') { /* v286: ficha AnimeD23 (misma forma que Latanime) */
         const dD = await datosAnimeD23(slug);
+        if (dD && dD.dead) { /* v288: el sitio la borró o vació sus capítulos → fuera del buscador (sondaD23 la re-prueba) */
+          if (!D23_OCULTAS.has(slug)) { D23_OCULTAS.add(slug); ocultasReescribir(D23_OCULTAS, 'd23-ocultas.txt'); console.log('[d23] ' + slug + ' (' + dD.dead + ') — oculta del buscador'); }
+          return json(res, 502, { ok: false, error: 'Esta serie ya no está disponible en AnimeD23 (la tarjeta se ocultará)' });
+        }
         if (!dD) return json(res, 502, { ok: false, error: 'No pude leer el anime en AnimeD23 — intenta luego' });
         dD.episodios = epsVivos(dD.episodios); /* v205.5 */
         return json(res, 200, dD);
@@ -12396,7 +12413,10 @@ async function estrenosMezclados(){
           episodios: eps,
         };
         out.episodios = epsVivos(out.episodios); /* v205.5 */
-        if (!out.episodios.length) return json(res, 404, { ok: false, error: 'Sin episodios' });
+        if (!out.episodios.length) { /* v288: la ficha existe pero el sitio no trae episodios → fuera del buscador (sondaAnimeflv la re-prueba) */
+          if (!AF_OCULTAS.has(slug)) { AF_OCULTAS.add(slug); ocultasReescribir(AF_OCULTAS, 'af-ocultas.txt'); console.log('[af] ' + slug + ' sin episodios — oculta del buscador'); }
+          return json(res, 502, { ok: false, error: 'Esta serie ya no trae episodios en AnimeFLV (la tarjeta se ocultará)' });
+        }
         serieCache.set('anime:' + slug, { at: Date.now(), d: out });
         cacheGuardar('serieCache', () => [...serieCache.entries()]); /* v111: a disco */
         return json(res, 200, out);
