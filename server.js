@@ -1566,7 +1566,6 @@ async function ennProbe(slug){
   try{ const d=await ennFicha(slug); return !!(d && d.ok && d.episodios && d.episodios.length); }catch{ return false; }
 }
 async function resolverVk(vkEmbedUrl, pageUrl){
-  // vkEmbedUrl like https://vk.com/video_ext.php?oid=848029978&id=456257718&hash=...
   try{
     let m = /video_ext\.php\?oid=(\d+).*?id=(\d+).*?hash=([a-z0-9]+)/i.exec(vkEmbedUrl);
     let oid, vid, hash='';
@@ -1578,31 +1577,20 @@ async function resolverVk(vkEmbedUrl, pageUrl){
     const alUrl = 'https://vk.com/al_video.php?act=show&al=1&video='+oid+'_'+vid + (hash ? '&hash='+hash : '');
     const r = await fetchSeguro(alUrl, 15000, {Referer: vkEmbedUrl, 'X-Requested-With':'XMLHttpRequest'}).catch(()=>null);
     const txt = r && r.ok ? await r.text().catch(()=> '') : '';
-    // VK devuelve JSON con \/ y &amp; escapados — desescapar bien
+    // helper to clean escaped VK urls: \/ -> / and &amp; -> &
+    const cleanUrl = (u)=> u ? u.replace(/\\\//g,'/').replace(/\\/g,'').replace(/&amp;/g,'&') : u;
     let m3u8 = (/https:[^"']+video\.m3u8[^"']*/i.exec(txt)||[])[0];
-    if(m3u8) {
-      m3u8 = m3u8.replace(/\\\//g,'/').replace(/\\/g,'').replace(/&amp;/g,'&');
-      // asegura https:
-      if(m3u8.startsWith('https:\\/')) m3u8=m3u8.replace('https:\\/','https://');
-      try{ hlsReferers.set(new URL(m3u8).hostname, vkEmbedUrl); }catch{}
-      return {m3u8, mp4:false, proxy:true, subs:[]};
-    }
-    // fallback: por si el al_video no trajo m3u8, intenta sacar del payload[1][1] directamente
-    let m3u82 = (/https:\\/\\/[^"']+\.m3u8[^"']*/i.exec(txt)||[])[0];
-    if(m3u82){
-      m3u82 = m3u82.replace(/\\\//g,'/').replace(/\\/g,'').replace(/&amp;/g,'&');
-      try{ hlsReferers.set(new URL(m3u82).hostname, vkEmbedUrl);}catch{};
-      return {m3u8: m3u82, mp4:false, proxy:true, subs:[]};
-    }
-    // fallback: fetch embed directamente y grep (para hash sin al_video)
+    if(m3u8){ m3u8 = cleanUrl(m3u8); try{ hlsReferers.set(new URL(m3u8).hostname, vkEmbedUrl); }catch{} return {m3u8, mp4:false, proxy:true, subs:[]}; }
+    let m3u82 = (/https:[^"']+\.m3u8[^"']*/i.exec(txt)||[])[0];
+    if(m3u82){ m3u82 = cleanUrl(m3u82); try{ hlsReferers.set(new URL(m3u82).hostname, vkEmbedUrl);}catch{}; return {m3u8: m3u82, mp4:false, proxy:true, subs:[]}; }
     const r2 = await fetchSeguro(vkEmbedUrl, 15000, {Referer: pageUrl}).catch(()=>null);
     const t2 = r2 && r2.ok ? await r2.text().catch(()=> '') : '';
     let m3u83 = (/https:[^"']+\.m3u8[^"']*/i.exec(t2)||[])[0];
-    if(!m3u83) m3u83 = (/https:\\/\\/[^"']+\.m3u8[^"']*/i.exec(t2)||[])[0];
-    if(m3u83){ m3u83=m3u83.replace(/\\\//g,'/').replace(/\\/g,'').replace(/&amp;/g,'&'); try{ hlsReferers.set(new URL(m3u83).hostname, vkEmbedUrl);}catch{}; return {m3u8: m3u83, mp4:false, proxy:true, subs:[]}; }
+    if(m3u83){ m3u83=cleanUrl(m3u83); try{ hlsReferers.set(new URL(m3u83).hostname, vkEmbedUrl);}catch{}; return {m3u8: m3u83, mp4:false, proxy:true, subs:[]}; }
     throw new Error('vk sin m3u8');
   }catch(e){ throw e; }
 }
+
 async function resolverEnnovelas(pageUrl){
   const r = await fetchSeguro(pageUrl, 18000).catch(()=>null);
   if(!r || !r.ok) throw new Error('No pude abrir ese capítulo en Ennovelas');
