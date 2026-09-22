@@ -395,12 +395,6 @@ input[type="range"]:disabled { opacity: 0.35; cursor: not-allowed; }
   background: #000;
   outline: none;
 }
-/* v284: reproductor oficial VK, mismo audio que Ennovelas */
-#roomFrame {
-  flex: 1; min-height: 0; width: 100%; height: 100%;
-  display: block; border: 0; background: #000;
-}
-#roomFrame.hidden { display: none; }
 .mirror-layer.locked #mirrorImg { cursor: not-allowed; }
 .mirror-bar {
   display: flex; align-items: center; gap: 8px;
@@ -1492,9 +1486,6 @@ body.ctrls-vis .msg-ticker {
   position: fixed; inset: 0; z-index: 90;
   background: #000; display: flex; align-items: center; justify-content: center;
 }
-/* v284: VK oficial en modo individual */
-#soloFrame { width: 100%; height: 100%; border: 0; display: block; background: #000; }
-#soloFrame.hidden { display: none; }
 .solo-player video { width: 100%; height: 100%; object-fit: contain; background: #000; }
 .solo-cargando {
   position: absolute; inset: 0; display: flex; flex-direction: column;
