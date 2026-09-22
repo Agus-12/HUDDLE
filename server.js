@@ -1577,11 +1577,13 @@ async function resolverVk(vkEmbedUrl, pageUrl){
   const alUrl = 'https://vk.com/al_video.php?act=show&al=1&video='+oid+'_'+vid + (hash ? '&hash='+hash : '');
   const cleanUrl = (u) => String(u || '')
     .replace(/\\u002f/gi, '/').replace(/\\u0026/gi, '&')
+    .replace(/\\u003f/gi, '?').replace(/\\u003d/gi, '=')
+    .replace(/\\u0023/gi, '#').replace(/\\u0025/gi, '%')
     .replace(/\\\//g, '/').replace(/\\/g, '').replace(/&amp;/g, '&').trim();
   /* VK alterna entre JSON embebido y HTML reducido. Primero se busca la
    * propiedad hls; las expresiones amplias quedan solo como fallback HTTP. */
   const extraerHls = (raw) => {
-    const txt = String(raw || '').replace(/\\u002f/gi, '/').replace(/\\u0026/gi, '&').replace(/\\\//g, '/');
+    const txt = String(raw || '').replace(/\\u002f/gi, '/').replace(/\\u0026/gi, '&').replace(/\\u003f/gi, '?').replace(/\\u003d/gi, '=').replace(/\\u0023/gi, '#').replace(/\\u0025/gi, '%').replace(/\\\//g, '/');
     const hallados = [];
     const poner = (x) => {
       const u = cleanUrl(x);
