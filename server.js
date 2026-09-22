@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v273'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v274'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -5317,11 +5317,13 @@ async function peliculasPorGenero(slug, pag) {
     const b = (pxd || []).slice(0,10);
     const c = (cv || []).slice(0,10);
     const mezcla = [];
+    const vistosPag = new Set();
+    const pushPag = (x)=>{ if(!x||vistosPag.has(x.url)) return; vistosPag.add(x.url); mezcla.push(x); };
     const max = Math.max(a.length, b.length, c.length);
     for (let i = 0; i < max && mezcla.length < 30; i++) {
-      if (a[i]) mezcla.push(a[i]);
-      if (b[i]) mezcla.push(b[i]);
-      if (c[i]) mezcla.push(c[i]);
+      if (a[i]) pushPag(a[i]);
+      if (b[i]) pushPag(b[i]);
+      if (c[i]) pushPag(c[i]);
     }
     return mezcla.length ? mezcla : (cc.items || []).slice(0, 20);
   }
@@ -5337,11 +5339,13 @@ async function peliculasPorGenero(slug, pag) {
   const cvMovItems = (cvMov || []).slice(0, 10);
   /* Mezclar: alternar Cuevana, PelisXD y Cuevana.mov para que se vea variado */
   const mezcla = [];
+  const vistosG = new Set();
+  const pushG = (x)=>{ if(!x||vistosG.has(x.url)) return; vistosG.add(x.url); mezcla.push(x); };
   const max = Math.max(cvItems.length, pxdItems.length, cvMovItems.length);
   for (let i = 0; i < max && mezcla.length < 30; i++) {
-    if (cvItems[i]) mezcla.push(cvItems[i]);
-    if (pxdItems[i]) mezcla.push(pxdItems[i]);
-    if (cvMovItems[i]) mezcla.push(cvMovItems[i]);
+    if (cvItems[i]) pushG(cvItems[i]);
+    if (pxdItems[i]) pushG(pxdItems[i]);
+    if (cvMovItems[i]) pushG(cvMovItems[i]);
   }
   // v270: rotativo — baraja el orden dentro del género cada carga
   for(let i=mezcla.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [mezcla[i],mezcla[j]]=[mezcla[j],mezcla[i]]; }
@@ -7008,10 +7012,14 @@ const CARI_ORDEN = [
   'megas-xlr-capitulos-completos', 'monstruos-de-verdad-latino', 'soy-la-comadreja-latino',
 ];
 async function caricaturasDestacadas() {
-  const listo = () => ({ caricaturas: cariFeedCache.items, cartoons: cariFeedCache.toons, liveaction: cariFeedCache.live }); /* v205: + liveaction */
+  const listo = () => ({ caricaturas: cariFeedCache.items, cartoons: cariFeedCache.toons, liveaction: cariFeedCache.live });
   if (Date.now() - cariFeedCache.at < 60 * 60 * 1000 && (cariFeedCache.items.length || cariFeedCache.toons.length)) return listo();
-  if (cariFeedCache.items.length || cariFeedCache.toons.length) { refrescarCariFeed().catch(() => {}); return listo(); } /* v111: vencido → se sirve y se refresca por detrás */
-  refrescarCariFeed().catch(() => {}); /* v205: arranque en frío NO bloquea el feed — se llena por detrás (el frontend reintenta a los 45 s) */
+  if (cariFeedCache.items.length || cariFeedCache.toons.length) { refrescarCariFeed().catch(() => {}); return listo(); }
+  // v274: arranque en frío espera 6s a que se llene, no devuelve vacío que deja feed sin 3 filas
+  try { await Promise.race([refrescarCariFeed(), new Promise(r=>setTimeout(r,6000))]); }catch{}
+  if (cariFeedCache.items.length || cariFeedCache.toons.length || cariFeedCache.live.length) return listo();
+  // aún vacío, reintenta una vez más en 2s por detrás
+  refrescarCariFeed().catch(()=>{});
   return listo();
 }
 async function refrescarCariFeed() {
@@ -7708,7 +7716,7 @@ async function catCv(kind, pag) {
   const por = 20;
   const allItems = await catCvFull(kind);
   const ini = (pag - 1) * por;
-  return { items: allItems.slice(ini, ini + por), mas: ini + por < allItems.length };
+  return { items: allItems.slice(ini, ini + por), mas: ini + por < allItems.length, total: allItems.length };
 }
 async function catAnimes(pag) {
   const key = 'la-' + pag;
@@ -7729,8 +7737,9 @@ async function catAnimes(pag) {
     if (!title) continue;
     items.push({ title, url: m[1], img: (im && im[1]) || '', site: 'Latanime', extra: '' });
   }
-  const out = { items, mas };
-  if (items.length) catCache.set(key, { at: Date.now(), items, mas });
+  const total = LA_TODOS.size - LA_OCULTAS_SET.size - LA_MUERTAS_SET.size;
+  const out = { items, mas, total: total || items.length };
+  if (items.length) catCache.set(key, { at: Date.now(), items, mas, total: out.total });
   return out;
 }
 function lctConCovers() {
@@ -10859,21 +10868,29 @@ async function seriesMezcladas(){
 }
 /* v270: Estrenos — todas las nuevas pelis que van entrando (PelisXD + Cuevana + CineCalidad tendencias) */
 async function estrenosMezclados(){
-  const [pxd, cv, cc] = await Promise.all([
+  // v274: lo nuevo en Huddle = recientes de cada fuente + sondas
+  const [pxd, cv, cc, la, af, d23, ser] = await Promise.all([
     pelisxdLatest().catch(()=>[]),
     cuevanaLatest().catch(()=>[]),
     popularesDeHoy().catch(()=>[]),
+    animesDelMomento().catch(()=>[]),
+    afLatest().catch(()=>[]),
+    d23Latest().catch(()=>[]),
+    seriesRecientes().catch(()=>[]),
   ]);
-  // filtrar solo pelis (no series) para estrenos
   const ccPelis = (cc||[]).filter(x=>!/\/serie\//.test(x.url));
+  // mezcla 1 de cada tipo nuevo
   const mezcla=[];
-  const max=Math.max(pxd.length, cv.length, ccPelis.length);
+  const max=Math.max(pxd.length, cv.length, ccPelis.length, la.length, af.length, d23.length, ser.length);
   for(let i=0;i<max && mezcla.length<36;i++){
     if(pxd[i]) mezcla.push(pxd[i]);
     if(cv[i]) mezcla.push(cv[i]);
     if(ccPelis[i]) mezcla.push(ccPelis[i]);
+    if(la[i]) mezcla.push(la[i]);
+    if(af[i]) mezcla.push(af[i]);
+    if(d23[i]) mezcla.push(d23[i]);
+    if(ser[i]) mezcla.push(ser[i]);
   }
-  // rotativo
   for(let i=mezcla.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [mezcla[i],mezcla[j]]=[mezcla[j],mezcla[i]]; }
   return mezcla;
 }
@@ -11247,9 +11264,9 @@ async function estrenosMezclados(){
           for (const sec of elegidas) for (const it of sec.items) items.push(it);
           return json(res, 200, Object.assign(trozo(items), { secciones: secs.map((x) => ({ canal: x.canal, nombre: x.nombre, n: x.items.length })) }));
         }
-        if (tipo === 'pelis') { const r = await catCv('movies', pag); return json(res, 200, { ok: true, pag, por: 20, items: r.items, mas: r.mas }); }
-        if (tipo === 'series') { const r = await catCv('series', pag); return json(res, 200, { ok: true, pag, por: 20, items: r.items, mas: r.mas }); }
-        if (tipo === 'animes') { const r = await catAnimes(pag); return json(res, 200, { ok: true, pag, por: 24, items: r.items, mas: r.mas }); }
+        if (tipo === 'pelis') { const r = await catCv('movies', pag); return json(res, 200, { ok: true, pag, por: 20, total: r.total|| (r.items.length + (r.mas?20:0)), items: r.items, mas: r.mas }); }
+        if (tipo === 'series') { const r = await catCv('series', pag); return json(res, 200, { ok: true, pag, por: 20, total: r.total|| (r.items.length + (r.mas?20:0)), items: r.items, mas: r.mas }); }
+        if (tipo === 'animes') { const r = await catAnimes(pag); return json(res, 200, { ok: true, pag, por: 24, total: r.total|| (r.items.length + (r.mas?24:0)), items: r.items, mas: r.mas }); }
         if (tipo === 'caricaturas') return json(res, 200, trozo(await catCaricaturas()));
         if (tipo === 'novelas') { const api = await mapiTarjetasHome(); /* v212: vitrina viva primero */ if (!NOVELAS_EXTERNAS_ON) return json(res, 200, trozo([...api, ...movieTarjetas()])); /* v208: solo Movie */ const a2 = (await nvCatalogo()).filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url) || [])[1])); const b2 = await nv2Recientes(); const mez = []; for (let i2 = 0; i2 < Math.max(a2.length, b2.length); i2++) { if (a2[i2]) mez.push(a2[i2]); if (b2[i2]) mez.push(b2[i2]); } return json(res, 200, trozo([...api, ...mez])); } /* v206.2: 360 + enpantalla */
         if (tipo === 'cartoons' || tipo === 'liveaction') {

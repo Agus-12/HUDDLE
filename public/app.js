@@ -1844,7 +1844,8 @@ async function cargarCatPag() {
     /* v205: el server dice si hay más (por página CRUDA — el filtro de
      * ocultas puede dejar la página corta sin que se acabe el catálogo) */
     es.hayMas = respuesta.mas === undefined ? respuesta.items.length >= es.por : !!respuesta.mas;
-    $('#catTotal').textContent = respuesta.total ? respuesta.total + ' títulos' : '';
+    const tot = respuesta.total || (respuesta.mas ? ((respuesta.pag||1)* (respuesta.por||20) + '+') : (respuesta.items? respuesta.items.length:0));
+    $('#catTotal').textContent = tot ? (String(tot).includes('+')? tot+' títulos' : tot+' títulos') : '';
     for (const it of respuesta.items) {
       $('#catGrid').appendChild(crearTarjetaResultado(it, (res) => {
         $('#catPage').classList.add('hidden'); /* al elegir, se cierra como el buscador */
@@ -4144,15 +4145,16 @@ async function cargarPopulares() {
     const hayAlgo = (d.results && d.results.length) || (d.series && d.series.length) || (d.animes && d.animes.length) || (d.caricaturas && d.caricaturas.length) || (d.liveaction && d.liveaction.length) || (d.generos && d.generos.length) || (d.pelisxd && d.pelisxd.length) || (d.cuevana && d.cuevana.length);
     if (!d.ok || !hayAlgo) { delete wrap.dataset.cargado; return; }
     const alTocar = (res) => () => tocarFeedResultado(res); /* v205: compartido con el catálogo */
+    if (wrap && fila) { fila.innerHTML=''; }
     if (d.results && d.results.length) {
       d.results.slice(0, 16).forEach((res) => fila.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrap.classList.remove('hidden');
     }
     /* v57: segunda fila — series recién agregadas */
-    if (wrapS && filaS && d.series && d.series.length) {
+    if (wrapS && filaS) { filaS.innerHTML=''; if (d.series && d.series.length) {
       d.series.slice(0, 16).forEach((res) => filaS.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrapS.classList.remove('hidden');
-    }
+    } else { wrapS && wrapS.classList.add('hidden'); } }
     /* v67: tercera fila — animes del momento (Latanime); un toque abre
      * el selector de episodios, igual que cualquier anime */
     // v271: Recomendado mixto 30% género top + 25%+25%+20% mixto
@@ -4240,10 +4242,10 @@ async function cargarPopulares() {
         }
       }
     }catch(e){ console.warn('reco',e); }
-    if (wrapA && filaA && d.animes && d.animes.length) {
+    if (wrapA && filaA) { filaA.innerHTML=''; if (d.animes && d.animes.length) {
       d.animes.slice(0, 16).forEach((res) => filaA.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrapA.classList.remove('hidden');
-    }
+    } else { wrapA && wrapA.classList.add('hidden'); } }
     // v270: Estrenos fila debajo de animes
     const wrapE = document.querySelector('#estrenosBox');
     const filaE = document.querySelector('#estrenosRow');
@@ -4260,19 +4262,19 @@ async function cargarPopulares() {
     /* v102: caricaturas — debajo de los animes; un toque abre el selector */
     const wrapC = document.querySelector('#cariBox');
     const filaC = document.querySelector('#cariRow');
-    if (wrapC && filaC && d.caricaturas && d.caricaturas.length) {
-      d.caricaturas.slice(0, 18).forEach((res) => filaC.appendChild(crearTarjetaResultado(res, alTocar(res)))); /* v107 */
+    if (wrapC && filaC) { filaC.innerHTML=''; if (d.caricaturas && d.caricaturas.length) {
+      d.caricaturas.slice(0, 18).forEach((res) => filaC.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrapC.classList.remove('hidden');
-    }
+    } else { wrapC.classList.add('hidden'); } }
     /* v119: apartado propio — los cartoons clásicos de Lacartoons
      * (Yogui, Tom y Jerry, Batman, Rugrats, X-Men…), separados de las
      * caricaturas de MisCaricaturas */
     const wrapT = document.querySelector('#toonBox');
     const filaT = document.querySelector('#toonRow');
-    if (wrapT && filaT && d.cartoons && d.cartoons.length) {
+    if (wrapT && filaT) { filaT.innerHTML=''; if (d.cartoons && d.cartoons.length) {
       d.cartoons.slice(0, 80).forEach((res) => filaT.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrapT.classList.remove('hidden');
-    }
+    } else { wrapT.classList.add('hidden'); } }
     /* v206: NOVELAS — telenovelas por capítulos (Novelas360) */
     const wrapNv = document.querySelector('#nvdBox');
     const filaNv = document.querySelector('#nvdRow');
@@ -4288,10 +4290,10 @@ async function cargarPopulares() {
      * viven dentro de Cartoons */
     const wrapL = document.querySelector('#liveBox');
     const filaL = document.querySelector('#liveRow');
-    if (wrapL && filaL && d.liveaction && d.liveaction.length) {
+    if (wrapL && filaL) { filaL.innerHTML=''; if (d.liveaction && d.liveaction.length) {
       d.liveaction.slice(0, 16).forEach((res) => filaL.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrapL.classList.remove('hidden');
-    }
+    } else { wrapL.classList.add('hidden'); } }
     /* v205: ¿el server arrancó en frío y todavía no tiene caricaturas/
      * cartoons/live? Se llenan por detrás — v205.4: reintento cada 60 s
      * hasta que aparezcan (antes era un solo intento y a veces se quedaba
@@ -4301,13 +4303,18 @@ async function cargarPopulares() {
       if (S.carisIntentos < 10) {
         S.carisIntentos++;
         delete wrap.dataset.cargado;
-        setTimeout(cargarPopulares, 60000);
+        setTimeout(cargarPopulares, 3000);
       }
     } else { S.carisIntentos = 0; }
     /* v101: filas de GÉNERO — seis secciones que rotan cada día; cada una
      * con su ícono y color, y las mismas tarjetas que todo el feed */
     const wrapG = document.querySelector('#generosBox');
+    if (wrapG) wrapG.innerHTML = '';
     if (wrapG && d.generos && d.generos.length) {
+      // v274: dedupe por slug para no repetir romance 2 veces
+      const vistosG = new Set();
+      const generosUnicos = [];
+      for(const g of d.generos){ if(!g||!g.slug||vistosG.has(g.slug)) continue; vistosG.add(g.slug); generosUnicos.push(g); }
       const PALETA = ['var(--pink)', 'var(--amber)', 'var(--violet)', 'var(--cyan)', 'var(--green)'];
       const SVG = (d2, color) => `<svg class="icon icon-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: ${color};">${d2}</svg>`;
       const ICONOS = {
@@ -4329,7 +4336,7 @@ async function cargarPopulares() {
         suspense: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
         terror: '<path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9"/><polyline points="13 11 9 17 15 17 11 23"/>',
       };
-      d.generos.forEach((g, i) => {
+      generosUnicos.forEach((g, i) => {
         if (!g.items || !g.items.length) return;
         const sec = document.createElement('div');
         sec.className = 'sr-sec';
