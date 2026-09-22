@@ -1607,7 +1607,7 @@ async function ennFichaSingle(slug){
 async function ennFicha(slug){
   slug=String(slug||'').toLowerCase().replace(/\/+$/,'');
   const g=ennGrupoPara(slug);
-  const members=g ? (g.members||[]).filter(m=>ENN_VISTAS.has(m.slug) || m.slug===slug) : [{slug,season:1}];
+  const members=g ? (g.members||[]).filter(m=>ENN_VISTAS.has(m.slug)) : [{slug,season:1}];
   const eps=[]; let poster=(g&&g.poster)||''; let titulo=(g&&g.title)||'';
   for(const m of members){
     const d=await ennFichaSingle(m.slug).catch(()=>null);
