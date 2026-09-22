@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v276'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v278.2'; // v278.2: Novelas VIX+Betty+Estrellas en feed (título Novelas), portadas IMDb fallback, LOGO_V 247 — sonda 3 fuentes goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -967,7 +967,7 @@ const VIX_CATALOGO = [
 const VIX_PROGRESO = new Map(); // slug -> {pct, estado, msg, at}
 const VIX_SONDA = { at:0, estado:'idle', anvack:'', error:'', bettyOk:false, rosaOk:false, autocuras:0 };
 for(const _c of VIX_CATALOGO){ if(_c.slug==='betty-la-fea') VIX_PROGRESO.set(_c.slug,{pct:100, estado:'lista 335 caps — Ennovelas', msg:'OK', at:Date.now()}); else VIX_PROGRESO.set(_c.slug,{pct:0, estado:'encolado — va desencriptando', msg:'en cola', at:Date.now()}); }
-function vixTarjetas(){ return VIX_CATALOGO.map(c=>({ title:c.titulo, url:c.url, img:c.img||'/carita.png', site:c.site, extra:c.extra + (VIX_PROGRESO.get(c.slug)? ' · '+VIX_PROGRESO.get(c.slug).estado : '') })); }
+function vixTarjetas(){ return VIX_CATALOGO.map(c=>({ title:c.titulo, url:c.url, img:c.img||'/sites/novelas.png?v=247', site:c.site, extra:c.extra + (VIX_PROGRESO.get(c.slug)? ' · '+VIX_PROGRESO.get(c.slug).estado : '') })); }
 async function sondaVixNovelas(){
   const t0=Date.now();
   try{
@@ -1013,7 +1013,7 @@ const ESTRELLAS_CATALOGO = [
 const ESTRELLAS_PROGRESO = new Map();
 const ESTRELLAS_SONDA = { at:0, estado:'idle', error:'', rosaOk:false, dichoOk:false, diasRestantes:0, caps:0, autocuras:0 };
 for(const _e of ESTRELLAS_CATALOGO){ ESTRELLAS_PROGRESO.set(_e.slug,{pct:0, estado:'encolado — chequeando LasEstrellas', msg:'en cola', at:Date.now()}); }
-function estrellasTarjetas(){ return ESTRELLAS_CATALOGO.map(c=>({ title:c.titulo+' (Estrellas)', url:c.url, img:c.img||'/carita.png', site:c.site, extra:c.extra + (ESTRELLAS_PROGRESO.get(c.slug)? ' · '+ESTRELLAS_PROGRESO.get(c.slug).estado : '') })); }
+function estrellasTarjetas(){ return ESTRELLAS_CATALOGO.map(c=>({ title:c.titulo+' (Estrellas)', url:c.url, img:c.img||'/sites/novelas.png?v=247', site:c.site, extra:c.extra + (ESTRELLAS_PROGRESO.get(c.slug)? ' · '+ESTRELLAS_PROGRESO.get(c.slug).estado : '') })); }
 async function sondaEstrellasNovelas(){
   const t0=Date.now();
   try{
@@ -2304,6 +2304,16 @@ async function imdbPosterDe(titulo) {
   imdbPosterCache.set(t.toLowerCase(), { at: Date.now(), u: out });
   return out;
 }
+/* v278.2: portadas IMDb para novelas sin img — rellena VIX/Estrellas que vienen vacías */
+async function fillNovelasCovers(){
+  for(const c of [...VIX_CATALOGO, ...ESTRELLAS_CATALOGO]){
+    if(c.img) continue;
+    try{ const p=await imdbPosterDe(c.titulo); if(p){ c.img=p; console.log('[novelas] IMDb poster para '+c.titulo+': OK'); } }catch{}
+    await new Promise(r=>setTimeout(r,800));
+  }
+}
+setTimeout(()=>{ fillNovelasCovers().catch(()=>{}); }, 8000);
+setInterval(()=>{ fillNovelasCovers().catch(()=>{}); }, 6*3600*1000);
 async function daniPosterUrl(slug) {
   const c = DANI_POSTERS.get(slug);
   if (c && Date.now() - c.at < 24 * 3600e3) return c.url;
@@ -12308,10 +12318,10 @@ async function estrenosMezclados(){
     if ((url.pathname === '/api/novelas-vix/catalogo' || url.pathname === '/api/vix/novelas') && req.method === 'GET') {
       const items = [...VIX_CATALOGO.map(c => {
         const p = VIX_PROGRESO.get(c.slug);
-        return { slug: c.slug, titulo: c.titulo, url: c.url, img: c.img, vix: c.vix, fuente: c.vix?'vix':'ennovelas', extra: c.extra, progreso: p ? { pct: p.pct, estado: p.estado } : { pct: c.slug==='betty-la-fea'?100:0, estado: c.slug==='betty-la-fea'?'lista':'encolado' } };
+        return { slug: c.slug, titulo: c.titulo, url: c.url, img: c.img||'/sites/novelas.png?v=247', vix: c.vix, fuente: c.vix?'vix':'ennovelas', extra: c.extra, progreso: p ? { pct: p.pct, estado: p.estado } : { pct: c.slug==='betty-la-fea'?100:0, estado: c.slug==='betty-la-fea'?'lista':'encolado' } };
       }), ...ESTRELLAS_CATALOGO.map(c=>{
         const p = ESTRELLAS_PROGRESO.get(c.slug);
-        return { slug: c.slug, titulo: c.titulo+' (Estrellas)', url: c.url, img: c.img||'/carita.png', vix:false, fuente:'lasestrellas', extra: c.extra, progreso: p ? { pct: p.pct, estado: p.estado } : { pct: 0, estado: 'encolado' } };
+        return { slug: c.slug, titulo: c.titulo+' (Estrellas)', url: c.url, img: c.img||'/sites/novelas.png?v=247', vix:false, fuente:'lasestrellas', extra: c.extra, progreso: p ? { pct: p.pct, estado: p.estado } : { pct: 0, estado: 'encolado' } };
       })];
       return json(res, 200, { ok: true, total: items.length, items, sonda: VIX_SONDA, sondaEstrellas: ESTRELLAS_SONDA });
     }
