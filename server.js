@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v280'; // v278.6: fix Betty para TODOS — solo auto-heal token (no más Perfil no válido tras restart), login force reclaim, frontend re-login automático + Betty 335 garantizada
+const UI_VERSION = 'v281'; // v278.6: fix Betty para TODOS — solo auto-heal token (no más Perfil no válido tras restart), login force reclaim, frontend re-login automático + Betty 335 garantizada
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -11662,7 +11662,7 @@ async function estrenosMezclados(){
         if (tipo === 'series') { const r = await catCv('series', pag); return json(res, 200, { ok: true, pag, por: 20, total: r.total|| (r.items.length + (r.mas?20:0)), items: r.items, mas: r.mas }); }
         if (tipo === 'animes') { const r = await catAnimes(pag); return json(res, 200, { ok: true, pag, por: 24, total: r.total|| (r.items.length + (r.mas?24:0)), items: r.items, mas: r.mas }); }
         if (tipo === 'caricaturas') return json(res, 200, trozo(await catCaricaturas()));
-        if (tipo === 'novelas') { const api = await mapiTarjetasHome(); /* v212: vitrina viva primero */ if (!NOVELAS_EXTERNAS_ON) return json(res, 200, trozo([...vixTarjetas(), ...estrellasTarjetas(), ...api, ...movieTarjetas()])); /* v278: VIX+Betty+Estrellas al frente */ const a2 = (await nvCatalogo()).filter((x) => !NV_OCULTAS.has((/categories\/([a-z0-9-]+)\//.exec(x.url) || [])[1])); const b2 = await nv2Recientes(); const mez = []; for (let i2 = 0; i2 < Math.max(a2.length, b2.length); i2++) { if (a2[i2]) mez.push(a2[i2]); if (b2[i2]) mez.push(b2[i2]); } return json(res, 200, trozo([...vixTarjetas(), ...estrellasTarjetas(), ...api, ...mez])); } /* v206.2: 360 + enpantalla */
+        if (tipo === 'novelas') { const enn = await ennCatalogo(); return json(res, 200, trozo(enn)); } /* v281: solo Ennovelas 360 auditadas */
         if (tipo === 'cartoons' || tipo === 'liveaction') {
           const vivo = tipo === 'liveaction';
           let items = lctConCovers().filter((x) => esLctLive(x._slug) === vivo);
