@@ -2396,6 +2396,14 @@ try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'd23-slugs.
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'animed23-slugs.txt'), 'utf8').split('\n')) if (l.trim()) D23_TODOS.add(l.trim()); } catch {} /* alias */
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'd23-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) D23_OCULTAS.add(l.trim()); } catch {}
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'd23-vistas.txt'), 'utf8').split('\n')) if (l.trim()) D23_VISTAS.add(l.trim()); } catch {}
+/* v286: portadas AnimeD23 curadas con IMDb cuando la portada del sitio
+ * falta, es placeholder o no corresponde. Se guardan localmente para que el
+ * feed y Continuar viendo no dependan del CDN remoto. */
+const D23_IMDB_COVERS = new Map();
+try {
+  const d23Covers = JSON.parse(fs.readFileSync(path.join(__dirname,'public','d23-imdb-covers.json'),'utf8'));
+  for(const [slug,row] of Object.entries(d23Covers.items||{})) if(row && row.poster) D23_IMDB_COVERS.set(slug,row);
+} catch {}
 const FALLOS_D23 = new Map();
 try { for (const [k,v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR,'fallos-d23.json'),'utf8'))||{})) FALLOS_D23.set(k,v); } catch {}
 console.log('[d23] '+D23_TODOS.size+' animes ('+D23_OCULTAS.size+' ocultas, '+D23_VISTAS.size+' vistas)');
@@ -11318,8 +11326,10 @@ async function d23Latest() {
       seen.add(slug);
       let img = m[2] || '';
       if (img && img.startsWith('/')) img = 'https://animed23.com' + img;
-      // filtra imágenes de placeholder
+      // filtra imágenes de placeholder y prefiere la portada IMDb curada.
       if (img && /placeholder|no-image|logo/i.test(img)) img = '';
+      const imdbCover=D23_IMDB_COVERS.get(slug);
+      if(imdbCover && imdbCover.poster) img=imdbCover.poster;
       items.push({ title: m[3].trim().slice(0,80), url: 'https://animed23.com/anime/' + slug + '/', img, site: 'AnimeD23', extra: 'Latino' });
     }
     if (!items.length) {
@@ -11328,10 +11338,14 @@ async function d23Latest() {
         const slug = m[1];
         if (seen.has(slug) || D23_OCULTAS.has(slug)) continue;
         seen.add(slug);
-        items.push({ title: slug.replace(/-/g,' ').slice(0,80), url: 'https://animed23.com/anime/' + slug + '/', img: '', site: 'AnimeD23', extra: 'Latino' });
+        const imdbCover=D23_IMDB_COVERS.get(slug);
+        items.push({ title: (imdbCover&&imdbCover.title)||slug.replace(/-/g,' ').slice(0,80), url: 'https://animed23.com/anime/' + slug + '/', img: imdbCover&&imdbCover.poster||'', site: 'AnimeD23', extra: 'Latino' });
       }
     }
     for (const it of items) {
+      const d23Slug=(/animed23\.com\/anime\/([a-z0-9-]+)/i.exec(it.url||'')||[])[1];
+      const imdbCover=d23Slug&&D23_IMDB_COVERS.get(d23Slug);
+      if(imdbCover&&imdbCover.poster) it.img=imdbCover.poster;
       if (!it.img) {
         const cov = await aniListCover(it.title).catch(()=> '');
         if (cov) it.img = cov;

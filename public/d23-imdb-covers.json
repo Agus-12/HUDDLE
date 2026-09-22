@@ -1,0 +1,2658 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-22T19:36:05.363696+00:00",
+  "source": "AnimeD23 pages + IMDb suggestion API",
+  "totalSlugs": 229,
+  "visibleSlugs": 229,
+  "imdbCovers": 204,
+  "items": {
+    "29-sai-dokushin-chuuken-boukensha-no-nichijou": {
+      "slug": "29-sai-dokushin-chuuken-boukensha-no-nichijou",
+      "title": "29-sai Dokushin Chuuken Boukensha no Nichijou (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38647627",
+        "name": "An Adventurer's Daily Grind at Age 29",
+        "source": "https://m.media-amazon.com/images/M/MV5BZjhiNDc4MDctNjJmYy00NmQzLTk4MzUtOGFkZTlkOTgzMmU3XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/29-sai-dokushin-chuuken-boukensha-no-nichijou.jpg",
+      "page": "https://animed23.com/anime/29-sai-dokushin-chuuken-boukensha-no-nichijou/",
+      "hidden": false
+    },
+    "aishiteru-game-wo-owarasetai": {
+      "slug": "aishiteru-game-wo-owarasetai",
+      "title": "Aishiteru Game wo Owarasetai (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39122671",
+        "name": "I Want to End This Love Game",
+        "source": "https://m.media-amazon.com/images/M/MV5BNGJkNmI2MGEtMzFjZS00MTY3LTgwNDktZmZmNjkxOTA3NDI4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/aishiteru-game-wo-owarasetai.jpg",
+      "page": "https://animed23.com/anime/aishiteru-game-wo-owarasetai/",
+      "hidden": false
+    },
+    "akuyaku-reijou-wa-ringoku-no-outaishi-ni-dekiai-sareru": {
+      "slug": "akuyaku-reijou-wa-ringoku-no-outaishi-ni-dekiai-sareru",
+      "title": "Akuyaku Reijou wa Ringoku no Outaishi ni Dekiai sareru (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38179614",
+        "name": "The Villainess Is Adored by the Prince of the Neighbor Kingdom",
+        "source": "https://m.media-amazon.com/images/M/MV5BMjY4M2M0YWMtZTBiZS00NjllLTkwNjEtNjczOGQ5YzAxZGQ5XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/akuyaku-reijou-wa-ringoku-no-outaishi-ni-dekiai-sareru.jpg",
+      "page": "https://animed23.com/anime/akuyaku-reijou-wa-ringoku-no-outaishi-ni-dekiai-sareru/",
+      "hidden": false
+    },
+    "all-you-need-is-kill": {
+      "slug": "all-you-need-is-kill",
+      "title": "All You Need Is Kill (2026) Película Sub Español",
+      "imdb": {
+        "id": "tt36148135",
+        "name": "All You Need Is Kill",
+        "source": "https://m.media-amazon.com/images/M/MV5BNjkxNzI2MTMtMGE0Yi00YzFlLTg4ODMtNGYyNGUwN2JhNjkwXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/all-you-need-is-kill.jpg",
+      "page": "https://animed23.com/anime/all-you-need-is-kill/",
+      "hidden": false
+    },
+    "android-wa-keiken-ninzuu-ni-hairimasu-ka": {
+      "slug": "android-wa-keiken-ninzuu-ni-hairimasu-ka",
+      "title": "Android wa Keiken Ninzuu ni Hairimasu ka?? (2026) (Sin Censura) Anime Sub Español",
+      "imdb": {
+        "id": "tt39255171",
+        "name": "Does it Count if You Lose Your Innocence to an Android?",
+        "source": "https://m.media-amazon.com/images/M/MV5BMjFlYjUyMDEtYmE0ZS00ODU0LTg0Y2QtYzg1OTNlNDc5MzY2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/android-wa-keiken-ninzuu-ni-hairimasu-ka.jpg",
+      "page": "https://animed23.com/anime/android-wa-keiken-ninzuu-ni-hairimasu-ka/",
+      "hidden": false
+    },
+    "ansatsu-kyoushitsu-movie-minna-no-jikan": {
+      "slug": "ansatsu-kyoushitsu-movie-minna-no-jikan",
+      "title": "Ansatsu Kyoushitsu Movie: Minna no Jikan (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38649153",
+        "name": "Assassination Classroom the Movie: Our Time",
+        "source": "https://m.media-amazon.com/images/M/MV5BMDE3YzdmNzMtNGI2Ni00MDczLWJlNDMtNzY5MDU3ODQ5N2M0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/ansatsu-kyoushitsu-movie-minna-no-jikan.jpg",
+      "page": "https://animed23.com/anime/ansatsu-kyoushitsu-movie-minna-no-jikan/",
+      "hidden": false
+    },
+    "ansatsusha-de-aru-ore-no-status-ga-yuusha-yori-mo-akiraka-ni-tsuyoi-no-da-ga": {
+      "slug": "ansatsusha-de-aru-ore-no-status-ga-yuusha-yori-mo-akiraka-ni-tsuyoi-no-da-ga",
+      "title": "Ansatsusha de Aru Ore no Status ga Yuusha yori mo Akiraka ni Tsuyoi no da ga (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt36230718",
+        "name": "My Status as an Assassin Obviously Exceeds the Hero's",
+        "source": "https://m.media-amazon.com/images/M/MV5BY2ZlZDE2ODQtY2M1OC00ZDRlLWEwZTgtZjc3NzA5ZDE0MGViXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/ansatsusha-de-aru-ore-no-status-ga-yuusha-yori-mo-akiraka-ni-tsuyoi-no-da-ga.jpg",
+      "page": "https://animed23.com/anime/ansatsusha-de-aru-ore-no-status-ga-yuusha-yori-mo-akiraka-ni-tsuyoi-no-da-ga/",
+      "hidden": false
+    },
+    "arne-no-jikenbo": {
+      "slug": "arne-no-jikenbo",
+      "title": "Arne no Jikenbo (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38798044",
+        "name": "The Case Book of Arne",
+        "source": "https://m.media-amazon.com/images/M/MV5BYTE3MzY2ZWQtNTU1Yi00YjlmLTg4NWItOTM4MGY3YzNmYWZjXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/arne-no-jikenbo.jpg",
+      "page": "https://animed23.com/anime/arne-no-jikenbo/",
+      "hidden": false
+    },
+    "avatar-aang-el-ultimo-maestro-del-aire": {
+      "slug": "avatar-aang-el-ultimo-maestro-del-aire",
+      "title": "Avatar Aang: El Último Maestro del Aire Anime Sub Español",
+      "imdb": {
+        "id": "tt18259538",
+        "name": "Avatar Aang: The Last Airbender",
+        "source": "https://m.media-amazon.com/images/M/MV5BZGQzMzIzODAtZjc5Ni00ODRkLTlhMzMtNTVkOTI4MjBhNWEyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/avatar-aang-el-ultimo-maestro-del-aire.jpg",
+      "page": "https://animed23.com/anime/avatar-aang-el-ultimo-maestro-del-aire/",
+      "hidden": false
+    },
+    "awajima-hyakkei": {
+      "slug": "awajima-hyakkei",
+      "title": "Awajima Hyakkei (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt37388613",
+        "name": "A Hundred Scenes of Awajima",
+        "source": "https://m.media-amazon.com/images/M/MV5BODljNDgxODAtODJiNi00MjUyLWIxODMtM2QxMTgwMTc2MWVhXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/awajima-hyakkei.jpg",
+      "page": "https://animed23.com/anime/awajima-hyakkei/",
+      "hidden": false
+    },
+    "azur-lane-bisoku-zenshin-ni": {
+      "slug": "azur-lane-bisoku-zenshin-ni",
+      "title": "Azur Lane: Bisoku Zenshin! Ni!! (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt13084120",
+        "name": "Azur Lane: Slow Ahead!",
+        "source": "https://m.media-amazon.com/images/M/MV5BZDFmNTQ5MjMtODZiOS00NGFlLTg5YWEtYjY2MDc3ZjU3MjM5XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/azur-lane-bisoku-zenshin-ni.jpg",
+      "page": "https://animed23.com/anime/azur-lane-bisoku-zenshin-ni/",
+      "hidden": false
+    },
+    "baki-dou-the-invincible-samurai": {
+      "slug": "baki-dou-the-invincible-samurai",
+      "title": "BAKI-DOU: The Invincible Samurai (2026) Anime Latino / Castellano / Sub Español",
+      "imdb": {
+        "id": "tt38201910",
+        "name": "Baki-Dou: The Invincible Samurai",
+        "source": "https://m.media-amazon.com/images/M/MV5BNjU4MDhkYmYtNGE1NC00Zjk4LWE0MTItYzcyMmE0YTM2MTlmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/baki-dou-the-invincible-samurai.jpg",
+      "page": "https://animed23.com/anime/baki-dou-the-invincible-samurai/",
+      "hidden": false
+    },
+    "beastars-temporada-final": {
+      "slug": "beastars-temporada-final",
+      "title": "Beastars Temporada Final (2024) Anime Sub Español",
+      "imdb": {
+        "id": "tt11043632",
+        "name": "Beastars",
+        "source": "https://m.media-amazon.com/images/M/MV5BZDRlMDA0MTctYjNmYy00MzRhLWEwYjEtYmYxZTI5YTdjMTgyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/beastars-temporada-final.jpg",
+      "page": "https://animed23.com/anime/beastars-temporada-final/",
+      "hidden": false
+    },
+    "black-clover-temporada-2": {
+      "slug": "black-clover-temporada-2",
+      "title": "Black Clover Temporada 2 Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/black-clover-temporada-2/",
+      "hidden": false
+    },
+    "black-torch": {
+      "slug": "black-torch",
+      "title": "Black Torch (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt37532893",
+        "name": "Black Torch",
+        "source": "https://m.media-amazon.com/images/M/MV5BOTdiYWZmM2QtYWU3OS00NzdiLWJkZjUtM2VlYWI1N2RhYzU2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/black-torch.jpg",
+      "page": "https://animed23.com/anime/black-torch/",
+      "hidden": false
+    },
+    "bleach-sennen-kessen-hen": {
+      "slug": "bleach-sennen-kessen-hen",
+      "title": "Bleach: Sennen Kessen-hen (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt14986406",
+        "name": "Bleach: Thousand-Year Blood War",
+        "source": "https://m.media-amazon.com/images/M/MV5BMjgyM2QzMjAtOGZjOS00OGFkLTkxZGYtMDJjZGM5MzIzYmM3XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/bleach-sennen-kessen-hen.jpg",
+      "page": "https://animed23.com/anime/bleach-sennen-kessen-hen/",
+      "hidden": false
+    },
+    "boku-no-hero-academia-i-am-a-hero-too": {
+      "slug": "boku-no-hero-academia-i-am-a-hero-too",
+      "title": "Boku no Hero Academia: I Am a Hero Too (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt5504766",
+        "name": "I Am a Hero: Hajimari no hi",
+        "source": "https://m.media-amazon.com/images/M/MV5BM2EwMzg1Y2QtZDUyMC00MDExLTk4YTgtOGQ1OTczOWRhZjc5XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/boku-no-hero-academia-i-am-a-hero-too.jpg",
+      "page": "https://animed23.com/anime/boku-no-hero-academia-i-am-a-hero-too/",
+      "hidden": false
+    },
+    "boku-no-hero-academia-temporada-final": {
+      "slug": "boku-no-hero-academia-temporada-final",
+      "title": "Boku no Hero Academia: Temporada Final Anime Sub Español",
+      "imdb": {
+        "id": "tt5626028",
+        "name": "My Hero Academia",
+        "source": "https://m.media-amazon.com/images/M/MV5BY2QzODA5OTQtYWJlNi00ZjIzLThhNTItMDMwODhlYzYzMjA2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/boku-no-hero-academia-temporada-final.jpg",
+      "page": "https://animed23.com/anime/boku-no-hero-academia-temporada-final/",
+      "hidden": false
+    },
+    "boku-no-kokoro-no-yabai-yatsu-movie": {
+      "slug": "boku-no-kokoro-no-yabai-yatsu-movie",
+      "title": "Boku no Kokoro no Yabai Yatsu Movie (2026) Película Sub Español",
+      "imdb": {
+        "id": "tt21423786",
+        "name": "The Dangers in My Heart",
+        "source": "https://m.media-amazon.com/images/M/MV5BMjYwMDMwNDQtZTdmNy00YzBkLTliMzYtNzkzNTc1Njc1OWI2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/boku-no-kokoro-no-yabai-yatsu-movie.jpg",
+      "page": "https://animed23.com/anime/boku-no-kokoro-no-yabai-yatsu-movie/",
+      "hidden": false
+    },
+    "buchigire-reijou-wa-houfuku-wo-chikaimashita-madousho-no-chikara-de-sokoku-wo-tatakitsubushimasu": {
+      "slug": "buchigire-reijou-wa-houfuku-wo-chikaimashita-madousho-no-chikara-de-sokoku-wo-tatakitsubushimasu",
+      "title": "Buchigire Reijou wa Houfuku wo Chikaimashita. Madousho no Chikara de Sokoku wo Tatakitsubushimasu (2026) Anime Sub Españ",
+      "imdb": {
+        "id": "tt39551287",
+        "name": "A Livid Lady's Guide to Getting Even: How I Crushed My Homeland with My Mighty Grimoires",
+        "source": "https://m.media-amazon.com/images/M/MV5BOWI5ZWJiMjQtMGJhNy00MGVjLTk0MjctYTcwODc2NDdlNWE4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/buchigire-reijou-wa-houfuku-wo-chikaimashita-madousho-no-chikara-de-sokoku-wo-tatakitsubushimasu.jpg",
+      "page": "https://animed23.com/anime/buchigire-reijou-wa-houfuku-wo-chikaimashita-madousho-no-chikara-de-sokoku-wo-tatakitsubushimasu/",
+      "hidden": false
+    },
+    "chainsaw-man-movie-reze-hen": {
+      "slug": "chainsaw-man-movie-reze-hen",
+      "title": "Chainsaw Man Movie: Reze-hen (2025) Latino / Sub Español",
+      "imdb": {
+        "id": "tt30472557",
+        "name": "Chainsaw Man - The Movie: Reze Arc",
+        "source": "https://m.media-amazon.com/images/M/MV5BZmMzNGVhODktYmU5MS00MDg1LThlNTEtNTMyYTg5MDA0Njk4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/chainsaw-man-movie-reze-hen.jpg",
+      "page": "https://animed23.com/anime/chainsaw-man-movie-reze-hen/",
+      "hidden": false
+    },
+    "champignon-no-majo": {
+      "slug": "champignon-no-majo",
+      "title": "Champignon no Majo (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt37137805",
+        "name": "Champignon Witch",
+        "source": "https://m.media-amazon.com/images/M/MV5BNWMzODI3MWUtY2E4Zi00ZmViLWE4OGEtNTFlZjQ1YjQzNmIzXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/champignon-no-majo.jpg",
+      "page": "https://animed23.com/anime/champignon-no-majo/",
+      "hidden": false
+    },
+    "chichi-wa-eiyuu-haha-wa-seirei-musume-no-watashi-wa-tenseisha": {
+      "slug": "chichi-wa-eiyuu-haha-wa-seirei-musume-no-watashi-wa-tenseisha",
+      "title": "Chichi wa Eiyuu, Haha wa Seirei, Musume no Watashi wa Tenseisha. Anime Sub Español",
+      "imdb": {
+        "id": "tt32777700",
+        "name": "Dad Is a Hero, Mom Is a Spirit, I'm a Reincarnator",
+        "source": "https://m.media-amazon.com/images/M/MV5BYWU4MTg3YTAtYzFmNC00YzViLTg0NWQtM2IzNDIyMGY2ZGUxXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/chichi-wa-eiyuu-haha-wa-seirei-musume-no-watashi-wa-tenseisha.jpg",
+      "page": "https://animed23.com/anime/chichi-wa-eiyuu-haha-wa-seirei-musume-no-watashi-wa-tenseisha/",
+      "hidden": false
+    },
+    "class-de-2-banme-ni-kawaii-onnanoko-to-tomodachi-ni-natta": {
+      "slug": "class-de-2-banme-ni-kawaii-onnanoko-to-tomodachi-ni-natta",
+      "title": "Class de 2-banme ni Kawaii Onnanoko to Tomodachi ni Natta (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt37532971",
+        "name": "I Made Friends with the Second Prettiest Girl in My Class",
+        "source": "https://m.media-amazon.com/images/M/MV5BNTcyMzNlNDUtZjdmYS00Mjg4LTllOWMtOGRlOGJhMGQwMDUyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/class-de-2-banme-ni-kawaii-onnanoko-to-tomodachi-ni-natta.jpg",
+      "page": "https://animed23.com/anime/class-de-2-banme-ni-kawaii-onnanoko-to-tomodachi-ni-natta/",
+      "hidden": false
+    },
+    "clevatess-ii-majuu-no-ou-to-itsuwari-no-yuusha-denshou": {
+      "slug": "clevatess-ii-majuu-no-ou-to-itsuwari-no-yuusha-denshou",
+      "title": "Clevatess II: Majuu no Ou to Itsuwari no Yuusha Denshou (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt32991344",
+        "name": "Clevatess",
+        "source": "https://m.media-amazon.com/images/M/MV5BZGVkODQ2MDctOTVkYi00YWYwLWJlMmMtOThlOGMzNTZkYzQ4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/clevatess-ii-majuu-no-ou-to-itsuwari-no-yuusha-denshou.jpg",
+      "page": "https://animed23.com/anime/clevatess-ii-majuu-no-ou-to-itsuwari-no-yuusha-denshou/",
+      "hidden": false
+    },
+    "crowned-in-a-hundred-days-bai-ri-cheng-wang": {
+      "slug": "crowned-in-a-hundred-days-bai-ri-cheng-wang",
+      "title": "Crowned in a Hundred Days (Bai Ri Cheng Wang) (2026) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/crowned-in-a-hundred-days-bai-ri-cheng-wang/",
+      "hidden": false
+    },
+    "dark-moon-tsuki-no-saidan": {
+      "slug": "dark-moon-tsuki-no-saidan",
+      "title": "Dark Moon: Tsuki no Saidan (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38646055",
+        "name": "Dark Moon: The Blood Altar",
+        "source": "https://m.media-amazon.com/images/M/MV5BMmVhMWM4N2YtM2M4NS00MWJhLTkyZmEtOThmMjY1MjQ2M2ViXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/dark-moon-tsuki-no-saidan.jpg",
+      "page": "https://animed23.com/anime/dark-moon-tsuki-no-saidan/",
+      "hidden": false
+    },
+    "darwin-jihen": {
+      "slug": "darwin-jihen",
+      "title": "Darwin Jihen (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38980285",
+        "name": "The Darwin Incident",
+        "source": "https://m.media-amazon.com/images/M/MV5BNTIwNGIyZTItZjU0Ny00YzA2LWFjNDQtOTIzNTBhM2Q3MGM4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/darwin-jihen.jpg",
+      "page": "https://animed23.com/anime/darwin-jihen/",
+      "hidden": false
+    },
+    "dead-account": {
+      "slug": "dead-account",
+      "title": "Dead Account (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt37533007",
+        "name": "Dead Account",
+        "source": "https://m.media-amazon.com/images/M/MV5BY2U2ZDQzMDctNjA2Yi00MjNlLTlmNDAtN2M2NmJhNGNlM2JhXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/dead-account.jpg",
+      "page": "https://animed23.com/anime/dead-account/",
+      "hidden": false
+    },
+    "diamond-no-ace-act-ii-temporada-2": {
+      "slug": "diamond-no-ace-act-ii-temporada-2",
+      "title": "Diamond no Ace: Act II Temporada 2 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt10838000",
+        "name": "Ace of Diamond: Act II",
+        "source": "https://m.media-amazon.com/images/M/MV5BOTdjMDgyMGItMzVmNS00YWY0LThjYTYtNDM0NzY5OTNkZjU0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/diamond-no-ace-act-ii-temporada-2.jpg",
+      "page": "https://animed23.com/anime/diamond-no-ace-act-ii-temporada-2/",
+      "hidden": false
+    },
+    "dorohedoro-temporada-2": {
+      "slug": "dorohedoro-temporada-2",
+      "title": "Dorohedoro Temporada 2 (2026) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/dorohedoro-temporada-2/",
+      "hidden": false
+    },
+    "douse-koishite-shimaunda-temporada-2": {
+      "slug": "douse-koishite-shimaunda-temporada-2",
+      "title": "Douse, Koishite Shimaunda Temporada 2 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt32832412",
+        "name": "Anyway, I'm Falling in Love with You",
+        "source": "https://m.media-amazon.com/images/M/MV5BZmE3NzI2MjUtZGQ4Yi00YWRjLTg0OWUtNmU4ZTdlY2Q3ODAxXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/douse-koishite-shimaunda-temporada-2.jpg",
+      "page": "https://animed23.com/anime/douse-koishite-shimaunda-temporada-2/",
+      "hidden": false
+    },
+    "enen-no-shouboutai-san-no-shou": {
+      "slug": "enen-no-shouboutai-san-no-shou",
+      "title": "Enen no Shouboutai: San no Shou (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt42969298",
+        "name": "Kamui: He's Behind You",
+        "source": "https://m.media-amazon.com/images/M/MV5BNmIwMTA4NGQtNzA2My00YTZjLWI3NmYtYTIwMzBhZmI1MTdhXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/enen-no-shouboutai-san-no-shou.jpg",
+      "page": "https://animed23.com/anime/enen-no-shouboutai-san-no-shou/",
+      "hidden": false
+    },
+    "eris-no-seihai": {
+      "slug": "eris-no-seihai",
+      "title": "Eris no Seihai (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38647635",
+        "name": "The Holy Grail of Eris",
+        "source": "https://m.media-amazon.com/images/M/MV5BYzViNjBlMjItYTAzZS00YThmLTliNTgtYzZiZGI5ZGRmMzMxXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/eris-no-seihai.jpg",
+      "page": "https://animed23.com/anime/eris-no-seihai/",
+      "hidden": false
+    },
+    "false-memory-jiyi-guanli-ju": {
+      "slug": "false-memory-jiyi-guanli-ju",
+      "title": "False Memory (Jiyi Guanli Ju) (2026) (2026) Donghua Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/false-memory-jiyi-guanli-ju/",
+      "hidden": false
+    },
+    "fate-strange-fake": {
+      "slug": "fate-strange-fake",
+      "title": "Fate/strange Fake (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt32864316",
+        "name": "Fate/Strange Fake",
+        "source": "https://m.media-amazon.com/images/M/MV5BMzIyZDNmMmUtMGZkNC00MTJjLTlmYzUtODllYWM5NDQ4YTJjXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/fate-strange-fake.jpg",
+      "page": "https://animed23.com/anime/fate-strange-fake/",
+      "hidden": false
+    },
+    "fate-strange-fake-whispers-of-dawn": {
+      "slug": "fate-strange-fake-whispers-of-dawn",
+      "title": "Fate/strange Fake -Whispers of Dawn- (2023) Anime Sub Español",
+      "imdb": {
+        "id": "tt32864316",
+        "name": "Fate/Strange Fake",
+        "source": "https://m.media-amazon.com/images/M/MV5BMzIyZDNmMmUtMGZkNC00MTJjLTlmYzUtODllYWM5NDQ4YTJjXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/fate-strange-fake-whispers-of-dawn.jpg",
+      "page": "https://animed23.com/anime/fate-strange-fake-whispers-of-dawn/",
+      "hidden": false
+    },
+    "feed": {
+      "slug": "feed",
+      "title": "Catálogo Anime",
+      "imdb": {
+        "id": "tt36517681",
+        "name": "Catalog",
+        "source": "https://m.media-amazon.com/images/M/MV5BNDIyZmE1NTEtMWRkNy00NWJlLTlmNjAtOTE3YjRiMDg1NmRjXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/feed.jpg",
+      "page": "https://animed23.com/anime/feed/",
+      "hidden": false
+    },
+    "fullmetal-alchemist-brotherhood": {
+      "slug": "fullmetal-alchemist-brotherhood",
+      "title": "Fullmetal Alchemist: Brotherhood (2009) Anime Sub Español",
+      "imdb": {
+        "id": "tt1355642",
+        "name": "Fullmetal Alchemist: Brotherhood",
+        "source": "https://m.media-amazon.com/images/M/MV5BMzNiODA5NjYtYWExZS00OTc4LTg3N2ItYWYwYTUyYmM5MWViXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/fullmetal-alchemist-brotherhood.jpg",
+      "page": "https://animed23.com/anime/fullmetal-alchemist-brotherhood/",
+      "hidden": false
+    },
+    "fumetsu-no-anata-e-temporada-3": {
+      "slug": "fumetsu-no-anata-e-temporada-3",
+      "title": "Fumetsu no Anata e Temporada 3 (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt12063450",
+        "name": "To Your Eternity",
+        "source": "https://m.media-amazon.com/images/M/MV5BMzZhYzAzODUtMzYxMi00OWE1LWI4ZTQtYzU4ZjgxZjcxODA3XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/fumetsu-no-anata-e-temporada-3.jpg",
+      "page": "https://animed23.com/anime/fumetsu-no-anata-e-temporada-3/",
+      "hidden": false
+    },
+    "futsutsuka-na-akujo-dewa-gozaimasu-ga-suuguu-chouso-torikae-den": {
+      "slug": "futsutsuka-na-akujo-dewa-gozaimasu-ga-suuguu-chouso-torikae-den",
+      "title": "Futsutsuka na Akujo dewa Gozaimasu ga: Suuguu Chouso Torikae Den (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41293157",
+        "name": "Though I Am an Inept Villainess",
+        "source": "https://m.media-amazon.com/images/M/MV5BOGYwZTZmOTYtM2NmYS00M2E1LTlkNjMtMWQ3MTBhNTUzZTUzXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/futsutsuka-na-akujo-dewa-gozaimasu-ga-suuguu-chouso-torikae-den.jpg",
+      "page": "https://animed23.com/anime/futsutsuka-na-akujo-dewa-gozaimasu-ga-suuguu-chouso-torikae-den/",
+      "hidden": false
+    },
+    "gachiakuta": {
+      "slug": "gachiakuta",
+      "title": "Gachiakuta Anime Sub Español",
+      "imdb": {
+        "id": "tt32612521",
+        "name": "Gachiakuta",
+        "source": "https://m.media-amazon.com/images/M/MV5BZDU5ZmEzODYtMDU2OS00NTZiLTk4MWYtYWUyZWUzNGU2ODdjXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/gachiakuta.jpg",
+      "page": "https://animed23.com/anime/gachiakuta/",
+      "hidden": false
+    },
+    "gaikotsu-kishi-sama-tadaima-isekai-e-odekakechuu-ii": {
+      "slug": "gaikotsu-kishi-sama-tadaima-isekai-e-odekakechuu-ii",
+      "title": "Gaikotsu Kishi-sama, Tadaima Isekai e Odekakechuu II (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt14476236",
+        "name": "Skeleton Knight in Another World",
+        "source": "https://m.media-amazon.com/images/M/MV5BNzdiNTljZDAtZjIzNS00ZjEwLThmMDUtY2ZlNzA5ZDJmYjZiXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/gaikotsu-kishi-sama-tadaima-isekai-e-odekakechuu-ii.jpg",
+      "page": "https://animed23.com/anime/gaikotsu-kishi-sama-tadaima-isekai-e-odekakechuu-ii/",
+      "hidden": false
+    },
+    "ganbare-nakamura-kun": {
+      "slug": "ganbare-nakamura-kun",
+      "title": "Ganbare! Nakamura-kun!! (2026) Anime Latino / Sub Español",
+      "imdb": {
+        "id": "tt37182080",
+        "name": "Go for It, Nakamura-kun!!",
+        "source": "https://m.media-amazon.com/images/M/MV5BMmRjYmZjMGItMGQ1Mi00OTZmLThmMTItYjMxZWZhNWNjNjczXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/ganbare-nakamura-kun.jpg",
+      "page": "https://animed23.com/anime/ganbare-nakamura-kun/",
+      "hidden": false
+    },
+    "ghost-concert-missing-songs": {
+      "slug": "ghost-concert-missing-songs",
+      "title": "GHOST CONCERT: missing Songs (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt40547056",
+        "name": "Ghost Concert: Missing Songs",
+        "source": "https://m.media-amazon.com/images/M/MV5BMzhmMjFiZDItMzBhZi00MTdhLWIxYjQtZjZkMTc1N2E5MzJmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/ghost-concert-missing-songs.jpg",
+      "page": "https://animed23.com/anime/ghost-concert-missing-songs/",
+      "hidden": false
+    },
+    "ghost-meets-gal-2026": {
+      "slug": "ghost-meets-gal-2026",
+      "title": "Ghost Meets Gal! Anime Sub Español",
+      "imdb": {
+        "id": "tt9384126",
+        "name": "When Ghost Meets Zombie",
+        "source": "https://m.media-amazon.com/images/M/MV5BMDc3MmQ2MjctMGIzZC00Nzk3LTkyZDAtNjE5YzU2YmRlNjM4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/ghost-meets-gal-2026.jpg",
+      "page": "https://animed23.com/anime/ghost-meets-gal-2026/",
+      "hidden": false
+    },
+    "gnosia": {
+      "slug": "gnosia",
+      "title": "Gnosia (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt34852231",
+        "name": "Gnosia",
+        "source": "https://m.media-amazon.com/images/M/MV5BNGM4OTk3MTctYWE0OS00YTA1LWJjNDItNDg4ZWZkOTEyZjkwXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/gnosia.jpg",
+      "page": "https://animed23.com/anime/gnosia/",
+      "hidden": false
+    },
+    "golden-kamuy-saishuushou": {
+      "slug": "golden-kamuy-saishuushou",
+      "title": "Golden Kamuy: Saishuushou (2026) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/golden-kamuy-saishuushou/",
+      "hidden": false
+    },
+    "goumon-baito-kun-no-nichijou": {
+      "slug": "goumon-baito-kun-no-nichijou",
+      "title": "Goumon Baito-kun no Nichijou (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38976904",
+        "name": "The Daily Life of a Part-Time Torturer",
+        "source": "https://m.media-amazon.com/images/M/MV5BOGM5NzRjNjUtMTRhZS00ZjA1LTk3ZjEtN2YwZDFkNDVhYTc1XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/goumon-baito-kun-no-nichijou.jpg",
+      "page": "https://animed23.com/anime/goumon-baito-kun-no-nichijou/",
+      "hidden": false
+    },
+    "grand-blue-temporada-3": {
+      "slug": "grand-blue-temporada-3",
+      "title": "Grand Blue Temporada 3 (2026) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/grand-blue-temporada-3/",
+      "hidden": false
+    },
+    "grow-up-show-himawari-no-circus-dan": {
+      "slug": "grow-up-show-himawari-no-circus-dan",
+      "title": "Grow Up Show: Himawari no Circus-dan (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41047955",
+        "name": "Grow Up Show",
+        "source": "https://m.media-amazon.com/images/M/MV5BZWQwZTAwOGYtNWJlYy00ZTY5LTkyMmYtZGZiODE4YTU3MmEzXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/grow-up-show-himawari-no-circus-dan.jpg",
+      "page": "https://animed23.com/anime/grow-up-show-himawari-no-circus-dan/",
+      "hidden": false
+    },
+    "haibara-kun-no-tsuyokute-seishun-new-game": {
+      "slug": "haibara-kun-no-tsuyokute-seishun-new-game",
+      "title": "Haibara-kun no Tsuyokute Seishun New Game (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39122622",
+        "name": "Haibara's Teenage New Game+",
+        "source": "https://m.media-amazon.com/images/M/MV5BODc2ZjQ3ZTMtMTQ5ZC00ZWRlLWFlMjMtYzAzODA4ZDgxNmRmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/haibara-kun-no-tsuyokute-seishun-new-game.jpg",
+      "page": "https://animed23.com/anime/haibara-kun-no-tsuyokute-seishun-new-game/",
+      "hidden": false
+    },
+    "hanaori-san-wa-tensei-shitemo-kenka-ga-shitai": {
+      "slug": "hanaori-san-wa-tensei-shitemo-kenka-ga-shitai",
+      "title": "Hanaori-san wa Tensei shitemo Kenka ga Shitai (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41276828",
+        "name": "Hanaori-san Still Wants to Fight in the Next Life",
+        "source": "https://m.media-amazon.com/images/M/MV5BYTZjMDczY2YtNTI0OC00ZTUzLWE4OGYtMDE5YWIxYzY4M2JhXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/hanaori-san-wa-tensei-shitemo-kenka-ga-shitai.jpg",
+      "page": "https://animed23.com/anime/hanaori-san-wa-tensei-shitemo-kenka-ga-shitai/",
+      "hidden": false
+    },
+    "hanazakari-no-kimitachi-e": {
+      "slug": "hanazakari-no-kimitachi-e",
+      "title": "Hanazakari no Kimitachi e (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38646611",
+        "name": "Hana-Kimi",
+        "source": "https://m.media-amazon.com/images/M/MV5BZGE4N2QxMWYtYTJkMi00YmY0LThlYzctZWZmNjFmZjMxOTc5XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/hanazakari-no-kimitachi-e.jpg",
+      "page": "https://animed23.com/anime/hanazakari-no-kimitachi-e/",
+      "hidden": false
+    },
+    "hanazakari-no-kimitachi-e-temporada-2": {
+      "slug": "hanazakari-no-kimitachi-e-temporada-2",
+      "title": "Hanazakari no Kimitachi e Temporada 2 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38646611",
+        "name": "Hana-Kimi",
+        "source": "https://m.media-amazon.com/images/M/MV5BZGE4N2QxMWYtYTJkMi00YmY0LThlYzctZWZmNjFmZjMxOTc5XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/hanazakari-no-kimitachi-e-temporada-2.jpg",
+      "page": "https://animed23.com/anime/hanazakari-no-kimitachi-e-temporada-2/",
+      "hidden": false
+    },
+    "hell-mode-yarikomizuki-no-gamer-wa-hai-settei-no-isekai-de-musou-suru": {
+      "slug": "hell-mode-yarikomizuki-no-gamer-wa-hai-settei-no-isekai-de-musou-suru",
+      "title": "Hell Mode: Yarikomizuki no Gamer wa Hai Settei no Isekai de Musou suru (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38646634",
+        "name": "Hell Mode: The Hardcore Gamer Dominates in Another World with Garbage Balancing",
+        "source": "https://m.media-amazon.com/images/M/MV5BMjRlNDE0NDEtNzQ1NC00NjA3LWIwMDgtMTU3MjAyNzk4YTU5XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/hell-mode-yarikomizuki-no-gamer-wa-hai-settei-no-isekai-de-musou-suru.jpg",
+      "page": "https://animed23.com/anime/hell-mode-yarikomizuki-no-gamer-wa-hai-settei-no-isekai-de-musou-suru/",
+      "hidden": false
+    },
+    "hell-mode-yarikomizuki-no-gamer-wa-hai-settei-no-isekai-de-musou-suru-temporada-2": {
+      "slug": "hell-mode-yarikomizuki-no-gamer-wa-hai-settei-no-isekai-de-musou-suru-temporada-2",
+      "title": "Hell Mode: Yarikomizuki no Gamer wa Hai Settei no Isekai de Musou suru Temporada 2 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38646634",
+        "name": "Hell Mode: The Hardcore Gamer Dominates in Another World with Garbage Balancing",
+        "source": "https://m.media-amazon.com/images/M/MV5BMjRlNDE0NDEtNzQ1NC00NjA3LWIwMDgtMTU3MjAyNzk4YTU5XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/hell-mode-yarikomizuki-no-gamer-wa-hai-settei-no-isekai-de-musou-suru-temporada-2.jpg",
+      "page": "https://animed23.com/anime/hell-mode-yarikomizuki-no-gamer-wa-hai-settei-no-isekai-de-musou-suru-temporada-2/",
+      "hidden": false
+    },
+    "heroine-seijo-iie-all-works-maid-desu-hokori": {
+      "slug": "heroine-seijo-iie-all-works-maid-desu-hokori",
+      "title": "Heroine? Seijo? Iie, All Works Maid desu (Hokori)! (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41276835",
+        "name": "Heroine? Saint? No, I'm an All-Works Maid (And Proud of It)!",
+        "source": "https://m.media-amazon.com/images/M/MV5BODI3NTk2M2UtYTlmMS00OTBmLWFiYmEtZGZlNDY0ZGY3YzYxXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/heroine-seijo-iie-all-works-maid-desu-hokori.jpg",
+      "page": "https://animed23.com/anime/heroine-seijo-iie-all-works-maid-desu-hokori/",
+      "hidden": false
+    },
+    "hidarikiki-no-eren": {
+      "slug": "hidarikiki-no-eren",
+      "title": "Hidarikiki no Eren (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39122591",
+        "name": "Eren the Southpaw",
+        "source": "https://m.media-amazon.com/images/M/MV5BZDM0NzlmYTQtMmRhMS00NWYwLWIzN2UtYmQ2Njg5OGRjNTZkXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/hidarikiki-no-eren.jpg",
+      "page": "https://animed23.com/anime/hidarikiki-no-eren/",
+      "hidden": false
+    },
+    "higeki-no-genkyou-to-naru-saikyou-gedou-last-boss-joou-wa-tami-no-tame-ni-tsukushimasu-temporada-2": {
+      "slug": "higeki-no-genkyou-to-naru-saikyou-gedou-last-boss-joou-wa-tami-no-tame-ni-tsukushimasu-temporada-2",
+      "title": "Higeki no Genkyou to Naru Saikyou Gedou Last Boss Joou wa Tami no Tame ni Tsukushimasu Temporada 2 (2026) Anime Sub Espa",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/higeki-no-genkyou-to-naru-saikyou-gedou-last-boss-joou-wa-tami-no-tame-ni-tsukushimasu-temporada-2/",
+      "hidden": false
+    },
+    "hikuidori-ushuu-boro-tobi-gumi": {
+      "slug": "hikuidori-ushuu-boro-tobi-gumi",
+      "title": "Hikuidori: Ushuu Boro Tobi-gumi (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38646977",
+        "name": "Hikuidori Ushuboro Tobigumi",
+        "source": "https://m.media-amazon.com/images/M/MV5BMmZlZTI3YTItYjM3Zi00MTE4LWJjMDgtMmQyMDEzZGIzOWMxXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/hikuidori-ushuu-boro-tobi-gumi.jpg",
+      "page": "https://animed23.com/anime/hikuidori-ushuu-boro-tobi-gumi/",
+      "hidden": false
+    },
+    "himekishi-wa-barbaroi-no-yome": {
+      "slug": "himekishi-wa-barbaroi-no-yome",
+      "title": "Himekishi wa Barbaroi no Yome (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt36593277",
+        "name": "The Warrior Princess and the Barbaric King",
+        "source": "https://m.media-amazon.com/images/M/MV5BMmZhMTU0MzQtNjk5YS00NmRkLTk0ZDctY2FhZGI3YjRjMGFmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/himekishi-wa-barbaroi-no-yome.jpg",
+      "page": "https://animed23.com/anime/himekishi-wa-barbaroi-no-yome/",
+      "hidden": false
+    },
+    "himesama-goumon-no-jikan-desu-temporada-2": {
+      "slug": "himesama-goumon-no-jikan-desu-temporada-2",
+      "title": "Himesama \"Goumon\" no Jikan desu Temporada 2 Anime Sub Español",
+      "imdb": {
+        "id": "tt30643998",
+        "name": "'Tis Time for \"Torture,\" Princess",
+        "source": "https://m.media-amazon.com/images/M/MV5BYTU3NWY5YmMtOWVmMi00NTVmLWE4OTUtNWUzZjJkOTNkMzAyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/himesama-goumon-no-jikan-desu-temporada-2.jpg",
+      "page": "https://animed23.com/anime/himesama-goumon-no-jikan-desu-temporada-2/",
+      "hidden": false
+    },
+    "hitori-no-shita-the-outcast-temporada-6": {
+      "slug": "hitori-no-shita-the-outcast-temporada-6",
+      "title": "Hitori No Shita: The Outcast Temporada 6 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt12882132",
+        "name": "Hitori No Shita - The Outcast",
+        "source": "https://m.media-amazon.com/images/M/MV5BMWIyNzYwN2MtN2I0Yi00ZTQzLTlhNmYtYWZlYmE5MDRmY2RkXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/hitori-no-shita-the-outcast-temporada-6.jpg",
+      "page": "https://animed23.com/anime/hitori-no-shita-the-outcast-temporada-6/",
+      "hidden": false
+    },
+    "hokuto-no-ken-fist-of-the-north-star": {
+      "slug": "hokuto-no-ken-fist-of-the-north-star",
+      "title": "Hokuto no Ken: Fist of the North Star (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt29106483",
+        "name": "Fist of the North Star: Hokuto no Ken",
+        "source": "https://m.media-amazon.com/images/M/MV5BN2Q4YjQzNWItOTE2ZS00NmFkLTg5NTUtYTNhNmU3MjFlM2I0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/hokuto-no-ken-fist-of-the-north-star.jpg",
+      "page": "https://animed23.com/anime/hokuto-no-ken-fist-of-the-north-star/",
+      "hidden": false
+    },
+    "honzuki-no-gekokujou-shisho-ni-naru-tame-ni-wa-shudan-wo-erandeiraremasen-ryoushu-no-youjo": {
+      "slug": "honzuki-no-gekokujou-shisho-ni-naru-tame-ni-wa-shudan-wo-erandeiraremasen-ryoushu-no-youjo",
+      "title": "Honzuki no Gekokujou: Shisho ni Naru Tame ni wa Shudan wo Erandeiraremasen - Ryoushu no Youjo (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt13043866",
+        "name": "Ascendance of a Bookworm: Side Story",
+        "source": "https://m.media-amazon.com/images/M/MV5BZTdiNzJmNDYtYzkzOC00MzgyLTkyMmQtNmY1NDJiZDg0ZjY3XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/honzuki-no-gekokujou-shisho-ni-naru-tame-ni-wa-shudan-wo-erandeiraremasen-ryoushu-no-youjo.jpg",
+      "page": "https://animed23.com/anime/honzuki-no-gekokujou-shisho-ni-naru-tame-ni-wa-shudan-wo-erandeiraremasen-ryoushu-no-youjo/",
+      "hidden": false
+    },
+    "ichijouma-mankitsugurashi": {
+      "slug": "ichijouma-mankitsugurashi",
+      "title": "Ichijouma Mankitsugurashi! (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41398126",
+        "name": "Ichijyoma Mankitsu Gurashi!",
+        "source": "https://m.media-amazon.com/images/M/MV5BMDE4N2ExODItZWUyNS00NWVhLTg4MWEtZTE0NWYwZWZhNjg3XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/ichijouma-mankitsugurashi.jpg",
+      "page": "https://animed23.com/anime/ichijouma-mankitsugurashi/",
+      "hidden": false
+    },
+    "ikoku-nikki": {
+      "slug": "ikoku-nikki",
+      "title": "Ikoku Nikki Anime Sub Español",
+      "imdb": {
+        "id": "tt32336365",
+        "name": "Journal with Witch",
+        "source": "https://m.media-amazon.com/images/M/MV5BMzYzYWRmNGEtMmEwNC00N2QzLWEwZWYtYmY0YjJjZDhiNjM4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/ikoku-nikki.jpg",
+      "page": "https://animed23.com/anime/ikoku-nikki/",
+      "hidden": false
+    },
+    "ingoku-danchi": {
+      "slug": "ingoku-danchi",
+      "title": "Ingoku Danchi (2026) (Sin Censura) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/ingoku-danchi/",
+      "hidden": false
+    },
+    "isekai-no-sata-wa-shachiku-shidai": {
+      "slug": "isekai-no-sata-wa-shachiku-shidai",
+      "title": "Isekai no Sata wa Shachiku Shidai (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38652044",
+        "name": "Isekai Office Worker: The Other World's Books Depend on the Bean Counter",
+        "source": "https://m.media-amazon.com/images/M/MV5BN2RlMTdlYWItMDA0ZC00YTg2LTgyOTItM2U3ZjkyOWNmYWJhXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/isekai-no-sata-wa-shachiku-shidai.jpg",
+      "page": "https://animed23.com/anime/isekai-no-sata-wa-shachiku-shidai/",
+      "hidden": false
+    },
+    "isekai-nonbiri-nouka-2": {
+      "slug": "isekai-nonbiri-nouka-2",
+      "title": "Isekai Nonbiri Nouka 2 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt19223420",
+        "name": "Farming Life in Another World",
+        "source": "https://m.media-amazon.com/images/M/MV5BNWY3MTUwYzYtOWNkMC00ZGIzLTgyOGYtYzg1ZDM0Y2EyZWU2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/isekai-nonbiri-nouka-2.jpg",
+      "page": "https://animed23.com/anime/isekai-nonbiri-nouka-2/",
+      "hidden": false
+    },
+    "iwamoto-senpai-no-suisen": {
+      "slug": "iwamoto-senpai-no-suisen",
+      "title": "Iwamoto-senpai no Suisen (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41276849",
+        "name": "Recommendations from Iwamoto-Senpai",
+        "source": "https://m.media-amazon.com/images/M/MV5BNzFiNTk0MTctNjViOS00YjY0LThkZDctMTkxYzRhYWMxM2E1XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/iwamoto-senpai-no-suisen.jpg",
+      "page": "https://animed23.com/anime/iwamoto-senpai-no-suisen/",
+      "hidden": false
+    },
+    "jidou-hanbaiki-ni-umarekawatta-ore-wa-meikyuu-wo-samayou-temporada-3": {
+      "slug": "jidou-hanbaiki-ni-umarekawatta-ore-wa-meikyuu-wo-samayou-temporada-3",
+      "title": "Jidou Hanbaiki ni Umarekawatta Ore wa Meikyuu wo Samayou Temporada 3 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt28100731",
+        "name": "Reborn as a Vending Machine, I Now Wander the Dungeon",
+        "source": "https://m.media-amazon.com/images/M/MV5BZjQ2MGYyYzgtODlhZi00YjczLWJmZTEtYzIxYWM1NTQ4ZGFlXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/jidou-hanbaiki-ni-umarekawatta-ore-wa-meikyuu-wo-samayou-temporada-3.jpg",
+      "page": "https://animed23.com/anime/jidou-hanbaiki-ni-umarekawatta-ore-wa-meikyuu-wo-samayou-temporada-3/",
+      "hidden": false
+    },
+    "jigokuraku": {
+      "slug": "jigokuraku",
+      "title": "Jigokuraku (2023) Anime Sub Español",
+      "imdb": {
+        "id": "tt13911284",
+        "name": "Hell's Paradise",
+        "source": "https://m.media-amazon.com/images/M/MV5BZjhmMjhkNjUtMGU2MC00N2IzLTg1YzItZDk5ODMxMDYxODc0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/jigokuraku.jpg",
+      "page": "https://animed23.com/anime/jigokuraku/",
+      "hidden": false
+    },
+    "jigokuraku-temporada-2": {
+      "slug": "jigokuraku-temporada-2",
+      "title": "Jigokuraku Temporada 2 (2026) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/jigokuraku-temporada-2/",
+      "hidden": false
+    },
+    "jingai-kyoushitsu-no-ningengirai-kyoushi": {
+      "slug": "jingai-kyoushitsu-no-ningengirai-kyoushi",
+      "title": "Jingai Kyoushitsu no Ningengirai Kyoushi (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38646016",
+        "name": "A Misanthrope Teaches a Class for Demi-Humans",
+        "source": "https://m.media-amazon.com/images/M/MV5BOGE1NTMyNTktMDQyMi00ZjcyLWIyYzMtN2RmN2MzNzkxZTZkXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/jingai-kyoushitsu-no-ningengirai-kyoushi.jpg",
+      "page": "https://animed23.com/anime/jingai-kyoushitsu-no-ningengirai-kyoushi/",
+      "hidden": false
+    },
+    "jishou-akuyaku-reijou-na-konyakusha-no-kansatsu-kiroku": {
+      "slug": "jishou-akuyaku-reijou-na-konyakusha-no-kansatsu-kiroku",
+      "title": "Jishou Akuyaku Reijou na Konyakusha no Kansatsu Kiroku. (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt40546935",
+        "name": "An Observation Log of My Fiancée Who Calls Herself a Villainess",
+        "source": "https://m.media-amazon.com/images/M/MV5BYjVkNjk2YjUtODJhNi00NjQwLWIzYWUtNjUzMTFkZDY4NzcxXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/jishou-akuyaku-reijou-na-konyakusha-no-kansatsu-kiroku.jpg",
+      "page": "https://animed23.com/anime/jishou-akuyaku-reijou-na-konyakusha-no-kansatsu-kiroku/",
+      "hidden": false
+    },
+    "jujutsu-kaisen-temporada-3-shimetsu-kaiyuu-zenpen": {
+      "slug": "jujutsu-kaisen-temporada-3-shimetsu-kaiyuu-zenpen",
+      "title": "Jujutsu Kaisen Temporada 3: Shimetsu Kaiyuu - Zenpen (2026) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/jujutsu-kaisen-temporada-3-shimetsu-kaiyuu-zenpen/",
+      "hidden": false
+    },
+    "kabushikigaisha-magi-lumiere-temporada-2": {
+      "slug": "kabushikigaisha-magi-lumiere-temporada-2",
+      "title": "Kabushikigaisha Magi-Lumière Temporada 2 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt30476504",
+        "name": "Magilumiere Magical Girls Inc.",
+        "source": "https://m.media-amazon.com/images/M/MV5BOWVlNzViMTQtYTQ2Yi00NDkwLTkyZTYtNDY4ZmJkZDFkYzJmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kabushikigaisha-magi-lumiere-temporada-2.jpg",
+      "page": "https://animed23.com/anime/kabushikigaisha-magi-lumiere-temporada-2/",
+      "hidden": false
+    },
+    "kami-no-niwatsuki-kusunoki-tei": {
+      "slug": "kami-no-niwatsuki-kusunoki-tei",
+      "title": "Kami no Niwatsuki Kusunoki-tei (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39122739",
+        "name": "Kusunoki's Garden of Gods",
+        "source": "https://m.media-amazon.com/images/M/MV5BMDMyZDI3YTktMWZiNi00MTczLWJkNzktMTVmOGRhNjZhNGQyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kami-no-niwatsuki-kusunoki-tei.jpg",
+      "page": "https://animed23.com/anime/kami-no-niwatsuki-kusunoki-tei/",
+      "hidden": false
+    },
+    "kami-no-shizuku": {
+      "slug": "kami-no-shizuku",
+      "title": "Kami no Shizuku (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39026840",
+        "name": "The Drops of God",
+        "source": "https://m.media-amazon.com/images/M/MV5BMzQyYTEwMDYtZjkxNS00YjliLTlmZTMtY2YyYzJkYmE0NTI0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kami-no-shizuku.jpg",
+      "page": "https://animed23.com/anime/kami-no-shizuku/",
+      "hidden": false
+    },
+    "kamiina-botan-yoeru-sugata-wa-yuri-no-hana": {
+      "slug": "kamiina-botan-yoeru-sugata-wa-yuri-no-hana",
+      "title": "Kamiina Botan, Yoeru Sugata wa Yuri no Hana (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38273912",
+        "name": "Botan Kamiina Fully Blossoms When Drunk",
+        "source": "https://m.media-amazon.com/images/M/MV5BNzcyZmQxYmMtZjYzYy00ZTQ2LWJmZmQtYzIzMTg0NzZjNmZiXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kamiina-botan-yoeru-sugata-wa-yuri-no-hana.jpg",
+      "page": "https://animed23.com/anime/kamiina-botan-yoeru-sugata-wa-yuri-no-hana/",
+      "hidden": false
+    },
+    "kanan-sama-wa-akumade-choroi": {
+      "slug": "kanan-sama-wa-akumade-choroi",
+      "title": "Kanan-sama wa Akumade Choroi (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt37729351",
+        "name": "Mistress Kanan is Devilishly Easy",
+        "source": "https://m.media-amazon.com/images/M/MV5BMWM2ZWYxNTUtMWUwMi00NDc0LTk1N2UtNjY2Y2E0NjFhZTU5XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kanan-sama-wa-akumade-choroi.jpg",
+      "page": "https://animed23.com/anime/kanan-sama-wa-akumade-choroi/",
+      "hidden": false
+    },
+    "kanojo-okarishimasu-temporada-5": {
+      "slug": "kanojo-okarishimasu-temporada-5",
+      "title": "Kanojo, Okarishimasu Temporada 5 (2026) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/kanojo-okarishimasu-temporada-5/",
+      "hidden": false
+    },
+    "katainaka-no-ossan-kensei-ni-naru-ii": {
+      "slug": "katainaka-no-ossan-kensei-ni-naru-ii",
+      "title": "Katainaka no Ossan, Kensei ni Naru II (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt35346717",
+        "name": "From Old Country Bumpkin to Master Swordsman",
+        "source": "https://m.media-amazon.com/images/M/MV5BMjg2ODRmN2ItMTIwNC00YmQ2LWFhYTItYmVmZDhkNWEzMjFhXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/katainaka-no-ossan-kensei-ni-naru-ii.jpg",
+      "page": "https://animed23.com/anime/katainaka-no-ossan-kensei-ni-naru-ii/",
+      "hidden": false
+    },
+    "kaya-chan-wa-kowakunai": {
+      "slug": "kaya-chan-wa-kowakunai",
+      "title": "Kaya-chan wa Kowakunai (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38631545",
+        "name": "Kaya-chan Isn't Scary",
+        "source": "https://m.media-amazon.com/images/M/MV5BNTNjZGJhNTItMjdlMi00OWY4LWI5OWUtYTRlYWI3ZTBlMDJjXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kaya-chan-wa-kowakunai.jpg",
+      "page": "https://animed23.com/anime/kaya-chan-wa-kowakunai/",
+      "hidden": false
+    },
+    "kekkon-yubiwa-monogatari-ii": {
+      "slug": "kekkon-yubiwa-monogatari-ii",
+      "title": "Kekkon Yubiwa Monogatari II (2025) Sin Censura Anime Sub Español",
+      "imdb": {
+        "id": "tt30488398",
+        "name": "Tales of Wedding Rings",
+        "source": "https://m.media-amazon.com/images/M/MV5BYjIzNmRiNWEtNDBjYi00NmM0LWI1ZjktY2Q2OTQ1ZTQ2NmU5XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kekkon-yubiwa-monogatari-ii.jpg",
+      "page": "https://animed23.com/anime/kekkon-yubiwa-monogatari-ii/",
+      "hidden": false
+    },
+    "kill-ao": {
+      "slug": "kill-ao",
+      "title": "Kill Ao (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39443399",
+        "name": "Kill Blue",
+        "source": "https://m.media-amazon.com/images/M/MV5BZDJhNzc2MmItNmEzOC00MWFmLWFjMDctZTFmZGI4YjcwYWVhXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kill-ao.jpg",
+      "page": "https://animed23.com/anime/kill-ao/",
+      "hidden": false
+    },
+    "kimetsu-no-yaiba-movie-1-mugenjou-hen-akaza-sairai": {
+      "slug": "kimetsu-no-yaiba-movie-1-mugenjou-hen-akaza-sairai",
+      "title": "Kimetsu no Yaiba Movie 1: Mugenjou-hen - Akaza Sairai Película Sub Español",
+      "imdb": {
+        "id": "tt32820897",
+        "name": "Demon Slayer: Kimetsu No Yaiba Infinity Castle",
+        "source": "https://m.media-amazon.com/images/M/MV5BOGQ3YWUzYjEtMTJiYy00ZjQ0LWI0YjktYjhiNGVhNGExYTM3XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kimetsu-no-yaiba-movie-1-mugenjou-hen-akaza-sairai.jpg",
+      "page": "https://animed23.com/anime/kimetsu-no-yaiba-movie-1-mugenjou-hen-akaza-sairai/",
+      "hidden": false
+    },
+    "kimi-ga-shinu-made-koi-wo-shitai": {
+      "slug": "kimi-ga-shinu-made-koi-wo-shitai",
+      "title": "Kimi ga Shinu made Koi wo Shitai (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt36056731",
+        "name": "I Want to Love You Till Your Dying Day",
+        "source": "https://m.media-amazon.com/images/M/MV5BOGZjMGI4NTUtOTNjMi00YjgzLWE0ZmYtMGFiZmNjNjNjZjAyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kimi-ga-shinu-made-koi-wo-shitai.jpg",
+      "page": "https://animed23.com/anime/kimi-ga-shinu-made-koi-wo-shitai/",
+      "hidden": false
+    },
+    "kimi-no-koto-ga-daidaidaidaidaisuki-na-100-nin-no-kanojo-temporada-3": {
+      "slug": "kimi-no-koto-ga-daidaidaidaidaisuki-na-100-nin-no-kanojo-temporada-3",
+      "title": "Kimi no Koto ga Daidaidaidaidaisuki na 100-nin no Kanojo Temporada 3 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt28919914",
+        "name": "The 100 Girlfriends Who Really, Really, Really, Really, REALLY Love You",
+        "source": "https://m.media-amazon.com/images/M/MV5BM2NiOWUzM2EtYTlmOC00Y2ZhLWIwM2QtYzY3NDYwZDgyNTg0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kimi-no-koto-ga-daidaidaidaidaisuki-na-100-nin-no-kanojo-temporada-3.jpg",
+      "page": "https://animed23.com/anime/kimi-no-koto-ga-daidaidaidaidaisuki-na-100-nin-no-kanojo-temporada-3/",
+      "hidden": false
+    },
+    "kimi-wo-aisuru-ki-wa-nai-to-itta-jiki-koushaku-sama-ga-nazeka-dekiai-shitekimasu": {
+      "slug": "kimi-wo-aisuru-ki-wa-nai-to-itta-jiki-koushaku-sama-ga-nazeka-dekiai-shitekimasu",
+      "title": "\"Kimi wo Aisuru Ki wa Nai\" to Itta Jiki Koushaku-sama ga Nazeka Dekiai shitekimasu (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41277587",
+        "name": "The Duke's Son Claims He Won't Love Me, But Showers Me with Adoration",
+        "source": "https://m.media-amazon.com/images/M/MV5BMTg0NDVmMDAtYWE2MC00MzYxLWE0YWYtODdmOWZkZmIzZmE0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kimi-wo-aisuru-ki-wa-nai-to-itta-jiki-koushaku-sama-ga-nazeka-dekiai-shitekimasu.jpg",
+      "page": "https://animed23.com/anime/kimi-wo-aisuru-ki-wa-nai-to-itta-jiki-koushaku-sama-ga-nazeka-dekiai-shitekimasu/",
+      "hidden": false
+    },
+    "kirei-ni-shitemoraemasu-ka": {
+      "slug": "kirei-ni-shitemoraemasu-ka",
+      "title": "Kirei ni Shitemoraemasu ka. Anime Sub Español",
+      "imdb": {
+        "id": "tt37196939",
+        "name": "Wash It All Away",
+        "source": "https://m.media-amazon.com/images/M/MV5BN2E0OTYzZmMtODZhZS00MzI2LTlhMDQtYTA1NTIyZGRlMGY1XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kirei-ni-shitemoraemasu-ka.jpg",
+      "page": "https://animed23.com/anime/kirei-ni-shitemoraemasu-ka/",
+      "hidden": false
+    },
+    "kizoku-tensei-megumareta-umare-kara-saikyou-no-chikara-wo-eru": {
+      "slug": "kizoku-tensei-megumareta-umare-kara-saikyou-no-chikara-wo-eru",
+      "title": "Kizoku Tensei: Megumareta Umare kara Saikyou no Chikara wo Eru (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38978132",
+        "name": "Noble Reincarnation: Born Blessed, So I'll Obtain Ultimate Power",
+        "source": "https://m.media-amazon.com/images/M/MV5BMzY2NjlhMGQtYTJhMy00Nzg0LWIyNWMtNmViMmM2ODA3ZWViXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kizoku-tensei-megumareta-umare-kara-saikyou-no-chikara-wo-eru.jpg",
+      "page": "https://animed23.com/anime/kizoku-tensei-megumareta-umare-kara-saikyou-no-chikara-wo-eru/",
+      "hidden": false
+    },
+    "kobayashi-san-chi-no-maid-dragon-samishigariya-no-ryuu": {
+      "slug": "kobayashi-san-chi-no-maid-dragon-samishigariya-no-ryuu",
+      "title": "Kobayashi-san Chi no Maid Dragon: Samishigariya no Ryuu (2025) Película Sub Español",
+      "imdb": {
+        "id": "tt36592985",
+        "name": "Miss Kobayashi's Dragon Maid: A Lonely Dragon Wants to Be Loved",
+        "source": "https://m.media-amazon.com/images/M/MV5BZDk5ODkyZTQtYTExYS00M2RjLWEzNzktZTI2NjQ4Y2I5YzI3XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kobayashi-san-chi-no-maid-dragon-samishigariya-no-ryuu.jpg",
+      "page": "https://animed23.com/anime/kobayashi-san-chi-no-maid-dragon-samishigariya-no-ryuu/",
+      "hidden": false
+    },
+    "koko-wa-ore-ni-makasete-saki-ni-ike-to-itte-kara-10-nen-ga-tattara-densetsu-ni-natteita": {
+      "slug": "koko-wa-ore-ni-makasete-saki-ni-ike-to-itte-kara-10-nen-ga-tattara-densetsu-ni-natteita",
+      "title": "Koko wa Ore ni Makasete Saki ni Ike to Itte kara 10-nen ga Tattara Densetsu ni Natteita. (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39443204",
+        "name": "I Became a Legend after My 10 Year-Long Last Stand",
+        "source": "https://m.media-amazon.com/images/M/MV5BZTQ2NjM5NWYtZTA2Zi00Mjc4LTk0NjQtNjdlMWY2MzdiNTZkXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/koko-wa-ore-ni-makasete-saki-ni-ike-to-itte-kara-10-nen-ga-tattara-densetsu-ni-natteita.jpg",
+      "page": "https://animed23.com/anime/koko-wa-ore-ni-makasete-saki-ni-ike-to-itte-kara-10-nen-ga-tattara-densetsu-ni-natteita/",
+      "hidden": false
+    },
+    "koori-no-jouheki": {
+      "slug": "koori-no-jouheki",
+      "title": "Koori no Jouheki (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39123061",
+        "name": "The Ramparts of Ice",
+        "source": "https://m.media-amazon.com/images/M/MV5BM2U2NWI3ZTctMjVhZS00NmYzLWI1OWMtYTFmMDlhYTI5ZjczXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/koori-no-jouheki.jpg",
+      "page": "https://animed23.com/anime/koori-no-jouheki/",
+      "hidden": false
+    },
+    "kore-kaite-shine": {
+      "slug": "kore-kaite-shine",
+      "title": "Kore Kaite Shine (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt36290385",
+        "name": "Draw This, Then Die!",
+        "source": "https://m.media-amazon.com/images/M/MV5BOTRkMWM4NWItODk5NS00NzBlLWFiZjEtZmY5OTlmZTBkMGMxXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kore-kaite-shine.jpg",
+      "page": "https://animed23.com/anime/kore-kaite-shine/",
+      "hidden": false
+    },
+    "koukaku-kidoutai-the-ghost-in-the-shell": {
+      "slug": "koukaku-kidoutai-the-ghost-in-the-shell",
+      "title": "Koukaku Kidoutai: THE GHOST IN THE SHELL (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt0113568",
+        "name": "Ghost in the Shell",
+        "source": "https://m.media-amazon.com/images/M/MV5BNzljMjA3MTQtMjM1OS00OGJjLWJiYzctZDRiMTk1NWI5YzQ5XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/koukaku-kidoutai-the-ghost-in-the-shell.jpg",
+      "page": "https://animed23.com/anime/koukaku-kidoutai-the-ghost-in-the-shell/",
+      "hidden": false
+    },
+    "kujima-utaeba-ie-hororo": {
+      "slug": "kujima-utaeba-ie-hororo",
+      "title": "Kujima Utaeba Ie Hororo (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39122722",
+        "name": "Kujima: Why Sing, When You Can Warble?",
+        "source": "https://m.media-amazon.com/images/M/MV5BMzU5N2M5YWEtNmI1Yy00MzAyLThjY2UtMGIxNWUyNGQ0YTVhXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kujima-utaeba-ie-hororo.jpg",
+      "page": "https://animed23.com/anime/kujima-utaeba-ie-hororo/",
+      "hidden": false
+    },
+    "kuroneko-to-majo-no-kyoushitsu": {
+      "slug": "kuroneko-to-majo-no-kyoushitsu",
+      "title": "Kuroneko to Majo no Kyoushitsu (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39123043",
+        "name": "The Classroom of a Black Cat and a Witch",
+        "source": "https://m.media-amazon.com/images/M/MV5BZTNhMGJmMzQtNjc5OC00NzM0LWEyNzItNDI2MTgwMzM0OTg4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/kuroneko-to-majo-no-kyoushitsu.jpg",
+      "page": "https://animed23.com/anime/kuroneko-to-majo-no-kyoushitsu/",
+      "hidden": false
+    },
+    "labyrinth-meikyuu-no-shiori": {
+      "slug": "labyrinth-meikyuu-no-shiori",
+      "title": "LABYRINTH: Meikyuu no Shiori (2026) Sub Español",
+      "imdb": {
+        "id": "tt38507195",
+        "name": "Labyrinth",
+        "source": "https://m.media-amazon.com/images/M/MV5BNzk3ODRmYjUtOTZkZi00ODg2LTlmMjYtNTIxYTVlM2FjMDc3XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/labyrinth-meikyuu-no-shiori.jpg",
+      "page": "https://animed23.com/anime/labyrinth-meikyuu-no-shiori/",
+      "hidden": false
+    },
+    "lets-go-kaiki-gumi": {
+      "slug": "lets-go-kaiki-gumi",
+      "title": "Let's Go Kaiki-gumi (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41278494",
+        "name": "Let's Go Kaikigumi",
+        "source": "https://m.media-amazon.com/images/M/MV5BY2Y0YTFlM2ItZTkwYy00NWQ5LTg5NjMtMDcwYTkzYjI0NmJlXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/lets-go-kaiki-gumi.jpg",
+      "page": "https://animed23.com/anime/lets-go-kaiki-gumi/",
+      "hidden": false
+    },
+    "li-xiongmao-raised-by-demons-panda-li-li-xiongmao": {
+      "slug": "li-xiongmao-raised-by-demons-panda-li-li-xiongmao",
+      "title": "Raised by Demons: Panda Li (Li Xiongmao) (2026) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/li-xiongmao-raised-by-demons-panda-li-li-xiongmao/",
+      "hidden": false
+    },
+    "liar-game": {
+      "slug": "liar-game",
+      "title": "Liar Game (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39229633",
+        "name": "Liar Game",
+        "source": "https://m.media-amazon.com/images/M/MV5BNjcyMWRkZDUtMDgyZi00MDU4LWJjYjUtZGVjZGYyZWY2YjU2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/liar-game.jpg",
+      "page": "https://animed23.com/anime/liar-game/",
+      "hidden": false
+    },
+    "link-click-shiguang-dailiren-iii": {
+      "slug": "link-click-shiguang-dailiren-iii",
+      "title": "Link Click (Shiguang Dailiren) III (2026) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/link-click-shiguang-dailiren-iii/",
+      "hidden": false
+    },
+    "lv999-no-murabito": {
+      "slug": "lv999-no-murabito",
+      "title": "Lv999 no Murabito (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38262097",
+        "name": "The Villager of Level 999",
+        "source": "https://m.media-amazon.com/images/M/MV5BOGM4YzNhN2YtMTYzNy00NDk4LWI1OWYtZGYwYWM5ZjIzMGM4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/lv999-no-murabito.jpg",
+      "page": "https://animed23.com/anime/lv999-no-murabito/",
+      "hidden": false
+    },
+    "mahou-shoujo-lyrical-nanoha-exceeds-gun-blaze-vengeance": {
+      "slug": "mahou-shoujo-lyrical-nanoha-exceeds-gun-blaze-vengeance",
+      "title": "Mahou Shoujo Lyrical Nanoha EXCEEDS: Gun Blaze Vengeance (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39311004",
+        "name": "Magical Girl Lyrical Nanoha EXCEEDS Gun Blaze Vengeance",
+        "source": "https://m.media-amazon.com/images/M/MV5BMjE0YzUyNTYtNmFhNS00ZDg5LTkyNTItYjYwZTU1MTYxYTZiXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/mahou-shoujo-lyrical-nanoha-exceeds-gun-blaze-vengeance.jpg",
+      "page": "https://animed23.com/anime/mahou-shoujo-lyrical-nanoha-exceeds-gun-blaze-vengeance/",
+      "hidden": false
+    },
+    "maid-san-wa-taberu-dake": {
+      "slug": "maid-san-wa-taberu-dake",
+      "title": "Maid-san wa Taberu dake (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38040630",
+        "name": "The Food Diary of Miss Maid",
+        "source": "https://m.media-amazon.com/images/M/MV5BNWUzY2Q4YWEtMzg5ZC00ZThiLWExMWYtZWNhMTA5MGE5ODc3XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/maid-san-wa-taberu-dake.jpg",
+      "page": "https://animed23.com/anime/maid-san-wa-taberu-dake/",
+      "hidden": false
+    },
+    "mairimashita-iruma-kun-temporada-4": {
+      "slug": "mairimashita-iruma-kun-temporada-4",
+      "title": "Mairimashita! Iruma-kun Temporada 4 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt11034066",
+        "name": "Welcome to Demon-School, Iruma-kun",
+        "source": "https://m.media-amazon.com/images/M/MV5BMzFhOWUyYTktZmFlOS00OTRmLTk0YTYtMmFlNDNiNDRiYjk2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/mairimashita-iruma-kun-temporada-4.jpg",
+      "page": "https://animed23.com/anime/mairimashita-iruma-kun-temporada-4/",
+      "hidden": false
+    },
+    "majutsushi-kunon-wa-mieteiru": {
+      "slug": "majutsushi-kunon-wa-mieteiru",
+      "title": "Majutsushi Kunon wa Mieteiru (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38646949",
+        "name": "Kunon the Sorcerer Can See",
+        "source": "https://m.media-amazon.com/images/M/MV5BNWJjZTY0MGUtZGFmOC00NmEyLThiZjMtNTkzYWIyMjNhZjllXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/majutsushi-kunon-wa-mieteiru.jpg",
+      "page": "https://animed23.com/anime/majutsushi-kunon-wa-mieteiru/",
+      "hidden": false
+    },
+    "mao-2026": {
+      "slug": "mao-2026",
+      "title": "Mao (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt37577523",
+        "name": "Mao",
+        "source": "https://m.media-amazon.com/images/M/MV5BMjVmMWY2N2YtYWM0MS00N2M3LThkYTgtOGI0YTNlNjMyOWZlXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/mao-2026.jpg",
+      "page": "https://animed23.com/anime/mao-2026/",
+      "hidden": false
+    },
+    "maou-no-musume-wa-yasashisugiru": {
+      "slug": "maou-no-musume-wa-yasashisugiru",
+      "title": "Maou no Musume wa Yasashisugiru!! (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38969275",
+        "name": "The Demon King's Daughter is Too Kind!!",
+        "source": "https://m.media-amazon.com/images/M/MV5BMWNmYzlmMDctZmFhNi00NTkwLTgwZTMtMjZmYWY3NGQ3ODIxXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/maou-no-musume-wa-yasashisugiru.jpg",
+      "page": "https://animed23.com/anime/maou-no-musume-wa-yasashisugiru/",
+      "hidden": false
+    },
+    "marika-chan-no-koukando-wa-bukkowareteiru": {
+      "slug": "marika-chan-no-koukando-wa-bukkowareteiru",
+      "title": "Marika-chan no Koukando wa Bukkowareteiru (2026) (Sin Censura) Anime Sub Español",
+      "imdb": {
+        "id": "tt41395364",
+        "name": "Marika's Love Meter Malfunction",
+        "source": "https://m.media-amazon.com/images/M/MV5BNmIwMTE3M2YtOTBiMi00ODkyLTk1OWQtMDVlYjAwZjE1ZDY0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/marika-chan-no-koukando-wa-bukkowareteiru.jpg",
+      "page": "https://animed23.com/anime/marika-chan-no-koukando-wa-bukkowareteiru/",
+      "hidden": false
+    },
+    "marriagetoxin": {
+      "slug": "marriagetoxin",
+      "title": "Marriagetoxin (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39122769",
+        "name": "Marriagetoxin",
+        "source": "https://m.media-amazon.com/images/M/MV5BMzM4NzU3ODctYTU2ZC00NDIyLTk0MjktNDI5N2YxZWE3N2ZjXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/marriagetoxin.jpg",
+      "page": "https://animed23.com/anime/marriagetoxin/",
+      "hidden": false
+    },
+    "mata-korosarete-shimatta-no-desu-ne-tantei-sama": {
+      "slug": "mata-korosarete-shimatta-no-desu-ne-tantei-sama",
+      "title": "Mata Korosarete Shimatta no desu ne, Tantei-sama (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39122702",
+        "name": "Killed Again, Mr. Detective.",
+        "source": "https://m.media-amazon.com/images/M/MV5BYTlkYTczOWItZWJhNy00ZDgzLWE5ZDUtYjkxMzA3ZjEzMmIyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/mata-korosarete-shimatta-no-desu-ne-tantei-sama.jpg",
+      "page": "https://animed23.com/anime/mata-korosarete-shimatta-no-desu-ne-tantei-sama/",
+      "hidden": false
+    },
+    "mato-seihei-no-slave": {
+      "slug": "mato-seihei-no-slave",
+      "title": "Mato Seihei no Slave (Sin Censura) (2024) Anime Sub Español",
+      "imdb": {
+        "id": "tt16156736",
+        "name": "Chained Soldier",
+        "source": "https://m.media-amazon.com/images/M/MV5BZGY3NTVhOWUtMDVmMy00OTIwLTkyYTMtYzQ5YjdmMDllODFkXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/mato-seihei-no-slave.jpg",
+      "page": "https://animed23.com/anime/mato-seihei-no-slave/",
+      "hidden": false
+    },
+    "mato-seihei-no-slave-temporada-2": {
+      "slug": "mato-seihei-no-slave-temporada-2",
+      "title": "Mato Seihei no Slave Temporada 2 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt16156736",
+        "name": "Chained Soldier",
+        "source": "https://m.media-amazon.com/images/M/MV5BZGY3NTVhOWUtMDVmMy00OTIwLTkyYTMtYzQ5YjdmMDllODFkXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/mato-seihei-no-slave-temporada-2.jpg",
+      "page": "https://animed23.com/anime/mato-seihei-no-slave-temporada-2/",
+      "hidden": false
+    },
+    "mayonaka-heart-tune": {
+      "slug": "mayonaka-heart-tune",
+      "title": "Mayonaka Heart Tune (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38980445",
+        "name": "Tune in to the Midnight Heart",
+        "source": "https://m.media-amazon.com/images/M/MV5BM2U4MDU1MTgtMTY0OS00NzNkLWI2MmYtYzVmZTEyZjgwMjQ1XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/mayonaka-heart-tune.jpg",
+      "page": "https://animed23.com/anime/mayonaka-heart-tune/",
+      "hidden": false
+    },
+    "mebius-dust": {
+      "slug": "mebius-dust",
+      "title": "Mebius Dust (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt43587102",
+        "name": "Mebius Dust",
+        "source": "https://m.media-amazon.com/images/M/MV5BMTk4YjU5ZjEtNDdmMi00ZmRjLWFhZjgtNjE5OTBmNmVkOTc3XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/mebius-dust.jpg",
+      "page": "https://animed23.com/anime/mebius-dust/",
+      "hidden": false
+    },
+    "medalist-temporada-2": {
+      "slug": "medalist-temporada-2",
+      "title": "Medalist Temporada 2 (2026) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/medalist-temporada-2/",
+      "hidden": false
+    },
+    "megami-isekai-tensei-nani-ni-naritai-desu-ka-ore-yuusha-no-rokkotsu-de": {
+      "slug": "megami-isekai-tensei-nani-ni-naritai-desu-ka-ore-yuusha-no-rokkotsu-de",
+      "title": "Megami \"Isekai Tensei Nani ni Naritai desu ka\" Ore \"Yuusha no Rokkotsu de\" (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt40547960",
+        "name": "My Ribdiculous Reincarnation",
+        "source": "https://m.media-amazon.com/images/M/MV5BNzBmYzhmOTgtMDMzZS00ZTQxLWE4NjEtYWVmZWMxNmMyOGFhXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/megami-isekai-tensei-nani-ni-naritai-desu-ka-ore-yuusha-no-rokkotsu-de.jpg",
+      "page": "https://animed23.com/anime/megami-isekai-tensei-nani-ni-naritai-desu-ka-ore-yuusha-no-rokkotsu-de/",
+      "hidden": false
+    },
+    "mf-ghost-temporada-3": {
+      "slug": "mf-ghost-temporada-3",
+      "title": "MF Ghost Temporada 3 (2026) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/mf-ghost-temporada-3/",
+      "hidden": false
+    },
+    "migawari-reijou-wo-sukutta-no-wa-reikoku-mujihi-na-koori-no-ouji-no-ai-deshita": {
+      "slug": "migawari-reijou-wo-sukutta-no-wa-reikoku-mujihi-na-koori-no-ouji-no-ai-deshita",
+      "title": "Migawari Reijou wo Sukutta no wa Reikoku Mujihi na Koori no Ouji no Ai deshita (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41358179",
+        "name": "Migawari Reijou wo Sukutta no wa Reikoku Mujihi na Koori no Ouji no Ai deshita",
+        "source": "https://m.media-amazon.com/images/M/MV5BZDI1NGRkMDMtMjViZi00MTAyLTg3NzEtMzUyZDI4ZTk3ZjYzXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/migawari-reijou-wo-sukutta-no-wa-reikoku-mujihi-na-koori-no-ouji-no-ai-deshita.jpg",
+      "page": "https://animed23.com/anime/migawari-reijou-wo-sukutta-no-wa-reikoku-mujihi-na-koori-no-ouji-no-ai-deshita/",
+      "hidden": false
+    },
+    "mikata-ga-yowasugite-hojo-mahou-ni-tesshiteita-kyuutei-mahoushi-tsuihou-sarete-saikyou-wo-mezasu": {
+      "slug": "mikata-ga-yowasugite-hojo-mahou-ni-tesshiteita-kyuutei-mahoushi-tsuihou-sarete-saikyou-wo-mezasu",
+      "title": "Mikata ga Yowasugite Hojo Mahou ni Tesshiteita Kyuutei Mahoushi, Tsuihou sarete Saikyou wo Mezasu (2025) Anime Sub Españ",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/mikata-ga-yowasugite-hojo-mahou-ni-tesshiteita-kyuutei-mahoushi-tsuihou-sarete-saikyou-wo-mezasu/",
+      "hidden": false
+    },
+    "mugen-gacha": {
+      "slug": "mugen-gacha",
+      "title": "Mugen Gacha (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt36593026",
+        "name": "My Gift Lvl 9999 Unlimited Gacha: Backstabbed in a Backwater Dungeon, I'm Out for Revenge!",
+        "source": "https://m.media-amazon.com/images/M/MV5BMTkyZGZiN2YtYmRlNy00NzU5LWFkYzYtYjFkMTQzMmI5MDA0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/mugen-gacha.jpg",
+      "page": "https://animed23.com/anime/mugen-gacha/",
+      "hidden": false
+    },
+    "mujikaku-seijo-wa-kyou-mo-muishiki-ni-chikara-wo-tare-nagasu": {
+      "slug": "mujikaku-seijo-wa-kyou-mo-muishiki-ni-chikara-wo-tare-nagasu",
+      "title": "Mujikaku Seijo wa Kyou mo Muishiki ni Chikara wo Tare Nagasu (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41278636",
+        "name": "The Oblivious Saint Can't Contain Her Power",
+        "source": "https://m.media-amazon.com/images/M/MV5BOTFkZWY4NzgtNjEzNS00YzRhLWE3MmUtZjMzYWFhMTlmODhkXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/mujikaku-seijo-wa-kyou-mo-muishiki-ni-chikara-wo-tare-nagasu.jpg",
+      "page": "https://animed23.com/anime/mujikaku-seijo-wa-kyou-mo-muishiki-ni-chikara-wo-tare-nagasu/",
+      "hidden": false
+    },
+    "mushoku-no-eiyuu-betsu-ni-skill-nanka-iranakatta-n-da-ga": {
+      "slug": "mushoku-no-eiyuu-betsu-ni-skill-nanka-iranakatta-n-da-ga",
+      "title": "Mushoku no Eiyuu: Betsu ni Skill Nanka Iranakatta n da ga (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt32582999",
+        "name": "Hero Without a Class: Who Even Needs Skills?!",
+        "source": "https://m.media-amazon.com/images/M/MV5BMDQ2ZjYyYTktYzI5OS00MWQ2LWFmODQtMDAzMDYyOTliNGEzXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/mushoku-no-eiyuu-betsu-ni-skill-nanka-iranakatta-n-da-ga.jpg",
+      "page": "https://animed23.com/anime/mushoku-no-eiyuu-betsu-ni-skill-nanka-iranakatta-n-da-ga/",
+      "hidden": false
+    },
+    "mushoku-tensei-iii-isekai-ittara-honki-dasu": {
+      "slug": "mushoku-tensei-iii-isekai-ittara-honki-dasu",
+      "title": "Mushoku Tensei III: Isekai Ittara Honki Dasu (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt13293588",
+        "name": "Mushoku Tensei: Jobless Reincarnation",
+        "source": "https://m.media-amazon.com/images/M/MV5BYWQwNjk3MDItNDAxMS00YTQ2LWEyNDctMGYyZTE5OGQxNGQ1XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/mushoku-tensei-iii-isekai-ittara-honki-dasu.jpg",
+      "page": "https://animed23.com/anime/mushoku-tensei-iii-isekai-ittara-honki-dasu/",
+      "hidden": false
+    },
+    "needy-girl-overdose": {
+      "slug": "needy-girl-overdose",
+      "title": "Needy Girl Overdose (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39403976",
+        "name": "Needy Girl Overdose",
+        "source": "https://m.media-amazon.com/images/M/MV5BNGEyNmI5ZDktNDZhNi00ZDIyLWJlMWItODUzYmZjMDgwMWJjXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/needy-girl-overdose.jpg",
+      "page": "https://animed23.com/anime/needy-girl-overdose/",
+      "hidden": false
+    },
+    "neko-to-ryuu": {
+      "slug": "neko-to-ryuu",
+      "title": "Neko to Ryuu (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41278620",
+        "name": "The Cat and the Dragon",
+        "source": "https://m.media-amazon.com/images/M/MV5BMWZjN2E5OTMtMDNhZi00MWI5LTgwYjktNGYwMTJiZmI5NzUwXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/neko-to-ryuu.jpg",
+      "page": "https://animed23.com/anime/neko-to-ryuu/",
+      "hidden": false
+    },
+    "nigashita-sakana-wa-ookikatta-ga-tsuriageta-sakana-ga-ookisugita-ken": {
+      "slug": "nigashita-sakana-wa-ookikatta-ga-tsuriageta-sakana-ga-ookisugita-ken",
+      "title": "Nigashita Sakana wa Ookikatta ga Tsuriageta Sakana ga Ookisugita Ken (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39122552",
+        "name": "Always a Catch!",
+        "source": "https://m.media-amazon.com/images/M/MV5BMDFhMjY4MzMtZDI4ZC00YjJhLWIxMmQtMDJkOTkzNWRhYjVlXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/nigashita-sakana-wa-ookikatta-ga-tsuriageta-sakana-ga-ookisugita-ken.jpg",
+      "page": "https://animed23.com/anime/nigashita-sakana-wa-ookikatta-ga-tsuriageta-sakana-ga-ookisugita-ken/",
+      "hidden": false
+    },
+    "nige-jouzu-no-wakagimi-temporada-2": {
+      "slug": "nige-jouzu-no-wakagimi-temporada-2",
+      "title": "Nige Jouzu no Wakagimi Temporada 2 (2026) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/nige-jouzu-no-wakagimi-temporada-2/",
+      "hidden": false
+    },
+    "nijusseiki-denki-mokuroku-eureka-evrika": {
+      "slug": "nijusseiki-denki-mokuroku-eureka-evrika",
+      "title": "Nijusseiki Denki Mokuroku: Eureka Evrika (2026) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/nijusseiki-denki-mokuroku-eureka-evrika/",
+      "hidden": false
+    },
+    "niwatori-fighter": {
+      "slug": "niwatori-fighter",
+      "title": "Niwatori Fighter (2026) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/niwatori-fighter/",
+      "hidden": false
+    },
+    "odayaka-kizoku-no-kyuuka-no-susume": {
+      "slug": "odayaka-kizoku-no-kyuuka-no-susume",
+      "title": "Odayaka Kizoku no Kyuuka no Susume. (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt36632066",
+        "name": "A Gentle Noble's Vacation Recommendation",
+        "source": "https://m.media-amazon.com/images/M/MV5BODFhMTFhODYtOTQzOS00ODVjLWIxYWEtODMwNTg4N2I3YzI4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/odayaka-kizoku-no-kyuuka-no-susume.jpg",
+      "page": "https://animed23.com/anime/odayaka-kizoku-no-kyuuka-no-susume/",
+      "hidden": false
+    },
+    "okiraku-ryoushu-no-tanoshii-ryouchi-bouei-seisankei-majutsu-de-na-mo-naki-mura-wo-saikyou-no-jousai-toshi-ni": {
+      "slug": "okiraku-ryoushu-no-tanoshii-ryouchi-bouei-seisankei-majutsu-de-na-mo-naki-mura-wo-saikyou-no-jousai-toshi-ni",
+      "title": "Okiraku Ryoushu no Tanoshii Ryouchi Bouei: Seisankei Majutsu de Na mo Naki Mura wo Saikyou no Jousai Toshi ni (2026) Ani",
+      "imdb": {
+        "id": "tt38977386",
+        "name": "Easygoing Territory Defense by the Optimistic Lord: Production Magic Turns a Nameless Village into the Strongest Fortified City",
+        "source": "https://m.media-amazon.com/images/M/MV5BOTRhMmEwMmQtNDllNS00YTE2LTgwMDMtOTJhNzY2ZDkzZTliXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/okiraku-ryoushu-no-tanoshii-ryouchi-bouei-seisankei-majutsu-de-na-mo-naki-mura-wo-saikyou-no-jousai-toshi-ni.jpg",
+      "page": "https://animed23.com/anime/okiraku-ryoushu-no-tanoshii-ryouchi-bouei-seisankei-majutsu-de-na-mo-naki-mura-wo-saikyou-no-jousai-toshi-ni/",
+      "hidden": false
+    },
+    "omae-gotoki-ga-maou-ni-kateru-to-omouna-to-yuusha-party-wo-tsuihou-sareta-node-outo-de-kimama-ni-kurashitai": {
+      "slug": "omae-gotoki-ga-maou-ni-kateru-to-omouna-to-yuusha-party-wo-tsuihou-sareta-node-outo-de-kimama-ni-kurashitai",
+      "title": "\"Omae Gotoki ga Maou ni Kateru to Omouna\" to Yuusha Party wo Tsuihou sareta node, Outo de Kimama ni Kurashitai (2026) An",
+      "imdb": {
+        "id": "tt37901124",
+        "name": "Roll Over and Die",
+        "source": "https://m.media-amazon.com/images/M/MV5BZmE3ZDBiMTgtOWRiYy00YTQzLWIxOGYtYWY2MmY4NDRlZDcwXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/omae-gotoki-ga-maou-ni-kateru-to-omouna-to-yuusha-party-wo-tsuihou-sareta-node-outo-de-kimama-ni-kurashitai.jpg",
+      "page": "https://animed23.com/anime/omae-gotoki-ga-maou-ni-kateru-to-omouna-to-yuusha-party-wo-tsuihou-sareta-node-outo-de-kimama-ni-kurashitai/",
+      "hidden": false
+    },
+    "one-piece": {
+      "slug": "one-piece",
+      "title": "One Piece (1999) Anime Sub Español",
+      "imdb": {
+        "id": "tt0388629",
+        "name": "One Piece",
+        "source": "https://m.media-amazon.com/images/M/MV5BMTNjNGU4NTUtYmVjMy00YjRiLTkxMWUtNzZkMDNiYjZhNmViXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/one-piece.jpg",
+      "page": "https://animed23.com/anime/one-piece/",
+      "hidden": false
+    },
+    "one-piece-arco-de-elbaph": {
+      "slug": "one-piece-arco-de-elbaph",
+      "title": "One Piece: Arco de Elbaph (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt1037116",
+        "name": "One Piece: Episode of Alabasta - The Desert Princess and the Pirates",
+        "source": "https://m.media-amazon.com/images/M/MV5BMTc2MGRkZTgtYmI2My00M2VjLTlmNTItYmJiNTY3ZmNkNTIyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/one-piece-arco-de-elbaph.jpg",
+      "page": "https://animed23.com/anime/one-piece-arco-de-elbaph/",
+      "hidden": false
+    },
+    "one-piece-heroines": {
+      "slug": "one-piece-heroines",
+      "title": "One Piece: Heroines (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41295042",
+        "name": "One Piece: Heroines",
+        "source": "https://m.media-amazon.com/images/M/MV5BOGE0NThiMWUtMzQyNC00MGM4LWEwNTUtM2ZkNDFhMmMxZTU3XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/one-piece-heroines.jpg",
+      "page": "https://animed23.com/anime/one-piece-heroines/",
+      "hidden": false
+    },
+    "one-punch-man-3": {
+      "slug": "one-punch-man-3",
+      "title": "One Punch Man 3 Latino / Sub Español",
+      "imdb": {
+        "id": "tt4508902",
+        "name": "One Punch Man",
+        "source": "https://m.media-amazon.com/images/M/MV5BNzMwOGQ5MWItNzE3My00ZDYyLTk4NzAtZWIyYWI0NTZhYzY0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/one-punch-man-3.jpg",
+      "page": "https://animed23.com/anime/one-punch-man-3/",
+      "hidden": false
+    },
+    "oni-no-hanayome": {
+      "slug": "oni-no-hanayome",
+      "title": "Oni no Hanayome (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39113208",
+        "name": "The Ogre's Bride",
+        "source": "https://m.media-amazon.com/images/M/MV5BYjk2OTJmM2UtYmRhMy00ODkyLTgyNzUtNDFlZTJlZWU0NmQ2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/oni-no-hanayome.jpg",
+      "page": "https://animed23.com/anime/oni-no-hanayome/",
+      "hidden": false
+    },
+    "ookii-onnanoko-wa-suki-desu-ka": {
+      "slug": "ookii-onnanoko-wa-suki-desu-ka",
+      "title": "Ookii Onnanoko wa Suki desu ka? (2026) (Sin Censura) Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/ookii-onnanoko-wa-suki-desu-ka/",
+      "hidden": false
+    },
+    "osananajimi-to-wa-love-comedy-ni-naranai": {
+      "slug": "osananajimi-to-wa-love-comedy-ni-naranai",
+      "title": "Osananajimi to wa Love Comedy ni Naranai (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38253018",
+        "name": "You Can't Be in a Rom-Com with Your Childhood Friends!",
+        "source": "https://m.media-amazon.com/images/M/MV5BYjc3OWJiNzEtODEwNC00Y2UyLTg5YjktNDk2ODBjNTkzOTUzXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/osananajimi-to-wa-love-comedy-ni-naranai.jpg",
+      "page": "https://animed23.com/anime/osananajimi-to-wa-love-comedy-ni-naranai/",
+      "hidden": false
+    },
+    "oshi-no-ko-temporada-3": {
+      "slug": "oshi-no-ko-temporada-3",
+      "title": "[Oshi No Ko] Temporada 3 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt21030032",
+        "name": "Oshi No Ko",
+        "source": "https://m.media-amazon.com/images/M/MV5BYzM3ZGJkN2YtOTQ5Ny00MzEyLTlkMzQtZDVhYzM3YWFlM2QwXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/oshi-no-ko-temporada-3.jpg",
+      "page": "https://animed23.com/anime/oshi-no-ko-temporada-3/",
+      "hidden": false
+    },
+    "otaku-ni-yasashii-gal-wa-inai": {
+      "slug": "otaku-ni-yasashii-gal-wa-inai",
+      "title": "Otaku ni Yasashii Gal wa Inai!? (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39443176",
+        "name": "Gals Can't Be Kind to Otaku!?",
+        "source": "https://m.media-amazon.com/images/M/MV5BOTM0YjAwYjktNmUxYS00YmZlLTg2YjUtM2MyNTU4NWYxZTNmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/otaku-ni-yasashii-gal-wa-inai.jpg",
+      "page": "https://animed23.com/anime/otaku-ni-yasashii-gal-wa-inai/",
+      "hidden": false
+    },
+    "otome-game-sekai-wa-mob-ni-kibishii-sekai-desu-2": {
+      "slug": "otome-game-sekai-wa-mob-ni-kibishii-sekai-desu-2",
+      "title": "Otome Game Sekai wa Mob ni Kibishii Sekai desu 2 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt16255458",
+        "name": "Trapped in a Dating Sim: The World of Otome Games Is Tough for Mobs",
+        "source": "https://m.media-amazon.com/images/M/MV5BNDgxNDRkZDgtMjk2ZC00MGUzLWEwYjUtZDc3YjY0ZTg5NDY0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/otome-game-sekai-wa-mob-ni-kibishii-sekai-desu-2.jpg",
+      "page": "https://animed23.com/anime/otome-game-sekai-wa-mob-ni-kibishii-sekai-desu-2/",
+      "hidden": false
+    },
+    "otome-kaijuu-carameliser": {
+      "slug": "otome-kaijuu-carameliser",
+      "title": "Otome Kaijuu Caraméliser (2026) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/otome-kaijuu-carameliser/",
+      "hidden": false
+    },
+    "otonari-no-tenshi-sama-ni-itsunomanika-dame-ningen-ni-sareteita-ken-temporada-2": {
+      "slug": "otonari-no-tenshi-sama-ni-itsunomanika-dame-ningen-ni-sareteita-ken-temporada-2",
+      "title": "Otonari no Tenshi-sama ni Itsunomanika Dame Ningen ni Sareteita Ken Temporada 2 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt19064770",
+        "name": "The Angel Next Door Spoils Me Rotten",
+        "source": "https://m.media-amazon.com/images/M/MV5BZjAzYzljMmUtYjZhZS00ZGIzLTg5ZTgtMWFmYmVkZGEwODEyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/otonari-no-tenshi-sama-ni-itsunomanika-dame-ningen-ni-sareteita-ken-temporada-2.jpg",
+      "page": "https://animed23.com/anime/otonari-no-tenshi-sama-ni-itsunomanika-dame-ningen-ni-sareteita-ken-temporada-2/",
+      "hidden": false
+    },
+    "perfect-addiction": {
+      "slug": "perfect-addiction",
+      "title": "Perfect Addiction (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt12965390",
+        "name": "Perfect Addiction",
+        "source": "https://m.media-amazon.com/images/M/MV5BOTJiOWI0ZDEtMDA4ZS00YmI5LWE0YmQtNjU0OTkwNzVjMDZhXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/perfect-addiction.jpg",
+      "page": "https://animed23.com/anime/perfect-addiction/",
+      "hidden": false
+    },
+    "ponkotsu-fuuki-iin-to-skirt-take-ga-futekisetsu-na-jk-no-hanashi": {
+      "slug": "ponkotsu-fuuki-iin-to-skirt-take-ga-futekisetsu-na-jk-no-hanashi",
+      "title": "Ponkotsu Fuuki Iin to Skirt-take ga Futekisetsu na JK no Hanashi (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39443960",
+        "name": "The Klutzy Class Monitor and the Girl with the Short Skirt",
+        "source": "https://m.media-amazon.com/images/M/MV5BOGNmOGNlYjktNjVjYS00MmJkLThjYWItNDQ3OGM0ZWJkY2M1XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/ponkotsu-fuuki-iin-to-skirt-take-ga-futekisetsu-na-jk-no-hanashi.jpg",
+      "page": "https://animed23.com/anime/ponkotsu-fuuki-iin-to-skirt-take-ga-futekisetsu-na-jk-no-hanashi/",
+      "hidden": false
+    },
+    "rakudai-kenja-no-gakuin-musou-nidome-no-tensei-s-rank-cheat-majutsushi-boukenroku": {
+      "slug": "rakudai-kenja-no-gakuin-musou-nidome-no-tensei-s-rank-cheat-majutsushi-boukenroku",
+      "title": "Rakudai Kenja no Gakuin Musou: Nidome no Tensei, S-Rank Cheat Majutsushi Boukenroku (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt40550160",
+        "name": "From Overshadowed to Overpowered: Second Reincarnation of a Talentless Sage",
+        "source": "https://m.media-amazon.com/images/M/MV5BNTEzMDdhYzYtOWRlNi00YzIzLWIxZmUtMDFkNGI3ZTIxYmQ0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/rakudai-kenja-no-gakuin-musou-nidome-no-tensei-s-rank-cheat-majutsushi-boukenroku.jpg",
+      "page": "https://animed23.com/anime/rakudai-kenja-no-gakuin-musou-nidome-no-tensei-s-rank-cheat-majutsushi-boukenroku/",
+      "hidden": false
+    },
+    "record-of-ragnarok-shuumatsu-no-walkure-temporada-3-2025": {
+      "slug": "record-of-ragnarok-shuumatsu-no-walkure-temporada-3-2025",
+      "title": "Record of Ragnarok: Shuumatsu no Walküre Temporada 3 (2025) Latino / Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/record-of-ragnarok-shuumatsu-no-walkure-temporada-3-2025/",
+      "hidden": false
+    },
+    "reincarnation-no-kaben": {
+      "slug": "reincarnation-no-kaben",
+      "title": "Reincarnation no Kaben (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38363695",
+        "name": "Petals of Reincarnation",
+        "source": "https://m.media-amazon.com/images/M/MV5BOGEwZDMzNWUtYjQ4OS00OTlhLThmYjAtNzlhZDY0NzBhYzgyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/reincarnation-no-kaben.jpg",
+      "page": "https://animed23.com/anime/reincarnation-no-kaben/",
+      "hidden": false
+    },
+    "reiwa-no-dara-san": {
+      "slug": "reiwa-no-dara-san",
+      "title": "Reiwa no Dara-san (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39195667",
+        "name": "Dara-san of the Reiwa Era",
+        "source": "https://m.media-amazon.com/images/M/MV5BOGViYmM1YzctMWYzNS00ZmNmLTk4OTEtODUzMWE2ZDdjOWRmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/reiwa-no-dara-san.jpg",
+      "page": "https://animed23.com/anime/reiwa-no-dara-san/",
+      "hidden": false
+    },
+    "replica-datte-koi-wo-suru": {
+      "slug": "replica-datte-koi-wo-suru",
+      "title": "Replica datte, Koi wo Suru. (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt22297712",
+        "name": "My Love Story with Yamada-kun at Lv999",
+        "source": "https://m.media-amazon.com/images/M/MV5BOGU4NzQ3YzQtOTU4MC00ZGMzLThlOGMtODMzODg3YzM1Mzg2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/replica-datte-koi-wo-suru.jpg",
+      "page": "https://animed23.com/anime/replica-datte-koi-wo-suru/",
+      "hidden": false
+    },
+    "rezero-kara-hajimeru-isekai-seikatsu": {
+      "slug": "rezero-kara-hajimeru-isekai-seikatsu",
+      "title": "Re:Zero kara Hajimeru Isekai Seikatsu Latino / Sub Español",
+      "imdb": {
+        "id": "tt5607616",
+        "name": "Re: Zero - Starting Life in Another World",
+        "source": "https://m.media-amazon.com/images/M/MV5BNDlmM2M2ZTgtN2RkYi00Nzk1LThkNTQtNzBjMGVjNWIwYjM4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/rezero-kara-hajimeru-isekai-seikatsu.jpg",
+      "page": "https://animed23.com/anime/rezero-kara-hajimeru-isekai-seikatsu/",
+      "hidden": false
+    },
+    "rezero-kara-hajimeru-isekai-seikatsu-temporada-4": {
+      "slug": "rezero-kara-hajimeru-isekai-seikatsu-temporada-4",
+      "title": "Re:Zero kara Hajimeru Isekai Seikatsu Temporada 4 (2026) Latino / Castellano / Sub Español",
+      "imdb": {
+        "id": "tt5607616",
+        "name": "Re: Zero - Starting Life in Another World",
+        "source": "https://m.media-amazon.com/images/M/MV5BNDlmM2M2ZTgtN2RkYi00Nzk1LThkNTQtNzBjMGVjNWIwYjM4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/rezero-kara-hajimeru-isekai-seikatsu-temporada-4.jpg",
+      "page": "https://animed23.com/anime/rezero-kara-hajimeru-isekai-seikatsu-temporada-4/",
+      "hidden": false
+    },
+    "ryoumin-0-nin-start-no-henkyou-ryoushu-sama": {
+      "slug": "ryoumin-0-nin-start-no-henkyou-ryoushu-sama",
+      "title": "Ryoumin 0-nin Start no Henkyou Ryoushu-sama (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41054252",
+        "name": "The Frontier Lord Begins with Zero Subjects",
+        "source": "https://m.media-amazon.com/images/M/MV5BYWI0NGFkMDEtOThjOC00NTQ4LTg4OTMtN2ZkMmMxZmM3OGIyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/ryoumin-0-nin-start-no-henkyou-ryoushu-sama.jpg",
+      "page": "https://animed23.com/anime/ryoumin-0-nin-start-no-henkyou-ryoushu-sama/",
+      "hidden": false
+    },
+    "saigo-ni-hitotsu-dake-onegai-shitemo-yoroshii-deshou-ka": {
+      "slug": "saigo-ni-hitotsu-dake-onegai-shitemo-yoroshii-deshou-ka",
+      "title": "Saigo ni Hitotsu dake Onegai shitemo Yoroshii deshou ka (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt33384856",
+        "name": "May I Ask for One Final Thing?",
+        "source": "https://m.media-amazon.com/images/M/MV5BMDBiNGMzODEtZjRjYi00NTVhLWI3MTItMDU4OWFjODY5YjMyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/saigo-ni-hitotsu-dake-onegai-shitemo-yoroshii-deshou-ka.jpg",
+      "page": "https://animed23.com/anime/saigo-ni-hitotsu-dake-onegai-shitemo-yoroshii-deshou-ka/",
+      "hidden": false
+    },
+    "saijo-no-osewa-takane-no-hanadarake-na-meimonkou-de-gakuin-ichi-no-ojousama-seikatsu-nouryoku-kaimu-wo-kagenagara-osewa-suru-koto-ni-narimashita": {
+      "slug": "saijo-no-osewa-takane-no-hanadarake-na-meimonkou-de-gakuin-ichi-no-ojousama-seikatsu-nouryoku-kaimu-wo-kagenagara-osewa-suru-koto-ni-narimashita",
+      "title": "Saijo no Osewa: Takane no Hanadarake na Meimonkou de, Gakuin Ichi no Ojousama (Seikatsu Nouryoku Kaimu) wo Kagenagara Os",
+      "imdb": {
+        "id": "tt41278600",
+        "name": "Rich Girl Caretaker: I'm Secretly the Caregiver of the Most Popular Girl in This Rich Kid School",
+        "source": "https://m.media-amazon.com/images/M/MV5BYzJiYjIwMGQtMDRlNS00ZTEwLWJjNWQtMzQyNGEzNzEwYjAyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/saijo-no-osewa-takane-no-hanadarake-na-meimonkou-de-gakuin-ichi-no-ojousama-seikatsu-nouryoku-kaimu-wo-kagenagara-osewa-suru-koto-ni-narimashita.jpg",
+      "page": "https://animed23.com/anime/saijo-no-osewa-takane-no-hanadarake-na-meimonkou-de-gakuin-ichi-no-ojousama-seikatsu-nouryoku-kaimu-wo-kagenagara-osewa-suru-koto-ni-narimashita/",
+      "hidden": false
+    },
+    "saikyou-degarashi-ouji-no-anyaku-teii-arasoi": {
+      "slug": "saikyou-degarashi-ouji-no-anyaku-teii-arasoi",
+      "title": "Saikyou Degarashi Ouji no Anyaku Teii Arasoi (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt32862795",
+        "name": "The Insipid Prince's Furtive Grab for the Throne",
+        "source": "https://m.media-amazon.com/images/M/MV5BZDg5OGMwMTctNDY5Zi00MWMxLTk5N2MtZjExZTdlYzdmNjBmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/saikyou-degarashi-ouji-no-anyaku-teii-arasoi.jpg",
+      "page": "https://animed23.com/anime/saikyou-degarashi-ouji-no-anyaku-teii-arasoi/",
+      "hidden": false
+    },
+    "saikyou-no-shokugyou-wa-yuusha-demo-kenja-demo-naku-kanteishi-kari-rashii-desu-yo": {
+      "slug": "saikyou-no-shokugyou-wa-yuusha-demo-kenja-demo-naku-kanteishi-kari-rashii-desu-yo",
+      "title": "Saikyou no Shokugyou wa Yuusha demo Kenja demo Naku Kanteishi (Kari) Rashii desu yo? (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38840807",
+        "name": "The Strongest Job Is Apparently Not a Hero or A Sage, but An Appraiser (provisional)!",
+        "source": "https://m.media-amazon.com/images/M/MV5BZTg1NmQwMjMtNDU1Zi00NGQzLWFiYjYtNmFmMzY2M2U2OWZkXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/saikyou-no-shokugyou-wa-yuusha-demo-kenja-demo-naku-kanteishi-kari-rashii-desu-yo.jpg",
+      "page": "https://animed23.com/anime/saikyou-no-shokugyou-wa-yuusha-demo-kenja-demo-naku-kanteishi-kari-rashii-desu-yo/",
+      "hidden": false
+    },
+    "saioshi-no-gikei-wo-mederu-tame-nagaiki-shimasu": {
+      "slug": "saioshi-no-gikei-wo-mederu-tame-nagaiki-shimasu",
+      "title": "Saioshi no Gikei wo Mederu Tame, Nagaiki shimasu! (2026) Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/saioshi-no-gikei-wo-mederu-tame-nagaiki-shimasu/",
+      "hidden": false
+    },
+    "sanda": {
+      "slug": "sanda",
+      "title": "Sanda (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt35127440",
+        "name": "Sanda",
+        "source": "https://m.media-amazon.com/images/M/MV5BM2M3MmFlYzUtNzBiZi00NDJkLWE3YmYtMzBlY2ZjNDQ1Nzk5XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/sanda.jpg",
+      "page": "https://animed23.com/anime/sanda/",
+      "hidden": false
+    },
+    "sawaranaide-kotesashi-kun": {
+      "slug": "sawaranaide-kotesashi-kun",
+      "title": "Sawaranaide Kotesashi-kun (2025) Sin Censura Anime Sub Español",
+      "imdb": {
+        "id": "tt37431541",
+        "name": "Hands Off: Sawaranaide Kotesashi-kun",
+        "source": "https://m.media-amazon.com/images/M/MV5BY2IyMWZkYTEtZTFlYy00Y2NhLTlkMTMtMDNiNTU3NzhjNzM2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/sawaranaide-kotesashi-kun.jpg",
+      "page": "https://animed23.com/anime/sawaranaide-kotesashi-kun/",
+      "hidden": false
+    },
+    "sayonara-lara": {
+      "slug": "sayonara-lara",
+      "title": "Sayonara Lara (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38049145",
+        "name": "Goodbye, Lara",
+        "source": "https://m.media-amazon.com/images/M/MV5BOTkwOTUyYWEtZTZjYi00ZGRhLTk5MzAtODY4YzE4MjgxNTRhXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/sayonara-lara.jpg",
+      "page": "https://animed23.com/anime/sayonara-lara/",
+      "hidden": false
+    },
+    "seihantai-na-kimi-to-boku": {
+      "slug": "seihantai-na-kimi-to-boku",
+      "title": "Seihantai na Kimi to Boku (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt36034547",
+        "name": "You and I Are Polar Opposites",
+        "source": "https://m.media-amazon.com/images/M/MV5BMmY0YjhhMDYtMDdlMS00MjhjLWJlMWYtMzE2MTI4YjVlYTE0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/seihantai-na-kimi-to-boku.jpg",
+      "page": "https://animed23.com/anime/seihantai-na-kimi-to-boku/",
+      "hidden": false
+    },
+    "seihantai-na-kimi-to-boku-temporada-2": {
+      "slug": "seihantai-na-kimi-to-boku-temporada-2",
+      "title": "Seihantai na Kimi to Boku Temporada 2 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt36034547",
+        "name": "You and I Are Polar Opposites",
+        "source": "https://m.media-amazon.com/images/M/MV5BMmY0YjhhMDYtMDdlMS00MjhjLWJlMWYtMzE2MTI4YjVlYTE0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/seihantai-na-kimi-to-boku-temporada-2.jpg",
+      "page": "https://animed23.com/anime/seihantai-na-kimi-to-boku-temporada-2/",
+      "hidden": false
+    },
+    "sekai-saikyou-no-kouei-meikyuukoku-no-shinjin-tansakusha": {
+      "slug": "sekai-saikyou-no-kouei-meikyuukoku-no-shinjin-tansakusha",
+      "title": "Sekai Saikyou no Kouei: Meikyuukoku no Shinjin Tansakusha (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41293112",
+        "name": "Sekai Saikyou no Kouei: Meikyuukoku no Shinjin Tansakusha",
+        "source": "https://m.media-amazon.com/images/M/MV5BZTliNzUyOGUtMDdiMi00OWZmLTk1YWUtMmVjZmJhZTNjYTdhXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/sekai-saikyou-no-kouei-meikyuukoku-no-shinjin-tansakusha.jpg",
+      "page": "https://animed23.com/anime/sekai-saikyou-no-kouei-meikyuukoku-no-shinjin-tansakusha/",
+      "hidden": false
+    },
+    "shibou-yuugi-de-meshi-wo-kuu": {
+      "slug": "shibou-yuugi-de-meshi-wo-kuu",
+      "title": "Shibou Yuugi de Meshi wo Kuu. (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt33309549",
+        "name": "Shiboyugi: Playing Death Games to Put Food on the Table",
+        "source": "https://m.media-amazon.com/images/M/MV5BODMyYzljNmUtZmNlYy00YTAyLTlhNGQtMDBhYzgzYzA1OGMwXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/shibou-yuugi-de-meshi-wo-kuu.jpg",
+      "page": "https://animed23.com/anime/shibou-yuugi-de-meshi-wo-kuu/",
+      "hidden": false
+    },
+    "shibou-yuugi-de-meshi-wo-kuu-44-cloudy-beach": {
+      "slug": "shibou-yuugi-de-meshi-wo-kuu-44-cloudy-beach",
+      "title": "Shibou Yuugi de Meshi wo Kuu. 44: Cloudy Beach (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt33309549",
+        "name": "Shiboyugi: Playing Death Games to Put Food on the Table",
+        "source": "https://m.media-amazon.com/images/M/MV5BODMyYzljNmUtZmNlYy00YTAyLTlhNGQtMDBhYzgzYzA1OGMwXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/shibou-yuugi-de-meshi-wo-kuu-44-cloudy-beach.jpg",
+      "page": "https://animed23.com/anime/shibou-yuugi-de-meshi-wo-kuu-44-cloudy-beach/",
+      "hidden": false
+    },
+    "shunkashuutou-daikousha-haru-no-mai": {
+      "slug": "shunkashuutou-daikousha-haru-no-mai",
+      "title": "Shunkashuutou Daikousha: Haru no Mai (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39267868",
+        "name": "Agents of the Four Seasons: Dance of Spring",
+        "source": "https://m.media-amazon.com/images/M/MV5BODE2NjU5ZjItNThkMC00ZDAzLTlmZDgtYTAyZDEwMjA0N2FmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/shunkashuutou-daikousha-haru-no-mai.jpg",
+      "page": "https://animed23.com/anime/shunkashuutou-daikousha-haru-no-mai/",
+      "hidden": false
+    },
+    "snowball-earth": {
+      "slug": "snowball-earth",
+      "title": "Snowball Earth (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39229727",
+        "name": "Snowball Earth",
+        "source": "https://m.media-amazon.com/images/M/MV5BYTI0ZDNjNjUtNzMxOS00MWM3LTgzNzEtNDA4MWZjYjNkNjVmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/snowball-earth.jpg",
+      "page": "https://animed23.com/anime/snowball-earth/",
+      "hidden": false
+    },
+    "sora-wa-akai-kawa-no-hotori-red-river": {
+      "slug": "sora-wa-akai-kawa-no-hotori-red-river",
+      "title": "Sora wa Akai Kawa no Hotori (Red River) (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41278592",
+        "name": "Red River",
+        "source": "https://m.media-amazon.com/images/M/MV5BNzUyMDcyYmMtMWJmNy00YjI4LWIxM2YtZTFmMjdhZTE4ODQ2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/sora-wa-akai-kawa-no-hotori-red-river.jpg",
+      "page": "https://animed23.com/anime/sora-wa-akai-kawa-no-hotori-red-river/",
+      "hidden": false
+    },
+    "sousou-no-frieren": {
+      "slug": "sousou-no-frieren",
+      "title": "Sousou no Frieren (2023) Latino / Castellano / Sub Español",
+      "imdb": {
+        "id": "tt22248376",
+        "name": "Frieren: Beyond Journey's End",
+        "source": "https://m.media-amazon.com/images/M/MV5BZTI4ZGMxN2UtODlkYS00MTBjLWE1YzctYzc3NDViMGI0ZmJmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/sousou-no-frieren.jpg",
+      "page": "https://animed23.com/anime/sousou-no-frieren/",
+      "hidden": false
+    },
+    "sousou-no-frieren-temporada-2": {
+      "slug": "sousou-no-frieren-temporada-2",
+      "title": "Sousou no Frieren Temporada 2 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt22248376",
+        "name": "Frieren: Beyond Journey's End",
+        "source": "https://m.media-amazon.com/images/M/MV5BZTI4ZGMxN2UtODlkYS00MTBjLWE1YzctYzc3NDViMGI0ZmJmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/sousou-no-frieren-temporada-2.jpg",
+      "page": "https://animed23.com/anime/sousou-no-frieren-temporada-2/",
+      "hidden": false
+    },
+    "sozai-saishuka-no-isekai-ryokouki": {
+      "slug": "sozai-saishuka-no-isekai-ryokouki",
+      "title": "Sozai Saishuka no Isekai Ryokouki (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt37038599",
+        "name": "Sozai Saishuka no Isekai Ryokouki",
+        "source": "https://m.media-amazon.com/images/M/MV5BOTUzNWFjZWItYjM5Zi00YTEzLThiNTUtYTM5YTdjNjhjOTY2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/sozai-saishuka-no-isekai-ryokouki.jpg",
+      "page": "https://animed23.com/anime/sozai-saishuka-no-isekai-ryokouki/",
+      "hidden": false
+    },
+    "spy-x-family-temporada-3": {
+      "slug": "spy-x-family-temporada-3",
+      "title": "Spy x Family Temporada 3 (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt13706018",
+        "name": "Spy x Family",
+        "source": "https://m.media-amazon.com/images/M/MV5BZDkwNjc0NWEtNzJlOC00N2YwLTk4MjktZGFlZDE2Y2QzOWI0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/spy-x-family-temporada-3.jpg",
+      "page": "https://animed23.com/anime/spy-x-family-temporada-3/",
+      "hidden": false
+    },
+    "steel-ball-run-jojo-no-kimyou-na-bouken-2026": {
+      "slug": "steel-ball-run-jojo-no-kimyou-na-bouken-2026",
+      "title": "Steel Ball Run: JoJo no Kimyou na Bouken (2026) Anime Latino / Castellano / Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/steel-ball-run-jojo-no-kimyou-na-bouken-2026/",
+      "hidden": false
+    },
+    "super-no-ura-de-yani-suu-futari": {
+      "slug": "super-no-ura-de-yani-suu-futari",
+      "title": "Super no Ura de Yani Suu Futari (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt37614297",
+        "name": "Smoking Behind the Supermarket with You",
+        "source": "https://m.media-amazon.com/images/M/MV5BMmQyMTI2NGYtMmQzMi00YTU3LWJmZmEtYjdlMjdjODMyMTlmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/super-no-ura-de-yani-suu-futari.jpg",
+      "page": "https://animed23.com/anime/super-no-ura-de-yani-suu-futari/",
+      "hidden": false
+    },
+    "suterare-seijo-no-isekai-gohan-tabi-kakure-skill-de-camping-car-wo-shoukan-shimashita": {
+      "slug": "suterare-seijo-no-isekai-gohan-tabi-kakure-skill-de-camping-car-wo-shoukan-shimashita",
+      "title": "Suterare Seijo no Isekai Gohan Tabi: Kakure Skill de Camping Car wo Shoukan shimashita (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41095208",
+        "name": "The Forsaken Saintess and Her Foodie Roadtrip in Another World",
+        "source": "https://m.media-amazon.com/images/M/MV5BZDliMGFhODMtZGVkYi00ZjAyLTg1ZjMtNDVjNjAxNjE3OTI0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/suterare-seijo-no-isekai-gohan-tabi-kakure-skill-de-camping-car-wo-shoukan-shimashita.jpg",
+      "page": "https://animed23.com/anime/suterare-seijo-no-isekai-gohan-tabi-kakure-skill-de-camping-car-wo-shoukan-shimashita/",
+      "hidden": false
+    },
+    "sword-art-online-unanswered-butterfly": {
+      "slug": "sword-art-online-unanswered-butterfly",
+      "title": "Sword Art Online: Unanswered//butterfly (2026) Película Anime Sub Español",
+      "imdb": {},
+      "poster": "",
+      "page": "https://animed23.com/anime/sword-art-online-unanswered-butterfly/",
+      "hidden": false
+    },
+    "tadaima-ojamasaremasu": {
+      "slug": "tadaima-ojamasaremasu",
+      "title": "Tadaima, Ojamasaremasu! (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt40548626",
+        "name": "Pardon the Intrusion, I'm Home!",
+        "source": "https://m.media-amazon.com/images/M/MV5BOGI3NmVkOTMtNzE1ZS00Mjg2LWFkNDAtNTZmMDgzOWFjOTI4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tadaima-ojamasaremasu.jpg",
+      "page": "https://animed23.com/anime/tadaima-ojamasaremasu/",
+      "hidden": false
+    },
+    "tai-ari-deshita-ojousama-wa-kakutou-game-nante-shinai": {
+      "slug": "tai-ari-deshita-ojousama-wa-kakutou-game-nante-shinai",
+      "title": "Tai-Ari deshita. Ojousama wa Kakutou Game nante Shinai (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt37015024",
+        "name": "Young Ladies Don't Play Fighting Games",
+        "source": "https://m.media-amazon.com/images/M/MV5BZTMyOTgxYjAtZmZhMS00MWU1LTk0MTYtMzQ4MjFiY2RlYTRlXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tai-ari-deshita-ojousama-wa-kakutou-game-nante-shinai.jpg",
+      "page": "https://animed23.com/anime/tai-ari-deshita-ojousama-wa-kakutou-game-nante-shinai/",
+      "hidden": false
+    },
+    "tamon-kun-ima-docchi": {
+      "slug": "tamon-kun-ima-docchi",
+      "title": "Tamon-kun Ima Docchi!? (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt37532722",
+        "name": "Tamon's B-Side",
+        "source": "https://m.media-amazon.com/images/M/MV5BYmNlOTFkMzMtYjg4Mi00MTE5LTk3MDktMTU2NTBiZGM3ZTQxXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tamon-kun-ima-docchi.jpg",
+      "page": "https://animed23.com/anime/tamon-kun-ima-docchi/",
+      "hidden": false
+    },
+    "tefuda-ga-oome-no-victoria": {
+      "slug": "tefuda-ga-oome-no-victoria",
+      "title": "Tefuda ga Oome no Victoria (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38273525",
+        "name": "Victoria of Many Faces",
+        "source": "https://m.media-amazon.com/images/M/MV5BMTdmNGE1NjAtZGIwMy00MTVmLTg5NmEtNDc5Zjk1Yzg2NWJkXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tefuda-ga-oome-no-victoria.jpg",
+      "page": "https://animed23.com/anime/tefuda-ga-oome-no-victoria/",
+      "hidden": false
+    },
+    "tenkou-saki-no-seiso-karen-na-bishoujo-ga-mukashi-danshi-to-omotte-issho-ni-asonda-osananajimi-datta-ken": {
+      "slug": "tenkou-saki-no-seiso-karen-na-bishoujo-ga-mukashi-danshi-to-omotte-issho-ni-asonda-osananajimi-datta-ken",
+      "title": "Tenkou-saki no Seiso Karen na Bishoujo ga, Mukashi Danshi to Omotte Issho ni Asonda Osananajimi Datta Ken (2026) Anime S",
+      "imdb": {
+        "id": "tt41278615",
+        "name": "Oh Boy, Was I Wrong About Her",
+        "source": "https://m.media-amazon.com/images/M/MV5BZjUyYzg4YTAtZTdkNC00YjFkLWEwODUtOTkxZjA1MDEyZDhmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tenkou-saki-no-seiso-karen-na-bishoujo-ga-mukashi-danshi-to-omotte-issho-ni-asonda-osananajimi-datta-ken.jpg",
+      "page": "https://animed23.com/anime/tenkou-saki-no-seiso-karen-na-bishoujo-ga-mukashi-danshi-to-omotte-issho-ni-asonda-osananajimi-datta-ken/",
+      "hidden": false
+    },
+    "tenmaku-no-jaadugar": {
+      "slug": "tenmaku-no-jaadugar",
+      "title": "Tenmaku no Jaadugar (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39281887",
+        "name": "Jaadugar: A Witch in Mongolia",
+        "source": "https://m.media-amazon.com/images/M/MV5BZWUyYTZmNjEtNzNjOS00NDIzLWE2OWQtMjI3OTNlZGRjNTYyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tenmaku-no-jaadugar.jpg",
+      "page": "https://animed23.com/anime/tenmaku-no-jaadugar/",
+      "hidden": false
+    },
+    "tensei-shitara-dragon-no-tamago-datta": {
+      "slug": "tensei-shitara-dragon-no-tamago-datta",
+      "title": "Tensei shitara Dragon no Tamago datta (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38940229",
+        "name": "Reincarnated as a Dragon Hatchling",
+        "source": "https://m.media-amazon.com/images/M/MV5BNGUzYjViMDEtYjY3NC00MTdjLWE0OWMtZGQxYWJkMjgwZTI1XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tensei-shitara-dragon-no-tamago-datta.jpg",
+      "page": "https://animed23.com/anime/tensei-shitara-dragon-no-tamago-datta/",
+      "hidden": false
+    },
+    "tensei-shitara-slime-datta-ken-movie-2-soukai-no-namida-hen": {
+      "slug": "tensei-shitara-slime-datta-ken-movie-2-soukai-no-namida-hen",
+      "title": "Tensei shitara Slime Datta Ken Movie 2: Soukai no Namida-hen (2026) Película Sub Español",
+      "imdb": {
+        "id": "tt38650409",
+        "name": "That Time I Got Reincarnated as a Slime the Movie: Tears of the Azure Sea",
+        "source": "https://m.media-amazon.com/images/M/MV5BYzdlYTUxMTgtNTAyYi00ZjcwLWIzOTctOTU0MTQzNjIwOTYyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tensei-shitara-slime-datta-ken-movie-2-soukai-no-namida-hen.jpg",
+      "page": "https://animed23.com/anime/tensei-shitara-slime-datta-ken-movie-2-soukai-no-namida-hen/",
+      "hidden": false
+    },
+    "tensei-shitara-slime-datta-ken-temporada-4": {
+      "slug": "tensei-shitara-slime-datta-ken-temporada-4",
+      "title": "Tensei shitara Slime Datta Ken Temporada 4 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt14408130",
+        "name": "The Slime Diaries: That Time I Got Reincarnated as a Slime",
+        "source": "https://m.media-amazon.com/images/M/MV5BZGUwNDhlZTktMTQ3NS00MGEyLTgyYjktZGU0ZDk0MzA1OTRhXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tensei-shitara-slime-datta-ken-temporada-4.jpg",
+      "page": "https://animed23.com/anime/tensei-shitara-slime-datta-ken-temporada-4/",
+      "hidden": false
+    },
+    "terror-man": {
+      "slug": "terror-man",
+      "title": "Terror Man (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt37970543",
+        "name": "Terror Man",
+        "source": "https://m.media-amazon.com/images/M/MV5BNzYwNTVkOTctMTVhYy00NGU3LTkyNjktNmY2MDVkNWJmNTMyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/terror-man.jpg",
+      "page": "https://animed23.com/anime/terror-man/",
+      "hidden": false
+    },
+    "tetsunabe-no-jan": {
+      "slug": "tetsunabe-no-jan",
+      "title": "Tetsunabe no Jan! (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt42963873",
+        "name": "Iron Wok Jan!",
+        "source": "https://m.media-amazon.com/images/M/MV5BMGNhZDNjMjctOGZjMy00ODE2LWI0OWItM2NjZTk0YTY1YjUwXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tetsunabe-no-jan.jpg",
+      "page": "https://animed23.com/anime/tetsunabe-no-jan/",
+      "hidden": false
+    },
+    "the-beginning-after-the-end-temporada-2": {
+      "slug": "the-beginning-after-the-end-temporada-2",
+      "title": "The Beginning After the End Temporada 2 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt34119820",
+        "name": "The Beginning After the End",
+        "source": "https://m.media-amazon.com/images/M/MV5BYzEyZmYzNjctODRmMi00N2NlLWI1MmEtMjM3NzY2OTU5ZWE0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/the-beginning-after-the-end-temporada-2.jpg",
+      "page": "https://animed23.com/anime/the-beginning-after-the-end-temporada-2/",
+      "hidden": false
+    },
+    "the-daily-life-of-the-immortal-king": {
+      "slug": "the-daily-life-of-the-immortal-king",
+      "title": "The Daily Life of the Immortal King (Audio Japonés) (2025) Sub Español",
+      "imdb": {
+        "id": "tt11755260",
+        "name": "The Daily Life of the Immortal King",
+        "source": "https://m.media-amazon.com/images/M/MV5BYTU2NGRmNTQtYTcyZi00OTNlLTgxMzEtZjRiZjUyNGRhYTM5XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/the-daily-life-of-the-immortal-king.jpg",
+      "page": "https://animed23.com/anime/the-daily-life-of-the-immortal-king/",
+      "hidden": false
+    },
+    "the-daily-life-of-the-immortal-king-temporada-5": {
+      "slug": "the-daily-life-of-the-immortal-king-temporada-5",
+      "title": "The Daily Life of the Immortal King Temporada 5 (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt11755260",
+        "name": "The Daily Life of the Immortal King",
+        "source": "https://m.media-amazon.com/images/M/MV5BYTU2NGRmNTQtYTcyZi00OTNlLTgxMzEtZjRiZjUyNGRhYTM5XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/the-daily-life-of-the-immortal-king-temporada-5.jpg",
+      "page": "https://animed23.com/anime/the-daily-life-of-the-immortal-king-temporada-5/",
+      "hidden": false
+    },
+    "the-fated-magical-princess-who-made-me-a-princess": {
+      "slug": "the-fated-magical-princess-who-made-me-a-princess",
+      "title": "The Fated Magical Princess: Who Made Me a Princess (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt38353703",
+        "name": "The Fated Magical Princess: Who Made Me a Princess",
+        "source": "https://m.media-amazon.com/images/M/MV5BMDZlZDkzMjEtMGRhMi00MzA3LWE4NzYtZTlhZWZjMTk1NTU0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/the-fated-magical-princess-who-made-me-a-princess.jpg",
+      "page": "https://animed23.com/anime/the-fated-magical-princess-who-made-me-a-princess/",
+      "hidden": false
+    },
+    "the-ribbon-hero": {
+      "slug": "the-ribbon-hero",
+      "title": "The Ribbon Hero (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt42186253",
+        "name": "The Ribbon Hero",
+        "source": "https://m.media-amazon.com/images/M/MV5BNDFjZmVlMGMtMzFlMi00MjdjLWFiYWMtMjYwZmRjYWQ4YjI3XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/the-ribbon-hero.jpg",
+      "page": "https://animed23.com/anime/the-ribbon-hero/",
+      "hidden": false
+    },
+    "to-be-winner-cheng-ye-xiao-he-2026": {
+      "slug": "to-be-winner-cheng-ye-xiao-he-2026",
+      "title": "To Be Winner (Cheng Ye Xiao He) (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt6448170",
+        "name": "New Happy Dad and Son 2: The Instant Genius",
+        "source": "https://m.media-amazon.com/images/M/MV5BY2M0MTNiODUtOGI3MC00NGQ3LWJiNGEtMDFkMGIzMDAyZjM0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/to-be-winner-cheng-ye-xiao-he-2026.jpg",
+      "page": "https://animed23.com/anime/to-be-winner-cheng-ye-xiao-he-2026/",
+      "hidden": false
+    },
+    "tomb-raider-king": {
+      "slug": "tomb-raider-king",
+      "title": "Tomb Raider King (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt32869308",
+        "name": "Tomb Raider King",
+        "source": "https://m.media-amazon.com/images/M/MV5BNWQ4NDk2MDktMTZmOS00ZGQ0LTg5ZDUtZTRkNThmZjk0MWZjXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tomb-raider-king.jpg",
+      "page": "https://animed23.com/anime/tomb-raider-king/",
+      "hidden": false
+    },
+    "tomodachi-no-imouto-ga-ore-ni-dake-uzai": {
+      "slug": "tomodachi-no-imouto-ga-ore-ni-dake-uzai",
+      "title": "Tomodachi no Imouto ga Ore ni dake Uzai (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt32742508",
+        "name": "My Friend's Little Sister Has It in for Me!",
+        "source": "https://m.media-amazon.com/images/M/MV5BOWY5OWNlMDQtMDAwNi00ZGFjLWJhOGYtN2EyNjc3Y2QyZmE5XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tomodachi-no-imouto-ga-ore-ni-dake-uzai.jpg",
+      "page": "https://animed23.com/anime/tomodachi-no-imouto-ga-ore-ni-dake-uzai/",
+      "hidden": false
+    },
+    "tondemo-skill-de-isekai-hourou-meshi-temporada-2": {
+      "slug": "tondemo-skill-de-isekai-hourou-meshi-temporada-2",
+      "title": "Tondemo Skill de Isekai Hourou Meshi Temporada 2 (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt24229160",
+        "name": "Campfire Cooking in Another World with My Absurd Skill",
+        "source": "https://m.media-amazon.com/images/M/MV5BZjIyMzY0MDQtOThjZS00ZWNkLWI3ODgtZTY1OWJhYWU2MjZiXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tondemo-skill-de-isekai-hourou-meshi-temporada-2.jpg",
+      "page": "https://animed23.com/anime/tondemo-skill-de-isekai-hourou-meshi-temporada-2/",
+      "hidden": false
+    },
+    "tongari-boushi-no-atelier": {
+      "slug": "tongari-boushi-no-atelier",
+      "title": "Tongari Boushi no Atelier (2026) Latino / Castellano / Sub Español",
+      "imdb": {
+        "id": "tt32550889",
+        "name": "Witch Hat Atelier",
+        "source": "https://m.media-amazon.com/images/M/MV5BZjQ2NGVmNzEtODg3Mi00MmViLTkzNGYtNWExNGEzNmNkOGYwXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tongari-boushi-no-atelier.jpg",
+      "page": "https://animed23.com/anime/tongari-boushi-no-atelier/",
+      "hidden": false
+    },
+    "tougen-anki": {
+      "slug": "tougen-anki",
+      "title": "Tougen Anki (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt32344704",
+        "name": "Tougen Anki: Dark Demon of Paradise",
+        "source": "https://m.media-amazon.com/images/M/MV5BMzE5MDU3YjMtZjk5Yi00YTFlLThmMGQtOGI2ODZlNzJlMTg2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tougen-anki.jpg",
+      "page": "https://animed23.com/anime/tougen-anki/",
+      "hidden": false
+    },
+    "toumei-na-yoru-ni-kakeru-kimi-to-me-ni-mienai-koi-wo-shita": {
+      "slug": "toumei-na-yoru-ni-kakeru-kimi-to-me-ni-mienai-koi-wo-shita",
+      "title": "Toumei na Yoru ni Kakeru Kimi to, Me ni Mienai Koi wo Shita. (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39304754",
+        "name": "Love Unseen Beneath the Clear Night Sky",
+        "source": "https://m.media-amazon.com/images/M/MV5BNzIwNmYxMmUtMzA0Zi00NmE4LTk4NDEtMWFkOGM0MzJiYjczXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/toumei-na-yoru-ni-kakeru-kimi-to-me-ni-mienai-koi-wo-shita.jpg",
+      "page": "https://animed23.com/anime/toumei-na-yoru-ni-kakeru-kimi-to-me-ni-mienai-koi-wo-shita/",
+      "hidden": false
+    },
+    "toumei-otoko-to-ningen-onna-sonouchi-fuufu-ni-naru-futari": {
+      "slug": "toumei-otoko-to-ningen-onna-sonouchi-fuufu-ni-naru-futari",
+      "title": "Toumei Otoko to Ningen Onna: Sonouchi Fuufu ni Naru Futari (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38647911",
+        "name": "The Invisible Man and His Soon-to-Be Wife",
+        "source": "https://m.media-amazon.com/images/M/MV5BNjA0OTFkMjktYzMxYi00ZGNlLWFhNzYtZWE1ZjQyOTZjNTJiXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/toumei-otoko-to-ningen-onna-sonouchi-fuufu-ni-naru-futari.jpg",
+      "page": "https://animed23.com/anime/toumei-otoko-to-ningen-onna-sonouchi-fuufu-ni-naru-futari/",
+      "hidden": false
+    },
+    "towa-no-yuugure": {
+      "slug": "towa-no-yuugure",
+      "title": "Towa no Yuugure (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt37532634",
+        "name": "Dusk Beyond the End of the World",
+        "source": "https://m.media-amazon.com/images/M/MV5BNTExYmZmZWEtMzNiOS00YjUwLWE5OTMtZjRiZjFmOTcxNzQ2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/towa-no-yuugure.jpg",
+      "page": "https://animed23.com/anime/towa-no-yuugure/",
+      "hidden": false
+    },
+    "trigun-stargaze": {
+      "slug": "trigun-stargaze",
+      "title": "Trigun Stargaze (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt36294552",
+        "name": "Trigun Stargaze",
+        "source": "https://m.media-amazon.com/images/M/MV5BNDg0ODE4MTgtYWU0Ni00NTQwLTkwNzQtYzZmYjQxMzg2NzdlXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/trigun-stargaze.jpg",
+      "page": "https://animed23.com/anime/trigun-stargaze/",
+      "hidden": false
+    },
+    "tsue-to-tsurugi-no-wistoria-temporada-2": {
+      "slug": "tsue-to-tsurugi-no-wistoria-temporada-2",
+      "title": "Tsue to Tsurugi no Wistoria Temporada 2 Anime Sub Español",
+      "imdb": {
+        "id": "tt31889371",
+        "name": "Wistoria: Wand and Sword",
+        "source": "https://m.media-amazon.com/images/M/MV5BNWU1OTgxYTMtZTViMy00MmU0LTg2ZGMtZDVkYTNlYzI4NWRjXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tsue-to-tsurugi-no-wistoria-temporada-2.jpg",
+      "page": "https://animed23.com/anime/tsue-to-tsurugi-no-wistoria-temporada-2/",
+      "hidden": false
+    },
+    "tsuihou-sareta-tensei-juukishi-wa-game-chishiki-de-musou-suru": {
+      "slug": "tsuihou-sareta-tensei-juukishi-wa-game-chishiki-de-musou-suru",
+      "title": "Tsuihou sareta Tensei Juukishi wa Game Chishiki de Musou suru (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt33334216",
+        "name": "The Exiled Heavy Knight Knows How to Game the System",
+        "source": "https://m.media-amazon.com/images/M/MV5BYjYyMmQwNDQtN2RmMC00OWVlLWFiYzItOGRiZWJlMzg4Mjg1XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/tsuihou-sareta-tensei-juukishi-wa-game-chishiki-de-musou-suru.jpg",
+      "page": "https://animed23.com/anime/tsuihou-sareta-tensei-juukishi-wa-game-chishiki-de-musou-suru/",
+      "hidden": false
+    },
+    "uchi-no-otouto-domo-ga-sumimasen": {
+      "slug": "uchi-no-otouto-domo-ga-sumimasen",
+      "title": "Uchi no Otouto-domo ga Sumimasen (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt41293320",
+        "name": "Please Excuse My Younger Brothers",
+        "source": "https://m.media-amazon.com/images/M/MV5BMjc2NGUxNmQtZDU2OC00NjM3LTgwZmUtMmJkNGFlYTEzZGUwXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/uchi-no-otouto-domo-ga-sumimasen.jpg",
+      "page": "https://animed23.com/anime/uchi-no-otouto-domo-ga-sumimasen/",
+      "hidden": false
+    },
+    "under-the-gate": {
+      "slug": "under-the-gate",
+      "title": "UNDER THE GATE (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt0043086",
+        "name": "Under the Gun",
+        "source": "https://m.media-amazon.com/images/M/MV5BMmFmMmY3OTgtNGU5Yi00YjE4LTg0ZTAtYmI3MjBkMGIxY2JjXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/under-the-gate.jpg",
+      "page": "https://animed23.com/anime/under-the-gate/",
+      "hidden": false
+    },
+    "uruwashi-no-yoi-no-tsuki": {
+      "slug": "uruwashi-no-yoi-no-tsuki",
+      "title": "Uruwashi no Yoi no Tsuki (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt37246098",
+        "name": "In the Clear Moonlit Dusk",
+        "source": "https://m.media-amazon.com/images/M/MV5BYjA2NzA1OTEtYWZmYy00OTJlLWJhNDEtNDNiNDUxYTUxYjY5XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/uruwashi-no-yoi-no-tsuki.jpg",
+      "page": "https://animed23.com/anime/uruwashi-no-yoi-no-tsuki/",
+      "hidden": false
+    },
+    "ushiro-no-shoumen-kamui-san": {
+      "slug": "ushiro-no-shoumen-kamui-san",
+      "title": "Ushiro no Shoumen Kamui-san (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt42969298",
+        "name": "Kamui: He's Behind You",
+        "source": "https://m.media-amazon.com/images/M/MV5BNmIwMTA4NGQtNzA2My00YTZjLWI3NmYtYTIwMzBhZmI1MTdhXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/ushiro-no-shoumen-kamui-san.jpg",
+      "page": "https://animed23.com/anime/ushiro-no-shoumen-kamui-san/",
+      "hidden": false
+    },
+    "vigilante-boku-no-hero-academia-illegals-temporada-2": {
+      "slug": "vigilante-boku-no-hero-academia-illegals-temporada-2",
+      "title": "Vigilante: Boku no Hero Academia Illegals Temporada 2 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt35636246",
+        "name": "My Hero Academia: Vigilantes",
+        "source": "https://m.media-amazon.com/images/M/MV5BOTQzMzIwOGQtMmMzYi00ZjllLWE3OTEtZjIyOGY4ZDBmNmUxXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/vigilante-boku-no-hero-academia-illegals-temporada-2.jpg",
+      "page": "https://animed23.com/anime/vigilante-boku-no-hero-academia-illegals-temporada-2/",
+      "hidden": false
+    },
+    "watari-kun-no-xx-ga-houkai-sunzen": {
+      "slug": "watari-kun-no-xx-ga-houkai-sunzen",
+      "title": "Watari-kun no xx ga Houkai Sunzen Anime Sub Español",
+      "imdb": {
+        "id": "tt32535912",
+        "name": "Watari-kun's ****** Is About to Collapse",
+        "source": "https://m.media-amazon.com/images/M/MV5BMzQ2ZGZiNDEtYTE4Zi00MGUxLTg2NWYtYmFjYWMyMmZmZjg0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/watari-kun-no-xx-ga-houkai-sunzen.jpg",
+      "page": "https://animed23.com/anime/watari-kun-no-xx-ga-houkai-sunzen/",
+      "hidden": false
+    },
+    "yani-neko": {
+      "slug": "yani-neko",
+      "title": "Yani Neko (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt39551330",
+        "name": "Chainsmoker Cat",
+        "source": "https://m.media-amazon.com/images/M/MV5BZTY5MzFmMzYtZjBhNS00ZGU5LTgzZWEtZWZmNDU2MDIwOThkXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/yani-neko.jpg",
+      "page": "https://animed23.com/anime/yani-neko/",
+      "hidden": false
+    },
+    "yasei-no-last-boss-ga-arawareta": {
+      "slug": "yasei-no-last-boss-ga-arawareta",
+      "title": "Yasei no Last Boss ga Arawareta! (2025) Anime Sub Español",
+      "imdb": {
+        "id": "tt33258199",
+        "name": "A Wild Last Boss Appeared!",
+        "source": "https://m.media-amazon.com/images/M/MV5BOTIzYjNkNDQtMDhmNi00ZjFkLTg1NzktMDY1NmFmMWM5ZjRkXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/yasei-no-last-boss-ga-arawareta.jpg",
+      "page": "https://animed23.com/anime/yasei-no-last-boss-ga-arawareta/",
+      "hidden": false
+    },
+    "yomi-no-tsugai": {
+      "slug": "yomi-no-tsugai",
+      "title": "Yomi no Tsugai Anime Sub Español",
+      "imdb": {
+        "id": "tt37532356",
+        "name": "Daemons of the Shadow Realm",
+        "source": "https://m.media-amazon.com/images/M/MV5BOWRlZDA5YjUtNjk3MC00YjRkLWEyYTUtM2ExYWUwNDRlN2UxXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/yomi-no-tsugai.jpg",
+      "page": "https://animed23.com/anime/yomi-no-tsugai/",
+      "hidden": false
+    },
+    "youjo-senki-ii": {
+      "slug": "youjo-senki-ii",
+      "title": "Youjo Senki II (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt6455986",
+        "name": "Saga of Tanya the Evil",
+        "source": "https://m.media-amazon.com/images/M/MV5BODY1NjI0ZTgtNTVlNy00Zjk0LWEzYjUtNTIxZGJmNDY1YTA3XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/youjo-senki-ii.jpg",
+      "page": "https://animed23.com/anime/youjo-senki-ii/",
+      "hidden": false
+    },
+    "youkoso-jitsuryoku-shijou-shugi-no-kyoushitsu-e-temporada-4": {
+      "slug": "youkoso-jitsuryoku-shijou-shugi-no-kyoushitsu-e-temporada-4",
+      "title": "Youkoso Jitsuryoku Shijou Shugi no Kyoushitsu e Temporada 4 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt7263328",
+        "name": "Classroom of the Elite",
+        "source": "https://m.media-amazon.com/images/M/MV5BMDg3MGVhNWUtYTQ2NS00ZDdiLTg5MTMtZmM5MjUzN2IxN2I4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/youkoso-jitsuryoku-shijou-shugi-no-kyoushitsu-e-temporada-4.jpg",
+      "page": "https://animed23.com/anime/youkoso-jitsuryoku-shijou-shugi-no-kyoushitsu-e-temporada-4/",
+      "hidden": false
+    },
+    "yowayowa-sensei": {
+      "slug": "yowayowa-sensei",
+      "title": "Yowayowa Sensei (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38895862",
+        "name": "Yowayowa Sensei",
+        "source": "https://m.media-amazon.com/images/M/MV5BZmM1MTg5ZWItMjY4My00NmUzLWEzZGItN2YwZGUwYzU1YWY0XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/yowayowa-sensei.jpg",
+      "page": "https://animed23.com/anime/yowayowa-sensei/",
+      "hidden": false
+    },
+    "yozakura-san-chi-no-daisakusen-temporada-2": {
+      "slug": "yozakura-san-chi-no-daisakusen-temporada-2",
+      "title": "Yozakura-san Chi no Daisakusen Temporada 2 (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt31131310",
+        "name": "Mission: Yozakura Family",
+        "source": "https://m.media-amazon.com/images/M/MV5BMTAwMmQ1MjgtMjhhMS00OGEwLTliYzMtZjI3YThjZjE2MDY4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/yozakura-san-chi-no-daisakusen-temporada-2.jpg",
+      "page": "https://animed23.com/anime/yozakura-san-chi-no-daisakusen-temporada-2/",
+      "hidden": false
+    },
+    "yuusha-kei-ni-shosu-choubatsu-yuusha-9004-tai-keimu-kiroku": {
+      "slug": "yuusha-kei-ni-shosu-choubatsu-yuusha-9004-tai-keimu-kiroku",
+      "title": "Yuusha-kei ni Shosu: Choubatsu Yuusha 9004-tai Keimu Kiroku (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt32536168",
+        "name": "Sentenced to Be a Hero",
+        "source": "https://m.media-amazon.com/images/M/MV5BM2NlNmRlODQtMmNhOS00MDM5LTgwNzEtNzc3M2ZjYzZjNzRkXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/yuusha-kei-ni-shosu-choubatsu-yuusha-9004-tai-keimu-kiroku.jpg",
+      "page": "https://animed23.com/anime/yuusha-kei-ni-shosu-choubatsu-yuusha-9004-tai-keimu-kiroku/",
+      "hidden": false
+    },
+    "yuusha-no-kuzu": {
+      "slug": "yuusha-no-kuzu",
+      "title": "Yuusha no Kuzu (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt36290183",
+        "name": "Scum of the Brave",
+        "source": "https://m.media-amazon.com/images/M/MV5BZTNhMTdhMDMtYTY2MC00NzMyLWI0YzItODVlNGQ5YzU2YTJlXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/yuusha-no-kuzu.jpg",
+      "page": "https://animed23.com/anime/yuusha-no-kuzu/",
+      "hidden": false
+    },
+    "yuusha-party-ni-kawaii-ko-ga-ita-node-kokuhaku-shitemita": {
+      "slug": "yuusha-party-ni-kawaii-ko-ga-ita-node-kokuhaku-shitemita",
+      "title": "Yuusha Party ni Kawaii Ko ga Ita node, Kokuhaku shitemita. Anime Sub Español",
+      "imdb": {
+        "id": "tt38037498",
+        "name": "There Was a Cute Girl in the Hero's Party, So I Tried Confessing to Her",
+        "source": "https://m.media-amazon.com/images/M/MV5BMWExNDE0MWYtMGY1Mi00NWY2LWFiN2MtYzU0OGFjMmMyZGY2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/yuusha-party-ni-kawaii-ko-ga-ita-node-kokuhaku-shitemita.jpg",
+      "page": "https://animed23.com/anime/yuusha-party-ni-kawaii-ko-ga-ita-node-kokuhaku-shitemita/",
+      "hidden": false
+    },
+    "yuusha-party-wo-oidasareta-kiyoubinbou": {
+      "slug": "yuusha-party-wo-oidasareta-kiyoubinbou",
+      "title": "Yuusha Party wo Oidasareta Kiyoubinbou (2026) Anime Sub Español",
+      "imdb": {
+        "id": "tt38648925",
+        "name": "Jack-of-All-Trades, Party of None",
+        "source": "https://m.media-amazon.com/images/M/MV5BYTU4NWRiOGUtMzkwNC00ODc4LWJlMTEtOWNmMGY5MTk4NGI4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/d23/imdb/yuusha-party-wo-oidasareta-kiyoubinbou.jpg",
+      "page": "https://animed23.com/anime/yuusha-party-wo-oidasareta-kiyoubinbou/",
+      "hidden": false
+    }
+  }
+}
