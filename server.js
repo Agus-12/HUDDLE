@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v275'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v276'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -7002,7 +7002,14 @@ async function buscarMiscaricaturas(q) {
  * las variantes, vía prefijo), VR Troopers y Los 3 Chiflados (Lacartoons)
  * + Sabrina y Kenan y Kel (MisCaricaturas). Dejan de mezclarse en
  * Caricaturas/Cartoons: tienen apartado propio en el feed y catálogo. */
-const CARI_LIVE = new Set(['sabrina-la-bruja-adolescente-latino', 'kenan-y-kel-latino', 'el-chavo-del-8-capitulos-completoss', 'el-chavo-del-8-capitulos-completos', 'el-chapulin-colorado-capitulos-completos', 'chespirito-capitulos-completos']);
+const CARI_LIVE = new Set(['sabrina-la-bruja-adolescente-latino', 'kenan-y-kel-latino', 'el-chavo-del-8-capitulos-completoss', 'el-chavo-del-8-capitulos-completos', 'el-chavo-del-8', 'el-chapulin-colorado-capitulos-completos', 'el-chapulin-colorado', 'chespirito-capitulos-completos', 'chespirito']);
+function esCariLive(slug){
+  if(!slug) return false;
+  if(CARI_LIVE.has(slug)) return true;
+  const s = String(slug).toLowerCase();
+  if(s.includes('chavo') || s.includes('chapulin') || s.includes('chespirito') || s.includes('sabrina') || s.includes('kenan-y-kel')) return true;
+  return false;
+}
 const LCT_LIVE = new Set(['icarly', 'drake-y-josh', 'los-3-chiflados-fox-kids', 'vr-troopers-fox-kids', 'la-familia-addams-nickelodeon', 'los-munsters-nickelodeon', 'hechizada-nickelodeon', 'super-agente-86-nickelodeon', 'mi-bella-genio-nickelodeon', 'el-misterio-de-anubis-nickelodeon', 'clarissa-lo-explica-todo-nickelodeon', 'el-lagartijo-de-ned', 'isa-tkm-nickelodeon', 'isa-tk-nickelodeon']);
 const esLctLive = (slug) => LCT_LIVE.has(slug) || String(slug).indexOf('power-rangers-') === 0; /* TODAS las variantes de Power Rangers */
 const CARI_ORDEN = [
@@ -7021,6 +7028,8 @@ const CARI_ORDEN = [
   'megas-xlr-capitulos-completos', 'monstruos-de-verdad-latino', 'soy-la-comadreja-latino',
 ];
 async function caricaturasDestacadas() {
+  // v276: si el cache viejo tenía chavo en caricaturas, invalídalo
+  if(cariFeedCache.items.some(x=> /chavo|chapulin|chespirito/i.test(x.title||'') )) cariFeedCache.at = 0;
   const listo = () => ({ caricaturas: cariFeedCache.items, cartoons: cariFeedCache.toons, liveaction: cariFeedCache.live });
   if (Date.now() - cariFeedCache.at < 60 * 60 * 1000 && (cariFeedCache.items.length || cariFeedCache.toons.length)) return listo();
   if (cariFeedCache.items.length || cariFeedCache.toons.length) { refrescarCariFeed().catch(() => {}); return listo(); }
@@ -7032,6 +7041,8 @@ async function caricaturasDestacadas() {
   return listo();
 }
 async function refrescarCariFeed() {
+  // v276: invalida cache viejo que tenía live en caricaturas
+  if(cariFeedCache.items.some(x=> /chavo|chapulin/i.test(x.title) )) cariFeedCache.at = 0;
   const home = await cariHomeImgs();
   if (!home.size) return { caricaturas: cariFeedCache.items, cartoons: cariFeedCache.toons, liveaction: cariFeedCache.live };
   const enHome = [...home.keys()];
@@ -7054,8 +7065,8 @@ async function refrescarCariFeed() {
    * caricaturas — tienen apartado propio */
   const limpiar = (x) => { const { slug, ...resto } = x; return resto; };
   const todos = (await Promise.all(slugs.map(mapearCari))).filter((x) => x.title && x.img);
-  const items = todos.filter((x) => !CARI_LIVE.has(x.slug)).map(limpiar);
-  const liveCari = todos.filter((x) => CARI_LIVE.has(x.slug)).map(limpiar);
+  const items = todos.filter((x) => !esCariLive(x.slug)).map(limpiar).sort((a,b)=> a.title.localeCompare(b.title,'es'));
+  const liveCari = todos.filter((x) => esCariLive(x.slug)).map(limpiar).sort((a,b)=> a.title.localeCompare(b.title,'es'));
   /* v119: apartado propio — las de LACARTOONS ya no se mezclan con las
    * de MisCaricaturas: van a "Cartoons". Son ~79 series, así que se bajan
    * en bloques de 16 en vez de todas a la vez (que no nos racione el
@@ -7077,7 +7088,11 @@ async function refrescarCariFeed() {
     }));
     for (const p of parte) if (p) (p.vivo ? liveToons : toons).push(p.it);
   }
-  const live = [...liveCari, ...liveToons];
+  // v276: orden alfabético final
+  toons.sort((a,b)=> a.title.localeCompare(b.title,'es'));
+  liveToons.sort((a,b)=> a.title.localeCompare(b.title,'es'));
+  const live = [...liveCari, ...liveToons].sort((a,b)=> a.title.localeCompare(b.title,'es'));
+  items.sort((a,b)=> a.title.localeCompare(b.title,'es'));
   if (items.length || toons.length || live.length) {
     cariFeedCache.at = Date.now();
     cariFeedCache.items = items;
@@ -7803,7 +7818,7 @@ async function catCaricaturas() {
     const home = await cariHomeImgs();
     const items = [];
     for (const [slug, h] of home) {
-      if (!cariEsSerie(slug) || CARI_LIVE.has(slug)) continue;
+      if (!cariEsSerie(slug) || esCariLive(slug)) continue;
       if (LCT_SERIES.has(slug)) continue;
       if (CARI_MUERTAS.has(slug)) continue;
       const meta = cariMeta.get(slug);
@@ -11328,7 +11343,7 @@ async function estrenosMezclados(){
           return json(res, 200, trozo(items));
         }
         if (tipo === 'danimados') {
-          const filtrados = DANI_CAT_ARR.filter(([sl])=> !CARI_LIVE.has(sl) && !LCT_SERIES.has(sl) && !DANI_MUERTAS.has(sl))
+          const filtrados = DANI_CAT_ARR.filter(([sl])=> !esCariLive(sl) && !LCT_SERIES.has(sl) && !DANI_MUERTAS.has(sl))
             .sort((a,b)=> String(a[1].t).localeCompare(String(b[1].t), 'es'));
           const ini = (pag - 1) * por;
           const items = filtrados.slice(ini, ini + por).map(([sl, v]) => ({ title: String(v.t).replace(/\xa0/g, ' '), url: 'https://danimados.cc/serie/' + sl, img: daniCoverDe(sl), site: 'Caricaturas', extra: '' }));
