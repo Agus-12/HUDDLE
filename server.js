@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v282'; // v278.6: fix Betty para TODOS — solo auto-heal token (no más Perfil no válido tras restart), login force reclaim, frontend re-login automático + Betty 335 garantizada
+const UI_VERSION = 'v283'; // v278.6: fix Betty para TODOS — solo auto-heal token (no más Perfil no válido tras restart), login force reclaim, frontend re-login automático + Betty 335 garantizada
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -10635,7 +10635,7 @@ function esProxeable(u) {
     const h = new URL(u).hostname;
     return /(^|\.)goodstream\.one$/i.test(h) || /(^|\.)mp4upload\.com$/i.test(h) || /(^|\.)vimeos\.(net|zip)$/i.test(h)
       || /(^|\.)rpmvid\.com$/i.test(h) || /(^|\.)tiktokcdn\.com$/i.test(h) /* v112: lacartoons (cubeembed) y sus segmentos camuflados */
-      || /(^|\.)okcdn\.ru$/i.test(h) /* v119: videos MP4 de ok.ru (Lacartoons) */
+      || /(^|\.)okcdn\.ru$/i.test(h) || /(^|\.)vkuser\.net$/i.test(h) || /(^|\.)vk\.com$/i.test(h) /* v283: Ennovelas VK */
       || hlsReferers.has(h); /* v93: hosts que ya resolvimos (con su Referer) */
   } catch { return false; }
 }
@@ -10644,7 +10644,7 @@ function servirPlaylist(res, codigo, txt, target) {
   const esLocal = /^\/test-media\//.test(target);
   const baseLocal = target.slice(0, target.lastIndexOf('/') + 1);
   const prox = (u) => {
-    if (/^\/[^/]/.test(u)) return '/api/hls?u=' + encodeURIComponent(u); /* v83: stream local de prueba */
+    if (/^\/test-media\//.test(u)) return '/api/hls?u=' + encodeURIComponent(u); /* v83: stream local de prueba */
     if (esLocal && !/^https?:/i.test(u)) return '/api/hls?u=' + encodeURIComponent(baseLocal + u);
     let abs; try { abs = new URL(u, target).href; } catch { return u; }
     return esProxeable(abs) ? '/api/hls?u=' + encodeURIComponent(abs) : abs; /* v90: también mp4upload/vimeos */
@@ -10671,6 +10671,20 @@ async function proxearHls(req, res, target) {
       res.end(buf);
     });
     return;
+  }
+  // v283: si target es relativo (/expires/... de VK), resolver contra host VK conocido
+  if (target.startsWith('/')) {
+    let baseHost = null;
+    // busca el último host VK/okcdn que resolvimos
+    for (const h of [...hlsReferers.keys()].reverse()) {
+      if (/vkuser\.net|okcdn\.ru/i.test(h)) { baseHost = h; break; }
+    }
+    if (baseHost) {
+      try { target = 'https://' + baseHost + target; } catch {}
+    } else {
+      // fallback a vkuser.net por defecto (Betty)
+      try { target = 'https://vk6-14.vkuser.net' + target; } catch {}
+    }
   }
   if (!esProxeable(target)) return json(res, 403, { ok: false, error: 'No permitido' }); /* v90: allowlist ampliada */
   /* v236.6: goodstream/vimeos/videoapp → ir directo por relay si está disponible */
