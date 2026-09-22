@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v278.5'; // v278.3: Betty/Rosa portadas IMDb (quitados placeholders VIX rotos), todas novelas con IMDb goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v278.6'; // v278.6: fix Betty para TODOS — solo auto-heal token (no más Perfil no válido tras restart), login force reclaim, frontend re-login automático + Betty 335 garantizada
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -11921,6 +11921,12 @@ async function estrenosMezclados(){
           existing.lastSeenAt = Date.now(); saveUsers();
           return json(res, 200, { ok: true, name: existing.name, token: existing.token, resumed: true });
         }
+        // v278.6: auto-heal para solo — si el token no coincide pero el cliente pide force ( tras 403 ), reclamar al instante
+        if (body.force || body.heal) {
+          existing.token = uid(); existing.lastSeenAt = Date.now(); saveUsers();
+          console.log(`[usuarios] heal ${name} -> nuevo token`);
+          return json(res, 200, { ok: true, name: existing.name, token: existing.token, healed: true });
+        }
         if (Date.now() - (existing.lastSeenAt || 0) > NAME_RECLAIM_MS) {
           existing.token = uid(); existing.lastSeenAt = Date.now(); saveUsers();
           return json(res, 200, { ok: true, name: existing.name, token: existing.token, reclaimed: true });
@@ -12004,16 +12010,38 @@ async function estrenosMezclados(){
     }
     if (url.pathname === '/api/solo' && req.method === 'GET') {
       crawlUltimaActividad = Date.now(); /* v190 */
-      /* v81: resolver el video directo de una página para modo individual */
-      const name = (url.searchParams.get('name') || '').trim();
-      const tok = url.searchParams.get('tok') || '';
-      const urec = users.get(name.toLowerCase());
-      if (!name || !urec || urec.token !== tok) return json(res, 403, { ok: false, error: 'Perfil no válido' });
+      /* v81: resolver el video directo de una página para modo individual — v278.6 auto-heal para TODOS */
+      let name = (url.searchParams.get('name') || '').trim();
+      let tok = url.searchParams.get('tok') || '';
+      let urec = users.get(name.toLowerCase());
+      let healedToken = null;
+      if (!name || !urec || urec.token !== tok) {
+        // v278.6: si el perfil existe pero token viejo (tras restart/data perdida), curar al instante y dejar pasar
+        const key = name.toLowerCase();
+        const exists = users.get(key);
+        if (name && exists && exists.token !== tok) {
+          exists.token = uid(); exists.lastSeenAt = Date.now(); saveUsers();
+          urec = exists; tok = exists.token; healedToken = tok;
+          console.log(`[solo] auto-heal token para ${name} -> ${tok.slice(0,8)}`);
+        } else if (name && !exists && NAME_RE.test(name)) {
+          // perfil nunca existió en este servidor (tras restart limpio) — crearlo al vuelo
+          const rec = { name, token: tok || uid(), createdAt: Date.now(), lastSeenAt: Date.now() };
+          if (!tok) tok = rec.token;
+          users.set(key, rec); saveUsers(); urec = rec; healedToken = tok;
+          console.log(`[solo] auto-create ${name}`);
+        } else {
+          return json(res, 403, { ok: false, error: 'Perfil no válido', healable: true });
+        }
+      }
       const target = url.searchParams.get('url') || '';
       /* v219: el catálogo vivo de Movie manda una ruta de NUESTRO proxy
          (/api/movie/v-vid?url=…). Antes el guardia de URL absoluta la tumbaba
          con «URL no válida» y la película no arrancaba en el modo Solo. */
-      if (esStreamPropioUS(target)) return json(res, 200, { ok: true, m3u8: target, subs: [], mp4: false, proxy: false });
+      if (esStreamPropioUS(target)) {
+        const out = { ok: true, m3u8: target, subs: [], mp4: false, proxy: false };
+        if (healedToken) out.newToken = healedToken;
+        return json(res, 200, out);
+      }
       if (!/^https?:\/\/[a-z0-9.-]+/i.test(target)) return json(res, 400, { ok: false, error: 'URL no válida' });
       try {
         /* v90: episodio de Latanime → resolver de animes (mp4 directo) */
@@ -12030,7 +12058,9 @@ async function estrenosMezclados(){
         let r;
         try { r = await (esMovie ? resolverMovie(target) : esEpAnime ? resolverAnime(target) : esCuevanaMov ? resolverCuevanaMov(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esNv ? resolverNovela(target) : esEnp ? resolverEnp(target) : esEnn ? resolverEnnovelas(target) : resolverSolo(target)); epsPerdonar(target); } /* v205.5 + v206 + v206.2 + v207 + v235 cuevana.mov */
         catch (e2r) { epsFallo(target); throw e2r; } /* v205.5: episodios muertos al contador */
-        return json(res, 200, { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy });
+        const out2 = { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy };
+        if (healedToken) out2.newToken = healedToken;
+        return json(res, 200, out2);
       } catch (e) {
         console.warn('[solo] no pude resolver', target.slice(0, 70), '→', String(e.message || e).slice(0, 90));
         return json(res, 404, { ok: false, error: String(e.message || e).slice(0, 200), ocultado: EPS_MUERTOS.has(target) || /ya no está disponible en el sitio/.test(String(e.message || e)) }); /* v205.5: el cliente quita la tarjeta al momento */

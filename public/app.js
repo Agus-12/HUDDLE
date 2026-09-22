@@ -3556,11 +3556,31 @@ async function abrirSolo(pageUrl, info, opts) {
     }
   }
   try {
-    const r = await fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(pageUrl));
-    const d = await r.json();
+    let r = await fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(pageUrl));
+    let d = await r.json();
+    // v278.6: auto-heal token para TODOS — si el server curó el token, guardarlo
+    if (d && d.newToken) {
+      try { S.profile.token = d.newToken; localStorage.setItem('rr-profile', JSON.stringify(S.profile)); const allH = JSON.parse(localStorage.getItem('rr-profiles')||'{}'); allH[S.profile.name.toLowerCase()] = S.profile.token; localStorage.setItem('rr-profiles', JSON.stringify(allH)); } catch {}
+    }
     if (!d.ok) {
-      if (d.ocultado) quitarTarjeta(pageUrl); /* v205.5: el server la ocultó — fuera del feed YA, sin cerrar y reabrir */
-      throw new Error(d.error || 'No pude resolver el video');
+      if (d.ocultado) quitarTarjeta(pageUrl);
+      // v278.6: Perfil no válido tras restart — heal automático para todos
+      if (r.status===403 && (d.healable || /Perfil no v/.test(d.error||''))) {
+        try {
+          const hr = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:S.profile.name, token:S.profile.token, force:true})});
+          const hd = await hr.json();
+          if (hd && hd.ok && hd.token) {
+            S.profile.token = hd.token;
+            try { localStorage.setItem('rr-profile', JSON.stringify(S.profile)); const all2 = JSON.parse(localStorage.getItem('rr-profiles')||'{}'); all2[S.profile.name.toLowerCase()] = hd.token; localStorage.setItem('rr-profiles', JSON.stringify(all2)); } catch {}
+            r = await fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(pageUrl));
+            d = await r.json();
+            if (d && d.newToken) { try { S.profile.token = d.newToken; localStorage.setItem('rr-profile', JSON.stringify(S.profile)); } catch {} }
+            if (!d.ok) throw new Error(d.error || 'No pude resolver el video');
+          } else throw new Error(d.error || 'No pude resolver el video');
+        } catch(eh) { throw new Error(d.error || String(eh.message||eh).slice(0,80)); }
+      } else {
+        throw new Error(d.error || 'No pude resolver el video');
+      }
     }
     if (!SOLO || SOLO.url !== pageUrl || SOLO.cerrado) return; /* cerraron mientras buscaba */
     SOLO.res = d;
