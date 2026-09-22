@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v281'; // v278.6: fix Betty para TODOS — solo auto-heal token (no más Perfil no válido tras restart), login force reclaim, frontend re-login automático + Betty 335 garantizada
+const UI_VERSION = 'v282'; // v278.6: fix Betty para TODOS — solo auto-heal token (no más Perfil no válido tras restart), login force reclaim, frontend re-login automático + Betty 335 garantizada
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -1566,24 +1566,40 @@ async function ennProbe(slug){
   try{ const d=await ennFicha(slug); return !!(d && d.ok && d.episodios && d.episodios.length); }catch{ return false; }
 }
 async function resolverVk(vkEmbedUrl, pageUrl){
-  // vkEmbedUrl like https://vk.com/video_ext.php?oid=848029978&id=456257718
+  // vkEmbedUrl like https://vk.com/video_ext.php?oid=848029978&id=456257718&hash=...
   try{
-    const m = /video_ext\.php\?oid=(\d+).*?id=(\d+)/i.exec(vkEmbedUrl);
-    if(!m) throw new Error('vk sin ids');
-    const oid=m[1], vid=m[2];
-    const r = await fetchSeguro('https://vk.com/al_video.php?act=show&al=1&video='+oid+'_'+vid, 15000, {Referer: vkEmbedUrl, 'X-Requested-With':'XMLHttpRequest'}).catch(()=>null);
+    let m = /video_ext\.php\?oid=(\d+).*?id=(\d+).*?hash=([a-z0-9]+)/i.exec(vkEmbedUrl);
+    let oid, vid, hash='';
+    if(m){ oid=m[1]; vid=m[2]; hash=m[3]; } else {
+      m = /video_ext\.php\?oid=(\d+).*?id=(\d+)/i.exec(vkEmbedUrl);
+      if(!m) throw new Error('vk sin ids');
+      oid=m[1]; vid=m[2];
+    }
+    const alUrl = 'https://vk.com/al_video.php?act=show&al=1&video='+oid+'_'+vid + (hash ? '&hash='+hash : '');
+    const r = await fetchSeguro(alUrl, 15000, {Referer: vkEmbedUrl, 'X-Requested-With':'XMLHttpRequest'}).catch(()=>null);
     const txt = r && r.ok ? await r.text().catch(()=> '') : '';
+    // VK devuelve JSON con \/ y &amp; escapados — desescapar bien
     let m3u8 = (/https:[^"']+video\.m3u8[^"']*/i.exec(txt)||[])[0];
     if(m3u8) {
-      m3u8 = m3u8.replace(/&amp;/g,'&');
+      m3u8 = m3u8.replace(/\\\//g,'/').replace(/\\/g,'').replace(/&amp;/g,'&');
+      // asegura https:
+      if(m3u8.startsWith('https:\\/')) m3u8=m3u8.replace('https:\\/','https://');
       try{ hlsReferers.set(new URL(m3u8).hostname, vkEmbedUrl); }catch{}
       return {m3u8, mp4:false, proxy:true, subs:[]};
     }
-    // fallback: fetch embed directly and grep
+    // fallback: por si el al_video no trajo m3u8, intenta sacar del payload[1][1] directamente
+    let m3u82 = (/https:\\/\\/[^"']+\.m3u8[^"']*/i.exec(txt)||[])[0];
+    if(m3u82){
+      m3u82 = m3u82.replace(/\\\//g,'/').replace(/\\/g,'').replace(/&amp;/g,'&');
+      try{ hlsReferers.set(new URL(m3u82).hostname, vkEmbedUrl);}catch{};
+      return {m3u8: m3u82, mp4:false, proxy:true, subs:[]};
+    }
+    // fallback: fetch embed directamente y grep (para hash sin al_video)
     const r2 = await fetchSeguro(vkEmbedUrl, 15000, {Referer: pageUrl}).catch(()=>null);
     const t2 = r2 && r2.ok ? await r2.text().catch(()=> '') : '';
-    m3u8 = (/https:[^"']+\.m3u8[^"']*/i.exec(t2)||[])[0];
-    if(m3u8){ m3u8=m3u8.replace(/&amp;/g,'&'); try{ hlsReferers.set(new URL(m3u8).hostname, vkEmbedUrl);}catch{}; return {m3u8, mp4:false, proxy:true, subs:[]}; }
+    let m3u83 = (/https:[^"']+\.m3u8[^"']*/i.exec(t2)||[])[0];
+    if(!m3u83) m3u83 = (/https:\\/\\/[^"']+\.m3u8[^"']*/i.exec(t2)||[])[0];
+    if(m3u83){ m3u83=m3u83.replace(/\\\//g,'/').replace(/\\/g,'').replace(/&amp;/g,'&'); try{ hlsReferers.set(new URL(m3u83).hostname, vkEmbedUrl);}catch{}; return {m3u8: m3u83, mp4:false, proxy:true, subs:[]}; }
     throw new Error('vk sin m3u8');
   }catch(e){ throw e; }
 }
@@ -1622,9 +1638,13 @@ async function resolverEnnovelas(pageUrl){
         const th = re && re.ok ? await re.text().catch(()=> '') : '';
         const inner = (/src="(https:\/\/vk\.com\/video_ext\.php[^"]+)"/i.exec(th)||[])[1];
         if(inner){
-          const ivk = inner.replace(/&amp;/g,'&');
+          const ivk = inner.replace(/&amp;/g,'&').replace(/\\\//g,'/').replace(/\\/g,'');
+          // si es placeholder youtube no-signal, marcar como muerta
+          if(/youtube\.com\/embed\/Di-qI09MdB8/i.test(ivk)) throw new Error('Ennovelas: video no disponible (placeholder)');
           const out=await resolverVk(ivk, emb); console.log('[enn] vk-emb → '+pageUrl.slice(-40)); return out;
         }
+        // youtube placeholder directo en emb (videos muertos)
+        if(/youtube\.com\/embed\/Di-qI09MdB8/i.test(th)) throw new Error('Ennovelas: video no disponible (placeholder YouTube)');
         const alt = (/src="([^"]+goodstream[^"]+)"/i.exec(th)||[])[1];
         if(alt){ const out=await resolverGoodstream(alt, emb); console.log('[enn] goodstream-emb → '+pageUrl.slice(-40)); return out; }
         const okm = (/ok\.ru\/videoembed\/(\d+)/i.exec(th)||[])[1];
