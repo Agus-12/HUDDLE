@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v278.2'; // v278.2: Novelas VIX+Betty+Estrellas en feed (título Novelas), portadas IMDb fallback, LOGO_V 247 — sonda 3 fuentes goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v278.3'; // v278.3: Betty/Rosa portadas IMDb (quitados placeholders VIX rotos), todas novelas con IMDb goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -952,8 +952,8 @@ const NV_STATS = { nv: 0, enp: 0 }; /* v245: últimos tamaños conocidos (catál
  * Cada título va desencriptándose y aparece en /api/trending novelas al instante.
  * Betty 335 viene por Ennovelas (fallback gratis, sin VIP) y también se sonda. */
 const VIX_CATALOGO = [
-  { slug:'betty-la-fea', titulo:'Yo Soy Betty, La Fea', url:'https://l.ennovelas-tv.com/serie/yo-soy-betty-la-fea/', img:'https://images.vix.com/betty.jpg', site:'Novelas', extra:'335 caps · Ennovelas gratis 480p', vix:false, eps:335 },
-  { slug:'vix-rosa', titulo:'La Rosa de Guadalupe', url:'https://vix.com/detail/series-502/video-4285473', img:'https://images.vix.com/videos/mcp/4285473/poster.jpg', site:'Novelas', extra:'17 temp · ~2000 caps · VIX 1080p desencriptado', vix:true, eps:2000, videoId:'video-4285473' },
+  { slug:'betty-la-fea', titulo:'Yo Soy Betty, La Fea', url:'https://l.ennovelas-tv.com/serie/yo-soy-betty-la-fea/', img:'', site:'Novelas', extra:'335 caps · Ennovelas gratis 480p', vix:false, eps:335 },
+  { slug:'vix-rosa', titulo:'La Rosa de Guadalupe', url:'https://vix.com/detail/series-502/video-4285473', img:'', site:'Novelas', extra:'17 temp · ~2000 caps · VIX 1080p desencriptado', vix:true, eps:2000, videoId:'video-4285473' },
   { slug:'vix-dicho', titulo:'Como dice el dicho', url:'https://vix.com/detail/video-4265138', img:'', site:'Novelas', extra:'~650 caps · VIX 1080p', vix:true, eps:650, videoId:'video-4265138' },
   { slug:'vix-hijas', titulo:'Las Hijas de la Señora García', url:'https://vix.com/detail/series-5168', img:'', site:'Novelas', extra:'2025 · TelevisaUnivision · VIX', vix:true },
   { slug:'vix-cerca', titulo:'Tan Cerca de Ti', url:'https://vix.com/detail/series-5725', img:'', site:'Novelas', extra:'2025 · VIX', vix:true },
