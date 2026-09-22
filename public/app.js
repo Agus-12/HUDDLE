@@ -1855,7 +1855,7 @@ async function cargarCatPag() {
     if (es.tipo === 'movie') pintarDisp(); /* v222: estado medido en cada tarjeta nueva */
   } else {
     es.hayMas = false;
-    if (es.pag === 1) $('#catGrid').innerHTML = '<div class="sr-info">No pude cargar el catálogo — inténtalo luego</div>';
+    if (es.pag === 1) $('#catGrid').innerHTML = '<div class="sr-info">No pude cargar el catálogo — <button onclick="cargarCatPag()" style="text-decoration:underline;background:none;border:none;color:var(--pink);cursor:pointer">reintentar</button></div>';
   }
   es.cargando = false;
 }

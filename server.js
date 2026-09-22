@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v274'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v275'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -5305,27 +5305,32 @@ async function cuevanaPorGeneroPagina(slug, pag){
 
 async function peliculasPorGenero(slug, pag) {
   if (pag > 1) {
-    // v269: paginado intercalado de las 3 fuentes para Ver todo con vida
-    const pxdSlug = PXD_GENERO_MAP[slug];
-    const cvSlug = PXD_CV_GENERO_MAP[slug] || slug;
-    const [cc, pxd, cv] = await Promise.all([
-      generoPagina(slug, pag).catch(() => ({ items: [], mas: false })),
-      pxdSlug ? pelisxdPorGeneroPagina(slug, pag).catch(() => []) : Promise.resolve([]),
-      cuevanaPorGeneroPagina(slug, pag).catch(() => []),
-    ]);
-    const a = (cc.items || []).slice(0,10);
-    const b = (pxd || []).slice(0,10);
-    const c = (cv || []).slice(0,10);
-    const mezcla = [];
-    const vistosPag = new Set();
-    const pushPag = (x)=>{ if(!x||vistosPag.has(x.url)) return; vistosPag.add(x.url); mezcla.push(x); };
-    const max = Math.max(a.length, b.length, c.length);
-    for (let i = 0; i < max && mezcla.length < 30; i++) {
-      if (a[i]) pushPag(a[i]);
-      if (b[i]) pushPag(b[i]);
-      if (c[i]) pushPag(c[i]);
-    }
-    return mezcla.length ? mezcla : (cc.items || []).slice(0, 20);
+    try{
+      const pxdSlug = PXD_GENERO_MAP[slug];
+      const cvSlug = PXD_CV_GENERO_MAP[slug] || slug;
+      const [cc, pxd, cv] = await Promise.all([
+        generoPagina(slug, pag).catch(() => ({ items: [], mas: false })),
+        pxdSlug ? pelisxdPorGeneroPagina(slug, pag).catch(() => []) : Promise.resolve([]),
+        cuevanaPorGeneroPagina(slug, pag).catch(() => []),
+      ]);
+      const a = (cc.items || []).slice(0,10);
+      const b = (pxd || []).slice(0,10);
+      const c = (cv || []).slice(0,10);
+      const mezcla = [];
+      const vistosPag = new Set();
+      const pushPag = (x)=>{ if(!x||vistosPag.has(x.url)) return; vistosPag.add(x.url); mezcla.push(x); };
+      const max = Math.max(a.length, b.length, c.length);
+      for (let i = 0; i < max && mezcla.length < 30; i++) {
+        if (a[i]) pushPag(a[i]);
+        if (b[i]) pushPag(b[i]);
+        if (c[i]) pushPag(c[i]);
+      }
+      if(mezcla.length) return mezcla;
+      if((cc.items||[]).length) return cc.items.slice(0,20);
+      if((pxd||[]).length) return pxd.slice(0,20);
+      if((cv||[]).length) return cv.slice(0,20);
+      return [];
+    }catch{ return []; }
   }
   const c = generosCache.get(slug);
   if (c && Date.now() - c.at < 60 * 60 * 1000 && c.items.length) return c.items;
@@ -5347,9 +5352,13 @@ async function peliculasPorGenero(slug, pag) {
     if (pxdItems[i]) pushG(pxdItems[i]);
     if (cvMovItems[i]) pushG(cvMovItems[i]);
   }
-  // v270: rotativo — baraja el orden dentro del género cada carga
   for(let i=mezcla.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [mezcla[i],mezcla[j]]=[mezcla[j],mezcla[i]]; }
-  const items = mezcla.length ? mezcla : cvItems;
+  let items = mezcla.length ? mezcla : cvItems;
+  // v275: si fantasia u otro viene vacío de cc pero tiene pxd/cv, ya está en mezcla
+  if(!items.length){
+    if(pxdItems.length) items = pxdItems;
+    else if(cvMovItems.length) items = cvMovItems;
+  }
   if (items.length) generosCache.set(slug, { at: Date.now(), items });
   return items;
 }
@@ -6993,7 +7002,7 @@ async function buscarMiscaricaturas(q) {
  * las variantes, vía prefijo), VR Troopers y Los 3 Chiflados (Lacartoons)
  * + Sabrina y Kenan y Kel (MisCaricaturas). Dejan de mezclarse en
  * Caricaturas/Cartoons: tienen apartado propio en el feed y catálogo. */
-const CARI_LIVE = new Set(['sabrina-la-bruja-adolescente-latino', 'kenan-y-kel-latino']);
+const CARI_LIVE = new Set(['sabrina-la-bruja-adolescente-latino', 'kenan-y-kel-latino', 'el-chavo-del-8-capitulos-completoss', 'el-chavo-del-8-capitulos-completos', 'el-chapulin-colorado-capitulos-completos', 'chespirito-capitulos-completos']);
 const LCT_LIVE = new Set(['icarly', 'drake-y-josh', 'los-3-chiflados-fox-kids', 'vr-troopers-fox-kids', 'la-familia-addams-nickelodeon', 'los-munsters-nickelodeon', 'hechizada-nickelodeon', 'super-agente-86-nickelodeon', 'mi-bella-genio-nickelodeon', 'el-misterio-de-anubis-nickelodeon', 'clarissa-lo-explica-todo-nickelodeon', 'el-lagartijo-de-ned', 'isa-tkm-nickelodeon', 'isa-tk-nickelodeon']);
 const esLctLive = (slug) => LCT_LIVE.has(slug) || String(slug).indexOf('power-rangers-') === 0; /* TODAS las variantes de Power Rangers */
 const CARI_ORDEN = [
@@ -7714,9 +7723,41 @@ setTimeout(() => { catCvFull('movies').catch(() => {}); catCvFull('series').catc
 
 async function catCv(kind, pag) {
   const por = 20;
-  const allItems = await catCvFull(kind);
-  const ini = (pag - 1) * por;
-  return { items: allItems.slice(ini, ini + por), mas: ini + por < allItems.length, total: allItems.length };
+  const cached = cvFullCache[kind];
+  // v275: si hay cache completo, úsalo
+  if (cached.items.length && Date.now() - cached.at < CV_FULL_TTL) {
+    const ini = (pag - 1) * por;
+    return { items: cached.items.slice(ini, ini + por), mas: ini + por < cached.items.length, total: cached.items.length };
+  }
+  // v275: sin cache, trae solo la página pedida (rápido, no 600 páginas)
+  try{
+    const r = await fetchSeguro('https://cine-calidad.mx/wp-json/mycustom/v1/' + kind + '?page=' + pag, 10000);
+    if(r.ok){
+      const d = await r.json().catch(()=> []);
+      const arr = Array.isArray(d) ? d : (d.posts || []);
+      const items = arr.map((p)=>({
+        title: String(p.title||'').replace(/&amp;/g,'&'),
+        url: kind==='series' ? 'https://cine-calidad.mx/serie/'+p.slug : 'https://cine-calidad.mx/pelicula/'+p.slug+'/',
+        img: String(p.featured_image||'').replace('/w780/','/w342/'),
+        site:'CineCalidad',
+        extra:[String(p.date||'').slice(0,4), p.rating? '★ '+(+p.rating).toFixed(1):''].filter(Boolean).join(' · '),
+      })).filter(x=>x.title && !cvOcultaUrl(x.url));
+      // dispara descarga completa por detrás para próximas páginas
+      if(pag===1) setTimeout(()=> catCvFull(kind).catch(()=>{}), 2000);
+      // total estimado: si trae 20, hay más
+      const mas = arr.length >= 20;
+      const totalEst = mas ? 200 : items.length; // estimado
+      // si hay cache parcial, úsalo para total
+      const total = cached.items.length ? cached.items.length : totalEst;
+      return { items, mas, total };
+    }
+  }catch{}
+  // fallback a cache aunque esté vencido
+  if(cached.items.length){
+    const ini=(pag-1)*por;
+    return { items: cached.items.slice(ini, ini+por), mas: ini+por < cached.items.length, total: cached.items.length };
+  }
+  return { items: [], mas:false, total:0 };
 }
 async function catAnimes(pag) {
   const key = 'la-' + pag;
@@ -7753,24 +7794,27 @@ function lctConCovers() {
     img: CARI_PORTADAS.get(lct.slug) || porUrl.get(LCT_BASE + 'serie/' + lct.lctId) || '',
     site: 'Cartoons',
     extra: '',
-  }));
+  })).sort((a,b)=> a.title.localeCompare(b.title,'es'));
 }
 async function catCaricaturas() {
   const c = catCache.get('cari-all');
   if (c && Date.now() - c.at < 60 * 60 * 1000) return c.items;
-  const home = await cariHomeImgs();
-  const items = [];
-  for (const [slug, h] of home) {
-    if (!cariEsSerie(slug) || CARI_LIVE.has(slug)) continue; /* v205: live action aparte */
-    if (LCT_SERIES.has(slug)) continue; /* v272: cartoons no van en caricaturas */
-    if (CARI_MUERTAS.has(slug)) continue; /* v272 */
-    const meta = cariMeta.get(slug);
-    const rawImg = CARI_PORTADAS.get(slug) || DANI_IMDB.get(slug) || (meta && (meta.cover || meta.poster)) || h.img || '';
-    if (!rawImg) continue; /* sin portada no entra al feed */
-    items.push({ title: (meta && meta.titulo) || cariLimpia(h.alt || cariBonito(slug)), url: CARI_BASE + slug + '/', img: rawImg, site: 'Caricaturas', extra: '' });
-  }
-  if (items.length) catCache.set('cari-all', { at: Date.now(), items });
-  return items;
+  try{
+    const home = await cariHomeImgs();
+    const items = [];
+    for (const [slug, h] of home) {
+      if (!cariEsSerie(slug) || CARI_LIVE.has(slug)) continue;
+      if (LCT_SERIES.has(slug)) continue;
+      if (CARI_MUERTAS.has(slug)) continue;
+      const meta = cariMeta.get(slug);
+      const rawImg = CARI_PORTADAS.get(slug) || DANI_IMDB.get(slug) || (meta && (meta.cover || meta.poster)) || h.img || '';
+      if (!rawImg) continue;
+      items.push({ title: (meta && meta.titulo) || cariLimpia(h.alt || cariBonito(slug)), url: CARI_BASE + slug + '/', img: rawImg, site: 'Caricaturas', extra: '' });
+    }
+    items.sort((a,b)=> a.title.localeCompare(b.title,'es'));
+    if (items.length) catCache.set('cari-all', { at: Date.now(), items });
+    return items;
+  }catch{ const c2 = catCache.get('cari-all'); return c2 ? c2.items : []; }
 }
 
 
@@ -11284,8 +11328,8 @@ async function estrenosMezclados(){
           return json(res, 200, trozo(items));
         }
         if (tipo === 'danimados') {
-          // v272: filtra live action y cartoons que no son caricaturas puras
-          const filtrados = DANI_CAT_ARR.filter(([sl])=> !CARI_LIVE.has(sl) && !LCT_SERIES.has(sl) && !DANI_MUERTAS.has(sl));
+          const filtrados = DANI_CAT_ARR.filter(([sl])=> !CARI_LIVE.has(sl) && !LCT_SERIES.has(sl) && !DANI_MUERTAS.has(sl))
+            .sort((a,b)=> String(a[1].t).localeCompare(String(b[1].t), 'es'));
           const ini = (pag - 1) * por;
           const items = filtrados.slice(ini, ini + por).map(([sl, v]) => ({ title: String(v.t).replace(/\xa0/g, ' '), url: 'https://danimados.cc/serie/' + sl, img: daniCoverDe(sl), site: 'Caricaturas', extra: '' }));
           return json(res, 200, { ok: true, pag, por, total: filtrados.length, mas: ini + por < filtrados.length, items });
