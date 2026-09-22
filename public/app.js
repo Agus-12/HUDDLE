@@ -1748,7 +1748,7 @@ const CATALOGOS = {
   cartoons: { titulo: 'Cartoons', color: 'var(--amber)', d: '<circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/>' },
   liveaction: { titulo: 'Live Action', color: 'var(--green)', d: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>' },
   movie: { titulo: 'Movie (catálogo completo)', color: 'var(--pink)', d: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="m17 2-5 5-5-5"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/>' }, /* v221: apartados reales de la app */
-  novelas: { titulo: 'Novelas', color: 'var(--pink)', d: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="m17 2-5 5-5-5"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/>' }, /* v278.2: Novelas VIX+Betty+Estrellas */
+  ennovelas: { titulo: 'Ennovelas', color: 'var(--pink)', d: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="m17 2-5 5-5-5"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/>' }, /* v285: allowlist HTTP/HLS de Ennovelas */
   danimados: { titulo: 'Caricaturas', color: 'var(--cyan)', d: '<rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><polyline points="17 2 12 7 7 2"/>' },
 };
 let catEstado = null; /* {tipo, nombre, pag, por, hayMas, cargando} */
@@ -3095,7 +3095,7 @@ function logoPara(url, nombre) {
     for (const k of Object.keys(LOGOS_DOMINIO)) if (h === k || h.endsWith('.' + k)) return '/sites/' + LOGOS_DOMINIO[k] + '?v=' + LOGO_V;
   } catch {}
   // Fallback por nombre (cuando la URL falla o es relativa) — mapea alias genéricos del feed
-  const alias = { 'caricaturas': '/sites/caricaturas.png', 'cartoons': '/sites/lacartoons.png', 'danimados': '/sites/danimados.png', 'lacartoons': '/sites/lacartoons.png', 'miscaricaturas': '/sites/caricaturas.png', 'animed23': '/sites/animed23.png', 'animeflv': '/sites/animeflv.png', 'novelas': '/sites/novelas.png', 'telenovelas': '/sites/novelas.png', 'cuevana': '/sites/cuevana.png', 'cinecalidad': '/sites/cinecalidad.png', 'pelisxd': '/sites/pelisxd.png', 'latanime': '/sites/latanime.png' };
+  const alias = { 'caricaturas': '/sites/caricaturas.png', 'cartoons': '/sites/lacartoons.png', 'danimados': '/sites/danimados.png', 'lacartoons': '/sites/lacartoons.png', 'miscaricaturas': '/sites/caricaturas.png', 'animed23': '/sites/animed23.png', 'animeflv': '/sites/animeflv.png', 'novelas': '/sites/novelas.png', 'ennovelas': '/sites/novelas.png', 'telenovelas': '/sites/novelas.png', 'cuevana': '/sites/cuevana.png', 'cinecalidad': '/sites/cinecalidad.png', 'pelisxd': '/sites/pelisxd.png', 'latanime': '/sites/latanime.png' };
   const low = String(nombre || '').toLowerCase();
   if (alias[low]) return alias[low] + '?v=' + LOGO_V;
   const s = (typeof SITES !== 'undefined' ? SITES : []).find((x) => String(x.name||'').toLowerCase() === low);
@@ -4297,17 +4297,13 @@ async function cargarPopulares() {
       d.cartoons.slice(0, 80).forEach((res) => filaT.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrapT.classList.remove('hidden');
     } else { wrapT.classList.add('hidden'); } }
-    /* v206: NOVELAS — telenovelas por capítulos (Novelas360) */
+    /* v285: ENNOVELAS — únicamente series verificadas por HTTP/HLS */
     const wrapNv = document.querySelector('#nvdBox');
     const filaNv = document.querySelector('#nvdRow');
-    if (wrapNv && filaNv && d.movieApi && d.movieApi.length) { /* v212: vitrina viva de la API Movie al principio de la fila */
-      d.movieApi.forEach((res) => filaNv.appendChild(crearTarjetaResultado(res, alTocar(res))));
-      wrapNv.classList.remove('hidden'); /* v215: mostrar la caja aunque el catálogo externo de novelas esté apagado */
-    }
-    if (wrapNv && filaNv && d.novelas && d.novelas.length) {
-      d.novelas.forEach((res) => filaNv.appendChild(crearTarjetaResultado(res, alTocar(res))));
+    if (wrapNv && filaNv) { filaNv.innerHTML=''; if (d.ennovelas && d.ennovelas.length) {
+      d.ennovelas.forEach((res) => filaNv.appendChild(crearTarjetaResultado(res, alTocar(res))));
       wrapNv.classList.remove('hidden');
-    }
+    } else { wrapNv.classList.add('hidden'); } }
     /* v205: LIVE ACTION — iCarly, Drake & Josh, Power Rangers… ya no
      * viven dentro de Cartoons */
     const wrapL = document.querySelector('#liveBox');

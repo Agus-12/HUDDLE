@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v284'; // v284 HTTP-only: hls.js 1.7.3 + correcciones PTS para audio AAC VK; sin iframe ni reproductor remoto
+const UI_VERSION = 'v285'; // v285 HTTP-only: Ennovelas auditada, allowlist persistente y portada canónica de Betty; sin iframe ni reproductor remoto
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -32,7 +32,7 @@ const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_
  * si el fallo es de Huddle o de la fuente y auto-repara caches de Huddle. */
 const HUDDLE_AUDITORIA = {
   activo: false, pausado: false, iniciadoEn: 0, pausadoEn: 0,
-  alcance: { peliculas: true, series: true, fuentes: { pelisxd:true, cuevana:true, cinecalidad:true, animeflv:true, latanime:true, animed23:true, danimados:true, lacartoons:true, miscaricaturas:true, novelas:false } },
+  alcance: { peliculas: true, series: true, fuentes: { pelisxd:true, cuevana:true, cinecalidad:true, animeflv:true, latanime:true, animed23:true, danimados:true, lacartoons:true, miscaricaturas:true, ennovelas:true } },
   progreso: { peliculas: { total:0, verificadas:0, ok:0, fail:0, reparadas:0, pct:0, porFuente:{} }, series: { total:0, verificadas:0, ok:0, fail:0, reparadas:0, pct:0, porFuente:{} }, duplicadas:0 },
   logs: [], // {ts, fuente, tipo, slug, msg} max 200
   _timer: null, _batch: 0,
@@ -246,6 +246,8 @@ function registrarProgreso(room, m, r) {
       img = m.img || '';
     }
     const entry = { url: m.url || '', t: Math.round(r.t), d: Math.round(r.d), title, img, ep, serie, ts: Date.now(), modo: '' };
+    /* v285: Solo y Sala siempre guardan la portada canónica de Betty. */
+    if(/ennovelas-tv\.com\/(?:series\/)?yo-soy-betty-la-fea(?:-|\/)/i.test(entry.url) || /betty.*fea/i.test((entry.title+' '+entry.serie).toLowerCase())) entry.img=ENN_BETTY_COVER;
     if (!entry.url) return;
     for (const u of room.users.values()) {
       const key = u.nameKey || String(u.name || '').toLowerCase();
@@ -948,6 +950,15 @@ const NV_OCULTAS = new Set();
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'nv-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) NV_OCULTAS.add(l.trim()); } catch {}
 const NV_VISTAS = new Set(); /* v245: claves nv:|enp: verificadas por sonda */
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'nv-vistas.txt'), 'utf8').split('\n')) if (l.trim()) NV_VISTAS.add(l.trim()); } catch {}
+/* v285: allowlist HTTP/HLS persistente de Ennovelas. */
+const ENN_AUDIT_FILE = path.join(__dirname, 'public', 'enn-funcionan.json');
+const ENN_AUDIT_READY = fs.existsSync(ENN_AUDIT_FILE);
+const ENN_VISTAS = new Set(), ENN_OCULTAS = new Set(), ENN_EPS_OCULTOS = new Set(), ENN_EPS_MOTIVOS = new Map();
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'enn-vistas.txt'), 'utf8').split('\n')) if (l.trim()) ENN_VISTAS.add(l.trim().split('\t')[0]); } catch {}
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'enn-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) ENN_OCULTAS.add(l.trim().split('\t')[0]); } catch {}
+try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'enn-episodios-ocultos.txt'), 'utf8').split('\n')) if (l.trim()) { const [u, motivo=''] = l.trim().split('\t'); if (u) { ENN_EPS_OCULTOS.add(u); ENN_EPS_MOTIVOS.set(u, motivo); } } } catch {}
+const ENN_SONDA = { at:0, estado:'idle', total:0, auditadas:0, visibles:0, ocultas:0, ultima:'', error:'', revisadas:0, revividas:0, caidas:0, episodiosOcultos:0, episodiosRevividos:0 };
+const ENN_FALLOS = new Map(), ENN_STATS = { total:0, vistas:0, ocultas:0 };
 const NV_STATS = { nv: 0, enp: 0 }; /* v245: últimos tamaños conocidos (catálogos vivos) */
 /* v277: VIX DESENCRIPTADO — catálogo + sonda autocurativa + progreso visible
  * Cada título va desencriptándose y aparece en /api/trending novelas al instante.
@@ -1526,7 +1537,16 @@ async function resolverEnp(pageUrl) {
  * La resolución es HTTP-only: se consulta el endpoint/HTML de VK, se extrae
  * su propiedad hls y después el master, playlists y segmentos pasan por /api/hls. */
 const ENN_BASE = 'https://l.ennovelas-tv.com/';
+const ENN_PAYWALL_RE = /(?:danfra|vip|paywall|pago|premium|suscri(?:pc|b))/i;
+const ENN_BETTY_SLUG = 'yo-soy-betty-la-fea';
+const ENN_BETTY_COVER = '/covers/enn/yo-soy-betty-la-fea.jpg';
 const ennFichaCache = new Map(); // slug -> {at, data}
+function ennPosterDesdeHtml(html, slug){
+  if(slug === ENN_BETTY_SLUG) return ENN_BETTY_COVER;
+  const cands=[]; const add=(u)=>{ u=String(u||'').replace(/[\r\n\t]/g,'').trim(); if(u.startsWith('//'))u='https:'+u; if(!/^https?:\/\//i.test(u)||/grey\.gif|33333|logo|avatar/i.test(u))return; if(!cands.includes(u))cands.push(u); };
+  for(const re of [/\<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)/gi,/\<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/gi,/\<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)/gi,/\<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/gi]) for(const m of html.matchAll(re)) add(m[1]);
+  return cands.find(u=>/wp-content\/uploads/i.test(u)) || cands[0] || '';
+}
 async function ennFicha(slug){
   slug = String(slug||'').toLowerCase().replace(/\/+$/,'');
   const cached = ennFichaCache.get(slug);
@@ -1534,8 +1554,7 @@ async function ennFicha(slug){
   const r = await fetchSeguro(ENN_BASE+'series/'+slug+'/', 18000).catch(()=>null);
   if(!r || !r.ok) return {ok:false, error:'No pude leer Ennovelas'};
   const html = await r.text();
-  const og = /property="og:image" content="([^"]+)"/i.exec(html);
-  const poster = og ? og[1] : '';
+  const poster = ennPosterDesdeHtml(html, slug) || (slug === ENN_BETTY_SLUG ? ENN_BETTY_COVER : '');
   const titleM = /<title>([^<]+)<\/title>/i.exec(html);
   const titulo = titleM ? titleM[1].replace(/\s*\|.*$/,'').replace(/ Capitulos Completos/i,'').trim().slice(0,80) : slug.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
   const eps=[];
@@ -1559,7 +1578,8 @@ async function ennFicha(slug){
     }
   }
   eps.sort((a,b)=>a.ep-b.ep);
-  const out = {ok: eps.length>0, slug, titulo: titulo || 'Yo Soy Betty, La Fea', poster, episodios: eps};
+  const vivos = eps.filter(e => !ENN_EPS_OCULTOS.has(e.url));
+  const out = {ok: vivos.length>0, slug, titulo: titulo || 'Yo Soy Betty, La Fea', poster, episodios: vivos};
   if(out.ok) ennFichaCache.set(slug,{at:Date.now(), data:out});
   return out;
 }
@@ -1628,7 +1648,8 @@ async function resolverEnnovelas(pageUrl){
   const r = await fetchSeguro(pageUrl, 18000).catch(()=>null);
   if(!r || !r.ok) throw new Error('No pude abrir ese capítulo en Ennovelas');
   const html = await r.text();
-  let cands = [...new Set([...html.matchAll(/<iframe[^>]*src="([^"]+)"/gi)].map(m=>m[1]).map(u=>u.startsWith('//')?'https:'+u:u).filter(u=>/^https?:\/\//.test(u) && !/facebook|addthis|disqus/i.test(u)))];
+  // Solo se extraen embeds HTTP de Ennovelas; nunca se monta un iframe remoto.
+  let cands = [];
   // también busca emb de ennovelas (meta twitter:player)
   for(const m of html.matchAll(/content="https:\/\/l\.ennovelas-tv\.com\/emb\/\?vid=(\d+)"[^>]*>/gi)) cands.push('https://l.ennovelas-tv.com/emb/?vid='+m[1]);
   for(const m of html.matchAll(/href="https:\/\/l\.ennovelas-tv\.com\/emb\/\?vid=(\d+)"[^>]*>/gi)) cands.push('https://l.ennovelas-tv.com/emb/?vid='+m[1]);
@@ -2493,66 +2514,90 @@ async function fillNovelasCovers(){
     await new Promise(r=>setTimeout(r,800));
   }
 }
-// v279: Ennovelas catálogo con IMDb — audita toda la variedad gratis sin Cloudflare
+// v285: Ennovelas catalogo allowlistado; lo no auditado nunca entra a Huddle.
 const ENN_CATALOGO_CACHE = { at:0, items:[] };
-async function ennCatalogo(){
-  if(Date.now()-ENN_CATALOGO_CACHE.at < 6*3600*1000 && ENN_CATALOGO_CACHE.items.length) return ENN_CATALOGO_CACHE.items;
-  const items=[];
-  const vistos=new Set();
-  for(let pag=1; pag<=6; pag++){
-    const urlEnn='https://l.ennovelas-tv.com/series/'+(pag>1?'page/'+pag+'/':'');
-    const r=await fetchSeguro(urlEnn, 12000).catch(()=>null);
+async function ennCatalogo(todos=false){
+  if(!todos && Date.now()-ENN_CATALOGO_CACHE.at < 6*3600*1000 && ENN_CATALOGO_CACHE.items.length) return ENN_CATALOGO_CACHE.items;
+  const items=[], vistos=new Set();
+  for(let pag=1; pag<=20; pag++){
+    const urlEnn=ENN_BASE+'series/'+(pag>1?'page/'+pag+'/':'');
+    const r=await fetchSeguro(urlEnn,12000).catch(()=>null);
     const html=r&&r.ok?await r.text().catch(()=> ''):'';
     if(!html) break;
-    let nuevos=0;
-    // cada serie: <a href="https://l.ennovelas-tv.com/series/<slug>/" title="Title">
+    let nuevos=0, encontrados=0;
     for(const m of html.matchAll(/<a href="https:\/\/l\.ennovelas-tv\.com\/series\/([a-z0-9-]+)\/"[^>]*title="([^"]+)"/gi)){
       const slug=m[1], title=m[2].trim();
-      if(!slug || vistos.has(slug) || slug==='series') continue;
-      // evita links de paginación
-      if(title.length<2) continue;
+      if(!slug || vistos.has(slug) || slug==='series' || title.length<2) continue;
+      encontrados++;
+      if(!todos && ((ENN_AUDIT_READY && !ENN_VISTAS.has(slug)) || ENN_OCULTAS.has(slug))) continue;
       vistos.add(slug);
-      // intenta poster rápido sin IMDb (evita 90s de espera en trending)
-      let poster='';
-      const sec = html.slice(Math.max(0, m.index-2000), m.index+3000);
-      const pm = /data-img="background-image:url\(([^)]+)\)"/i.exec(sec);
-      if(pm){ poster=pm[1].replace(/['"]/g,'').trim(); if(poster.startsWith('//')) poster='https:'+poster; }
-      if(!poster || /grey\.gif/.test(poster)) poster='';
-      items.push({ title: title.slice(0,80), url:'https://l.ennovelas-tv.com/series/'+slug+'/', img: poster||'/sites/novelas.png?v=247', site:'Novelas', extra:'Ennovelas gratis', slug });
-      nuevos++;
-      if(nuevos>=40) break;
+      let poster=slug===ENN_BETTY_SLUG?ENN_BETTY_COVER:'';
+      const card=html.slice(m.index,m.index+2400);
+      const pm=/data-img="background-image:url\(([^)]+)\);?"/i.exec(card);
+      if(pm&&!poster){poster=pm[1].replace(/['"]/g,'').trim();if(poster.startsWith('//'))poster='https:'+poster;}
+      if(!poster||/grey\.gif|33333|logo/i.test(poster))poster='';
+      items.push({title:title.slice(0,80),url:ENN_BASE+'series/'+slug+'/',img:poster||'/sites/novelas.png?v=247',site:'Ennovelas',extra:'Ennovelas gratis',slug});
+      nuevos++; if(nuevos>=40) break;
     }
-    if(nuevos===0) break;
-    if(!html.includes('page/')) break;
-    await new Promise(r2=>setTimeout(r2,300));
+    if(encontrados===0) break;
+    if(!html.includes('page/')&&pag>1) break;
+    await new Promise(r=>setTimeout(r,300));
   }
-  // asegura Betty al frente
-  const bettyIdx=items.findIndex(x=>/betty/i.test(x.title));
-  if(bettyIdx>0){ const b=items.splice(bettyIdx,1)[0]; items.unshift(b); }
-  if(!items.find(x=>/betty/i.test(x.title))){
-    try{ const im=await imdbPosterDe('Yo Soy Betty, La Fea'); items.unshift({title:'Yo Soy Betty, La Fea', url:'https://l.ennovelas-tv.com/series/yo-soy-betty-la-fea/', img: im||'/sites/novelas.png?v=247', site:'Novelas', extra:'335 caps · Ennovelas gratis', slug:'yo-soy-betty-la-fea'}); }catch{}
-  }
-  if(items.length){ ENN_CATALOGO_CACHE.at=Date.now(); ENN_CATALOGO_CACHE.items=items; console.log('[enn] catalogo '+items.length+' series'); }
+  const bi=items.findIndex(x=>/betty/i.test(x.title));
+  if(bi>0){const b=items.splice(bi,1)[0];items.unshift(b);}
+  if(!items.find(x=>/betty/i.test(x.title))&&(!todos||ENN_VISTAS.has(ENN_BETTY_SLUG))) items.unshift({title:'Yo Soy Betty, La Fea',url:ENN_BASE+'series/'+ENN_BETTY_SLUG+'/',img:ENN_BETTY_COVER,site:'Ennovelas',extra:'335 caps · Ennovelas gratis',slug:ENN_BETTY_SLUG});
+  if(items.length&&!todos){ENN_CATALOGO_CACHE.at=Date.now();ENN_CATALOGO_CACHE.items=items;console.log('[enn] catalogo '+items.length+' series');}
   return items;
 }
-async function ennCatalogoTrending(){
+/* v285: sonda HTTP/HLS persistente. Nunca abre navegador ni monta iframe. */
+async function ennComprobarHls(master,referer){
   try{
-    const it=await ennCatalogo();
-    const out=it.slice(0,24).map(x=>({ title:x.title, url:x.url, img:x.img, site:x.site, extra:x.extra }));
-    // rellena IMDb en segundo plano sin bloquear trending
-    setTimeout(async()=>{
-      for(const c of out){
-        if(c.img && c.img!=='/sites/novelas.png?v=247' && !/grey/.test(c.img)) continue;
-        try{ const im=await imdbPosterDe(c.title); if(im){ c.img=im; const cached=ENN_CATALOGO_CACHE.items.find(y=>y.title===c.title); if(cached) cached.img=im; } }catch{}
-        await new Promise(r=>setTimeout(r,600));
-      }
-    }, 100);
-    return out;
-  }catch{ return [{title:'Yo Soy Betty, La Fea', url:'https://l.ennovelas-tv.com/series/yo-soy-betty-la-fea/', img:'/sites/novelas.png?v=247', site:'Novelas', extra:'335 caps'}]; }
+    const cab={Referer:referer||''}; const r=await fetchSeguro(master,16000,cab); if(!r||!r.ok)return false;
+    const mt=await r.text(); const lines=mt.split(/\r?\n/).map(x=>x.trim()).filter(x=>x&&!x.startsWith('#')); if(!lines.length)return false;
+    const variant=new URL(lines[0],r.url||master).href; const rv=await fetchSeguro(variant,16000,cab); if(!rv||!rv.ok)return false;
+    const vt=await rv.text(); const seg=vt.split(/\r?\n/).map(x=>x.trim()).find(x=>x&&!x.startsWith('#')); if(!seg)return false;
+    const rs=await fetchSeguro(new URL(seg,rv.url||variant).href,16000,{...cab,Range:'bytes=0-2047'}); return !!(rs&&(rs.ok||rs.status===206));
+  }catch{return false;}
 }
-setTimeout(()=>{ fillNovelasCovers().catch(()=>{}); ennCatalogo().catch(()=>{}); }, 8000);
-setInterval(()=>{ fillNovelasCovers().catch(()=>{}); }, 6*3600*1000);
-setInterval(()=>{ ennCatalogo().catch(()=>{}); }, 6*3600*1000);
+function ennEpsPersistir(){
+  try{const lines=[...ENN_EPS_OCULTOS].sort().map(u=>u+'\t'+(ENN_EPS_MOTIVOS.get(u)||'fallo HLS'));fs.writeFileSync(path.join(__dirname,'public','enn-episodios-ocultos.txt'),lines.join('\n')+(lines.length?'\n':''));}catch{}
+}
+async function ennPaginaGratis(epUrl){
+  try{const r=await fetchSeguro(epUrl,12000).catch(()=>null);if(!r||!r.ok)return false;return !ENN_PAYWALL_RE.test(await r.text().catch(()=>''));}catch{return false;}
+}
+async function ennProbeEpisodeUrl(epUrl){try{if(!await ennPaginaGratis(epUrl))return false;const out=await resolverEnnovelas(epUrl);if(!out||!out.m3u8)return false;return await ennComprobarHls(out.m3u8,hlsReferers.get(new URL(out.m3u8).hostname)||epUrl);}catch{return false;}}
+function ennPerdonarEp(epUrl){if(!epUrl||!ENN_EPS_OCULTOS.delete(epUrl))return false;ENN_EPS_MOTIVOS.delete(epUrl);ennEpsPersistir();sondaNotify('Ennovelas','revivio',epUrl.split('/').pop()||epUrl,'episodio revivió — HLS HTTP confirmado');ennFichaCache.clear();return true;}
+async function ennProbePlayable(slug){
+  try{
+    const ficha=await ennFicha(slug);if(!ficha||!ficha.ok||!ficha.episodios?.length)return {ok:false,error:'sin episodios'};
+    const eps=ficha.episodios.filter(e=>e&&e.url&&!ENN_EPS_OCULTOS.has(e.url)).slice(0,2);let last='sin reproductor';
+    for(const ep of eps){try{if(!await ennPaginaGratis(ep.url)){last='VIP/paywall';continue;}const out=await resolverEnnovelas(ep.url);if(!out||!out.m3u8){last='sin HLS';continue;}if(await ennComprobarHls(out.m3u8,hlsReferers.get(new URL(out.m3u8).hostname)||ep.url))return {ok:true,ep:ep.ep};last='HLS caído';}catch(e){last=String(e?.message||e).slice(0,100);}}
+    return {ok:false,error:last};
+  }catch(e){return {ok:false,error:String(e?.message||e).slice(0,100)};}
+}
+function ennPersistirListas(){try{fs.writeFileSync(path.join(__dirname,'public','enn-vistas.txt'),[...ENN_VISTAS].sort().join('\n')+'\n');}catch{}try{fs.writeFileSync(path.join(__dirname,'public','enn-ocultas.txt'),[...ENN_OCULTAS].sort().join('\n')+'\n');}catch{}}
+function ennOcultar(slug,razon){if(!slug)return false;const nuevo=!ENN_OCULTAS.has(slug);ENN_OCULTAS.add(slug);ENN_VISTAS.delete(slug);ennPersistirListas();ENN_CATALOGO_CACHE.at=0;ENN_CATALOGO_CACHE.items=[];if(nuevo)sondaNotify('Ennovelas','muerto',slug,slug+' ocultada — '+(razon||'sin HLS'));return nuevo;}
+function ennPerdonar(slug){if(!slug)return false;const revivio=ENN_OCULTAS.delete(slug);ENN_VISTAS.add(slug);ennPersistirListas();ENN_CATALOGO_CACHE.at=0;ENN_CATALOGO_CACHE.items=[];if(revivio)sondaNotify('Ennovelas','revivio',slug,slug+' revivió — HLS HTTP confirmado');return revivio;}
+function ennFallo(slug,razon){falloRegistrar(ENN_FALLOS,'fallos-enn.json',slug,s=>ennOcultar(s,razon));}
+try{for(const [k,v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR,'fallos-enn.json'),'utf8'))||{}))ENN_FALLOS.set(k,v);}catch{}
+async function sondaEnnovelas(){
+  if(ENN_SONDA.estado==='chequeando')return;ENN_SONDA.estado='chequeando';ENN_SONDA.at=Date.now();ENN_SONDA.error='';
+  try{
+    const todos=await ennCatalogo(true), visibles=await ennCatalogo();ENN_SONDA.total=todos.length;ENN_SONDA.visibles=visibles.length;ENN_SONDA.ocultas=ENN_OCULTAS.size;ENN_SONDA.auditadas=ENN_VISTAS.size;
+    const ocultas=todos.filter(x=>ENN_OCULTAS.has(x.slug)), nuevas=todos.filter(x=>!ENN_VISTAS.has(x.slug)&&!ENN_OCULTAS.has(x.slug));const picks=[];const add=(a,n)=>{for(let i=0;i<Math.min(n,a.length);i++){const x=a[(ENN_SONDA.revisadas+i)%a.length];if(x&&!picks.some(y=>y.slug===x.slug))picks.push(x);}};add(visibles,3);add(ocultas,2);add(nuevas,2);
+    for(const x of picks){ENN_SONDA.revisadas++;const p=await ennProbePlayable(x.slug);if(p.ok){const wasHidden=ENN_OCULTAS.has(x.slug),wasNew=!ENN_VISTAS.has(x.slug);ennPerdonar(x.slug);if(wasHidden)ENN_SONDA.revividas++;if(wasNew&&!wasHidden)sondaNotify('Ennovelas','ok',x.slug,x.slug+' confirmado y agregado al catálogo');}else if(ENN_VISTAS.has(x.slug)){const antes=ENN_OCULTAS.has(x.slug);ennFallo(x.slug,p.error);if(!antes&&ENN_OCULTAS.has(x.slug))ENN_SONDA.caidas++;}await new Promise(r=>setTimeout(r,500));}
+    ENN_SONDA.episodiosOcultos=ENN_EPS_OCULTOS.size;const epMuerto=[...ENN_EPS_OCULTOS][ENN_SONDA.revisadas%Math.max(1,ENN_EPS_OCULTOS.size)];if(epMuerto&&await ennProbeEpisodeUrl(epMuerto)&&ennPerdonarEp(epMuerto))ENN_SONDA.episodiosRevividos++;
+    ENN_SONDA.visibles=ENN_VISTAS.size;ENN_SONDA.auditadas=ENN_VISTAS.size;ENN_SONDA.ocultas=ENN_OCULTAS.size;ENN_SONDA.episodiosOcultos=ENN_EPS_OCULTOS.size;ENN_SONDA.ultima=new Date().toISOString();ENN_SONDA.estado='vivo';ENN_STATS.total=ENN_SONDA.total;ENN_STATS.vistas=ENN_SONDA.auditadas;ENN_STATS.ocultas=ENN_SONDA.ocultas;console.log('[sonda] ennovelas: '+ENN_SONDA.visibles+' visibles / '+ENN_SONDA.ocultas+' ocultas; revisadas='+ENN_SONDA.revisadas);
+  }catch(e){ENN_SONDA.estado='error';ENN_SONDA.error=String(e?.message||e).slice(0,160);console.warn('[sonda] ennovelas error',ENN_SONDA.error);}
+}
+setTimeout(()=>sondaEnnovelas().catch(()=>{}),95000);setInterval(()=>sondaEnnovelas().catch(()=>{}),10*60*1000);
+async function ennCatalogoTrending(){
+  try{const it=await ennCatalogo();return it.slice(0,24).map(x=>({title:x.title,url:x.url,img:x.img,site:x.site,extra:x.extra}));}
+  catch{return [{title:'Yo Soy Betty, La Fea',url:ENN_BASE+'series/'+ENN_BETTY_SLUG+'/',img:ENN_BETTY_COVER,site:'Ennovelas',extra:'335 caps'}];}
+}
+setTimeout(()=>{fillNovelasCovers().catch(()=>{});ennCatalogo().catch(()=>{});},8000);
+setInterval(()=>{fillNovelasCovers().catch(()=>{});},6*3600*1000);
+setInterval(()=>{ennCatalogo().catch(()=>{});},6*3600*1000);
 async function daniPosterUrl(slug) {
   const c = DANI_POSTERS.get(slug);
   if (c && Date.now() - c.at < 24 * 3600e3) return c.url;
@@ -11335,7 +11380,7 @@ async function estrenosMezclados(){
       /* v55: populares del día + v57: series recién agregadas
        * v101: + 6 filas de género que rotan cada día
        * v102: + caricaturas (debajo de los animes) */
-      const [day, series, animes, generos, cari, nv, estrenos] = await Promise.all([ /* v206: + novelas */
+      const [day, series, animes, generos, cari, estrenos] = await Promise.all([
         popularesDeHoy().catch(() => []),
         seriesMezcladas().catch(() => []),
         animesMezclados().catch(() => []), /* v269: animes intercalados Latanime+AnimeFLV+D23 */
@@ -11355,7 +11400,6 @@ async function estrenosMezclados(){
           return result;
         })(),
         caricaturasDestacadas().catch(() => ({ caricaturas: [], cartoons: [] })),
-        nvCatalogo().catch(() => []), /* v206 */
         estrenosMezclados().catch(() => []),
       ]);
       const fCV = (xs) => (xs || []).filter((x) => !cvOcultaUrl(x.url) && !laOcultaUrl(x.url)); /* v195 muertas + v198 latanime castellano/duplicados fuera */
@@ -11368,7 +11412,7 @@ async function estrenosMezclados(){
         caricaturas: cari.caricaturas || [],
         cartoons: cari.cartoons || [], /* v119: apartado propio de Lacartoons */
         liveaction: cari.liveaction || [], /* v205: iCarly, Drake & Josh, Power Rangers… */
-        novelas: await ennCatalogoTrending(), /* v279: solo Ennovelas con IMDb, VIX/Estrellas eliminados */
+        ennovelas: await ennCatalogoTrending(), /* v285: solo Ennovelas allowlist HTTP/HLS */
         movieApi: await mapiTarjetasHome(), /* v212: vitrina viva de la API Movie (portadas reales) */
         generos: (generos || []).map((g) => ({ slug: g.slug, nombre: g.nombre, items: fCV(g.items) })).filter((g) => g.items.length),
         pelisxd: await pelisxdLatest().catch(() => []),
@@ -11397,6 +11441,7 @@ async function estrenosMezclados(){
     if (url.pathname.startsWith('/api/ennovelas/') || url.pathname.startsWith('/api/enn/')) { /* v278.4: ficha de Ennovelas (Betty 335) */
       const pref = decodeURIComponent((url.pathname.split('/')[3]||'').toLowerCase()).replace(/\/+$/,'');
       if(!/^[a-z0-9-]{3,90}$/.test(pref)) return json(res,400,{ok:false,error:'Serie inválida'});
+      if(ENN_AUDIT_READY && (!ENN_VISTAS.has(pref) || ENN_OCULTAS.has(pref))) return json(res,404,{ok:false,error:'Esa serie de Ennovelas no está verificada'});
       const d = await ennFicha(pref).catch(()=>null);
       if(!d || !d.ok) return json(res,502,{ok:false,error:'No pude leer esa novela en Ennovelas — intenta luego'});
       d.episodios = epsVivos(d.episodios);
@@ -11717,7 +11762,7 @@ async function estrenosMezclados(){
         if (tipo === 'series') { const r = await catCv('series', pag); return json(res, 200, { ok: true, pag, por: 20, total: r.total|| (r.items.length + (r.mas?20:0)), items: r.items, mas: r.mas }); }
         if (tipo === 'animes') { const r = await catAnimes(pag); return json(res, 200, { ok: true, pag, por: 24, total: r.total|| (r.items.length + (r.mas?24:0)), items: r.items, mas: r.mas }); }
         if (tipo === 'caricaturas') return json(res, 200, trozo(await catCaricaturas()));
-        if (tipo === 'novelas') { const enn = await ennCatalogo(); return json(res, 200, trozo(enn)); } /* v281: solo Ennovelas 360 auditadas */
+        if (tipo === 'novelas' || tipo === 'ennovelas') { const enn = await ennCatalogo(); return json(res, 200, trozo(enn)); } /* v285: solo Ennovelas auditadas; alias viejo de compatibilidad */
         if (tipo === 'cartoons' || tipo === 'liveaction') {
           const vivo = tipo === 'liveaction';
           let items = lctConCovers().filter((x) => esLctLive(x._slug) === vivo);
@@ -12071,10 +12116,20 @@ async function estrenosMezclados(){
       const tok = url.searchParams.get('tok') || '';
       const urec = users.get(name.toLowerCase());
       if (!name || !urec || urec.token !== tok) return json(res, 403, { ok: false, error: 'Perfil no válido' });
-      const items = (continuar.get(name.toLowerCase()) || []).map((e) => ({
+      const keyContinue = name.toLowerCase();
+      const storedContinue = continuar.get(keyContinue) || [];
+      const items = storedContinue.map((e) => ({
         url: e.url, t: e.t, d: e.d, title: e.title, img: e.img, ep: e.ep, serie: e.serie, ts: e.ts, modo: e.modo || '',
         eps: Array.isArray(e.eps) ? e.eps : [], /* v86: para "Sigue con el próximo" */
       }));
+      /* v285: saneamiento determinista de Betty al leer historial antiguo. */
+      let continueChanged=false;
+      for(let i=0;i<items.length;i++){
+        const e=items[i];
+        const esBetty=/ennovelas-tv\.com\/(?:series\/)?yo-soy-betty-la-fea(?:-|\/)/i.test(e.url||'') || /betty.*fea/i.test(((e.title||'')+' '+(e.serie||'')).toLowerCase());
+        if(esBetty&&e.img!==ENN_BETTY_COVER){e.img=ENN_BETTY_COVER;if(storedContinue[i])storedContinue[i].img=ENN_BETTY_COVER;continueChanged=true;}
+      }
+      if(continueChanged)saveContinuar();
       /* v96: sana TAMBIÉN al leer — las entradas viejas de episodios (con
        * el still de la escena) muestran el póster de la serie ya mismo,
        * sin esperar a que se vuelvan a guardar.
@@ -12280,6 +12335,8 @@ async function estrenosMezclados(){
         modo: body.modo === 'solo' ? 'solo' : '',
         ts: Date.now(),
       };
+      /* v285: Solo y Sala siempre persisten la portada canónica de Betty. */
+      if(/ennovelas-tv\.com\/(?:series\/)?yo-soy-betty-la-fea(?:-|\/)/i.test(entry.url) || /betty.*fea/i.test((entry.title+' '+entry.serie).toLowerCase())) entry.img=ENN_BETTY_COVER;
       if (!entry.url) return json(res, 400, { ok: false, error: 'Falta la URL' });
       /* v96: la entrada de un EPISODIO de serie lleva el PÓSTER DE LA
        * SERIE — las entradas creadas antes (o re-guardadas al retomar y
@@ -12488,12 +12545,13 @@ async function estrenosMezclados(){
             vistas: AF_VISTAS.size,
             activas: AF_TODOS.size - AF_OCULTAS.size,
           },
-          novelas: {
-            nombre: 'Novelas',
-            total: (NV_STATS.nv || 73) + (NV_STATS.enp || 120), /* auditoría sept 2026 hasta primer fetch */
-            ocultas: NV_OCULTAS.size,
-            vistas: NV_VISTAS.size,
-            activas: (NV_STATS.nv || 73) + (NV_STATS.enp || 120) - NV_OCULTAS.size,
+          ennovelas: {
+            nombre: 'Ennovelas',
+            total: ENN_SONDA.total || (ENN_VISTAS.size + ENN_OCULTAS.size),
+            ocultas: ENN_SONDA.ocultas || ENN_OCULTAS.size,
+            vistas: ENN_SONDA.auditadas || ENN_VISTAS.size,
+            activas: ENN_SONDA.visibles || ENN_VISTAS.size,
+            sonda: ENN_SONDA,
           },
           miscaricaturas: {
             nombre: 'MisCaricaturas',
@@ -12612,14 +12670,9 @@ async function estrenosMezclados(){
       return json(res, 200, { ok: true, progreso: Object.fromEntries(VIX_PROGRESO), sonda: VIX_SONDA });
     }
     if ((url.pathname === '/api/novelas-vix/catalogo' || url.pathname === '/api/vix/novelas') && req.method === 'GET') {
-      const items = [...VIX_CATALOGO.map(c => {
-        const p = VIX_PROGRESO.get(c.slug);
-        return { slug: c.slug, titulo: c.titulo, url: c.url, img: c.img||'/sites/novelas.png?v=247', vix: c.vix, fuente: c.vix?'vix':'ennovelas', extra: c.extra, progreso: p ? { pct: p.pct, estado: p.estado } : { pct: c.slug==='betty-la-fea'?100:0, estado: c.slug==='betty-la-fea'?'lista':'encolado' } };
-      }), ...ESTRELLAS_CATALOGO.map(c=>{
-        const p = ESTRELLAS_PROGRESO.get(c.slug);
-        return { slug: c.slug, titulo: c.titulo+' (Estrellas)', url: c.url, img: c.img||'/sites/novelas.png?v=247', vix:false, fuente:'lasestrellas', extra: c.extra, progreso: p ? { pct: p.pct, estado: p.estado } : { pct: 0, estado: 'encolado' } };
-      })];
-      return json(res, 200, { ok: true, total: items.length, items, sonda: VIX_SONDA, sondaEstrellas: ESTRELLAS_SONDA });
+      /* v285: ruta legacy reducida a la única fuente permitida: Ennovelas. */
+      const items = (await ennCatalogo()).map(c => ({ slug:c.slug, titulo:c.title, url:c.url, img:c.img, vix:false, fuente:'ennovelas', extra:c.extra, progreso:{pct:100,estado:'HLS HTTP confirmado'} }));
+      return json(res, 200, { ok:true, total:items.length, items, sonda:ENN_SONDA });
     }
     // v278: LasEstrellas endpoints por fuente separada
     if (url.pathname === '/api/estrellas/sonda' && req.method === 'GET') {
@@ -12633,13 +12686,9 @@ async function estrenosMezclados(){
       }
       return json(res, 200, { ok: true, progreso: Object.fromEntries(ESTRELLAS_PROGRESO), sonda: ESTRELLAS_SONDA });
     }
-    // v278: unificado 3 fuentes por separado para panel novelas-vix.html
+    // v285: endpoint legacy sin VIX/Estrellas; conserva solo Ennovelas.
     if (url.pathname === '/api/novelas-vix/sondas' && req.method === 'GET') {
-      return json(res, 200, { ok: true,
-        vix: { sonda: VIX_SONDA, progreso: Object.fromEntries(VIX_PROGRESO), catalogo: VIX_CATALOGO.map(c=>({slug:c.slug,titulo:c.titulo,fuente:c.vix?'vix':'ennovelas', extra:c.extra})) },
-        estrellas: { sonda: ESTRELLAS_SONDA, progreso: Object.fromEntries(ESTRELLAS_PROGRESO), catalogo: ESTRELLAS_CATALOGO.map(c=>({slug:c.slug,titulo:c.titulo,fuente:'lasestrellas', extra:c.extra})) },
-        ennovelas: { sonda: { at: VIX_SONDA.at, estado: VIX_SONDA.bettyOk?'vivo':'chequeando', bettyOk: VIX_SONDA.bettyOk }, catalogo: [{slug:'betty-la-fea', titulo:'Betty la Fea 335', fuente:'ennovelas'}] }
-      });
+      return json(res, 200, { ok:true, ennovelas:{sonda:ENN_SONDA, catalogo:(await ennCatalogo()).map(c=>({slug:c.slug,titulo:c.title,fuente:'ennovelas',extra:c.extra}))} });
     }
     if (url.pathname === '/api/estado') { /* v205.4: todo el estado en un JSON para el panel; v223: + cosecha; v227: + llave CDN */
       
@@ -12661,8 +12710,8 @@ async function estrenosMezclados(){
         espejos: MOVIE_ESPEJOS,
         espejoPreferido: movieEspejoPreferido() || null,
         intros: { analizados: CRAWL.hechas || 0, total: CRAWL.total || 0, enCola: CRAWL.pend.length, aprendidas: Object.keys(INTROS).length, sinIntro: (CRAWL.sinIntro || []).length, muestra },
-        moderacion: { animesMuertos: LA_MUERTAS_SET.size, animesCastDup: LA_OCULTAS_SET.size, pelisxd: PXD_OCULTAS.size, animeflv: AF_OCULTAS.size, animed23: D23_OCULTAS.size, cuevana: CV_OCULTAS_RT.size, novelas: NV_OCULTAS.size, caricaturasMuertas: DANI_MUERTAS.size + LCT_MUERTAS.size + CARI_MUERTAS.size, protegidas: CV_PROTEGIDAS.size, epsOcultos: EPS_MUERTOS.size, fallosEnCurso: [FALLOS_PXD, FALLOS_AF, FALLOS_CV, FALLOS_NV, FALLOS_DANI, FALLOS_LCT, FALLOS_CARI, FALLOS_D23, EPS_FALLOS].reduce((a2, mm2) => a2 + [...mm2.values()].filter((x2) => x2.f >= 1 && !x2.h).length, 0) },
-        catalogos: { caricaturas: cariFeedCache.items.length, cartoons: cariFeedCache.toons.length, liveaction: cariFeedCache.live.length, danimados: DANI_CAT.size, animes: LA_TODOS.size - LA_OCULTAS_SET.size - LA_MUERTAS_SET.size, novelas: nvdCache.items.length, animeflv: AF_TODOS.size - AF_OCULTAS.size, animed23: D23_TODOS.size - D23_OCULTAS.size },
+        moderacion: { animesMuertos: LA_MUERTAS_SET.size, animesCastDup: LA_OCULTAS_SET.size, pelisxd: PXD_OCULTAS.size, animeflv: AF_OCULTAS.size, animed23: D23_OCULTAS.size, cuevana: CV_OCULTAS_RT.size, ennovelas: ENN_OCULTAS.size, caricaturasMuertas: DANI_MUERTAS.size + LCT_MUERTAS.size + CARI_MUERTAS.size, protegidas: CV_PROTEGIDAS.size, epsOcultos: EPS_MUERTOS.size, fallosEnCurso: [FALLOS_PXD, FALLOS_AF, FALLOS_CV, FALLOS_NV, FALLOS_DANI, FALLOS_LCT, FALLOS_CARI, FALLOS_D23, EPS_FALLOS].reduce((a2, mm2) => a2 + [...mm2.values()].filter((x2) => x2.f >= 1 && !x2.h).length, 0) },
+        catalogos: { caricaturas: cariFeedCache.items.length, cartoons: cariFeedCache.toons.length, liveaction: cariFeedCache.live.length, danimados: DANI_CAT.size, animes: LA_TODOS.size - LA_OCULTAS_SET.size - LA_MUERTAS_SET.size, ennovelas: ENN_SONDA.visibles || ENN_VISTAS.size, animeflv: AF_TODOS.size - AF_OCULTAS.size, animed23: D23_TODOS.size - D23_OCULTAS.size },
         cosecha,
         movie: (() => { /* v207: estado del mapa local del app Movie */
           movieRecargar();
@@ -13088,5 +13137,5 @@ server.keepAliveTimeout = 65000;
 server.headersTimeout = 66000;
 server.timeout = 0; // streaming SSE sin timeout
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🎬 Huddle v268 corriendo en http://0.0.0.0:${PORT} — 100 usuarios, sonda 10conc/0.5s, auditoría 100% disponible`);
+  console.log(`🎬 Huddle ${UI_VERSION} corriendo en http://0.0.0.0:${PORT} — 100 usuarios, sonda HTTP/HLS, auditoría 100% disponible`);
 });
