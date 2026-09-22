@@ -8,3 +8,9 @@ nv:alta-mar
 enp:cirkin
 enp:esref-ruya
 enp:gozleri-karadeniz
+nv:outlander-5
+nv:outlander-3
+nv:ingobernable-2
+enp:muhtemel-ask
+enp:operacion-triunfo-estados-unidos
+enp:corazon-de-oro-online-hd
