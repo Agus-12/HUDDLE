@@ -1,6 +1,73 @@
 # 🧠 ARCHIVO DE CONTINUACIÓN — HUDDLE + APP MOVIE
 
-> **🔴 PARA REANUDAR EN OTRO CHAT: lee PRIMERO la sección de AQUÍ ABAJO (22 SEP 2026 — v286, AnimeD23 nativo — es el estado ACTUAL). El bloque 20 SEP sigue vigente para el capítulo "Movie", ya CERRADO.**
+> **🔴 PARA REANUDAR EN OTRO CHAT: lee PRIMERO la sección de AQUÍ ABAJO (22 SEP 2026 — v287, auditoría Latanime+AnimeFLV y podredumbre de episodios — es el estado ACTUAL). El bloque 20 SEP sigue vigente para el capítulo "Movie", ya CERRADO.**
+
+---
+
+## ✅ ESTADO ACTUAL — 22 SEP 2026 (v287): AUDITORÍA LATANIME + ANIMEFLV — LOS EPISODIOS CAÍDOS SE QUITAN SOLOS DE LA TEMPORADA
+
+### Lo que pedía el usuario (y la regla explícita)
+- AnimeFLV: varias series abrían y decían **"no encontré episodios de esta serie"**.
+- Latanime: episodios de varias series decían **"no encontró el servidor" / "está caído"**.
+- "La sonda no está funcionando."
+- **REGLA EXPLÍCITA (22 SEP):** si un episodio no funciona de verdad, **QUITAR ese episodio de la temporada** — no dejar eps muertos listados para siempre.
+
+### Diagnóstico verificado en vivo (producción + fuentes)
+1. **Los contadores de fallo se reiniciaban en cada deploy**: `FALLOS_PXD/AF/CV` y `EPS_FALLOS`
+   NUNCA se cargaban al arrancar (los demás `fallos-*.json` sí). La regla "3 fallos → oculto"
+   casi nunca se completaba → `epsOcultos: 0` en producción pese a fallos reales.
+2. **Juntos (salas) nunca contaba fallos de episodio**: `epsFallo` solo vivía en el catch de
+   `/api/solo`. En sala el fallo pasaba por `resolverNativo` (llamadores 3354/3742/…) sin
+   contabilidad.
+3. **Slugs de AnimeFLV muertos (404) nunca se ocultaban**: la ficha caía al catch genérico
+   ("No pude leer el anime") y la tarjeta seguía saliendo del buscador para siempre.
+4. **Latanime**: el mp4upload (que muere con "file was deleted") no siempre es el player
+   único: hay 7-8 players por ep (ok.ru, mixdrop, doodstream, filemoon, uqload…). Solo con
+   TODOS muertos el ep está muerto — el navegador del servidor puede salvar los otros.
+5. Producción (v286): `epsOcultos: 0, fallosEnCurso: 3, laMuertas: 1369, afOcultas: 35`.
+
+### Qué hace v287
+- **`epsPodredumbre()`** (nuevo, ~líneas 940-1060): cada 6 h (y 15 min post-arranque)
+  muestrea 6 series LA + 6 AF (las más vistas, sin muertas/ocultas) × 3 episodios
+  (primero/medio/último) y **prueba cada ep contra el sitio real**:
+  - LA: players de la página (`data-player` base64) — muerto solo si 0 players, o 404,
+    o TODOS los players son MEGA / mp4upload "file was deleted".
+  - AF: `data-encrypt` → POST `/flv` → embeds hex — misma regla estricta.
+  - Muerte → `epsFallo(url)` (el ep sale del picker con 3 fallos espaciados, igual que
+    los fallos de click); vida → `epsPerdonar` (los ocultos se re-prueban: hasta 10
+    apelaciones por ciclo).
+  - **Guarda anti-plantilla**: si los 5 primeros mueren a la vez → se aborta el ciclo
+    (cambio de plantilla del sitio ≠ muerte masiva).
+  - Log SIEMPRE al final: `[eps-podredumbre] ciclo terminado: N revisados…` (operación).
+- **Juntos cuenta fallos**: `resolverNativo` ahora envuelve `.catch(e => { if (esEpUrl) epsFallo; throw e })`.
+- **Contadores sobreviven deploys**: loaders de `fallos-pxd/af/cv/eps.json` al arranque.
+- **AF slug 404 → se oculta al momento** (`AF_OCULTAS` + `af-ocultas.txt`) con mensaje
+  específico: "Esta serie ya no existe en AnimeFLV (la tarjeta se ocultará)".
+- **El picker muestra el motivo real** (`d.error` en vez de "No encontré episodios").
+- `UI_VERSION v287`.
+
+### Verificado en vivo (server local, 22 SEP)
+- AF 404 real (`jujutsu-kaisen-tv-b`) → 502 con mensaje específico + slug persistido en
+  `af-ocultas.txt` ✓ · AF vivo (`one-piece`) → ficha 1179 eps ✓
+- Probes reales: ep LA con mp4upload borrado + 6 players vivos → **vivo** (no se toca);
+  ep AF con uqload + mp4upload borrado → **vivo** ✓ (antes se contaban como muertos:
+  falso positivo cazado y corregido con la regla estricta).
+- `node --check` OK en server.js y app.js.
+
+### Nota de sandbox
+`animed23.com` sigue con challenge Cloudflare a la IP del sandbox (no afecta a v287;
+Latanime y AnimeFLV SÍ son alcanzables desde aquí y se probaron contra el sitio real).
+
+### Despliegue
+`cd ~/huddle && bash actualizar.sh`. Primer ciclo de la sonda de episodios a los 15 min
+de arrancar; luego cada 6 h. En el log: `[eps-podredumbre] ciclo terminado…`.
+
+### Archivos tocados
+- `server.js`: loaders FALLOS_PXD/AF/CV + EPS_FALLOS; wrapper `resolverNativo`;
+  bloque `epsPodredumbre` (`epsEpsDeFichaLA/AF`, `epsProbar`, timers); rama AF 404 en
+  `/api/anime`.
+- `public/app.js`: 1 línea — el picker muestra `d.error` (motivo real).
+- Docs: `LATANIME-AUDIT.md` + `ANIMEFLV-AUDIT.md` (notas v287).
 
 ---
 

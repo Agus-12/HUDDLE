@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v286'; // v286: AnimeD23 REPRODUCE — ficha + resolver HTTP puro (Byse→OK→rpmvid) + búsqueda global; portadas/stills y reproducción HTTP/HLS intactas
+const UI_VERSION = 'v287'; // v286: AnimeD23 REPRODUCE — ficha + resolver HTTP puro (Byse→OK→rpmvid) + búsqueda global; portadas/stills y reproducción HTTP/HLS intactas
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -326,7 +326,7 @@ function resolverNativo(url) {
   const k = String(url || '');
   const enVuelo = RESOLVIENDO.get(k);
   if (enVuelo) return enVuelo;
-  const p = resolverNativoInterno(url).finally(() => RESOLVIENDO.delete(k));
+  const p = resolverNativoInterno(url).catch((e) => { if (esEpUrl(k)) epsFallo(k); throw e; }).finally(() => RESOLVIENDO.delete(k)); /* v287: los fallos en Juntos también cuentan (antes solo Solo, y el contador se reiniciaba en cada deploy) */
   RESOLVIENDO.set(k, p);
   return p;
 }
@@ -541,10 +541,12 @@ async function laRevizar() { /* apelaciones: ocultadas hace <7 días, una a una 
 setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); sondaNovelas().catch(() => {}); sondaD23().catch(() => {}); 
   // v252 Huddle: si no hay auditoría activa, igual corre una pasada ligera 24/7 cada 6h
   if(!HUDDLE_AUDITORIA.activo) sondaHuddleGeneral().catch(()=>{});
-}, 90 * 1000);
+}, 90 * 1000); /* v287: + podredumbre de episodios */
+setTimeout(() => { epsPodredumbre().catch(() => {}); }, 15 * 60 * 1000);
 setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); sondaNovelas().catch(() => {}); sondaD23().catch(() => {}); 
   if(!HUDDLE_AUDITORIA.activo) sondaHuddleGeneral().catch(()=>{});
-}, 6 * 3600 * 1000);
+}, 6 * 3600 * 1000); /* v287: el ciclo de 6h también corre la podredumbre de episodios */
+setInterval(() => { epsPodredumbre().catch(() => {}); }, 6 * 3600 * 1000);
 
 /* v234: SONDA PELISXD — revisa películas ocultas para ver si volvieron */
 /* v234: SONDA PELISXD COMPLETA — 3 frentes:
@@ -803,13 +805,23 @@ const AF_TODOS = new Set(), AF_VISTAS = new Set(); /* v243: catálogo + verifica
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'animeflv-slugs.txt'), 'utf8').split('\n')) if (l.trim()) AF_TODOS.add(l.trim()); } catch {}
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'af-vistas.txt'), 'utf8').split('\n')) if (l.trim()) AF_VISTAS.add(l.trim()); } catch {}
 const FALLOS_PXD = new Map(), FALLOS_AF = new Map(), FALLOS_CV = new Map();
-for (const [mapa, arch] of [[FALLOS_PXD, 'fallos-pxd.json'], [FALLOS_AF, 'fallos-af.json'], [FALLOS_CV, 'fallos-cv.json']]) {
-  try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR, arch), 'utf8')) || {})) mapa.set(k, v); } catch {}
-}
+/* v287: los contadores de fallo ahora sobreviven a cada deploy (antes se
+ * reiniciaban al arrancar y la regla de "3 fallos" casi nunca se completaba) */
+for (const [mapa, arch] of [[FALLOS_PXD, 'fallos-pxd.json'], [FALLOS_AF, 'fallos-af.json'], [FALLOS_CV, 'fallos-cv.json']]) fallosCargar(mapa, arch);
 const fallosGuardarT = new Map();
+/* v287: loader tolerante — los fallos-*.json viejos se guardaban como arreglo
+ * de pares y el loader los leía como objeto (nunca se cargaban). Ambos formatos
+ * se aceptan ahora; el guardado queda en formato objeto. */
+function fallosCargar(mapa, arch) {
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(DATA_DIR, arch), 'utf8'));
+    const entradas = Array.isArray(raw) ? raw : Object.entries(raw || {});
+    for (const [k, v] of entradas) if (k && v && typeof v === 'object') mapa.set(String(k), v);
+  } catch {}
+}
 function fallosGuardar(mapa, arch) {
   if (fallosGuardarT.has(arch)) return;
-  const t = setTimeout(() => { fallosGuardarT.delete(arch); try { fs.writeFileSync(path.join(DATA_DIR, arch), JSON.stringify([...mapa.entries()])); } catch {} }, 4000);
+  const t = setTimeout(() => { fallosGuardarT.delete(arch); try { fs.writeFileSync(path.join(DATA_DIR, arch), JSON.stringify(Object.fromEntries(mapa))); } catch {} }, 4000);
   t.unref(); fallosGuardarT.set(arch, t);
 }
 function falloRegistrar(mapa, arch, clave, alOcultar) {
@@ -904,6 +916,7 @@ async function revivirGeneral() {
  * reproduce, perdona y vuelve. */
 const EPS_FALLOS = new Map(), EPS_MUERTOS = new Set();
 try { for (const x of JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'eps-muertos.json'), 'utf8')) || []) EPS_MUERTOS.add(x); } catch {}
+fallosCargar(EPS_FALLOS, 'fallos-eps.json'); /* v287: contadores de episodio sobreviven al deploy */
 let epsT1 = null;
 const epsEscribir = () => { try { fs.writeFileSync(path.join(DATA_DIR, 'eps-muertos.json'), JSON.stringify([...EPS_MUERTOS])); } catch {} };
 function esEpUrl(u) {
@@ -931,6 +944,134 @@ function epsPerdonar(u) {
   }
 }
 const epsVivos = (eps) => (eps || []).filter((e) => e && e.url && !EPS_MUERTOS.has(e.url)); /* v251 muertas siempre ocultas */
+
+/* v287: PODREDUMBRE DE EPISODIOS — los capítulos muertos salen solos de la
+ * temporada, sin esperar a que el usuario los pique 3 veces. Solo cuenta
+ * señales de muerte DEFINITIVAS (página sin ningún reproductor, o
+ * mp4upload "file was deleted"); si el episodio trae otros players, se deja
+ * en manos del navegador y NO se marca. Si la mayor parte de la muestra
+ * "muere" a la vez, se aborta el ciclo (cambio de plantilla ≠ muerte masiva).
+ * Los episodios ocultos que vuelven a vivir se reviven (epsPerdonar). */
+let epsPodrundo = false;
+async function epsEpsDeFichaLA(slug) {
+  try {
+    const r = await fetchSeguro('https://latanime.org/anime/' + slug, 12000);
+    if (!r || !r.ok) return null;
+    const h = await r.text();
+    const out = []; const vistos = new Set();
+    for (const m of h.matchAll(/href="(https:\/\/latanime\.org\/ver\/[a-z0-9-]+-episodio-\d+(?:-[a-z0-9]+)?)/g)) if (!vistos.has(m[1])) { vistos.add(m[1]); out.push(m[1]); }
+    return out.length ? out : null;
+  } catch { return null; }
+}
+async function epsEpsDeFichaAF(slug) {
+  try {
+    const r = await fetchSeguro('https://vww.animeflv.one/anime/' + slug, 12000);
+    if (!r || !r.ok) return null;
+    const h = await r.text();
+    const nums = new Set();
+    const bloque = /var\s+eps\s*=\s*(\[[\s\S]*?\]);/.exec(h);
+    if (bloque) { try { for (const it of JSON.parse(bloque[1])) if (it && it[0]) nums.add(+it[0]); } catch {} }
+    if (!nums.size) { const re = /\["(\d+)","0","[^"]*"\]/g; let mm; while ((mm = re.exec(h)) && nums.size < 500) nums.add(+mm[1]); }
+    return nums.size ? [...nums].sort((a, b) => a - b).map((n) => 'https://vww.animeflv.one/ver/' + slug + '-' + n) : null;
+  } catch { return null; }
+}
+async function epsProbar(url) {
+  /* null = indeciso (red/site fuera), true = vivo, false = muerte definitiva.
+   * Regla estricta (v287b): solo se declara muerto si NO queda nada que el
+   * navegador pudiera sacar — sin players, o todos los players son MEGA o
+   * mp4uploads con "file was deleted". Si queda CUALQUIER otro player, se
+   * deja vivo (el navegador del servidor puede salvarlo). */
+  try {
+    const jugadorMuerto = async (u, ref) => {
+      if (/mega\.nz/i.test(u)) return true; /* MEGA no lo abre el navegador */
+      if (/mp4upload\./i.test(u)) {
+        const em = await fetchSeguro(u, 10000, { Referer: ref }).then((x) => (x && x.ok ? x.text() : null)).catch(() => null);
+        return em !== null && /file was deleted/i.test(em);
+      }
+      return false; /* desconocido: el navegador puede con él */
+    };
+    const juegar = async (players, ref) => {
+      if (!players.length) return false;
+      let todosPerdidos = true;
+      for (const u of players) {
+        if (!(await jugadorMuerto(u, ref))) { todosPerdidos = false; break; }
+      }
+      return !todosPerdidos;
+    };
+    if (/latanime\.org\/ver\//i.test(url)) {
+      const r = await fetchSeguro(url, 12000, { Referer: 'https://latanime.org/' });
+      if (r && r.status === 404) return false; /* el episodio ya no existe */
+      if (!r || !r.ok) return null;
+      const h = await r.text();
+      const players = [...h.matchAll(/<a\b[^>]*class="[^"]*play-video[^"]*"[^>]*data-player="([^"]+)"[^>]*>/gi)]
+        .map((m) => { try { return Buffer.from(m[1], 'base64').toString('utf8'); } catch { return ''; } }).filter((u) => /^https?:\/\//i.test(u));
+      return juegar(players, 'https://latanime.org/');
+    }
+    if (/animeflv\.one\/ver\//i.test(url)) {
+      const r = await fetchSeguro(url, 12000, { Referer: 'https://vww.animeflv.one/' });
+      if (r && r.status === 404) return false; /* el episodio ya no existe */
+      if (!r || !r.ok) return null;
+      const h = await r.text();
+      const enc = (/class="opt"[^>]*data-encrypt="([0-9a-f]+)"/i.exec(h) || [])[1];
+      if (!enc) return false; /* la página ya no trae servidores */
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 10000);
+      let cuerpo = '';
+      try {
+        const pf = await fetch('https://vww.animeflv.one/flv', { method: 'POST', headers: { 'User-Agent': MIRROR_UA, Referer: url, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' }, body: 'acc=opt&i=' + enc, signal: ctl.signal, redirect: 'follow' });
+        cuerpo = await pf.text();
+      } catch { clearTimeout(t); return null; }
+      clearTimeout(t);
+      const embeds = [...cuerpo.matchAll(/<li[^>]*encrypt="([0-9a-f]+)"/gi)]
+        .map((m) => { try { return Buffer.from(m[1], 'hex').toString('utf8'); } catch { return ''; } }).filter((u) => /^https?:\/\//i.test(u));
+      return juegar(embeds, 'https://vww.animeflv.one/');
+    }
+    return null;
+  } catch { return null; }
+}
+async function epsPodredumbre() {
+  if (epsPodrundo) return; epsPodrundo = true;
+  try {
+    const pausa = (ms) => new Promise((r2) => setTimeout(r2, ms));
+    const shuf = (arr) => { const a = [...arr]; for (let k = a.length - 1; k > 0; k--) { const z = Math.floor(Math.random() * (k + 1)); [a[k], a[z]] = [a[z], a[k]]; } return a; };
+    let revisados = 0, muertos = 0, revividos = 0;
+    const cola = []; /* estados {url, st} — se cuentan al final de la muestra inicial */
+    const contar = (url, st) => { if (st === null) return; revisados++; if (st === false) { muertos++; epsFallo(url); } else if (EPS_MUERTOS.has(url)) { revividos++; epsPerdonar(url); } };
+    const probar = async (url) => {
+      const st = await epsProbar(url);
+      cola.push({ url, st });
+      if (cola.length === 5) { /* guarda: si los 5 primeros mueren a la vez, es la plantilla, no la vida */
+        const m = cola.filter((c) => c.st === false).length;
+        if (m === 5) { console.log('[eps-podredumbre] muestra inicial 5/5 muerta — parece cambio de plantilla del sitio, ciclo abortado sin contar'); return false; }
+        for (const c of cola) contar(c.url, c.st);
+        cola.length = 0;
+      }
+      await pausa(2200);
+      return true;
+    };
+    const muestrearSerie = async (slug, fichaFn, nEps) => {
+      const ficha = await fichaFn(slug);
+      if (!ficha || !ficha.length) return true;
+      const muestra = [...new Set([ficha[0], ficha[Math.floor(ficha.length / 2)], ficha[ficha.length - 1]])].slice(0, nEps);
+      for (const u of muestra) { const ok = await probar(u); if (!ok) return false; }
+      return true;
+    };
+    const slugsLA = shuf([...LA_VISTAS].filter((s) => !LA_MUERTAS_SET.has(s) && !LA_OCULTAS_SET.has(s))).slice(0, 6);
+    const slugsAF = shuf([...AF_VISTAS].filter((s) => !AF_OCULTAS.has(s))).slice(0, 6);
+    let seguir = true;
+    for (const s of slugsLA) { seguir = await muestrearSerie(s, epsEpsDeFichaLA, 3); await pausa(1500); if (!seguir) break; }
+    if (seguir) for (const s of slugsAF) { seguir = await muestrearSerie(s, epsEpsDeFichaAF, 3); await pausa(1500); if (!seguir) break; }
+    if (seguir) { for (const c of cola) contar(c.url, c.st); cola.length = 0; }
+    /* apelaciones: los ocultos se re-prueban para revivirlos (hasta 10 por ciclo) */
+    if (seguir) for (const u of [...EPS_MUERTOS].slice(0, 10)) {
+      const st = await epsProbar(u);
+      if (st === true) { revisados++; revividos++; epsPerdonar(u); }
+      await pausa(2200);
+    }
+    if (revisados !== muertos && (muertos || revividos)) console.log('[eps-podredumbre] ciclo: ' + muertos + ' contados como fallidos, ' + revividos + ' revividos');
+    console.log('[eps-podredumbre] ciclo terminado: ' + revisados + ' revisados, ' + muertos + ' fallidos, ' + revividos + ' revividos, ocultos totales=' + EPS_MUERTOS.size);
+  } catch (e) { console.log('[eps-podredumbre] ERROR:', String(e.message || e).slice(0, 120)); }
+  finally { epsPodrundo = false; }
+}
 
 /* v206: NOVELAS — novelas360.com (telenovelas por capítulos, HTTP puro).
  * Catálogo = tab «Todos» de /series/ (portada en data-src, título en
@@ -1095,7 +1236,7 @@ async function sondaEstrellasNovelas(){
 setTimeout(()=>{ sondaEstrellasNovelas().catch(()=>{}); }, 27000);
 setInterval(()=>{ sondaEstrellasNovelas().catch(()=>{}); }, 10*60*1000);
 const FALLOS_NV = new Map();
-try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'fallos-nv.json'), 'utf8')) || {})) FALLOS_NV.set(k, v); } catch {}
+fallosCargar(FALLOS_NV, 'fallos-nv.json');
 function nvOcultar(slug) {
   falloRegistrar(FALLOS_NV, 'fallos-nv.json', slug, (k2) => {
     if (NV_OCULTAS.has(k2)) return;
@@ -1118,9 +1259,9 @@ try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'cari-muert
 const CARI_VISTAS = new Set(); /* claves dani:|lct:|cari: ya verificadas */
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'cari-vistas.txt'), 'utf8').split('\n')) if (l.trim()) CARI_VISTAS.add(l.trim()); } catch {}
 const FALLOS_DANI = new Map(), FALLOS_LCT = new Map(), FALLOS_CARI = new Map();
-try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'fallos-dani.json'), 'utf8')) || {})) FALLOS_DANI.set(k, v); } catch {}
-try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'fallos-lct.json'), 'utf8')) || {})) FALLOS_LCT.set(k, v); } catch {}
-try { for (const [k, v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'fallos-cari.json'), 'utf8')) || {})) FALLOS_CARI.set(k, v); } catch {}
+fallosCargar(FALLOS_DANI, 'fallos-dani.json');
+fallosCargar(FALLOS_LCT, 'fallos-lct.json');
+fallosCargar(FALLOS_CARI, 'fallos-cari.json');
 function daniOcultar(slug) {
   falloRegistrar(FALLOS_DANI, 'fallos-dani.json', slug, (k2) => {
     if (DANI_MUERTAS.has(k2)) return;
@@ -2405,7 +2546,7 @@ try {
   for(const [slug,row] of Object.entries(d23Covers.items||{})) if(row && row.poster) D23_IMDB_COVERS.set(slug,row);
 } catch {}
 const FALLOS_D23 = new Map();
-try { for (const [k,v] of Object.entries(JSON.parse(fs.readFileSync(path.join(DATA_DIR,'fallos-d23.json'),'utf8'))||{})) FALLOS_D23.set(k,v); } catch {}
+fallosCargar(FALLOS_D23, 'fallos-d23.json');
 console.log('[d23] '+D23_TODOS.size+' animes ('+D23_OCULTAS.size+' ocultas, '+D23_VISTAS.size+' vistas)');
 
 /* v286: ficha de AnimeD23 — lista de capítulos para el picker (misma forma
@@ -12213,6 +12354,10 @@ async function estrenosMezclados(){
       if (c && Date.now() - c.at < 30 * 60 * 1000) return json(res, 200, c.d);
       try {
         const r = await fetchSeguro(`https://vww.animeflv.one/anime/${slug}`, 10000);
+        if (r && r.status === 404) { /* v287: el sitio renombró/borró esta serie — la tarjeta muerta dejaba de salir del buscador */
+          if (!AF_OCULTAS.has(slug)) { AF_OCULTAS.add(slug); ocultasReescribir(AF_OCULTAS, 'af-ocultas.txt'); console.log('[af] ' + slug + ' ya no existe en el sitio (404) — oculta del buscador'); }
+          return json(res, 502, { ok: false, error: 'Esta serie ya no existe en AnimeFLV (la tarjeta se ocultará)' });
+        }
         if (!r.ok) return json(res, 502, { ok: false, error: 'No pude leer el anime' });
         const html = await r.text();
         /* lista completa viene como: var eps = [["220","0",""],["219","0",""],...] */

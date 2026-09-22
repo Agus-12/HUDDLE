@@ -188,3 +188,18 @@ curl -s "http://129.80.212.92:3000/api/estado" | python3 -c "import sys,json; d=
 ---
 
 *Documento generado: v239.13 — 21 septiembre 2026*
+
+---
+
+## Nota v287 (22 sep 2026) — podredumbre de episodios
+- El mp4upload NO es el único player: los eps traen 7-8 players (filemoon, ok.ru,
+  mixdrop, doodstream, yourupload, wolfstream, mp4upload, mega…).
+- **Regla de muerte de EPISODIO (v287, estricta):** un ep solo se declara muerto si
+  su página da 404, o tiene 0 players, o TODOS los players son MEGA / mp4uploads con
+  "file was deleted". Si queda CUALQUIER otro player, se deja vivo (el navegador del
+  servidor puede sacarlo) y si el usuario falla al reproducirlo, el fallo se cuenta
+  igual (v287: Juntos también cuenta).
+- `epsPodredumbre()` muestrea 6 series (las más vistas) × 3 eps cada 6 h; los eps
+  muertos salen del picker solos (3 fallos espaciados → `EPS_MUERTOS`), y los
+  ocultos se re-prueban para revivirlos (hasta 10/ciclo).
+- Los contadores (`fallos-eps.json`, `eps-muertos.json`) ahora sobreviven a deploys.

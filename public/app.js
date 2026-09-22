@@ -1566,7 +1566,7 @@ function abrirSeriePicker(res, enSala, esAnime) {
       ? (d.episodios || []).map((e) => ({ temporada: 1, ep: e.n, url: e.url, titulo: e.titulo || ('Episodio ' + e.n), img: '' }))
       : (d.episodios || []);
     if (!d.ok || !eps.length) {
-      $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">No encontré episodios de esta ' + (esAnime ? 'serie' : 'serie') + '</div>';
+      $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">' + (d && d.error ? d.error : 'No encontré episodios de esta serie') + '</div>'; /* v287: muestra el motivo real (antes siempre decía lo mismo) */
       $('#spMeta').textContent = '';
       return;
     }

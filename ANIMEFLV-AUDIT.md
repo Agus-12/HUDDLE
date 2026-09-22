@@ -34,3 +34,16 @@ Hosts vistos: mp4upload, hqq, ok.ru, mega, yourupload, voe, uqload, streamwish, 
 - `sondaAnimeflv`: 5 vivas + 3 muertas por ciclo (arranque + 6h), pausas 1.5s, log `sonda-animeflv.log`, notifica como `AnimeFLV`.
 - Podredumbre `FALLOS_AF` (3 fallos) + `AF_VISTAS` (`public/af-vistas.txt`).
 - Tarjeta AnimeFLV (melocotón `#feac5d`, logo AF) con detalle y log; Catálogo Series suma Latanime + AnimeFLV.
+
+## Nota v287 (22 sep 2026) — slugs 404 + podredumbre de episodios
+- **Slugs muertos (404) ya no se quedan colgando en el buscador:** la rama AF de
+  `/api/anime/<slug>` ahora, si el sitio responde 404, oculta el slug al momento
+  (`AF_OCULTAS` + `af-ocultas.txt`) y devuelve el mensaje específico "Esta serie ya
+  no existe en AnimeFLV (la tarjeta se ocultará)" (antes: error genérico y la
+  tarjeta seguía saliendo). Verificado con slug muerto real (`jujutsu-kaisen-tv-b`).
+- **Podredumbre de episodios:** `epsPodredumbre()` muestrea 6 series × 3 eps cada 6 h.
+  Muerte estricta: página 404, sin `data-encrypt`, 0 embeds tras POST `/flv`, o todos
+  los embeds MEGA / mp4upload "file was deleted". Con cualquier otro embed vivo
+  (uqload, hqq, streamwish…) el ep se deja vivo (el navegador lo saca).
+- El picker muestra el MOTIVO real del fallo (`d.error`) en vez de "No encontré
+  episodios de esta serie".
