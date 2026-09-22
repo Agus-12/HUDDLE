@@ -4094,9 +4094,18 @@ function guardarHistorial(res){
     const key='huddle_historial';
     let arr=[]; try{ arr=JSON.parse(localStorage.getItem(key)||'[]'); }catch{}
     if(!Array.isArray(arr)) arr=[];
-    // evita duplicado consecutivo
     if(arr.length && arr[0].url===res.url) return;
-    arr.unshift({ title: res.title||'', url: res.url||'', site: res.site||'', at: Date.now() });
+    // intenta capturar género de la fila donde se clickeó (si el res viene de un género)
+    let g = res._g || '';
+    if(!g){
+      try{
+        const card = document.querySelector(`[data-url="${CSS.escape(res.url)}"]`);
+        const sec = card && card.closest('.sr-sec');
+        const titleEl = sec && sec.querySelector('.sr-sec-titulo span');
+        if(titleEl) g = titleEl.textContent.trim().toLowerCase();
+      }catch{}
+    }
+    arr.unshift({ title: res.title||'', url: res.url||'', site: res.site||'', genero: g||'', at: Date.now() });
     if(arr.length>24) arr=arr.slice(0,24);
     localStorage.setItem(key, JSON.stringify(arr));
   }catch{}
@@ -4146,7 +4155,7 @@ async function cargarPopulares() {
     }
     /* v67: tercera fila — animes del momento (Latanime); un toque abre
      * el selector de episodios, igual que cualquier anime */
-    // v270: Recomendado para ti — solo si hay historial (>=3)
+    // v271: Recomendado mixto 30% género top + 25%+25%+20% mixto
     try{
       const hist = JSON.parse(localStorage.getItem('huddle_historial')||'[]');
       const recoBox = document.querySelector('#recoBox');
@@ -4155,36 +4164,76 @@ async function cargarPopulares() {
         try{ const p=JSON.parse(localStorage.getItem('huddle_profile')||'null'); return p&&p.name; }catch{return '';}
       })() || '';
       if(recoBox && recoRow && hist && hist.length>=3){
-        const palabras = {};
-        hist.slice(0,8).forEach(h=>{
-          (h.title||'').toLowerCase().split(/[^a-z0-9áéíóúñ]+/).forEach(w=>{
-            if(w.length<3) return;
-            if(['the','los','las','del','una','con','para','esta','este','esto','pelicula','serie','anime'].includes(w)) return;
-            palabras[w]=(palabras[w]||0)+1;
-          });
+        // mapa url -> género (para contar qué género ve más)
+        const urlToGenero = new Map();
+        (d.generos||[]).forEach(g=> (g.items||[]).forEach(it=> { if(it.url) urlToGenero.set(it.url, g.slug); }));
+        const generoCount = {};
+        hist.forEach(h=>{
+          let g = urlToGenero.get(h.url);
+          if(!g){
+            // fallback por coincidencia de título con pool de géneros
+            const poolG = (d.generos||[]).flatMap(x=> (x.items||[]).map(it=> ({...it, gslug:x.slug})));
+            const found = poolG.find(p=> p.title && h.title && p.title.toLowerCase()===h.title.toLowerCase());
+            if(found) g=found.gslug;
+          }
+          if(g) generoCount[g]=(generoCount[g]||0)+1;
         });
-        const topW = Object.entries(palabras).sort((a,b)=>b[1]-a[1]).slice(0,4).map(x=>x[0]);
-        // junta todo el feed para buscar similares
-        const pool = [
-          ...(d.results||[]), ...(d.series||[]), ...(d.animes||[]),
-          ...(d.generos||[]).flatMap(g=>g.items||[]),
-          ...(d.caris||[]), ...(d.cartoons||[]), ...(d.liveaction||[]),
-          ...(d.estrenos||[]), ...(d.pelisxd||[]), ...(d.cuevana||[])
-        ];
+        const topGenero = Object.entries(generoCount).sort((a,b)=>b[1]-a[1])[0]?.[0] || null;
         const vistos = new Set(hist.map(h=>h.url));
-        let recom = [];
-        if(topW.length){
-          recom = pool.filter(r=> !vistos.has(r.url) && topW.some(w=> (r.title||'').toLowerCase().includes(w))).slice(0,16);
+        // pools
+        const poolGeneros = (d.generos||[]).flatMap(g=> (g.items||[]).map(it=> ({...it, _g:g.slug})) ).filter(r=>!vistos.has(r.url));
+        const poolTrending = (d.results||[]).filter(r=>!vistos.has(r.url));
+        const poolSeriesAnimes = [...(d.series||[]), ...(d.animes||[])].filter(r=>!vistos.has(r.url));
+        const poolEstrenos = [...(d.estrenos||[]), ...(d.pelisxd||[]), ...(d.cuevana||[])].filter(r=>!vistos.has(r.url));
+        const poolCaris = [...(d.caricaturas||[]), ...(d.cartoons||[]), ...(d.liveaction||[])].filter(r=>!vistos.has(r.url));
+        const poolTodos = [...poolGeneros, ...poolTrending, ...poolSeriesAnimes, ...poolEstrenos, ...poolCaris];
+        // helper shuffle
+        const shuf = (a)=>{ const x=[...a]; for(let i=x.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [x[i],x[j]]=[x[j],x[i]];} return x; };
+        const recom = [];
+        const pushUnique = (arr, n)=>{
+          const s = shuf(arr);
+          for(const r of s){ if(recom.length>=16) break; if(recom.find(x=>x.url===r.url)) continue; if(recom.length<n || recom.length <16) recom.push(r); if(recom.length>=n) break; }
+        };
+        // 30% del género que más ve (5 de 16)
+        if(topGenero){
+          const topPool = poolGeneros.filter(r=> r._g===topGenero);
+          const needTop = 5;
+          const chosenTop = shuf(topPool).slice(0, Math.min(needTop, topPool.length));
+          chosenTop.forEach(r=> recom.push(r));
+          // si no hay suficientes del top, completa con ese género desde poolTodos que contenga palabra clave del historial
+          if(chosenTop.length < needTop){
+            const palabras = {};
+            hist.slice(0,6).forEach(h=> (h.title||'').toLowerCase().split(/[^a-z0-9áéíóúñ]+/).forEach(w=>{ if(w.length<3) return; palabras[w]=(palabras[w]||0)+1; }));
+            const topW = Object.entries(palabras).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]);
+            const extra = poolTodos.filter(r=> topW.some(w=> (r.title||'').toLowerCase().includes(w)) && !recom.find(x=>x.url===r.url)).slice(0, needTop - chosenTop.length);
+            extra.forEach(r=> recom.push(r));
+          }
+        } else {
+          // sin top, toma 5 aleatorios de géneros
+          pushUnique(poolGeneros, 5);
         }
-        if(recom.length<8){
-          // fallback: aleatorio de generos
-          const pool2 = (d.generos||[]).flatMap(g=>g.items||[]).filter(r=>!vistos.has(r.url));
-          const sh = [...pool2]; for(let i=sh.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [sh[i],sh[j]]=[sh[j],sh[i]]; }
-          for(const r of sh){ if(recom.length>=12) break; if(!recom.find(x=>x.url===r.url)) recom.push(r); }
+        // 25% trending/pelis populares (4)
+        const needA = 4; const beforeA = recom.length;
+        const mixA = shuf(poolTrending).slice(0, needA);
+        mixA.forEach(r=> { if(!recom.find(x=>x.url===r.url)) recom.push(r); });
+        // 25% series+animes (4)
+        const needB = 4; const mixB = shuf(poolSeriesAnimes).slice(0, needB);
+        mixB.forEach(r=> { if(!recom.find(x=>x.url===r.url)) recom.push(r); });
+        // 20% estrenos/caris mix (3) — resto hasta 16
+        const needC = 16 - recom.length;
+        const mixC = shuf([...poolEstrenos, ...poolCaris]).slice(0, needC);
+        mixC.forEach(r=> { if(!recom.find(x=>x.url===r.url)) recom.push(r); });
+        // si aún falta, completa con poolTodos
+        if(recom.length < 12){
+          const extra = shuf(poolTodos).filter(r=> !recom.find(x=>x.url===r.url)).slice(0, 16 - recom.length);
+          extra.forEach(r=> recom.push(r));
         }
-        if(recom.length){
+        // recorta a 16 y baraja final leve para no verse bloqueado
+        const final = shuf(recom).slice(0,16);
+        // Si el top existe, asegura que al menos 4-5 del top queden visibles al inicio mezclados
+        if(final.length){
           recoRow.innerHTML='';
-          recom.slice(0,16).forEach(res=> recoRow.appendChild(crearTarjetaResultado(res, alTocar(res))));
+          final.forEach(res=> recoRow.appendChild(crearTarjetaResultado(res, alTocar(res))));
           const t = document.querySelector('#recoTitle');
           if(t) t.textContent = nombre ? ('Recomendado para ' + nombre) : 'Recomendado para ti';
           recoBox.classList.remove('hidden');
