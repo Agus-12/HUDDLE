@@ -1542,10 +1542,11 @@ function imgPorProxy(src) {
   return src;
 }
 function abrirSeriePicker(res, enSala, esAnime) {
+  const esEnn = /ennovelas-tv\.com\//i.test(res.url || ''); /* v278.4 */
   const esNv = /novelas360\.com\/categories\//i.test(res.url || ''); /* v206 */
   const esEnp = /enpantallatv\.com\//i.test(res.url || ''); /* v206.2 */
   const esMovie = /movie\.huddle\/(?:serie|v)\//i.test(res.url || ''); /* v207: app Movie · v212: v = catálogo vivo */
-  const slugM = esMovie ? (/movie\.huddle\/(?:serie|v)\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esNv ? (/categories\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esEnp ? (/enpantallatv\.com\/([a-z0-9-]+)/i.exec(res.url || '') || []) : (/(?:serie|anime)\/([a-z0-9-]+)/i.exec(res.url || '') || []);
+  const slugM = esEnn ? (/ennovelas-tv\.com\/(?:series\/)?([a-z0-9-]+)/i.exec(res.url || '') || []) : esMovie ? (/movie\.huddle\/(?:serie|v)\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esNv ? (/categories\/([a-z0-9-]+)/i.exec(res.url || '') || []) : esEnp ? (/enpantallatv\.com\/([a-z0-9-]+)/i.exec(res.url || '') || []) : (/(?:serie|anime)\/([a-z0-9-]+)/i.exec(res.url || '') || []);
   if (!slugM || !slugM[1]) { toast('No pude leer esa serie'); return; }
   const slug = slugM[1];
   const esLat = /latanime\./i.test(res.url || ''); /* v63: anime de Latanime */
@@ -1558,7 +1559,7 @@ function abrirSeriePicker(res, enSala, esAnime) {
   if (poster0) { po.src = poster0; po.style.display = ''; } else po.style.display = 'none';
   $('#spTemporadas').innerHTML = '';
   $('#spEpisodios').innerHTML = '<div class="sp-meta" style="padding:20px 0;text-align:center">Buscando episodios…</div>';
-  fetch((esMovie ? '/api/movie/ficha/' + (/movie\.huddle\/v\//i.test(res.url || '') ? 'v' : '') + slug : esEnp ? '/api/enp/' + slug : esNv ? '/api/novelas/' + slug : esAnime ? ('/api/anime/' + slug + (esLat ? '?site=latanime' : '')) : '/api/serie/' + slug)).then((r) => r.json()).then((d) => { /* v206 + v206.2 + v207 · v216: el catálogo vivo pide ficha v<vod> */
+  fetch((esEnn ? '/api/ennovelas/' + slug : esMovie ? '/api/movie/ficha/' + (/movie\.huddle\/v\//i.test(res.url || '') ? 'v' : '') + slug : esEnp ? '/api/enp/' + slug : esNv ? '/api/novelas/' + slug : esAnime ? ('/api/anime/' + slug + (esLat ? '?site=latanime' : '')) : '/api/serie/' + slug)).then((r) => r.json()).then((d) => { /* v278.4 + v206 + v206.2 + v207 · v216: el catálogo vivo pide ficha v<vod> */
     /* v62: animes → una sola lista de episodios, sin miniaturas */
     const eps = esAnime
       ? (d.episodios || []).map((e) => ({ temporada: 1, ep: e.n, url: e.url, titulo: e.titulo || ('Episodio ' + e.n), img: '' }))
@@ -1883,6 +1884,7 @@ function elegirTitulo(res, enSala) {
   if (/\/serie\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, false); return true; }
   if (/\/anime\//i.test(res.url || '')) { abrirSeriePicker(res, enSala, true); return true; }
   if (/miscaricaturas\.com\//i.test(res.url || '')) { abrirCaricaturasPicker(res, enSala); return true; } /* v102 */
+  if (/ennovelas-tv\.com\//i.test(res.url || '')) { abrirSeriePicker(res, enSala); return true; } /* v278.4: Ennovelas (Betty 335) */
   if (/novelas360\.com\/categories\//i.test(res.url || '')) { abrirSeriePicker(res, enSala); return true; } /* v206: novelas */
   if (/enpantallatv\.com\//i.test(res.url || '')) { abrirSeriePicker(res, enSala); return true; } /* v206.2: EnPantallaTV */
   return false;
@@ -1977,7 +1979,7 @@ const LOGOS_DOMINIO = {
   'lacartoons.com': 'lacartoons.png',
   'miscaricaturas.com': 'caricaturas.png',
   'animeflv.one': 'animeflv.png', 'animeflv.net': 'animeflv.png', 'animeflv.io': 'animeflv.png',
-  'novelas360.com': 'novelas.png', 'enpantallatv.com': 'novelas.png', 'movie.huddle': 'novelas.png',
+  'novelas360.com': 'novelas.png', 'enpantallatv.com': 'novelas.png', 'l.ennovelas-tv.com': 'novelas.png', 'ennovelas-tv.com': 'novelas.png', 'movie.huddle': 'novelas.png',
   'animed23.com': 'animed23.png',
   'youtube.com': 'youtube.png', 'youtu.be': 'youtube.png',
 };

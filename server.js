@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v278.3'; // v278.3: Betty/Rosa portadas IMDb (quitados placeholders VIX rotos), todas novelas con IMDb goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v278.4'; // v278.3: Betty/Rosa portadas IMDb (quitados placeholders VIX rotos), todas novelas con IMDb goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -909,7 +909,8 @@ function esEpUrl(u) {
     || /miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}/i.test(u)
     || /cine-calidad\.mx\/(?:episode\/|serie\/[a-z0-9-]+\/)/i.test(u)
     || /novelas360\.com\/video\//i.test(u)
-    || /enpantallatv\.com\/[a-z0-9-]*capitulo[a-z0-9-]*\//i.test(u); /* v206.2 */
+    || /enpantallatv\.com\/[a-z0-9-]*capitulo[a-z0-9-]*\//i.test(u) /* v206.2 */
+    || /ennovelas-tv\.com\/[a-z0-9-]+-capitulo-\d+/i.test(u); /* v278.4 */
 }
 function epsFallo(u) {
   if (!u || !esEpUrl(u)) return;
@@ -952,7 +953,7 @@ const NV_STATS = { nv: 0, enp: 0 }; /* v245: últimos tamaños conocidos (catál
  * Cada título va desencriptándose y aparece en /api/trending novelas al instante.
  * Betty 335 viene por Ennovelas (fallback gratis, sin VIP) y también se sonda. */
 const VIX_CATALOGO = [
-  { slug:'betty-la-fea', titulo:'Yo Soy Betty, La Fea', url:'https://l.ennovelas-tv.com/serie/yo-soy-betty-la-fea/', img:'', site:'Novelas', extra:'335 caps · Ennovelas gratis 480p', vix:false, eps:335 },
+  { slug:'betty-la-fea', titulo:'Yo Soy Betty, La Fea', url:'https://l.ennovelas-tv.com/series/yo-soy-betty-la-fea/', img:'', site:'Novelas', extra:'335 caps · Ennovelas gratis 480p', vix:false, eps:335 },
   { slug:'vix-rosa', titulo:'La Rosa de Guadalupe', url:'https://vix.com/detail/series-502/video-4285473', img:'', site:'Novelas', extra:'17 temp · ~2000 caps · VIX 1080p desencriptado', vix:true, eps:2000, videoId:'video-4285473' },
   { slug:'vix-dicho', titulo:'Como dice el dicho', url:'https://vix.com/detail/video-4265138', img:'', site:'Novelas', extra:'~650 caps · VIX 1080p', vix:true, eps:650, videoId:'video-4265138' },
   { slug:'vix-hijas', titulo:'Las Hijas de la Señora García', url:'https://vix.com/detail/series-5168', img:'', site:'Novelas', extra:'2025 · TelevisaUnivision · VIX', vix:true },
@@ -974,7 +975,7 @@ async function sondaVixNovelas(){
     VIX_SONDA.at=Date.now(); VIX_SONDA.estado='chequeando';
     // 1) Betty en Ennovelas (fallback real)
     let bettyOk=false;
-    try{ const r=await fetchSeguro('https://l.ennovelas-tv.com/serie/yo-soy-betty-la-fea/',12000); bettyOk=r&&r.ok&&/Ep 335|Betty/i.test(await r.text()); }catch{ bettyOk=false; }
+    try{ const r=await fetchSeguro('https://l.ennovelas-tv.com/series/yo-soy-betty-la-fea/',12000); const t=r&&r.ok?await r.text():''; bettyOk=r&&r.ok&&(/Betty|yo-soy-betty/i.test(t) && /capitulo/i.test(t)); }catch{ bettyOk=false; }
     VIX_SONDA.bettyOk=bettyOk;
     if(bettyOk) sondaNotify('Novelas','ok','betty-la-fea','Betty 335 OK (Ennovelas)'); else sondaNotify('Novelas','muerto','betty-la-fea','Betty no responde — sonda revisará');
     // 2) VIX token (anvack) — chequeo ligero
@@ -1518,6 +1519,145 @@ async function resolverEnp(pageUrl) {
     }
   }
   throw new Error('Los servidores de ese capítulo están caídos — prueba otro capítulo u opción');
+}
+
+/* v278.4: ENNOVELAS-TV — Betty la Fea 335 y demás novelas latinas gratis sin Cloudflare.
+ * Ficha = /series/<slug>/ (lista con href="...-capitulo-N/"), episodio = /<slug>-capitulo-N/
+ * con iframe directo a hls/mp4. Todo por HTTP puro con fetchSeguro. */
+const ENN_BASE = 'https://l.ennovelas-tv.com/';
+const ennFichaCache = new Map(); // slug -> {at, data}
+async function ennFicha(slug){
+  slug = String(slug||'').toLowerCase().replace(/\/+$/,'');
+  const cached = ennFichaCache.get(slug);
+  if(cached && Date.now()-cached.at < 30*60*1000) return cached.data;
+  const r = await fetchSeguro(ENN_BASE+'series/'+slug+'/', 18000).catch(()=>null);
+  if(!r || !r.ok) return {ok:false, error:'No pude leer Ennovelas'};
+  const html = await r.text();
+  const og = /property="og:image" content="([^"]+)"/i.exec(html);
+  const poster = og ? og[1] : '';
+  const titleM = /<title>([^<]+)<\/title>/i.exec(html);
+  const titulo = titleM ? titleM[1].replace(/\s*\|.*$/,'').replace(/ Capitulos Completos/i,'').trim().slice(0,80) : slug.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+  const eps=[];
+  const seen=new Set();
+  // episodios son enlaces tipo https://l.ennovelas-tv.com/xxx-capitulo-N/
+  const reEnn = new RegExp('href="https://l\\.ennovelas-tv\\.com/('+slug.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'-capitulo-(\\d+)[a-z0-9-]*)/?"', 'gi');
+  for(const m of html.matchAll(reEnn)){
+    const full = 'https://l.ennovelas-tv.com/'+m[1]+'/';
+    if(seen.has(full)) continue; seen.add(full);
+    const n = parseInt(m[2],10);
+    if(!n || n>5000) continue;
+    eps.push({temporada:1, ep:n, url:full, titulo:'Capítulo '+n});
+  }
+  // fallback genérico: si no hubo con slug exacto, busca cualquier -capitulo- en la página
+  if(!eps.length){
+    for(const m of html.matchAll(/href="https:\/\/l\.ennovelas-tv\.com\/([a-z0-9-]+-capitulo-(\d+)[a-z0-9-]*)\/?"/gi)){
+      const full='https://l.ennovelas-tv.com/'+m[1]+'/';
+      if(seen.has(full)) continue; seen.add(full);
+      const n=parseInt(m[2],10);
+      eps.push({temporada:1, ep:n, url:full, titulo:'Capítulo '+n});
+    }
+  }
+  eps.sort((a,b)=>a.ep-b.ep);
+  const out = {ok: eps.length>0, slug, titulo: titulo || 'Yo Soy Betty, La Fea', poster, episodios: eps};
+  if(out.ok) ennFichaCache.set(slug,{at:Date.now(), data:out});
+  return out;
+}
+async function ennProbe(slug){
+  try{ const d=await ennFicha(slug); return !!(d && d.ok && d.episodios && d.episodios.length); }catch{ return false; }
+}
+async function resolverVk(vkEmbedUrl, pageUrl){
+  // vkEmbedUrl like https://vk.com/video_ext.php?oid=848029978&id=456257718
+  try{
+    const m = /video_ext\.php\?oid=(\d+).*?id=(\d+)/i.exec(vkEmbedUrl);
+    if(!m) throw new Error('vk sin ids');
+    const oid=m[1], vid=m[2];
+    const r = await fetchSeguro('https://vk.com/al_video.php?act=show&al=1&video='+oid+'_'+vid, 15000, {Referer: vkEmbedUrl, 'X-Requested-With':'XMLHttpRequest'}).catch(()=>null);
+    const txt = r && r.ok ? await r.text().catch(()=> '') : '';
+    let m3u8 = (/https:[^"']+video\.m3u8[^"']*/i.exec(txt)||[])[0];
+    if(m3u8) {
+      m3u8 = m3u8.replace(/&amp;/g,'&');
+      try{ hlsReferers.set(new URL(m3u8).hostname, vkEmbedUrl); }catch{}
+      return {m3u8, mp4:false, proxy:true, subs:[]};
+    }
+    // fallback: fetch embed directly and grep
+    const r2 = await fetchSeguro(vkEmbedUrl, 15000, {Referer: pageUrl}).catch(()=>null);
+    const t2 = r2 && r2.ok ? await r2.text().catch(()=> '') : '';
+    m3u8 = (/https:[^"']+\.m3u8[^"']*/i.exec(t2)||[])[0];
+    if(m3u8){ m3u8=m3u8.replace(/&amp;/g,'&'); try{ hlsReferers.set(new URL(m3u8).hostname, vkEmbedUrl);}catch{}; return {m3u8, mp4:false, proxy:true, subs:[]}; }
+    throw new Error('vk sin m3u8');
+  }catch(e){ throw e; }
+}
+async function resolverEnnovelas(pageUrl){
+  const r = await fetchSeguro(pageUrl, 18000).catch(()=>null);
+  if(!r || !r.ok) throw new Error('No pude abrir ese capítulo en Ennovelas');
+  const html = await r.text();
+  let cands = [...new Set([...html.matchAll(/<iframe[^>]*src="([^"]+)"/gi)].map(m=>m[1]).map(u=>u.startsWith('//')?'https:'+u:u).filter(u=>/^https?:\/\//.test(u) && !/facebook|addthis|disqus/i.test(u)))];
+  // también busca emb de ennovelas (meta twitter:player)
+  for(const m of html.matchAll(/content="https:\/\/l\.ennovelas-tv\.com\/emb\/\?vid=(\d+)"[^>]*>/gi)) cands.push('https://l.ennovelas-tv.com/emb/?vid='+m[1]);
+  for(const m of html.matchAll(/href="https:\/\/l\.ennovelas-tv\.com\/emb\/\?vid=(\d+)"[^>]*>/gi)) cands.push('https://l.ennovelas-tv.com/emb/?vid='+m[1]);
+  for(const m of html.matchAll(/https:\/\/l\.ennovelas-tv\.com\/emb\/\?vid=\d+/gi)) { const u=m[0].replace(/\\/g,''); if(!cands.includes(u)) cands.push(u); }
+  // también busca cualquier emb/?vid= en html raw
+  for(const m of html.matchAll(/emb\/\?vid=(\d+)/gi)) { const u='https://l.ennovelas-tv.com/emb/?vid='+m[1]; if(!cands.includes(u)) cands.push(u); }
+  if(!cands.length){
+    // último intento: si la página es emb ya, trata como emb directo
+    if(/\/emb\/\?vid=/i.test(pageUrl)) cands=[pageUrl];
+    else throw new Error('Ese capítulo no trae reproductor — prueba otro');
+  }
+  // intenta ok.ru / goodstream / vk primero
+  for(const emb of cands){
+    try{
+      if(/ok\.ru\/videoembed\/(\d+)/i.test(emb)){
+        const id = (/ok\.ru\/videoembed\/(\d+)/i.exec(emb)||[])[1];
+        if(id){ const out=await resolverOkRu(id); console.log('[enn] ok.ru → '+pageUrl.slice(-40)); return out; }
+      }
+      if(/goodstream\.one/i.test(emb)){
+        const out=await resolverGoodstream(emb, pageUrl); console.log('[enn] goodstream → '+pageUrl.slice(-40)); return out;
+      }
+      if(/vk\.com\/video_ext\.php/i.test(emb)){
+        const out=await resolverVk(emb, pageUrl); console.log('[enn] vk → '+pageUrl.slice(-40)); return out;
+      }
+      if(/l\.ennovelas-tv\.com\/emb\/\?vid=/i.test(emb)){
+        // emb intermedio: saca el iframe vk dentro
+        const re = await fetchSeguro(emb, 15000, {Referer: pageUrl}).catch(()=>null);
+        const th = re && re.ok ? await re.text().catch(()=> '') : '';
+        const inner = (/src="(https:\/\/vk\.com\/video_ext\.php[^"]+)"/i.exec(th)||[])[1];
+        if(inner){
+          const ivk = inner.replace(/&amp;/g,'&');
+          const out=await resolverVk(ivk, emb); console.log('[enn] vk-emb → '+pageUrl.slice(-40)); return out;
+        }
+        const alt = (/src="([^"]+goodstream[^"]+)"/i.exec(th)||[])[1];
+        if(alt){ const out=await resolverGoodstream(alt, emb); console.log('[enn] goodstream-emb → '+pageUrl.slice(-40)); return out; }
+        const okm = (/ok\.ru\/videoembed\/(\d+)/i.exec(th)||[])[1];
+        if(okm){ const out=await resolverOkRu(okm); console.log('[enn] ok-emb → '+pageUrl.slice(-40)); return out; }
+      }
+    }catch(e1){ console.warn('[enn] '+emb.slice(0,50)+' falló '+String(e1).slice(0,80)); }
+  }
+  // genérico: lee iframe y saca m3u8/mp4
+  for(const emb of cands){
+    if(/goodstream|ok\.ru/i.test(emb)) continue;
+    const rp = await fetchSeguro(emb, 15000, {Referer: pageUrl}).catch(()=>null);
+    const tp = rp && rp.ok ? await rp.text().catch(()=> '') : '';
+    const m3u8 = (/['"](https?:\/\/[^'"]+\.m3u8[^'"]*)['"]/i.exec(tp)||[])[1];
+    const mp4 = (/['"](https?:\/\/[^'"]+\.mp4[^'"]*)['"]/i.exec(tp)||[])[1];
+    if(m3u8 || mp4){
+      try{ hlsReferers.set(new URL(m3u8||mp4).hostname, emb); }catch{}
+      console.log('[enn] genérico '+(m3u8?'m3u8':'mp4')+' → '+pageUrl.slice(-40));
+      return {m3u8: m3u8||mp4, mp4: !!mp4, proxy:true, subs:[]};
+    }
+    // packer
+    const pk=/eval\(function\(p,a,c,k,e,[dr]\)\{[\s\S]*?\}\('([\s\S]*?)',(\d+),(\d+),'([\s\S]*?)'\.split\('\|'\)/i.exec(tp);
+    if(pk){
+      try{
+        const pStr=pk[1], aVal=+pk[2], cVal=+pk[3], k=pk[4].split('|');
+        const toBase=(n,b)=>{ if(!n) return '0'; const d=[]; while(n){ d.push('0123456789abcdefghijklmnopqrstuvwxyz'[n%b]); n=Math.floor(n/b);} return d.reverse().join(''); };
+        let result=pStr;
+        for(let i=cVal-1;i>=0;i--){ const w=toBase(i,aVal); if(i<k.length && k[i]) result=result.replace(new RegExp('\\b'+w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','g'),k[i]); }
+        const m = /(https?:\/\/[^"'<>]+\.(m3u8|mp4)[^"'<>]*)/i.exec(result);
+        if(m){ try{ hlsReferers.set(new URL(m[1]).hostname, emb);}catch{}; return {m3u8:m[1], mp4:/\.mp4/i.test(m[1]), proxy:true, subs:[]}; }
+      }catch{}
+    }
+  }
+  throw new Error('Los servidores de ese capítulo están caídos — prueba otro capítulo');
 }
 
 /* ================= v207: MOVIE (app) — novelas latinas del mapa local =================
@@ -11141,6 +11281,18 @@ async function estrenosMezclados(){
       d.episodios = epsVivos(d.episodios); /* v205.5 */
       return json(res, 200, d);
     }
+    if (url.pathname.startsWith('/api/ennovelas/') || url.pathname.startsWith('/api/enn/')) { /* v278.4: ficha de Ennovelas (Betty 335) */
+      const pref = decodeURIComponent((url.pathname.split('/')[3]||'').toLowerCase()).replace(/\/+$/,'');
+      if(!/^[a-z0-9-]{3,90}$/.test(pref)) return json(res,400,{ok:false,error:'Serie inválida'});
+      const d = await ennFicha(pref).catch(()=>null);
+      if(!d || !d.ok) return json(res,502,{ok:false,error:'No pude leer esa novela en Ennovelas — intenta luego'});
+      d.episodios = epsVivos(d.episodios);
+      return json(res,200,d);
+    }
+    if (url.pathname === '/api/ennovelas' && req.method==='GET') { /* lista rápida para debug */
+      const d = await ennFicha('yo-soy-betty-la-fea').catch(()=>null);
+      return json(res,200,d||{ok:false});
+    }
       if (url.pathname === '/api/movie/v-ficha') { /* v211: ficha EN VIVO de la API Movie (catalogo completo) */
         const vod = (url.searchParams.get('vod') || '').replace(/[^0-9]/g, '');
         if (!vod) return json(res, 400, { ok: false, error: 'Falta vod' });
@@ -11873,9 +12025,10 @@ async function estrenosMezclados(){
         const esDani = /danimados\.cc\/episodios\//i.test(target); /* v179: danimados en Solo — sin esto TODO el catálogo nuevo caía al resolutor viejo de Cuevana: «Este título no tiene servidor goodstream» */
         const esNv = /novelas360\.com\/video\//i.test(target); /* v206 novelas */
         const esEnp = /enpantallatv\.com\/[a-z0-9-]*capitulo/i.test(target); /* v206.2 */
+        const esEnn = /ennovelas-tv\.com\/[a-z0-9-]+-capitulo-\d+/i.test(target); /* v278.4 */
         const esMovie = new RegExp(MOVIE_HOST_VIRTUAL.replace(/\./g, '\\.') + '\\/ver\\/', 'i').test(target); /* v207: Movie (mapa local) */
         let r;
-        try { r = await (esMovie ? resolverMovie(target) : esEpAnime ? resolverAnime(target) : esCuevanaMov ? resolverCuevanaMov(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esNv ? resolverNovela(target) : esEnp ? resolverEnp(target) : resolverSolo(target)); epsPerdonar(target); } /* v205.5 + v206 + v206.2 + v207 + v235 cuevana.mov */
+        try { r = await (esMovie ? resolverMovie(target) : esEpAnime ? resolverAnime(target) : esCuevanaMov ? resolverCuevanaMov(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esNv ? resolverNovela(target) : esEnp ? resolverEnp(target) : esEnn ? resolverEnnovelas(target) : resolverSolo(target)); epsPerdonar(target); } /* v205.5 + v206 + v206.2 + v207 + v235 cuevana.mov */
         catch (e2r) { epsFallo(target); throw e2r; } /* v205.5: episodios muertos al contador */
         return json(res, 200, { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy });
       } catch (e) {
