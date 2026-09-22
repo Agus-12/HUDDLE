@@ -246,8 +246,9 @@ function registrarProgreso(room, m, r) {
       img = m.img || '';
     }
     const entry = { url: m.url || '', t: Math.round(r.t), d: Math.round(r.d), title, img, ep, serie, ts: Date.now(), modo: '' };
-    /* v285: Solo y Sala siempre guardan la portada canónica de Betty. */
-    if(/ennovelas-tv\.com\/(?:series\/)?yo-soy-betty-la-fea(?:-|\/)/i.test(entry.url) || /betty.*fea/i.test((entry.title+' '+entry.serie).toLowerCase())) entry.img=ENN_BETTY_COVER;
+    /* v286: feed, Solo y Sala usan la portada original de IMDb de la
+     * serie agrupada; la portada local de Betty queda como fallback. */
+    if(/ennovelas-tv\.com\//i.test(entry.url)) { const po=ennPosterParaEntrada(entry.url,entry.title,entry.serie); if(po) entry.img=po; }
     if (!entry.url) return;
     for (const u of room.users.values()) {
       const key = u.nameKey || String(u.name || '').toLowerCase();
@@ -959,6 +960,24 @@ try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'enn-oculta
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'enn-episodios-ocultos.txt'), 'utf8').split('\n')) if (l.trim()) { const [u, motivo=''] = l.trim().split('\t'); if (u) { ENN_EPS_OCULTOS.add(u); ENN_EPS_MOTIVOS.set(u, motivo); } } } catch {}
 const ENN_SONDA = { at:0, estado:'idle', total:0, auditadas:0, visibles:0, ocultas:0, ultima:'', error:'', revisadas:0, revividas:0, caidas:0, episodiosOcultos:0, episodiosRevividos:0 };
 const ENN_FALLOS = new Map(), ENN_STATS = { total:0, vistas:0, ocultas:0 };
+/* v286: ficha persistente de temporadas y portadas de serie de IMDb. */
+const ENN_GROUPS = new Map(), ENN_GROUP_BY_MEMBER = new Map();
+try {
+  const rawGroups = JSON.parse(fs.readFileSync(path.join(__dirname,'public','enn-series-grupos.json'),'utf8'));
+  for (const g of (rawGroups.groups || [])) {
+    if (!g || !g.slug) continue;
+    ENN_GROUPS.set(g.slug, g);
+    for (const m of (g.members || [])) if (m && m.slug) ENN_GROUP_BY_MEMBER.set(m.slug, g);
+  }
+} catch {}
+function ennGrupoPara(slug){ return ENN_GROUPS.get(slug) || ENN_GROUP_BY_MEMBER.get(slug) || null; }
+function ennPosterParaEntrada(url, title='', serie=''){
+  const u=String(url||'');
+  let slug=(/ennovelas-tv\.com\/series\/([a-z0-9-]+)/i.exec(u)||[])[1] || (/ennovelas-tv\.com\/([a-z0-9-]+)-capitulo-\d+/i.exec(u)||[])[1] || '';
+  let g=slug && ennGrupoPara(slug);
+  if(!g){ const q=((title||'')+' '+(serie||'')).toLowerCase(); g=[...ENN_GROUPS.values()].find(x=>String(x.title||'').toLowerCase()===q.trim() || q.includes(String(x.title||'').toLowerCase())); }
+  return (g && g.poster) || (slug==='yo-soy-betty-la-fea' ? '/covers/enn/yo-soy-betty-la-fea.jpg' : '');
+}
 const NV_STATS = { nv: 0, enp: 0 }; /* v245: últimos tamaños conocidos (catálogos vivos) */
 /* v277: VIX DESENCRIPTADO — catálogo + sonda autocurativa + progreso visible
  * Cada título va desencriptándose y aparece en /api/trending novelas al instante.
@@ -1547,7 +1566,7 @@ function ennPosterDesdeHtml(html, slug){
   for(const re of [/\<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)/gi,/\<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/gi,/\<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)/gi,/\<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/gi]) for(const m of html.matchAll(re)) add(m[1]);
   return cands.find(u=>/wp-content\/uploads/i.test(u)) || cands[0] || '';
 }
-async function ennFicha(slug){
+async function ennFichaSingle(slug){
   slug = String(slug||'').toLowerCase().replace(/\/+$/,'');
   const cached = ennFichaCache.get(slug);
   if(cached && Date.now()-cached.at < 30*60*1000) return cached.data;
@@ -1583,8 +1602,28 @@ async function ennFicha(slug){
   if(out.ok) ennFichaCache.set(slug,{at:Date.now(), data:out});
   return out;
 }
+/* v286: una tarjeta puede representar varias fichas de Ennovelas. Se
+ * consultan una por una y se devuelven juntas con la temporada correcta. */
+async function ennFicha(slug){
+  slug=String(slug||'').toLowerCase().replace(/\/+$/,'');
+  const g=ennGrupoPara(slug);
+  const members=g ? (g.members||[]).filter(m=>ENN_VISTAS.has(m.slug) || m.slug===slug) : [{slug,season:1}];
+  const eps=[]; let poster=(g&&g.poster)||''; let titulo=(g&&g.title)||'';
+  for(const m of members){
+    const d=await ennFichaSingle(m.slug).catch(()=>null);
+    if(!d||!d.ok) continue;
+    if(!poster) poster=d.poster||'';
+    if(!titulo) titulo=d.titulo||'';
+    const temporada=Number(m.season)||1;
+    for(const e of (d.episodios||[])) eps.push({...e,temporada});
+  }
+  eps.sort((a,b)=>(a.temporada-b.temporada)||(a.ep-b.ep));
+  const out={ok:eps.length>0,slug,titulo:titulo||'Ennovelas',poster:poster||ENN_BETTY_COVER,episodios:eps,grupo:g?g.slug:slug};
+  if(out.ok) ennFichaCache.set('group:'+slug,{at:Date.now(),data:out});
+  return out;
+}
 async function ennProbe(slug){
-  try{ const d=await ennFicha(slug); return !!(d && d.ok && d.episodios && d.episodios.length); }catch{ return false; }
+  try{ const d=await ennFichaSingle(slug); return !!(d && d.ok && d.episodios && d.episodios.length); }catch{ return false; }
 }
 async function resolverVk(vkEmbedUrl, pageUrl){
   let m = /video_ext\.php\?oid=(\d+).*?id=(\d+).*?hash=([a-z0-9]+)/i.exec(vkEmbedUrl);
@@ -2514,6 +2553,22 @@ async function fillNovelasCovers(){
     await new Promise(r=>setTimeout(r,800));
   }
 }
+/* v286: Ennovelas publica cada temporada como una tarjeta distinta. El
+ * feed muestra una sola tarjeta por familia y la ficha devuelve todos sus
+ * capítulos con temporada numerada para reutilizar la barra existente. */
+function ennUnificarCatalogo(items){
+  const by=new Map(items.map(x=>[x.slug,x])); const used=new Set(); const out=[];
+  for(const g of ENN_GROUPS.values()){
+    const members=(g.members||[]).filter(m=>by.has(m.slug));
+    if(!members.length) continue;
+    const first=by.get(g.slug)||by.get(members[0].slug); if(!first) continue;
+    const visibleSlugs=members.map(m=>m.slug);
+    for(const s of visibleSlugs) used.add(s);
+    out.push({...first,title:g.title||first.title,url:ENN_BASE+'series/'+g.slug+'/',img:g.poster||first.img,site:'Ennovelas',extra:members.length>1?(members.length+' temporadas · Ennovelas gratis'):'Ennovelas gratis',slug:g.slug,groupSlugs:visibleSlugs});
+  }
+  for(const x of items) if(!used.has(x.slug)) out.push(x);
+  return out;
+}
 // v285: Ennovelas catalogo allowlistado; lo no auditado nunca entra a Huddle.
 const ENN_CATALOGO_CACHE = { at:0, items:[] };
 async function ennCatalogo(todos=false){
@@ -2546,7 +2601,11 @@ async function ennCatalogo(todos=false){
   const bi=items.findIndex(x=>/betty/i.test(x.title));
   if(bi>0){const b=items.splice(bi,1)[0];items.unshift(b);}
   if(!items.find(x=>/betty/i.test(x.title))&&(!todos||ENN_VISTAS.has(ENN_BETTY_SLUG))) items.unshift({title:'Yo Soy Betty, La Fea',url:ENN_BASE+'series/'+ENN_BETTY_SLUG+'/',img:ENN_BETTY_COVER,site:'Ennovelas',extra:'335 caps · Ennovelas gratis',slug:ENN_BETTY_SLUG});
-  if(items.length&&!todos){ENN_CATALOGO_CACHE.at=Date.now();ENN_CATALOGO_CACHE.items=items;console.log('[enn] catalogo '+items.length+' series');}
+  if(items.length&&!todos){
+    const agrupadas=ennUnificarCatalogo(items);
+    ENN_CATALOGO_CACHE.at=Date.now();ENN_CATALOGO_CACHE.items=agrupadas;console.log('[enn] catalogo '+agrupadas.length+' tarjetas / '+items.length+' series');
+    return agrupadas;
+  }
   return items;
 }
 /* v285: sonda HTTP/HLS persistente. Nunca abre navegador ni monta iframe. */
@@ -2569,7 +2628,7 @@ async function ennProbeEpisodeUrl(epUrl){try{if(!await ennPaginaGratis(epUrl))re
 function ennPerdonarEp(epUrl){if(!epUrl||!ENN_EPS_OCULTOS.delete(epUrl))return false;ENN_EPS_MOTIVOS.delete(epUrl);ennEpsPersistir();sondaNotify('Ennovelas','revivio',epUrl.split('/').pop()||epUrl,'episodio revivió — HLS HTTP confirmado');ennFichaCache.clear();return true;}
 async function ennProbePlayable(slug){
   try{
-    const ficha=await ennFicha(slug);if(!ficha||!ficha.ok||!ficha.episodios?.length)return {ok:false,error:'sin episodios'};
+    const ficha=await ennFichaSingle(slug);if(!ficha||!ficha.ok||!ficha.episodios?.length)return {ok:false,error:'sin episodios'};
     const eps=ficha.episodios.filter(e=>e&&e.url&&!ENN_EPS_OCULTOS.has(e.url)).slice(0,2);let last='sin reproductor';
     for(const ep of eps){try{if(!await ennPaginaGratis(ep.url)){last='VIP/paywall';continue;}const out=await resolverEnnovelas(ep.url);if(!out||!out.m3u8){last='sin HLS';continue;}if(await ennComprobarHls(out.m3u8,hlsReferers.get(new URL(out.m3u8).hostname)||ep.url))return {ok:true,ep:ep.ep};last='HLS caído';}catch(e){last=String(e?.message||e).slice(0,100);}}
     return {ok:false,error:last};
@@ -11441,7 +11500,10 @@ async function estrenosMezclados(){
     if (url.pathname.startsWith('/api/ennovelas/') || url.pathname.startsWith('/api/enn/')) { /* v278.4: ficha de Ennovelas (Betty 335) */
       const pref = decodeURIComponent((url.pathname.split('/')[3]||'').toLowerCase()).replace(/\/+$/,'');
       if(!/^[a-z0-9-]{3,90}$/.test(pref)) return json(res,400,{ok:false,error:'Serie inválida'});
-      if(ENN_AUDIT_READY && (!ENN_VISTAS.has(pref) || ENN_OCULTAS.has(pref))) return json(res,404,{ok:false,error:'Esa serie de Ennovelas no está verificada'});
+      const grupoPref=ennGrupoPara(pref);
+      const grupoVisible=grupoPref && (grupoPref.members||[]).some(m=>ENN_VISTAS.has(m.slug));
+      const permitido=ENN_VISTAS.has(pref) || (grupoPref && grupoPref.slug===pref && grupoVisible);
+      if(ENN_AUDIT_READY && !permitido) return json(res,404,{ok:false,error:'Esa serie de Ennovelas no está verificada'});
       const d = await ennFicha(pref).catch(()=>null);
       if(!d || !d.ok) return json(res,502,{ok:false,error:'No pude leer esa novela en Ennovelas — intenta luego'});
       d.episodios = epsVivos(d.episodios);
@@ -12122,12 +12184,13 @@ async function estrenosMezclados(){
         url: e.url, t: e.t, d: e.d, title: e.title, img: e.img, ep: e.ep, serie: e.serie, ts: e.ts, modo: e.modo || '',
         eps: Array.isArray(e.eps) ? e.eps : [], /* v86: para "Sigue con el próximo" */
       }));
-      /* v285: saneamiento determinista de Betty al leer historial antiguo. */
+      /* v286: saneamiento determinista del historial de Ennovelas. */
       let continueChanged=false;
       for(let i=0;i<items.length;i++){
         const e=items[i];
-        const esBetty=/ennovelas-tv\.com\/(?:series\/)?yo-soy-betty-la-fea(?:-|\/)/i.test(e.url||'') || /betty.*fea/i.test(((e.title||'')+' '+(e.serie||'')).toLowerCase());
-        if(esBetty&&e.img!==ENN_BETTY_COVER){e.img=ENN_BETTY_COVER;if(storedContinue[i])storedContinue[i].img=ENN_BETTY_COVER;continueChanged=true;}
+        if(!/ennovelas-tv\.com\//i.test(e.url||'')) continue;
+        const po=ennPosterParaEntrada(e.url,e.title,e.serie);
+        if(po&&e.img!==po){e.img=po;if(storedContinue[i])storedContinue[i].img=po;continueChanged=true;}
       }
       if(continueChanged)saveContinuar();
       /* v96: sana TAMBIÉN al leer — las entradas viejas de episodios (con
@@ -12335,8 +12398,8 @@ async function estrenosMezclados(){
         modo: body.modo === 'solo' ? 'solo' : '',
         ts: Date.now(),
       };
-      /* v285: Solo y Sala siempre persisten la portada canónica de Betty. */
-      if(/ennovelas-tv\.com\/(?:series\/)?yo-soy-betty-la-fea(?:-|\/)/i.test(entry.url) || /betty.*fea/i.test((entry.title+' '+entry.serie).toLowerCase())) entry.img=ENN_BETTY_COVER;
+      /* v286: todo progreso de Ennovelas guarda la portada de serie de IMDb. */
+      if(/ennovelas-tv\.com\//i.test(entry.url)){const po=ennPosterParaEntrada(entry.url,entry.title,entry.serie);if(po)entry.img=po;}
       if (!entry.url) return json(res, 400, { ok: false, error: 'Falta la URL' });
       /* v96: la entrada de un EPISODIO de serie lleva el PÓSTER DE LA
        * SERIE — las entradas creadas antes (o re-guardadas al retomar y

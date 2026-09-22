@@ -1,0 +1,5172 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-22T18:49:20.402948+00:00",
+  "source": "IMDb suggestion API + media-amazon poster",
+  "seriesAudited": 360,
+  "groups": [
+    {
+      "slug": "yo-soy-betty-la-fea",
+      "title": "Yo soy Betty, la fea",
+      "members": [
+        {
+          "slug": "yo-soy-betty-la-fea",
+          "title": "Yo soy Betty, la fea",
+          "season": 1,
+          "episodes": 335,
+          "url": "https://l.ennovelas-tv.com/series/yo-soy-betty-la-fea/"
+        }
+      ],
+      "imdb": {
+        "id": "tt0233127",
+        "name": "Ugly Betty",
+        "source": "https://m.media-amazon.com/images/M/MV5BYjhmNjYwNGEtYmNhZi00YzBmLThjNTMtOTAyNGJjNzc5YmJiXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/yo-soy-betty-la-fea.jpg"
+    },
+    {
+      "slug": "40-y-20-temporada-2",
+      "title": "40 y 20 Temporada",
+      "members": [
+        {
+          "slug": "40-y-20-temporada-2",
+          "title": "40 y 20 Temporada 2",
+          "season": 2,
+          "episodes": 13,
+          "url": "https://l.ennovelas-tv.com/series/40-y-20-temporada-2/"
+        },
+        {
+          "slug": "40-y-20-temporada-3",
+          "title": "40 y 20 Temporada 3",
+          "season": 3,
+          "episodes": 13,
+          "url": "https://l.ennovelas-tv.com/series/40-y-20-temporada-3/"
+        },
+        {
+          "slug": "40-y-20-temporada-4",
+          "title": "40 y 20 Temporada 4",
+          "season": 4,
+          "episodes": 13,
+          "url": "https://l.ennovelas-tv.com/series/40-y-20-temporada-4/"
+        },
+        {
+          "slug": "40-y-20-temporada-5",
+          "title": "40 y 20 Temporada 5",
+          "season": 5,
+          "episodes": 12,
+          "url": "https://l.ennovelas-tv.com/series/40-y-20-temporada-5/"
+        },
+        {
+          "slug": "40-y-20-temporada-6",
+          "title": "40 y 20 Temporada 6",
+          "season": 6,
+          "episodes": 12,
+          "url": "https://l.ennovelas-tv.com/series/40-y-20-temporada-6/"
+        },
+        {
+          "slug": "40-y-20-temporada-7",
+          "title": "40 y 20 Temporada 7",
+          "season": 7,
+          "episodes": 12,
+          "url": "https://l.ennovelas-tv.com/series/40-y-20-temporada-7/"
+        },
+        {
+          "slug": "40-y-20-temporada-8",
+          "title": "40 y 20 Temporada 8",
+          "season": 8,
+          "episodes": 12,
+          "url": "https://l.ennovelas-tv.com/series/40-y-20-temporada-8/"
+        },
+        {
+          "slug": "40-y-20-temporada-9",
+          "title": "40 y 20 Temporada 9",
+          "season": 9,
+          "episodes": 12,
+          "url": "https://l.ennovelas-tv.com/series/40-y-20-temporada-9/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "8-gun",
+      "title": "8 Gun",
+      "members": [
+        {
+          "slug": "8-gun",
+          "title": "8 Gun",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/8-gun/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "a-corazon-abierto",
+      "title": "A corazón abierto",
+      "members": [
+        {
+          "slug": "a-corazon-abierto",
+          "title": "A corazón abierto",
+          "season": 1,
+          "episodes": 169,
+          "url": "https://l.ennovelas-tv.com/series/a-corazon-abierto/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "a-que-no-me-dejas",
+      "title": "A que no me dejas",
+      "members": [
+        {
+          "slug": "a-que-no-me-dejas",
+          "title": "A que no me dejas",
+          "season": 1,
+          "episodes": 142,
+          "url": "https://l.ennovelas-tv.com/series/a-que-no-me-dejas/"
+        }
+      ],
+      "imdb": {
+        "id": "tt4872292",
+        "name": "A que no me dejas",
+        "source": "https://m.media-amazon.com/images/M/MV5BYTAzODc1YTAtNWVkNy00NDg1LWFjMjgtNTMwY2ViZjM3NWY1XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/a-que-no-me-dejas.jpg"
+    },
+    {
+      "slug": "acapulco-shore-1",
+      "title": "Acapulco Shore",
+      "members": [
+        {
+          "slug": "acapulco-shore-1",
+          "title": "Acapulco Shore 1",
+          "season": 1,
+          "episodes": 12,
+          "url": "https://l.ennovelas-tv.com/series/acapulco-shore-1/"
+        },
+        {
+          "slug": "acapulco-shore-4",
+          "title": "Acapulco Shore 4",
+          "season": 4,
+          "episodes": 12,
+          "url": "https://l.ennovelas-tv.com/series/acapulco-shore-4/"
+        },
+        {
+          "slug": "acapulco-shore-5",
+          "title": "Acapulco Shore 5",
+          "season": 5,
+          "episodes": 12,
+          "url": "https://l.ennovelas-tv.com/series/acapulco-shore-5/"
+        },
+        {
+          "slug": "acapulco-shore-6",
+          "title": "Acapulco Shore 6",
+          "season": 6,
+          "episodes": 15,
+          "url": "https://l.ennovelas-tv.com/series/acapulco-shore-6/"
+        },
+        {
+          "slug": "acapulco-shore-7",
+          "title": "Acapulco Shore 7",
+          "season": 7,
+          "episodes": 17,
+          "url": "https://l.ennovelas-tv.com/series/acapulco-shore-7/"
+        },
+        {
+          "slug": "acapulco-shore-8",
+          "title": "Acapulco Shore 8",
+          "season": 8,
+          "episodes": 15,
+          "url": "https://l.ennovelas-tv.com/series/acapulco-shore-8/"
+        },
+        {
+          "slug": "acapulco-shore-9",
+          "title": "Acapulco Shore 9",
+          "season": 9,
+          "episodes": 14,
+          "url": "https://l.ennovelas-tv.com/series/acapulco-shore-9/"
+        },
+        {
+          "slug": "acapulco-shore-10",
+          "title": "Acapulco Shore 10",
+          "season": 10,
+          "episodes": 12,
+          "url": "https://l.ennovelas-tv.com/series/acapulco-shore-10/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "ada-masali",
+      "title": "Ada Masali",
+      "members": [
+        {
+          "slug": "ada-masali",
+          "title": "Ada Masali",
+          "season": 1,
+          "episodes": 25,
+          "url": "https://l.ennovelas-tv.com/series/ada-masali/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "akinci",
+      "title": "Akinci",
+      "members": [
+        {
+          "slug": "akinci",
+          "title": "Akinci",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/akinci/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "al-diablo-con-los-guapos",
+      "title": "Al diablo con los guapos",
+      "members": [
+        {
+          "slug": "al-diablo-con-los-guapos",
+          "title": "Al diablo con los guapos",
+          "season": 1,
+          "episodes": 175,
+          "url": "https://l.ennovelas-tv.com/series/al-diablo-con-los-guapos/"
+        }
+      ],
+      "imdb": {
+        "id": "tt1132292",
+        "name": "Al diablo con los guapos",
+        "source": "https://m.media-amazon.com/images/M/MV5BZDEwMTk2MTAtNjE5OS00NDRlLWE5NjMtNTBjMDk5MjFhMDU1XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/al-diablo-con-los-guapos.jpg"
+    },
+    {
+      "slug": "al-sancak",
+      "title": "Al Sancak",
+      "members": [
+        {
+          "slug": "al-sancak",
+          "title": "Al Sancak",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/al-sancak/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "alas-de-amor",
+      "title": "Alas De Amor",
+      "members": [
+        {
+          "slug": "alas-de-amor",
+          "title": "Alas De Amor",
+          "season": 1,
+          "episodes": 73,
+          "url": "https://l.ennovelas-tv.com/series/alas-de-amor/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "alborada",
+      "title": "Alborada",
+      "members": [
+        {
+          "slug": "alborada",
+          "title": "Alborada",
+          "season": 1,
+          "episodes": 90,
+          "url": "https://l.ennovelas-tv.com/series/alborada/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "alcanzar-una-estrella",
+      "title": "Alcanzar una estrella",
+      "members": [
+        {
+          "slug": "alcanzar-una-estrella",
+          "title": "Alcanzar una estrella",
+          "season": 1,
+          "episodes": 79,
+          "url": "https://l.ennovelas-tv.com/series/alcanzar-una-estrella/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "aldatmak",
+      "title": "Aldatmak",
+      "members": [
+        {
+          "slug": "aldatmak",
+          "title": "Aldatmak",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/aldatmak/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "alev-alev",
+      "title": "Alev Alev",
+      "members": [
+        {
+          "slug": "alev-alev",
+          "title": "Alev Alev",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/alev-alev/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "alla-te-espero",
+      "title": "Allá Te Espero",
+      "members": [
+        {
+          "slug": "alla-te-espero",
+          "title": "Allá Te Espero",
+          "season": 1,
+          "episodes": 135,
+          "url": "https://l.ennovelas-tv.com/series/alla-te-espero/"
+        }
+      ],
+      "imdb": {
+        "id": "tt2198680",
+        "name": "Allá te espero",
+        "source": "https://m.media-amazon.com/images/M/MV5BOTVhZjVhZTItZjA4Yy00YjM3LWE5ZmUtNjkyNmY0NGQxZDIyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/alla-te-espero.jpg"
+    },
+    {
+      "slug": "alparslan-buyuk-selcuklu",
+      "title": "Alparslan Buyuk Selcuklu",
+      "members": [
+        {
+          "slug": "alparslan-buyuk-selcuklu",
+          "title": "Alparslan Buyuk Selcuklu",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/alparslan-buyuk-selcuklu/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "amar-a-muerte",
+      "title": "Amar a muerte",
+      "members": [
+        {
+          "slug": "amar-a-muerte",
+          "title": "Amar a muerte",
+          "season": 1,
+          "episodes": 86,
+          "url": "https://l.ennovelas-tv.com/series/amar-a-muerte/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "amar-y-vivir",
+      "title": "Amar y Vivir",
+      "members": [
+        {
+          "slug": "amar-y-vivir",
+          "title": "Amar y Vivir",
+          "season": 1,
+          "episodes": 63,
+          "url": "https://l.ennovelas-tv.com/series/amar-y-vivir/"
+        }
+      ],
+      "imdb": {
+        "id": "tt10347886",
+        "name": "All for Love",
+        "source": "https://m.media-amazon.com/images/M/MV5BZTczMGExYjUtM2JkYy00YWZjLWFhNGMtZTVmYTJkMDRiMTQyXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/amar-y-vivir.jpg"
+    },
+    {
+      "slug": "amarte-asi-frijolito",
+      "title": "Amarte así, Frijolito",
+      "members": [
+        {
+          "slug": "amarte-asi-frijolito",
+          "title": "Amarte así, Frijolito",
+          "season": 1,
+          "episodes": 119,
+          "url": "https://l.ennovelas-tv.com/series/amarte-asi-frijolito/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "amarte-es-mi-pecado",
+      "title": "Amarte es mi pecado",
+      "members": [
+        {
+          "slug": "amarte-es-mi-pecado",
+          "title": "Amarte es mi pecado",
+          "season": 1,
+          "episodes": 95,
+          "url": "https://l.ennovelas-tv.com/series/amarte-es-mi-pecado/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "amo-despertar-contigo",
+      "title": "Amo Despertar Contigo",
+      "members": [
+        {
+          "slug": "amo-despertar-contigo",
+          "title": "Amo Despertar Contigo",
+          "season": 1,
+          "episodes": 121,
+          "url": "https://l.ennovelas-tv.com/series/amo-despertar-contigo/"
+        }
+      ],
+      "imdb": {
+        "id": "tt5934646",
+        "name": "Waking Up with You",
+        "source": "https://m.media-amazon.com/images/M/MV5BN2EwODU4MTAtMmNhNy00NjRkLTk0MTMtYTRjNWI3ZDhlODdmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/amo-despertar-contigo.jpg"
+    },
+    {
+      "slug": "amor-bravio",
+      "title": "Amor bravío",
+      "members": [
+        {
+          "slug": "amor-bravio",
+          "title": "Amor bravío",
+          "season": 1,
+          "episodes": 162,
+          "url": "https://l.ennovelas-tv.com/series/amor-bravio/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "amor-cautivo",
+      "title": "Amor Cautivo",
+      "members": [
+        {
+          "slug": "amor-cautivo",
+          "title": "Amor Cautivo",
+          "season": 1,
+          "episodes": 120,
+          "url": "https://l.ennovelas-tv.com/series/amor-cautivo/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "amor-en-custodia",
+      "title": "Amor en custodia",
+      "members": [
+        {
+          "slug": "amor-en-custodia",
+          "title": "Amor en custodia",
+          "season": 1,
+          "episodes": 142,
+          "url": "https://l.ennovelas-tv.com/series/amor-en-custodia/"
+        }
+      ],
+      "imdb": {
+        "id": "tt0495921",
+        "name": "Love in Custody",
+        "source": "https://m.media-amazon.com/images/M/MV5BYjM5ZGY4NDgtNDI5NS00M2Q2LTgxZDktZmMxNjk0NTc5NWY1XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/amor-en-custodia.jpg"
+    },
+    {
+      "slug": "amor-eterno",
+      "title": "Amor Eterno",
+      "members": [
+        {
+          "slug": "amor-eterno",
+          "title": "Amor Eterno",
+          "season": 1,
+          "episodes": 244,
+          "url": "https://l.ennovelas-tv.com/series/amor-eterno/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "amor-perfecto",
+      "title": "Amor Perfecto",
+      "members": [
+        {
+          "slug": "amor-perfecto",
+          "title": "Amor Perfecto",
+          "season": 1,
+          "episodes": 2,
+          "url": "https://l.ennovelas-tv.com/series/amor-perfecto/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "amor-real",
+      "title": "Amor real",
+      "members": [
+        {
+          "slug": "amor-real",
+          "title": "Amor real",
+          "season": 1,
+          "episodes": 95,
+          "url": "https://l.ennovelas-tv.com/series/amor-real/"
+        }
+      ],
+      "imdb": {
+        "id": "tt0341281",
+        "name": "Amor real",
+        "source": "https://m.media-amazon.com/images/M/MV5BMzNkZDE3NTAtYjFlZS00NTY2LWI0NTItYmIzMDlmMDM1N2ZkXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/amor-real.jpg"
+    },
+    {
+      "slug": "amor-sin-igual",
+      "title": "Amor Sin Igual",
+      "members": [
+        {
+          "slug": "amor-sin-igual",
+          "title": "Amor Sin Igual",
+          "season": 1,
+          "episodes": 194,
+          "url": "https://l.ennovelas-tv.com/series/amor-sin-igual/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "amor-sin-maquillaje",
+      "title": "Amor sin maquillaje",
+      "members": [
+        {
+          "slug": "amor-sin-maquillaje",
+          "title": "Amor sin maquillaje",
+          "season": 1,
+          "episodes": 25,
+          "url": "https://l.ennovelas-tv.com/series/amor-sin-maquillaje/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "amor-sincero",
+      "title": "Amor sincero",
+      "members": [
+        {
+          "slug": "amor-sincero",
+          "title": "Amor sincero",
+          "season": 1,
+          "episodes": 81,
+          "url": "https://l.ennovelas-tv.com/series/amor-sincero/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "amorcito-corazon",
+      "title": "Amorcito corazón",
+      "members": [
+        {
+          "slug": "amorcito-corazon",
+          "title": "Amorcito corazón",
+          "season": 1,
+          "episodes": 207,
+          "url": "https://l.ennovelas-tv.com/series/amorcito-corazon/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "amores-verdaderos",
+      "title": "Amores verdaderos",
+      "members": [
+        {
+          "slug": "amores-verdaderos",
+          "title": "Amores verdaderos",
+          "season": 1,
+          "episodes": 183,
+          "url": "https://l.ennovelas-tv.com/series/amores-verdaderos/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "ana-de-nadie",
+      "title": "Ana de nadie",
+      "members": [
+        {
+          "slug": "ana-de-nadie",
+          "title": "Ana de nadie",
+          "season": 1,
+          "episodes": 9,
+          "url": "https://l.ennovelas-tv.com/series/ana-de-nadie/"
+        }
+      ],
+      "imdb": {
+        "id": "tt26918095",
+        "name": "Ana de nadie",
+        "source": "https://m.media-amazon.com/images/M/MV5BZDU1NmMwYjUtMzBkMS00MzY3LWI4ZWMtYzhlNjFiN2RkMmZlXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/ana-de-nadie.jpg"
+    },
+    {
+      "slug": "analar-ve-anneler",
+      "title": "Analar ve Anneler",
+      "members": [
+        {
+          "slug": "analar-ve-anneler",
+          "title": "Analar ve Anneler",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/analar-ve-anneler/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "annemizi-saklarken",
+      "title": "Annemizi Saklarken",
+      "members": [
+        {
+          "slug": "annemizi-saklarken",
+          "title": "Annemizi Saklarken",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/annemizi-saklarken/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "annenin-sirridir-cocuk",
+      "title": "Annenin Sirridir Cocuk",
+      "members": [
+        {
+          "slug": "annenin-sirridir-cocuk",
+          "title": "Annenin Sirridir Cocuk",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/annenin-sirridir-cocuk/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "antes-muerta-que-lichita",
+      "title": "Antes muerta que Lichita",
+      "members": [
+        {
+          "slug": "antes-muerta-que-lichita",
+          "title": "Antes muerta que Lichita",
+          "season": 1,
+          "episodes": 133,
+          "url": "https://l.ennovelas-tv.com/series/antes-muerta-que-lichita/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "apuesta-por-un-amor",
+      "title": "Apuesta por un amor",
+      "members": [
+        {
+          "slug": "apuesta-por-un-amor",
+          "title": "Apuesta por un amor",
+          "season": 1,
+          "episodes": 130,
+          "url": "https://l.ennovelas-tv.com/series/apuesta-por-un-amor/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "ariza",
+      "title": "Ariza",
+      "members": [
+        {
+          "slug": "ariza",
+          "title": "Ariza",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/ariza/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "ask-aglatir",
+      "title": "Ask Aglatir",
+      "members": [
+        {
+          "slug": "ask-aglatir",
+          "title": "Ask Aglatir",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/ask-aglatir/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "ask-mantik-intikam",
+      "title": "Ask Mantik Intikam",
+      "members": [
+        {
+          "slug": "ask-mantik-intikam",
+          "title": "Ask Mantik Intikam",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/ask-mantik-intikam/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "aska-surgun",
+      "title": "Aska Surgun",
+      "members": [
+        {
+          "slug": "aska-surgun",
+          "title": "Aska Surgun",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/aska-surgun/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "asla-vazgecmem",
+      "title": "Asla Vazgecmem",
+      "members": [
+        {
+          "slug": "asla-vazgecmem",
+          "title": "Asla Vazgecmem",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/asla-vazgecmem/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "aslan-ailem",
+      "title": "Aslan Ailem",
+      "members": [
+        {
+          "slug": "aslan-ailem",
+          "title": "Aslan Ailem",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/aslan-ailem/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "asi-son-ellas",
+      "title": "Así son ellas",
+      "members": [
+        {
+          "slug": "asi-son-ellas",
+          "title": "Así son ellas",
+          "season": 1,
+          "episodes": 90,
+          "url": "https://l.ennovelas-tv.com/series/asi-son-ellas/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "atesbocegi",
+      "title": "Atesbocegi",
+      "members": [
+        {
+          "slug": "atesbocegi",
+          "title": "Atesbocegi",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/atesbocegi/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "atrevete-a-olvidarme",
+      "title": "Atrévete a olvidarme",
+      "members": [
+        {
+          "slug": "atrevete-a-olvidarme",
+          "title": "Atrévete a olvidarme",
+          "season": 1,
+          "episodes": 25,
+          "url": "https://l.ennovelas-tv.com/series/atrevete-a-olvidarme/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "aziz",
+      "title": "Aziz",
+      "members": [
+        {
+          "slug": "aziz",
+          "title": "Aziz",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/aziz/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "azucar",
+      "title": "Azúcar",
+      "members": [
+        {
+          "slug": "azucar",
+          "title": "Azúcar",
+          "season": 1,
+          "episodes": 77,
+          "url": "https://l.ennovelas-tv.com/series/azucar/"
+        }
+      ],
+      "imdb": {
+        "id": "tt5873850",
+        "name": "Azúcar",
+        "source": "https://m.media-amazon.com/images/M/MV5BNmJmNmJkYmYtNDdhYS00NjZiLTkxMjEtNTNlZDNjNjU5Mzg3XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/azucar.jpg"
+    },
+    {
+      "slug": "baht-oyunu",
+      "title": "Baht Oyunu",
+      "members": [
+        {
+          "slug": "baht-oyunu",
+          "title": "Baht Oyunu",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/baht-oyunu/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "bajo-las-riendas-del-amor",
+      "title": "Bajo las riendas del amor",
+      "members": [
+        {
+          "slug": "bajo-las-riendas-del-amor",
+          "title": "Bajo las riendas del amor",
+          "season": 1,
+          "episodes": 150,
+          "url": "https://l.ennovelas-tv.com/series/bajo-las-riendas-del-amor/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "balkan-ninnisi",
+      "title": "Balkan Ninnisi",
+      "members": [
+        {
+          "slug": "balkan-ninnisi",
+          "title": "Balkan Ninnisi",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/balkan-ninnisi/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "barbaroslar-akdeniz-in-kilici",
+      "title": "Barbaroslar Akdeniz in Kilici",
+      "members": [
+        {
+          "slug": "barbaroslar-akdeniz-in-kilici",
+          "title": "Barbaroslar Akdeniz in Kilici",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/barbaroslar-akdeniz-in-kilici/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "bas-belasi",
+      "title": "Bas Belasi",
+      "members": [
+        {
+          "slug": "bas-belasi",
+          "title": "Bas Belasi",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/bas-belasi/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "bay-yanlis",
+      "title": "Bay Yanlis",
+      "members": [
+        {
+          "slug": "bay-yanlis",
+          "title": "Bay Yanlis",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/bay-yanlis/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "bella-calamidades",
+      "title": "Bella Calamidades",
+      "members": [
+        {
+          "slug": "bella-calamidades",
+          "title": "Bella Calamidades",
+          "season": 1,
+          "episodes": 140,
+          "url": "https://l.ennovelas-tv.com/series/bella-calamidades/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "ben-bu-cihana-sigmazam",
+      "title": "Ben Bu Cihana Sigmazam",
+      "members": [
+        {
+          "slug": "ben-bu-cihana-sigmazam",
+          "title": "Ben Bu Cihana Sigmazam",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/ben-bu-cihana-sigmazam/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "ben-gri",
+      "title": "Ben Gri",
+      "members": [
+        {
+          "slug": "ben-gri",
+          "title": "Ben Gri",
+          "season": 1,
+          "episodes": 4,
+          "url": "https://l.ennovelas-tv.com/series/ben-gri/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "benim-adim-melek",
+      "title": "Benim Adim Melek",
+      "members": [
+        {
+          "slug": "benim-adim-melek",
+          "title": "Benim Adim Melek",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/benim-adim-melek/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "benim-hayatim",
+      "title": "Benim Hayatim",
+      "members": [
+        {
+          "slug": "benim-hayatim",
+          "title": "Benim Hayatim",
+          "season": 1,
+          "episodes": 6,
+          "url": "https://l.ennovelas-tv.com/series/benim-hayatim/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "bir-cocuk-sevdim",
+      "title": "Bir Cocuk Sevdim",
+      "members": [
+        {
+          "slug": "bir-cocuk-sevdim",
+          "title": "Bir Cocuk Sevdim",
+          "season": 1,
+          "episodes": 39,
+          "url": "https://l.ennovelas-tv.com/series/bir-cocuk-sevdim/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "bir-deli-ruzgar",
+      "title": "Bir Deli Ruzgar (Un viento loco)",
+      "members": [
+        {
+          "slug": "bir-deli-ruzgar",
+          "title": "Bir Deli Ruzgar (Un viento loco)",
+          "season": 1,
+          "episodes": 4,
+          "url": "https://l.ennovelas-tv.com/series/bir-deli-ruzgar/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "bir-kucuk-gun-isigi",
+      "title": "Bir Kucuk Gun Isigi",
+      "members": [
+        {
+          "slug": "bir-kucuk-gun-isigi",
+          "title": "Bir Kucuk Gun Isigi",
+          "season": 1,
+          "episodes": 36,
+          "url": "https://l.ennovelas-tv.com/series/bir-kucuk-gun-isigi/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "bir-peri-masali",
+      "title": "Bir Peri Masali",
+      "members": [
+        {
+          "slug": "bir-peri-masali",
+          "title": "Bir Peri Masali",
+          "season": 1,
+          "episodes": 13,
+          "url": "https://l.ennovelas-tv.com/series/bir-peri-masali/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "bir-zamanlar-cukurova",
+      "title": "Bir Zamanlar Cukurova",
+      "members": [
+        {
+          "slug": "bir-zamanlar-cukurova",
+          "title": "Bir Zamanlar Cukurova",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/bir-zamanlar-cukurova/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "cachito-de-cielo",
+      "title": "Cachito de cielo",
+      "members": [
+        {
+          "slug": "cachito-de-cielo",
+          "title": "Cachito de cielo",
+          "season": 1,
+          "episodes": 108,
+          "url": "https://l.ennovelas-tv.com/series/cachito-de-cielo/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "cadenas-de-amargura",
+      "title": "Cadenas de amargura",
+      "members": [
+        {
+          "slug": "cadenas-de-amargura",
+          "title": "Cadenas de amargura",
+          "season": 1,
+          "episodes": 80,
+          "url": "https://l.ennovelas-tv.com/series/cadenas-de-amargura/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "caer-en-tentacion",
+      "title": "Caer en tentación",
+      "members": [
+        {
+          "slug": "caer-en-tentacion",
+          "title": "Caer en tentación",
+          "season": 1,
+          "episodes": 103,
+          "url": "https://l.ennovelas-tv.com/series/caer-en-tentacion/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "cafe-con-aroma-de-mujer",
+      "title": "Café con aroma de mujer",
+      "members": [
+        {
+          "slug": "cafe-con-aroma-de-mujer",
+          "title": "Café con aroma de mujer",
+          "season": 1,
+          "episodes": 145,
+          "url": "https://l.ennovelas-tv.com/series/cafe-con-aroma-de-mujer/"
+        },
+        {
+          "slug": "cafe-con-aroma-de-mujer-2021",
+          "title": "Café con aroma de mujer 2021",
+          "season": 2021,
+          "episodes": 88,
+          "url": "https://l.ennovelas-tv.com/series/cafe-con-aroma-de-mujer-2021/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "calikusu",
+      "title": "Calikusu",
+      "members": [
+        {
+          "slug": "calikusu",
+          "title": "Calikusu",
+          "season": 1,
+          "episodes": 30,
+          "url": "https://l.ennovelas-tv.com/series/calikusu/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "cam-tavanlar",
+      "title": "Cam Tavanlar",
+      "members": [
+        {
+          "slug": "cam-tavanlar",
+          "title": "Cam Tavanlar",
+          "season": 1,
+          "episodes": 8,
+          "url": "https://l.ennovelas-tv.com/series/cam-tavanlar/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "camaleones",
+      "title": "Camaleones",
+      "members": [
+        {
+          "slug": "camaleones",
+          "title": "Camaleones",
+          "season": 1,
+          "episodes": 135,
+          "url": "https://l.ennovelas-tv.com/series/camaleones/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "camdaki-kiz",
+      "title": "Camdaki Kiz (La Chica en el Cristal)",
+      "members": [
+        {
+          "slug": "camdaki-kiz",
+          "title": "Camdaki Kiz (La Chica en el Cristal)",
+          "season": 1,
+          "episodes": 82,
+          "url": "https://l.ennovelas-tv.com/series/camdaki-kiz/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "can-kiriklari",
+      "title": "Can Kiriklari",
+      "members": [
+        {
+          "slug": "can-kiriklari",
+          "title": "Can Kiriklari",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/can-kiriklari/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "canevim",
+      "title": "Canevim",
+      "members": [
+        {
+          "slug": "canevim",
+          "title": "Canevim",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/canevim/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "carita-de-angel",
+      "title": "Carita de ángel",
+      "members": [
+        {
+          "slug": "carita-de-angel",
+          "title": "Carita de ángel",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/carita-de-angel/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "chepe-fortuna",
+      "title": "Chepe Fortuna",
+      "members": [
+        {
+          "slug": "chepe-fortuna",
+          "title": "Chepe Fortuna",
+          "season": 1,
+          "episodes": 151,
+          "url": "https://l.ennovelas-tv.com/series/chepe-fortuna/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "cielo-rojo",
+      "title": "Cielo Rojo",
+      "members": [
+        {
+          "slug": "cielo-rojo",
+          "title": "Cielo Rojo",
+          "season": 1,
+          "episodes": 165,
+          "url": "https://l.ennovelas-tv.com/series/cielo-rojo/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "cita-a-ciegas",
+      "title": "Cita a ciegas",
+      "members": [
+        {
+          "slug": "cita-a-ciegas",
+          "title": "Cita a ciegas",
+          "season": 1,
+          "episodes": 70,
+          "url": "https://l.ennovelas-tv.com/series/cita-a-ciegas/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "comando-elite",
+      "title": "Comando Elite",
+      "members": [
+        {
+          "slug": "comando-elite",
+          "title": "Comando Elite",
+          "season": 1,
+          "episodes": 84,
+          "url": "https://l.ennovelas-tv.com/series/comando-elite/"
+        }
+      ],
+      "imdb": {
+        "id": "tt3360134",
+        "name": "Comando Elite",
+        "source": "https://m.media-amazon.com/images/M/MV5BZWI0OTA3MmUtYjNhNS00YWJiLTkwYjItNWYwOTI0ZDE1ODg3XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/comando-elite.jpg"
+    },
+    {
+      "slug": "como-tu-no-hay-dos-2",
+      "title": "Como tú no hay dos 2",
+      "members": [
+        {
+          "slug": "como-tu-no-hay-dos-2",
+          "title": "Como tú no hay dos 2",
+          "season": 1,
+          "episodes": 85,
+          "url": "https://l.ennovelas-tv.com/series/como-tu-no-hay-dos-2/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "cop-adam",
+      "title": "Cop Adam (Hombre Palo)",
+      "members": [
+        {
+          "slug": "cop-adam",
+          "title": "Cop Adam (Hombre Palo)",
+          "season": 1,
+          "episodes": 25,
+          "url": "https://l.ennovelas-tv.com/series/cop-adam/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "corazones-blindados",
+      "title": "Corazones Blindados",
+      "members": [
+        {
+          "slug": "corazones-blindados",
+          "title": "Corazones Blindados",
+          "season": 1,
+          "episodes": 85,
+          "url": "https://l.ennovelas-tv.com/series/corazones-blindados/"
+        }
+      ],
+      "imdb": {
+        "id": "tt2523062",
+        "name": "Corazones Blindados",
+        "source": "https://m.media-amazon.com/images/M/MV5BZDBiMGMzMDctZTg0YS00ZTAyLWFjMGEtNWViZWM2YzAyNzU1XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/corazones-blindados.jpg"
+    },
+    {
+      "slug": "corazon-que-miente",
+      "title": "Corazón que miente",
+      "members": [
+        {
+          "slug": "corazon-que-miente",
+          "title": "Corazón que miente",
+          "season": 1,
+          "episodes": 71,
+          "url": "https://l.ennovelas-tv.com/series/corazon-que-miente/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "corazon-salvaje",
+      "title": "Corazón salvaje",
+      "members": [
+        {
+          "slug": "corazon-salvaje",
+          "title": "Corazón salvaje",
+          "season": 1,
+          "episodes": 135,
+          "url": "https://l.ennovelas-tv.com/series/corazon-salvaje/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "corona-de-lagrimas-1",
+      "title": "Corona de lágrimas",
+      "members": [
+        {
+          "slug": "corona-de-lagrimas-1",
+          "title": "Corona de lágrimas 1",
+          "season": 1,
+          "episodes": 112,
+          "url": "https://l.ennovelas-tv.com/series/corona-de-lagrimas-1/"
+        },
+        {
+          "slug": "corona-de-lagrimas-2",
+          "title": "Corona de lágrimas 2",
+          "season": 2,
+          "episodes": 110,
+          "url": "https://l.ennovelas-tv.com/series/corona-de-lagrimas-2/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "cuando-me-enamoro",
+      "title": "Cuando me enamoro",
+      "members": [
+        {
+          "slug": "cuando-me-enamoro",
+          "title": "Cuando me enamoro",
+          "season": 1,
+          "episodes": 182,
+          "url": "https://l.ennovelas-tv.com/series/cuando-me-enamoro/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "cuestion-de-honor",
+      "title": "Cuestión de honor",
+      "members": [
+        {
+          "slug": "cuestion-de-honor",
+          "title": "Cuestión de honor",
+          "season": 1,
+          "episodes": 76,
+          "url": "https://l.ennovelas-tv.com/series/cuestion-de-honor/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "cuidado-con-el-angel",
+      "title": "Cuidado con el ángel",
+      "members": [
+        {
+          "slug": "cuidado-con-el-angel",
+          "title": "Cuidado con el ángel",
+          "season": 1,
+          "episodes": 194,
+          "url": "https://l.ennovelas-tv.com/series/cuidado-con-el-angel/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "cuna-de-lobos",
+      "title": "Cuna de lobos",
+      "members": [
+        {
+          "slug": "cuna-de-lobos",
+          "title": "Cuna de lobos",
+          "season": 1,
+          "episodes": 85,
+          "url": "https://l.ennovelas-tv.com/series/cuna-de-lobos/"
+        },
+        {
+          "slug": "cuna-de-lobos-2",
+          "title": "Cuna de Lobos 2",
+          "season": 2,
+          "episodes": 25,
+          "url": "https://l.ennovelas-tv.com/series/cuna-de-lobos-2/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "darisi-basimiza",
+      "title": "Darisi Basimiza",
+      "members": [
+        {
+          "slug": "darisi-basimiza",
+          "title": "Darisi Basimiza",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/darisi-basimiza/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "darmaduman",
+      "title": "Darmaduman (Desordenado)",
+      "members": [
+        {
+          "slug": "darmaduman",
+          "title": "Darmaduman (Desordenado)",
+          "season": 1,
+          "episodes": 9,
+          "url": "https://l.ennovelas-tv.com/series/darmaduman/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "demente",
+      "title": "Demente",
+      "members": [
+        {
+          "slug": "demente",
+          "title": "Demente",
+          "season": 1,
+          "episodes": 140,
+          "url": "https://l.ennovelas-tv.com/series/demente/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "destan",
+      "title": "Destan (La Princesa Guerrera)",
+      "members": [
+        {
+          "slug": "destan",
+          "title": "Destan (La Princesa Guerrera)",
+          "season": 1,
+          "episodes": 28,
+          "url": "https://l.ennovelas-tv.com/series/destan/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "destilando-amor",
+      "title": "Destilando amor",
+      "members": [
+        {
+          "slug": "destilando-amor",
+          "title": "Destilando amor",
+          "season": 1,
+          "episodes": 168,
+          "url": "https://l.ennovelas-tv.com/series/destilando-amor/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "diomedes-el-cacique-de-la-junta",
+      "title": "Diomedes, el Cacique de La Junta",
+      "members": [
+        {
+          "slug": "diomedes-el-cacique-de-la-junta",
+          "title": "Diomedes, el Cacique de La Junta",
+          "season": 1,
+          "episodes": 195,
+          "url": "https://l.ennovelas-tv.com/series/diomedes-el-cacique-de-la-junta/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "disenando-tu-amor",
+      "title": "Diseñando tu amor",
+      "members": [
+        {
+          "slug": "disenando-tu-amor",
+          "title": "Diseñando tu amor",
+          "season": 1,
+          "episodes": 120,
+          "url": "https://l.ennovelas-tv.com/series/disenando-tu-amor/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "dos-lagos",
+      "title": "Dos Lagos",
+      "members": [
+        {
+          "slug": "dos-lagos",
+          "title": "Dos Lagos",
+          "season": 1,
+          "episodes": 12,
+          "url": "https://l.ennovelas-tv.com/series/dos-lagos/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "dona-bella",
+      "title": "Doña Bella",
+      "members": [
+        {
+          "slug": "dona-bella",
+          "title": "Doña Bella",
+          "season": 1,
+          "episodes": 84,
+          "url": "https://l.ennovelas-tv.com/series/dona-bella/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "dona-barbara",
+      "title": "Doña Bárbara",
+      "members": [
+        {
+          "slug": "dona-barbara",
+          "title": "Doña Bárbara",
+          "season": 1,
+          "episodes": 189,
+          "url": "https://l.ennovelas-tv.com/series/dona-barbara/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "dona-flor-y-sus-dos-maridos",
+      "title": "Doña Flor y sus dos maridos",
+      "members": [
+        {
+          "slug": "dona-flor-y-sus-dos-maridos",
+          "title": "Doña Flor y sus dos maridos",
+          "season": 1,
+          "episodes": 65,
+          "url": "https://l.ennovelas-tv.com/series/dona-flor-y-sus-dos-maridos/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "duele-amar",
+      "title": "Duele amar",
+      "members": [
+        {
+          "slug": "duele-amar",
+          "title": "Duele amar",
+          "season": 1,
+          "episodes": 210,
+          "url": "https://l.ennovelas-tv.com/series/duele-amar/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "dunyayla-benim-aramda",
+      "title": "Dünyayla Benim Aramda",
+      "members": [
+        {
+          "slug": "dunyayla-benim-aramda",
+          "title": "Dünyayla Benim Aramda",
+          "season": 1,
+          "episodes": 8,
+          "url": "https://l.ennovelas-tv.com/series/dunyayla-benim-aramda/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "ego",
+      "title": "EGO",
+      "members": [
+        {
+          "slug": "ego",
+          "title": "EGO",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/ego/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-amor-invencible",
+      "title": "El amor invencible",
+      "members": [
+        {
+          "slug": "el-amor-invencible",
+          "title": "El amor invencible",
+          "season": 1,
+          "episodes": 80,
+          "url": "https://l.ennovelas-tv.com/series/el-amor-invencible/"
+        }
+      ],
+      "imdb": {
+        "id": "tt22188282",
+        "name": "Invincible Love",
+        "source": "https://m.media-amazon.com/images/M/MV5BNGU5NGM2ZTMtZWI2Zi00ZTdkLTkyOGUtMTliNmZlZTcwYjZiXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/el-amor-invencible.jpg"
+    },
+    {
+      "slug": "el-bronx",
+      "title": "El Bronx",
+      "members": [
+        {
+          "slug": "el-bronx",
+          "title": "El Bronx",
+          "season": 1,
+          "episodes": 82,
+          "url": "https://l.ennovelas-tv.com/series/el-bronx/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-capo-1",
+      "title": "El capo",
+      "members": [
+        {
+          "slug": "el-capo-1",
+          "title": "El capo 1",
+          "season": 1,
+          "episodes": 90,
+          "url": "https://l.ennovelas-tv.com/series/el-capo-1/"
+        },
+        {
+          "slug": "el-capo-2",
+          "title": "El capo 2",
+          "season": 2,
+          "episodes": 76,
+          "url": "https://l.ennovelas-tv.com/series/el-capo-2/"
+        },
+        {
+          "slug": "el-capo-3",
+          "title": "El capo 3",
+          "season": 3,
+          "episodes": 57,
+          "url": "https://l.ennovelas-tv.com/series/el-capo-3/"
+        }
+      ],
+      "imdb": {
+        "id": "tt1527368",
+        "name": "El Capo",
+        "source": "https://m.media-amazon.com/images/M/MV5BNTM2MzU0MmEtMTc3MS00MzdjLWEyOWUtZGM3MzA3Y2NkOGU1XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/el-capo-1.jpg"
+    },
+    {
+      "slug": "el-cartel-de-los-sapos",
+      "title": "El Cartel de los Sapos",
+      "members": [
+        {
+          "slug": "el-cartel-de-los-sapos",
+          "title": "El Cartel de los Sapos",
+          "season": 1,
+          "episodes": 60,
+          "url": "https://l.ennovelas-tv.com/series/el-cartel-de-los-sapos/"
+        }
+      ],
+      "imdb": {
+        "id": "tt1260520",
+        "name": "El Cartel de los Sapos",
+        "source": "https://m.media-amazon.com/images/M/MV5BNTAwNTc4NjUxMV5BMl5BanBnXkFtZTgwNjc3MDAxMjE@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/el-cartel-de-los-sapos.jpg"
+    },
+    {
+      "slug": "el-color-de-la-pasion",
+      "title": "El color de la pasión",
+      "members": [
+        {
+          "slug": "el-color-de-la-pasion",
+          "title": "El color de la pasión",
+          "season": 1,
+          "episodes": 122,
+          "url": "https://l.ennovelas-tv.com/series/el-color-de-la-pasion/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-comandante",
+      "title": "El Comandante",
+      "members": [
+        {
+          "slug": "el-comandante",
+          "title": "El Comandante",
+          "season": 1,
+          "episodes": 63,
+          "url": "https://l.ennovelas-tv.com/series/el-comandante/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-corazon-nunca-se-equivoca",
+      "title": "El corazón nunca se equivoca",
+      "members": [
+        {
+          "slug": "el-corazon-nunca-se-equivoca",
+          "title": "El corazón nunca se equivoca",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/el-corazon-nunca-se-equivoca/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-derecho-de-nacer",
+      "title": "El derecho de nacer",
+      "members": [
+        {
+          "slug": "el-derecho-de-nacer",
+          "title": "El derecho de nacer",
+          "season": 1,
+          "episodes": 80,
+          "url": "https://l.ennovelas-tv.com/series/el-derecho-de-nacer/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-doctor-del-pueblo",
+      "title": "El doctor del pueblo",
+      "members": [
+        {
+          "slug": "el-doctor-del-pueblo",
+          "title": "El doctor del pueblo",
+          "season": 1,
+          "episodes": 5,
+          "url": "https://l.ennovelas-tv.com/series/el-doctor-del-pueblo/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-dragon",
+      "title": "El dragón",
+      "members": [
+        {
+          "slug": "el-dragon",
+          "title": "El dragón",
+          "season": 1,
+          "episodes": 38,
+          "url": "https://l.ennovelas-tv.com/series/el-dragon/"
+        },
+        {
+          "slug": "el-dragon-2",
+          "title": "El dragón 2",
+          "season": 2,
+          "episodes": 44,
+          "url": "https://l.ennovelas-tv.com/series/el-dragon-2/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-estilista",
+      "title": "El Estilista",
+      "members": [
+        {
+          "slug": "el-estilista",
+          "title": "El Estilista",
+          "season": 1,
+          "episodes": 84,
+          "url": "https://l.ennovelas-tv.com/series/el-estilista/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-extrano-retorno-de-diana-salazar",
+      "title": "El extraño Retorno de Diana Salazar",
+      "members": [
+        {
+          "slug": "el-extrano-retorno-de-diana-salazar",
+          "title": "El extraño Retorno de Diana Salazar",
+          "season": 1,
+          "episodes": 196,
+          "url": "https://l.ennovelas-tv.com/series/el-extrano-retorno-de-diana-salazar/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-final-del-paraiso",
+      "title": "El Final del Paraíso",
+      "members": [
+        {
+          "slug": "el-final-del-paraiso",
+          "title": "El Final del Paraíso",
+          "season": 1,
+          "episodes": 90,
+          "url": "https://l.ennovelas-tv.com/series/el-final-del-paraiso/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-hotel-de-los-secretos",
+      "title": "El hotel de los secretos",
+      "members": [
+        {
+          "slug": "el-hotel-de-los-secretos",
+          "title": "El hotel de los secretos",
+          "season": 1,
+          "episodes": 80,
+          "url": "https://l.ennovelas-tv.com/series/el-hotel-de-los-secretos/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-manantial",
+      "title": "El manantial",
+      "members": [
+        {
+          "slug": "el-manantial",
+          "title": "El manantial",
+          "season": 1,
+          "episodes": 95,
+          "url": "https://l.ennovelas-tv.com/series/el-manantial/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-marginal",
+      "title": "El marginal",
+      "members": [
+        {
+          "slug": "el-marginal",
+          "title": "El marginal",
+          "season": 1,
+          "episodes": 12,
+          "url": "https://l.ennovelas-tv.com/series/el-marginal/"
+        },
+        {
+          "slug": "el-marginal-2",
+          "title": "El Marginal 2",
+          "season": 2,
+          "episodes": 8,
+          "url": "https://l.ennovelas-tv.com/series/el-marginal-2/"
+        },
+        {
+          "slug": "el-marginal-3",
+          "title": "El Marginal 3",
+          "season": 3,
+          "episodes": 8,
+          "url": "https://l.ennovelas-tv.com/series/el-marginal-3/"
+        },
+        {
+          "slug": "el-marginal-4",
+          "title": "El Marginal 4",
+          "season": 4,
+          "episodes": 8,
+          "url": "https://l.ennovelas-tv.com/series/el-marginal-4/"
+        },
+        {
+          "slug": "el-marginal-5",
+          "title": "El Marginal 5",
+          "season": 5,
+          "episodes": 6,
+          "url": "https://l.ennovelas-tv.com/series/el-marginal-5/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-pecado-de-oyuki",
+      "title": "El pecado de Oyuki",
+      "members": [
+        {
+          "slug": "el-pecado-de-oyuki",
+          "title": "El pecado de Oyuki",
+          "season": 1,
+          "episodes": 123,
+          "url": "https://l.ennovelas-tv.com/series/el-pecado-de-oyuki/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-privilegio-de-amar",
+      "title": "El privilegio de amar",
+      "members": [
+        {
+          "slug": "el-privilegio-de-amar",
+          "title": "El privilegio de amar",
+          "season": 1,
+          "episodes": 155,
+          "url": "https://l.ennovelas-tv.com/series/el-privilegio-de-amar/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-rostro-de-la-venganza",
+      "title": "El Rostro de la Venganza",
+      "members": [
+        {
+          "slug": "el-rostro-de-la-venganza",
+          "title": "El Rostro de la Venganza",
+          "season": 1,
+          "episodes": 115,
+          "url": "https://l.ennovelas-tv.com/series/el-rostro-de-la-venganza/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-secretario",
+      "title": "El Secretario",
+      "members": [
+        {
+          "slug": "el-secretario",
+          "title": "El Secretario",
+          "season": 1,
+          "episodes": 123,
+          "url": "https://l.ennovelas-tv.com/series/el-secretario/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "el-senor-de-los-cielos-1-temporada",
+      "title": "El Señor de los Cielos",
+      "members": [
+        {
+          "slug": "el-senor-de-los-cielos-1-temporada",
+          "title": "El Señor de los Cielos 1 Temporada",
+          "season": 1,
+          "episodes": 74,
+          "url": "https://l.ennovelas-tv.com/series/el-senor-de-los-cielos-1-temporada/"
+        },
+        {
+          "slug": "el-senor-de-los-cielos-2-temporada",
+          "title": "El Señor de los Cielos 2 Temporada",
+          "season": 2,
+          "episodes": 84,
+          "url": "https://l.ennovelas-tv.com/series/el-senor-de-los-cielos-2-temporada/"
+        },
+        {
+          "slug": "el-senor-de-los-cielos-3-temporada",
+          "title": "El Señor de los Cielos 3 Temporada",
+          "season": 3,
+          "episodes": 104,
+          "url": "https://l.ennovelas-tv.com/series/el-senor-de-los-cielos-3-temporada/"
+        },
+        {
+          "slug": "el-senor-de-los-cielos-4-temporada",
+          "title": "El Señor de los Cielos 4 Temporada",
+          "season": 4,
+          "episodes": 80,
+          "url": "https://l.ennovelas-tv.com/series/el-senor-de-los-cielos-4-temporada/"
+        },
+        {
+          "slug": "el-senor-de-los-cielos-5-temporada",
+          "title": "El Señor de los Cielos 5 Temporada",
+          "season": 5,
+          "episodes": 95,
+          "url": "https://l.ennovelas-tv.com/series/el-senor-de-los-cielos-5-temporada/"
+        },
+        {
+          "slug": "el-senor-de-los-cielos-6-temporada",
+          "title": "El Señor de los Cielos 6 Temporada",
+          "season": 6,
+          "episodes": 99,
+          "url": "https://l.ennovelas-tv.com/series/el-senor-de-los-cielos-6-temporada/"
+        },
+        {
+          "slug": "el-senor-de-los-cielos-7-temporada",
+          "title": "El Señor de los Cielos 7 Temporada",
+          "season": 7,
+          "episodes": 75,
+          "url": "https://l.ennovelas-tv.com/series/el-senor-de-los-cielos-7-temporada/"
+        },
+        {
+          "slug": "el-senor-de-los-cielos-8-temporada",
+          "title": "El Señor de los Cielos 8 Temporada",
+          "season": 8,
+          "episodes": 89,
+          "url": "https://l.ennovelas-tv.com/series/el-senor-de-los-cielos-8-temporada/"
+        }
+      ],
+      "imdb": {
+        "id": "tt2777882",
+        "name": "The Lord of the Skies",
+        "source": "https://m.media-amazon.com/images/M/MV5BN2JmMzFmNGEtZGNmNy00MTJmLTk1OTQtMmFhMzUxZTU5ZTI2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/el-senor-de-los-cielos-1-temporada.jpg"
+    },
+    {
+      "slug": "en-nombre-del-amor",
+      "title": "En nombre del amor",
+      "members": [
+        {
+          "slug": "en-nombre-del-amor",
+          "title": "En nombre del amor",
+          "season": 1,
+          "episodes": 170,
+          "url": "https://l.ennovelas-tv.com/series/en-nombre-del-amor/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "en-otra-piel",
+      "title": "En otra piel",
+      "members": [
+        {
+          "slug": "en-otra-piel",
+          "title": "En otra piel",
+          "season": 1,
+          "episodes": 154,
+          "url": "https://l.ennovelas-tv.com/series/en-otra-piel/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "en-tierras-salvajes",
+      "title": "En tierras salvajes",
+      "members": [
+        {
+          "slug": "en-tierras-salvajes",
+          "title": "En tierras salvajes",
+          "season": 1,
+          "episodes": 70,
+          "url": "https://l.ennovelas-tv.com/series/en-tierras-salvajes/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "enamorandome-de-ramon",
+      "title": "Enamorándome de Ramón",
+      "members": [
+        {
+          "slug": "enamorandome-de-ramon",
+          "title": "Enamorándome de Ramón",
+          "season": 1,
+          "episodes": 117,
+          "url": "https://l.ennovelas-tv.com/series/enamorandome-de-ramon/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "enfermeras",
+      "title": "Enfermeras",
+      "members": [
+        {
+          "slug": "enfermeras",
+          "title": "Enfermeras",
+          "season": 1,
+          "episodes": 100,
+          "url": "https://l.ennovelas-tv.com/series/enfermeras/"
+        },
+        {
+          "slug": "enfermeras-2-temporada",
+          "title": "Enfermeras 2",
+          "season": 2,
+          "episodes": 225,
+          "url": "https://l.ennovelas-tv.com/series/enfermeras-2-temporada/"
+        }
+      ],
+      "imdb": {
+        "id": "tt11434706",
+        "name": "Enfermeras",
+        "source": "https://m.media-amazon.com/images/M/MV5BMTBhNTY1N2EtMTNjZS00NmZmLTg2Y2QtMDA3MDFkZTIyNjE1XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/enfermeras.jpg"
+    },
+    {
+      "slug": "entre-el-amor-y-el-odio",
+      "title": "Entre el amor y el odio",
+      "members": [
+        {
+          "slug": "entre-el-amor-y-el-odio",
+          "title": "Entre el amor y el odio",
+          "season": 1,
+          "episodes": 124,
+          "url": "https://l.ennovelas-tv.com/series/entre-el-amor-y-el-odio/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "esmeraldas",
+      "title": "Esmeraldas",
+      "members": [
+        {
+          "slug": "esmeraldas",
+          "title": "Esmeraldas",
+          "season": 1,
+          "episodes": 62,
+          "url": "https://l.ennovelas-tv.com/series/esmeraldas/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "eternamente-amandonos",
+      "title": "Eternamente Amándonos",
+      "members": [
+        {
+          "slug": "eternamente-amandonos",
+          "title": "Eternamente Amándonos",
+          "season": 1,
+          "episodes": 4,
+          "url": "https://l.ennovelas-tv.com/series/eternamente-amandonos/"
+        }
+      ],
+      "imdb": {
+        "id": "tt24229602",
+        "name": "Eternamente Amándonos",
+        "source": "https://m.media-amazon.com/images/M/MV5BMjhmMGQ5Y2EtZjU4My00YzdlLTk1ODYtMTU0NTdjYTc1MDcxXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/eternamente-amandonos.jpg"
+    },
+    {
+      "slug": "eva-luna",
+      "title": "Eva Luna",
+      "members": [
+        {
+          "slug": "eva-luna",
+          "title": "Eva Luna",
+          "season": 1,
+          "episodes": 114,
+          "url": "https://l.ennovelas-tv.com/series/eva-luna/"
+        }
+      ],
+      "imdb": {
+        "id": "tt1846055",
+        "name": "Eva Luna",
+        "source": "https://m.media-amazon.com/images/M/MV5BZDgyZTdjNDQtYWZlZC00MmUxLTliZTgtMmRjMDY3NjI0ZDg1XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/eva-luna.jpg"
+    },
+    {
+      "slug": "evlilik-hakkinda-her-sey",
+      "title": "Evlilik Hakkinda Her Sey",
+      "members": [
+        {
+          "slug": "evlilik-hakkinda-her-sey",
+          "title": "Evlilik Hakkinda Her Sey",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/evlilik-hakkinda-her-sey/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "filinta",
+      "title": "Filinta",
+      "members": [
+        {
+          "slug": "filinta",
+          "title": "Filinta",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/filinta/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "fuego-ardiente",
+      "title": "Fuego ardiente",
+      "members": [
+        {
+          "slug": "fuego-ardiente",
+          "title": "Fuego ardiente",
+          "season": 1,
+          "episodes": 85,
+          "url": "https://l.ennovelas-tv.com/series/fuego-ardiente/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "fuego-en-la-sangre",
+      "title": "Fuego en la sangre",
+      "members": [
+        {
+          "slug": "fuego-en-la-sangre",
+          "title": "Fuego en la sangre",
+          "season": 1,
+          "episodes": 200,
+          "url": "https://l.ennovelas-tv.com/series/fuego-en-la-sangre/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "fugitivos",
+      "title": "Fugitivos",
+      "members": [
+        {
+          "slug": "fugitivos",
+          "title": "Fugitivos",
+          "season": 1,
+          "episodes": 40,
+          "url": "https://l.ennovelas-tv.com/series/fugitivos/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "gamsiz-hayat",
+      "title": "Gamsiz Hayat",
+      "members": [
+        {
+          "slug": "gamsiz-hayat",
+          "title": "Gamsiz Hayat",
+          "season": 1,
+          "episodes": 6,
+          "url": "https://l.ennovelas-tv.com/series/gamsiz-hayat/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "gecenin-ucunda",
+      "title": "Gecenin Ucunda (Al final de la noche)",
+      "members": [
+        {
+          "slug": "gecenin-ucunda",
+          "title": "Gecenin Ucunda (Al final de la noche)",
+          "season": 1,
+          "episodes": 26,
+          "url": "https://l.ennovelas-tv.com/series/gecenin-ucunda/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "gelsin-hayat-bildigi-gibi",
+      "title": "Gelsin Hayat Bildigi Gibi",
+      "members": [
+        {
+          "slug": "gelsin-hayat-bildigi-gibi",
+          "title": "Gelsin Hayat Bildigi Gibi",
+          "season": 1,
+          "episodes": 41,
+          "url": "https://l.ennovelas-tv.com/series/gelsin-hayat-bildigi-gibi/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "gencligim-eyvah",
+      "title": "Gençligim Eyvah (Mi juventud)",
+      "members": [
+        {
+          "slug": "gencligim-eyvah",
+          "title": "Gençligim Eyvah (Mi juventud)",
+          "season": 1,
+          "episodes": 34,
+          "url": "https://l.ennovelas-tv.com/series/gencligim-eyvah/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "gizli-sakli",
+      "title": "Gizli Sakli (Secretamente)",
+      "members": [
+        {
+          "slug": "gizli-sakli",
+          "title": "Gizli Sakli (Secretamente)",
+          "season": 1,
+          "episodes": 8,
+          "url": "https://l.ennovelas-tv.com/series/gizli-sakli/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "golpe-de-suerte",
+      "title": "Golpe de suerte",
+      "members": [
+        {
+          "slug": "golpe-de-suerte",
+          "title": "Golpe de suerte",
+          "season": 1,
+          "episodes": 80,
+          "url": "https://l.ennovelas-tv.com/series/golpe-de-suerte/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "gonul-dagi",
+      "title": "Gonul Dagi",
+      "members": [
+        {
+          "slug": "gonul-dagi",
+          "title": "Gonul Dagi",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/gonul-dagi/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "guerra-de-idolos",
+      "title": "Guerra de Ídolos",
+      "members": [
+        {
+          "slug": "guerra-de-idolos",
+          "title": "Guerra de Ídolos",
+          "season": 1,
+          "episodes": 76,
+          "url": "https://l.ennovelas-tv.com/series/guerra-de-idolos/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "gul-masali",
+      "title": "Gul Masali (Cuento de Rosa)",
+      "members": [
+        {
+          "slug": "gul-masali",
+          "title": "Gul Masali (Cuento de Rosa)",
+          "season": 1,
+          "episodes": 17,
+          "url": "https://l.ennovelas-tv.com/series/gul-masali/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "gulumse-kaderine",
+      "title": "Gulumse Kaderine (Sonrie a tu Destino)",
+      "members": [
+        {
+          "slug": "gulumse-kaderine",
+          "title": "Gulumse Kaderine (Sonrie a tu Destino)",
+          "season": 1,
+          "episodes": 5,
+          "url": "https://l.ennovelas-tv.com/series/gulumse-kaderine/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "gulumse-yeter",
+      "title": "Gulumse Yeter (Solo sonríe)",
+      "members": [
+        {
+          "slug": "gulumse-yeter",
+          "title": "Gulumse Yeter (Solo sonríe)",
+          "season": 1,
+          "episodes": 24,
+          "url": "https://l.ennovelas-tv.com/series/gulumse-yeter/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "gunebakan",
+      "title": "Gunebakan (Girasol)",
+      "members": [
+        {
+          "slug": "gunebakan",
+          "title": "Gunebakan (Girasol)",
+          "season": 1,
+          "episodes": 10,
+          "url": "https://l.ennovelas-tv.com/series/gunebakan/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "guvercin",
+      "title": "Guvercin (Paloma)",
+      "members": [
+        {
+          "slug": "guvercin",
+          "title": "Guvercin (Paloma)",
+          "season": 1,
+          "episodes": 16,
+          "url": "https://l.ennovelas-tv.com/series/guvercin/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "hanim-koylu",
+      "title": "Hanim Koylu (Mujer de pueblo)",
+      "members": [
+        {
+          "slug": "hanim-koylu",
+          "title": "Hanim Koylu (Mujer de pueblo)",
+          "season": 1,
+          "episodes": 13,
+          "url": "https://l.ennovelas-tv.com/series/hanim-koylu/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "hasta-el-fin-del-mundo",
+      "title": "Hasta el fin del mundo",
+      "members": [
+        {
+          "slug": "hasta-el-fin-del-mundo",
+          "title": "Hasta el fin del mundo",
+          "season": 1,
+          "episodes": 193,
+          "url": "https://l.ennovelas-tv.com/series/hasta-el-fin-del-mundo/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "hasta-que-el-dinero-nos-separe",
+      "title": "Hasta que el dinero nos separe",
+      "members": [
+        {
+          "slug": "hasta-que-el-dinero-nos-separe",
+          "title": "Hasta que el dinero nos separe",
+          "season": 1,
+          "episodes": 227,
+          "url": "https://l.ennovelas-tv.com/series/hasta-que-el-dinero-nos-separe/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "hasta-que-te-conoci",
+      "title": "Hasta Que Te Conocí",
+      "members": [
+        {
+          "slug": "hasta-que-te-conoci",
+          "title": "Hasta Que Te Conocí",
+          "season": 1,
+          "episodes": 13,
+          "url": "https://l.ennovelas-tv.com/series/hasta-que-te-conoci/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "hayaller-ve-hayatlar",
+      "title": "Hayaller ve hayatlar",
+      "members": [
+        {
+          "slug": "hayaller-ve-hayatlar",
+          "title": "Hayaller ve hayatlar",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/hayaller-ve-hayatlar/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "hayat-bugun",
+      "title": "Hayat Bugun (La Vida de Hoy)",
+      "members": [
+        {
+          "slug": "hayat-bugun",
+          "title": "Hayat Bugun (La Vida de Hoy)",
+          "season": 1,
+          "episodes": 8,
+          "url": "https://l.ennovelas-tv.com/series/hayat-bugun/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "hayat-mucizelere-gebe",
+      "title": "Hayat Mucizelere Gebe (La vida es milagrosa)",
+      "members": [
+        {
+          "slug": "hayat-mucizelere-gebe",
+          "title": "Hayat Mucizelere Gebe (La vida es milagrosa)",
+          "season": 1,
+          "episodes": 7,
+          "url": "https://l.ennovelas-tv.com/series/hayat-mucizelere-gebe/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "hayat-sirlari",
+      "title": "Hayat Sirlari (Secretos de la vida)",
+      "members": [
+        {
+          "slug": "hayat-sirlari",
+          "title": "Hayat Sirlari (Secretos de la vida)",
+          "season": 1,
+          "episodes": 11,
+          "url": "https://l.ennovelas-tv.com/series/hayat-sirlari/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "hayatimin-aski",
+      "title": "Hayatimin Aski (Amor de mi vida)",
+      "members": [
+        {
+          "slug": "hayatimin-aski",
+          "title": "Hayatimin Aski (Amor de mi vida)",
+          "season": 1,
+          "episodes": 17,
+          "url": "https://l.ennovelas-tv.com/series/hayatimin-aski/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "hercai-amor-y-venganza",
+      "title": "Hercai Amor y Venganza",
+      "members": [
+        {
+          "slug": "hercai-amor-y-venganza",
+          "title": "Hercai Amor y Venganza",
+          "season": 1,
+          "episodes": 239,
+          "url": "https://l.ennovelas-tv.com/series/hercai-amor-y-venganza/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "heridas-de-amor",
+      "title": "Heridas de amor",
+      "members": [
+        {
+          "slug": "heridas-de-amor",
+          "title": "Heridas de amor",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/heridas-de-amor/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "huracan",
+      "title": "Huracán",
+      "members": [
+        {
+          "slug": "huracan",
+          "title": "Huracán",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/huracan/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "huzur-sokagi",
+      "title": "Huzur Sokagi (Calle tranquila)",
+      "members": [
+        {
+          "slug": "huzur-sokagi",
+          "title": "Huzur Sokagi (Calle tranquila)",
+          "season": 1,
+          "episodes": 201,
+          "url": "https://l.ennovelas-tv.com/series/huzur-sokagi/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "huerfanas",
+      "title": "Huérfanas",
+      "members": [
+        {
+          "slug": "huerfanas",
+          "title": "Huérfanas",
+          "season": 1,
+          "episodes": 130,
+          "url": "https://l.ennovelas-tv.com/series/huerfanas/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "huerfanos-de-su-tierra",
+      "title": "Huérfanos de su Tierra",
+      "members": [
+        {
+          "slug": "huerfanos-de-su-tierra",
+          "title": "Huérfanos de su Tierra",
+          "season": 1,
+          "episodes": 83,
+          "url": "https://l.ennovelas-tv.com/series/huerfanos-de-su-tierra/"
+        }
+      ],
+      "imdb": {
+        "id": "tt10126500",
+        "name": "Orphans of a Nation",
+        "source": "https://m.media-amazon.com/images/M/MV5BYjk1Y2YwNGYtYWNmYy00NDgxLWIyNDktMTUzM2ZiMTA2ODJiXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/huerfanos-de-su-tierra.jpg"
+    },
+    {
+      "slug": "icimizdeki-ates",
+      "title": "Icimizdeki Ates (El Fuego en Nosotros)",
+      "members": [
+        {
+          "slug": "icimizdeki-ates",
+          "title": "Icimizdeki Ates (El Fuego en Nosotros)",
+          "season": 1,
+          "episodes": 5,
+          "url": "https://l.ennovelas-tv.com/series/icimizdeki-ates/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "icimizden-biri",
+      "title": "Icimizden Biri (Uno de nosotros)",
+      "members": [
+        {
+          "slug": "icimizden-biri",
+          "title": "Icimizden Biri (Uno de nosotros)",
+          "season": 1,
+          "episodes": 5,
+          "url": "https://l.ennovelas-tv.com/series/icimizden-biri/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "ikimizin-sirri",
+      "title": "Ikimizin Sirri (Nuestro Secreto)",
+      "members": [
+        {
+          "slug": "ikimizin-sirri",
+          "title": "Ikimizin Sirri (Nuestro Secreto)",
+          "season": 1,
+          "episodes": 10,
+          "url": "https://l.ennovelas-tv.com/series/ikimizin-sirri/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "iliski-durumu-karisik",
+      "title": "Iliski Durumu Karisik",
+      "members": [
+        {
+          "slug": "iliski-durumu-karisik",
+          "title": "Iliski Durumu Karisik",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/iliski-durumu-karisik/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "imperio-de-mentiras",
+      "title": "Imperio de mentiras",
+      "members": [
+        {
+          "slug": "imperio-de-mentiras",
+          "title": "Imperio de mentiras",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/imperio-de-mentiras/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "insanlik-sucu",
+      "title": "Insanlik Sucu",
+      "members": [
+        {
+          "slug": "insanlik-sucu",
+          "title": "Insanlik Sucu",
+          "season": 1,
+          "episodes": 8,
+          "url": "https://l.ennovelas-tv.com/series/insanlik-sucu/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "iyi-gunde-kotu",
+      "title": "Iyi Gunde Kotu",
+      "members": [
+        {
+          "slug": "iyi-gunde-kotu",
+          "title": "Iyi Gunde Kotu",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/iyi-gunde-kotu/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "iyilik",
+      "title": "Iyilik (Bondad)",
+      "members": [
+        {
+          "slug": "iyilik",
+          "title": "Iyilik (Bondad)",
+          "season": 1,
+          "episodes": 27,
+          "url": "https://l.ennovelas-tv.com/series/iyilik/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "josue-y-la-tierra-prometida",
+      "title": "Josue y la tierra prometida",
+      "members": [
+        {
+          "slug": "josue-y-la-tierra-prometida",
+          "title": "Josue y la tierra prometida",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/josue-y-la-tierra-prometida/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kacis",
+      "title": "Kacis (Escape)",
+      "members": [
+        {
+          "slug": "kacis",
+          "title": "Kacis (Escape)",
+          "season": 1,
+          "episodes": 8,
+          "url": "https://l.ennovelas-tv.com/series/kacis/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kaderimin-oyunu",
+      "title": "Kaderimin Oyunu (El Juego de mi Destino)",
+      "members": [
+        {
+          "slug": "kaderimin-oyunu",
+          "title": "Kaderimin Oyunu (El Juego de mi Destino)",
+          "season": 1,
+          "episodes": 26,
+          "url": "https://l.ennovelas-tv.com/series/kaderimin-oyunu/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kagit-ev",
+      "title": "Kagit Ev",
+      "members": [
+        {
+          "slug": "kagit-ev",
+          "title": "Kagit Ev",
+          "season": 1,
+          "episodes": 7,
+          "url": "https://l.ennovelas-tv.com/series/kagit-ev/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kahraman-babam",
+      "title": "Kahraman Babam",
+      "members": [
+        {
+          "slug": "kahraman-babam",
+          "title": "Kahraman Babam",
+          "season": 1,
+          "episodes": 8,
+          "url": "https://l.ennovelas-tv.com/series/kahraman-babam/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kalbimin-sultani",
+      "title": "Kalbimin Sultani",
+      "members": [
+        {
+          "slug": "kalbimin-sultani",
+          "title": "Kalbimin Sultani",
+          "season": 1,
+          "episodes": 11,
+          "url": "https://l.ennovelas-tv.com/series/kalbimin-sultani/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kalp-atisi",
+      "title": "Kalp Atisi",
+      "members": [
+        {
+          "slug": "kalp-atisi",
+          "title": "Kalp Atisi",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/kalp-atisi/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kalp-yarasi",
+      "title": "Kalp Yarasi",
+      "members": [
+        {
+          "slug": "kalp-yarasi",
+          "title": "Kalp Yarasi",
+          "season": 1,
+          "episodes": 32,
+          "url": "https://l.ennovelas-tv.com/series/kalp-yarasi/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kanunsuz-topraklar",
+      "title": "Kanunsuz Topraklar",
+      "members": [
+        {
+          "slug": "kanunsuz-topraklar",
+          "title": "Kanunsuz Topraklar",
+          "season": 1,
+          "episodes": 16,
+          "url": "https://l.ennovelas-tv.com/series/kanunsuz-topraklar/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kara-ekmek",
+      "title": "Kara Ekmek",
+      "members": [
+        {
+          "slug": "kara-ekmek",
+          "title": "Kara Ekmek",
+          "season": 1,
+          "episodes": 77,
+          "url": "https://l.ennovelas-tv.com/series/kara-ekmek/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kara-tahta",
+      "title": "Kara Tahta",
+      "members": [
+        {
+          "slug": "kara-tahta",
+          "title": "Kara Tahta",
+          "season": 1,
+          "episodes": 20,
+          "url": "https://l.ennovelas-tv.com/series/kara-tahta/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "karadaglar",
+      "title": "Karadaglar",
+      "members": [
+        {
+          "slug": "karadaglar",
+          "title": "Karadaglar",
+          "season": 1,
+          "episodes": 40,
+          "url": "https://l.ennovelas-tv.com/series/karadaglar/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kardes-cocuklari",
+      "title": "kardes cocuklari",
+      "members": [
+        {
+          "slug": "kardes-cocuklari",
+          "title": "kardes cocuklari",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/kardes-cocuklari/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kardeslerim",
+      "title": "Kardeslerim",
+      "members": [
+        {
+          "slug": "kardeslerim",
+          "title": "Kardeslerim",
+          "season": 1,
+          "episodes": 100,
+          "url": "https://l.ennovelas-tv.com/series/kardeslerim/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kasaba-doktoru",
+      "title": "Kasaba Doktoru",
+      "members": [
+        {
+          "slug": "kasaba-doktoru",
+          "title": "Kasaba Doktoru",
+          "season": 1,
+          "episodes": 32,
+          "url": "https://l.ennovelas-tv.com/series/kasaba-doktoru/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kazara-ask",
+      "title": "Kazara Ask",
+      "members": [
+        {
+          "slug": "kazara-ask",
+          "title": "Kazara Ask",
+          "season": 1,
+          "episodes": 13,
+          "url": "https://l.ennovelas-tv.com/series/kazara-ask/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kefaret",
+      "title": "Kefaret",
+      "members": [
+        {
+          "slug": "kefaret",
+          "title": "Kefaret",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/kefaret/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kibris-zafere-dogru",
+      "title": "Kibris Zafere Dogru",
+      "members": [
+        {
+          "slug": "kibris-zafere-dogru",
+          "title": "Kibris Zafere Dogru",
+          "season": 1,
+          "episodes": 24,
+          "url": "https://l.ennovelas-tv.com/series/kibris-zafere-dogru/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kimse-bilmez",
+      "title": "Kimse Bilmez",
+      "members": [
+        {
+          "slug": "kimse-bilmez",
+          "title": "Kimse Bilmez",
+          "season": 1,
+          "episodes": 27,
+          "url": "https://l.ennovelas-tv.com/series/kimse-bilmez/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kirmizi-oda",
+      "title": "Kirmizi Oda",
+      "members": [
+        {
+          "slug": "kirmizi-oda",
+          "title": "Kirmizi Oda",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/kirmizi-oda/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kizilcik-serbeti",
+      "title": "Kizilcik Serbeti",
+      "members": [
+        {
+          "slug": "kizilcik-serbeti",
+          "title": "Kizilcik Serbeti",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/kizilcik-serbeti/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kurulus-osman",
+      "title": "Kurulus Osman",
+      "members": [
+        {
+          "slug": "kurulus-osman",
+          "title": "Kurulus Osman",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/kurulus-osman/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "kusursuz-kiraci",
+      "title": "Kusursuz kiraci",
+      "members": [
+        {
+          "slug": "kusursuz-kiraci",
+          "title": "Kusursuz kiraci",
+          "season": 1,
+          "episodes": 6,
+          "url": "https://l.ennovelas-tv.com/series/kusursuz-kiraci/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "la-desalmada",
+      "title": "La desalmada",
+      "members": [
+        {
+          "slug": "la-desalmada",
+          "title": "La desalmada",
+          "season": 1,
+          "episodes": 85,
+          "url": "https://l.ennovelas-tv.com/series/la-desalmada/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "la-dona",
+      "title": "La Doña",
+      "members": [
+        {
+          "slug": "la-dona",
+          "title": "La Doña",
+          "season": 1,
+          "episodes": 120,
+          "url": "https://l.ennovelas-tv.com/series/la-dona/"
+        },
+        {
+          "slug": "la-dona-2-temporada",
+          "title": "La Doña 2",
+          "season": 2,
+          "episodes": 75,
+          "url": "https://l.ennovelas-tv.com/series/la-dona-2-temporada/"
+        }
+      ],
+      "imdb": {
+        "id": "tt5663590",
+        "name": "Lady Altagracia",
+        "source": "https://m.media-amazon.com/images/M/MV5BYTRjMGYwNDQtZmEyMy00ZTg2LWFlYmQtYThiYmIyYmJhYjViXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/la-dona.jpg"
+    },
+    {
+      "slug": "la-esclava-blanca",
+      "title": "La esclava blanca",
+      "members": [
+        {
+          "slug": "la-esclava-blanca",
+          "title": "La esclava blanca",
+          "season": 1,
+          "episodes": 62,
+          "url": "https://l.ennovelas-tv.com/series/la-esclava-blanca/"
+        }
+      ],
+      "imdb": {
+        "id": "tt5458128",
+        "name": "The White Slave",
+        "source": "https://m.media-amazon.com/images/M/MV5BMGExYWY0ZjYtNzEyYS00MTI5LTgyMjYtZDdkZDQ4OGExYTE3XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/la-esclava-blanca.jpg"
+    },
+    {
+      "slug": "la-heredera-filipinas",
+      "title": "La Heredera ( filipinas )",
+      "members": [
+        {
+          "slug": "la-heredera-filipinas",
+          "title": "La Heredera ( filipinas )",
+          "season": 1,
+          "episodes": 149,
+          "url": "https://l.ennovelas-tv.com/series/la-heredera-filipinas/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "la-mujer-de-judas",
+      "title": "La mujer de Judas",
+      "members": [
+        {
+          "slug": "la-mujer-de-judas",
+          "title": "La mujer de Judas",
+          "season": 1,
+          "episodes": 165,
+          "url": "https://l.ennovelas-tv.com/series/la-mujer-de-judas/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "la-nieta-elegida",
+      "title": "La Nieta Elegida",
+      "members": [
+        {
+          "slug": "la-nieta-elegida",
+          "title": "La Nieta Elegida",
+          "season": 1,
+          "episodes": 72,
+          "url": "https://l.ennovelas-tv.com/series/la-nieta-elegida/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "la-pola",
+      "title": "La Pola",
+      "members": [
+        {
+          "slug": "la-pola",
+          "title": "La Pola",
+          "season": 1,
+          "episodes": 98,
+          "url": "https://l.ennovelas-tv.com/series/la-pola/"
+        }
+      ],
+      "imdb": {
+        "id": "tt1773176",
+        "name": "La Pola",
+        "source": "https://m.media-amazon.com/images/M/MV5BZGMyZWFmNjMtZGNiYi00ZjY4LTlkMzAtY2IxN2YwZDkwMTQ2XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/la-pola.jpg"
+    },
+    {
+      "slug": "la-reina-del-flow",
+      "title": "La reina del flow",
+      "members": [
+        {
+          "slug": "la-reina-del-flow",
+          "title": "La reina del flow",
+          "season": 1,
+          "episodes": 82,
+          "url": "https://l.ennovelas-tv.com/series/la-reina-del-flow/"
+        },
+        {
+          "slug": "la-reina-del-flow-2-temporada",
+          "title": "La reina del flow 2",
+          "season": 2,
+          "episodes": 90,
+          "url": "https://l.ennovelas-tv.com/series/la-reina-del-flow-2-temporada/"
+        }
+      ],
+      "imdb": {
+        "id": "tt8560918",
+        "name": "The Queen of Flow",
+        "source": "https://m.media-amazon.com/images/M/MV5BNGIzOWNlMDktZjkzMy00MjcxLTgzMjAtMzdkM2EwNTk2Y2JhXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/la-reina-del-flow.jpg"
+    },
+    {
+      "slug": "la-reina-del-sur-1-temporada",
+      "title": "La Reina del Sur",
+      "members": [
+        {
+          "slug": "la-reina-del-sur-1-temporada",
+          "title": "La Reina del Sur 1 Temporada",
+          "season": 1,
+          "episodes": 63,
+          "url": "https://l.ennovelas-tv.com/series/la-reina-del-sur-1-temporada/"
+        },
+        {
+          "slug": "la-reina-del-sur-2-temporada",
+          "title": "La Reina del Sur 2 Temporada",
+          "season": 2,
+          "episodes": 60,
+          "url": "https://l.ennovelas-tv.com/series/la-reina-del-sur-2-temporada/"
+        },
+        {
+          "slug": "la-reina-del-sur-3-temporada",
+          "title": "La Reina del Sur 3 Temporada",
+          "season": 3,
+          "episodes": 60,
+          "url": "https://l.ennovelas-tv.com/series/la-reina-del-sur-3-temporada/"
+        }
+      ],
+      "imdb": {
+        "id": "tt1704637",
+        "name": "La Reina del Sur",
+        "source": "https://m.media-amazon.com/images/M/MV5BMDY0ZTZkY2UtYzNmNC00YWNiLWEzMDYtNDQwNTA0MzczZDNiXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/la-reina-del-sur-1-temporada.jpg"
+    },
+    {
+      "slug": "la-taxista",
+      "title": "La taxista",
+      "members": [
+        {
+          "slug": "la-taxista",
+          "title": "La taxista",
+          "season": 1,
+          "episodes": 81,
+          "url": "https://l.ennovelas-tv.com/series/la-taxista/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "la-tempestad",
+      "title": "La Tempestad",
+      "members": [
+        {
+          "slug": "la-tempestad",
+          "title": "La Tempestad",
+          "season": 1,
+          "episodes": 122,
+          "url": "https://l.ennovelas-tv.com/series/la-tempestad/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "la-traicionera",
+      "title": "La Traicionera",
+      "members": [
+        {
+          "slug": "la-traicionera",
+          "title": "La Traicionera",
+          "season": 1,
+          "episodes": 92,
+          "url": "https://l.ennovelas-tv.com/series/la-traicionera/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "la-traicion",
+      "title": "La Traición",
+      "members": [
+        {
+          "slug": "la-traicion",
+          "title": "La Traición",
+          "season": 1,
+          "episodes": 107,
+          "url": "https://l.ennovelas-tv.com/series/la-traicion/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "la-venganza-de-analia",
+      "title": "La Venganza de Analía",
+      "members": [
+        {
+          "slug": "la-venganza-de-analia",
+          "title": "La Venganza de Analía",
+          "season": 1,
+          "episodes": 53,
+          "url": "https://l.ennovelas-tv.com/series/la-venganza-de-analia/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "la-venganza-de-los-ex-2018",
+      "title": "La venganza de los ex ( 2018 )",
+      "members": [
+        {
+          "slug": "la-venganza-de-los-ex-2018",
+          "title": "La venganza de los ex ( 2018 )",
+          "season": 1,
+          "episodes": 12,
+          "url": "https://l.ennovelas-tv.com/series/la-venganza-de-los-ex-2018/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "la-venganza-de-los-ex-vip-2021",
+      "title": "La Venganza de los Ex VIP (2021)",
+      "members": [
+        {
+          "slug": "la-venganza-de-los-ex-vip-2021",
+          "title": "La Venganza de los Ex VIP (2021)",
+          "season": 1,
+          "episodes": 12,
+          "url": "https://l.ennovelas-tv.com/series/la-venganza-de-los-ex-vip-2021/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "la-venganza-de-los-ex-vip-2-2023",
+      "title": "La Venganza de los Ex VIP 2 (2023)",
+      "members": [
+        {
+          "slug": "la-venganza-de-los-ex-vip-2-2023",
+          "title": "La Venganza de los Ex VIP 2 (2023)",
+          "season": 1,
+          "episodes": 7,
+          "url": "https://l.ennovelas-tv.com/series/la-venganza-de-los-ex-vip-2-2023/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "las-dos-caras-de-ana",
+      "title": "Las dos caras de Ana",
+      "members": [
+        {
+          "slug": "las-dos-caras-de-ana",
+          "title": "Las dos caras de Ana",
+          "season": 1,
+          "episodes": 120,
+          "url": "https://l.ennovelas-tv.com/series/las-dos-caras-de-ana/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "las-noches-de-luciana",
+      "title": "Las noches de Luciana",
+      "members": [
+        {
+          "slug": "las-noches-de-luciana",
+          "title": "Las noches de Luciana",
+          "season": 1,
+          "episodes": 141,
+          "url": "https://l.ennovelas-tv.com/series/las-noches-de-luciana/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "las-tontas-no-van-al-cielo",
+      "title": "Las tontas no van al cielo",
+      "members": [
+        {
+          "slug": "las-tontas-no-van-al-cielo",
+          "title": "Las tontas no van al cielo",
+          "season": 1,
+          "episodes": 140,
+          "url": "https://l.ennovelas-tv.com/series/las-tontas-no-van-al-cielo/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "lazos-de-amor",
+      "title": "Lazos de amor",
+      "members": [
+        {
+          "slug": "lazos-de-amor",
+          "title": "Lazos de amor",
+          "season": 1,
+          "episodes": 100,
+          "url": "https://l.ennovelas-tv.com/series/lazos-de-amor/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "leke",
+      "title": "Leke",
+      "members": [
+        {
+          "slug": "leke",
+          "title": "Leke",
+          "season": 1,
+          "episodes": 9,
+          "url": "https://l.ennovelas-tv.com/series/leke/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "lise-devriyesi",
+      "title": "Lise Devriyesi",
+      "members": [
+        {
+          "slug": "lise-devriyesi",
+          "title": "Lise Devriyesi",
+          "season": 1,
+          "episodes": 11,
+          "url": "https://l.ennovelas-tv.com/series/lise-devriyesi/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "lo-que-la-vida-me-robo",
+      "title": "Lo que la vida me robó",
+      "members": [
+        {
+          "slug": "lo-que-la-vida-me-robo",
+          "title": "Lo que la vida me robó",
+          "season": 1,
+          "episodes": 197,
+          "url": "https://l.ennovelas-tv.com/series/lo-que-la-vida-me-robo/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "loquito-por-ti",
+      "title": "Loquito por ti",
+      "members": [
+        {
+          "slug": "loquito-por-ti",
+          "title": "Loquito por ti",
+          "season": 1,
+          "episodes": 56,
+          "url": "https://l.ennovelas-tv.com/series/loquito-por-ti/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "los-herederos-del-monte",
+      "title": "Los Herederos del Monte",
+      "members": [
+        {
+          "slug": "los-herederos-del-monte",
+          "title": "Los Herederos del Monte",
+          "season": 1,
+          "episodes": 128,
+          "url": "https://l.ennovelas-tv.com/series/los-herederos-del-monte/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "los-medallistas",
+      "title": "Los Medallistas",
+      "members": [
+        {
+          "slug": "los-medallistas",
+          "title": "Los Medallistas",
+          "season": 1,
+          "episodes": 13,
+          "url": "https://l.ennovelas-tv.com/series/los-medallistas/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "mahkum",
+      "title": "Mahkum",
+      "members": [
+        {
+          "slug": "mahkum",
+          "title": "Mahkum",
+          "season": 1,
+          "episodes": 31,
+          "url": "https://l.ennovelas-tv.com/series/mahkum/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "maldita-tentacion",
+      "title": "Maldita Tentación",
+      "members": [
+        {
+          "slug": "maldita-tentacion",
+          "title": "Maldita Tentación",
+          "season": 1,
+          "episodes": 45,
+          "url": "https://l.ennovelas-tv.com/series/maldita-tentacion/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "maria-ile-mustafa",
+      "title": "Maria ile Mustafa",
+      "members": [
+        {
+          "slug": "maria-ile-mustafa",
+          "title": "Maria ile Mustafa",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/maria-ile-mustafa/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "maricucha-1-temporada",
+      "title": "Maricucha",
+      "members": [
+        {
+          "slug": "maricucha-1-temporada",
+          "title": "Maricucha 1 Temporada",
+          "season": 1,
+          "episodes": 93,
+          "url": "https://l.ennovelas-tv.com/series/maricucha-1-temporada/"
+        },
+        {
+          "slug": "maricucha-2-temporada",
+          "title": "Maricucha 2 Temporada",
+          "season": 2,
+          "episodes": 74,
+          "url": "https://l.ennovelas-tv.com/series/maricucha-2-temporada/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "masum-degiliz",
+      "title": "Masum Degiliz",
+      "members": [
+        {
+          "slug": "masum-degiliz",
+          "title": "Masum Degiliz",
+          "season": 1,
+          "episodes": 6,
+          "url": "https://l.ennovelas-tv.com/series/masum-degiliz/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "masumlar-apartmani",
+      "title": "Masumlar Apartmani",
+      "members": [
+        {
+          "slug": "masumlar-apartmani",
+          "title": "Masumlar Apartmani",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/masumlar-apartmani/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "mavera",
+      "title": "Mavera",
+      "members": [
+        {
+          "slug": "mavera",
+          "title": "Mavera",
+          "season": 1,
+          "episodes": 26,
+          "url": "https://l.ennovelas-tv.com/series/mavera/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "manana-es-para-siempre",
+      "title": "Mañana es para siempre",
+      "members": [
+        {
+          "slug": "manana-es-para-siempre",
+          "title": "Mañana es para siempre",
+          "season": 1,
+          "episodes": 160,
+          "url": "https://l.ennovelas-tv.com/series/manana-es-para-siempre/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "mehmed-bir-cihan",
+      "title": "Mehmed Bir Cihan",
+      "members": [
+        {
+          "slug": "mehmed-bir-cihan",
+          "title": "Mehmed Bir Cihan",
+          "season": 1,
+          "episodes": 6,
+          "url": "https://l.ennovelas-tv.com/series/mehmed-bir-cihan/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "mehmetcik-kutulamare",
+      "title": "Mehmetcik Kutulamare",
+      "members": [
+        {
+          "slug": "mehmetcik-kutulamare",
+          "title": "Mehmetcik Kutulamare",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/mehmetcik-kutulamare/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "mendirman-jaloliddin",
+      "title": "Mendirman Jaloliddin",
+      "members": [
+        {
+          "slug": "mendirman-jaloliddin",
+          "title": "Mendirman Jaloliddin",
+          "season": 1,
+          "episodes": 13,
+          "url": "https://l.ennovelas-tv.com/series/mendirman-jaloliddin/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "mi-camino-es-amarte",
+      "title": "Mi camino es amarte",
+      "members": [
+        {
+          "slug": "mi-camino-es-amarte",
+          "title": "Mi camino es amarte",
+          "season": 1,
+          "episodes": 91,
+          "url": "https://l.ennovelas-tv.com/series/mi-camino-es-amarte/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "mi-corazon-es-tuyo",
+      "title": "Mi corazón es tuyo",
+      "members": [
+        {
+          "slug": "mi-corazon-es-tuyo",
+          "title": "Mi corazón es tuyo",
+          "season": 1,
+          "episodes": 177,
+          "url": "https://l.ennovelas-tv.com/series/mi-corazon-es-tuyo/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "mi-querida-madre",
+      "title": "Mi Querida Madre",
+      "members": [
+        {
+          "slug": "mi-querida-madre",
+          "title": "Mi Querida Madre",
+          "season": 1,
+          "episodes": 350,
+          "url": "https://l.ennovelas-tv.com/series/mi-querida-madre/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "mi-secreto",
+      "title": "Mi secreto",
+      "members": [
+        {
+          "slug": "mi-secreto",
+          "title": "Mi secreto",
+          "season": 1,
+          "episodes": 120,
+          "url": "https://l.ennovelas-tv.com/series/mi-secreto/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "mas-sabe-el-diablo",
+      "title": "Más sabe el diablo",
+      "members": [
+        {
+          "slug": "mas-sabe-el-diablo",
+          "title": "Más sabe el diablo",
+          "season": 1,
+          "episodes": 182,
+          "url": "https://l.ennovelas-tv.com/series/mas-sabe-el-diablo/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "nefes-nefese",
+      "title": "Nefes Nefese",
+      "members": [
+        {
+          "slug": "nefes-nefese",
+          "title": "Nefes Nefese",
+          "season": 1,
+          "episodes": 10,
+          "url": "https://l.ennovelas-tv.com/series/nefes-nefese/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "nuevo-rico-nuevo-pobre",
+      "title": "Nuevo rico, nuevo pobre",
+      "members": [
+        {
+          "slug": "nuevo-rico-nuevo-pobre",
+          "title": "Nuevo rico, nuevo pobre",
+          "season": 1,
+          "episodes": 194,
+          "url": "https://l.ennovelas-tv.com/series/nuevo-rico-nuevo-pobre/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "ojo-por-ojo",
+      "title": "Ojo por ojo",
+      "members": [
+        {
+          "slug": "ojo-por-ojo",
+          "title": "Ojo por ojo",
+          "season": 1,
+          "episodes": 98,
+          "url": "https://l.ennovelas-tv.com/series/ojo-por-ojo/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "oyunbozan",
+      "title": "Oyunbozan",
+      "members": [
+        {
+          "slug": "oyunbozan",
+          "title": "Oyunbozan",
+          "season": 1,
+          "episodes": 5,
+          "url": "https://l.ennovelas-tv.com/series/oyunbozan/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "pa-quererte",
+      "title": "Pa quererte",
+      "members": [
+        {
+          "slug": "pa-quererte",
+          "title": "Pa quererte",
+          "season": 1,
+          "episodes": 56,
+          "url": "https://l.ennovelas-tv.com/series/pa-quererte/"
+        },
+        {
+          "slug": "pa-quererte-2-temporada",
+          "title": "Pa quererte 2",
+          "season": 2,
+          "episodes": 83,
+          "url": "https://l.ennovelas-tv.com/series/pa-quererte-2-temporada/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "papa-en-apuros",
+      "title": "Papá en Apuros",
+      "members": [
+        {
+          "slug": "papa-en-apuros",
+          "title": "Papá en Apuros",
+          "season": 1,
+          "episodes": 72,
+          "url": "https://l.ennovelas-tv.com/series/papa-en-apuros/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "pasion-de-gavilanes",
+      "title": "Pasión de gavilanes",
+      "members": [
+        {
+          "slug": "pasion-de-gavilanes",
+          "title": "Pasión de gavilanes",
+          "season": 1,
+          "episodes": 188,
+          "url": "https://l.ennovelas-tv.com/series/pasion-de-gavilanes/"
+        },
+        {
+          "slug": "pasion-de-gavilanes-2-temporada",
+          "title": "Pasión de gavilanes 2",
+          "season": 2,
+          "episodes": 71,
+          "url": "https://l.ennovelas-tv.com/series/pasion-de-gavilanes-2-temporada/"
+        }
+      ],
+      "imdb": {
+        "id": "tt0387763",
+        "name": "Hidden Passion",
+        "source": "https://m.media-amazon.com/images/M/MV5BMTY5MWEzMTMtZDU0Yy00ZDBjLWE2Y2MtY2ZlMmIwZGQ0Njk5XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/pasion-de-gavilanes.jpg"
+    },
+    {
+      "slug": "pedro-el-escamoso",
+      "title": "Pedro el escamoso",
+      "members": [
+        {
+          "slug": "pedro-el-escamoso",
+          "title": "Pedro el escamoso",
+          "season": 1,
+          "episodes": 206,
+          "url": "https://l.ennovelas-tv.com/series/pedro-el-escamoso/"
+        }
+      ],
+      "imdb": {
+        "id": "tt0283770",
+        "name": "Pedro el escamoso",
+        "source": "https://m.media-amazon.com/images/M/MV5BMjE4NzAwODM3MV5BMl5BanBnXkFtZTcwMDM5MzkyMQ@@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/pedro-el-escamoso.jpg"
+    },
+    {
+      "slug": "perdona-nuestros-pecados",
+      "title": "Perdona nuestros pecados",
+      "members": [
+        {
+          "slug": "perdona-nuestros-pecados",
+          "title": "Perdona nuestros pecados",
+          "season": 1,
+          "episodes": 25,
+          "url": "https://l.ennovelas-tv.com/series/perdona-nuestros-pecados/"
+        }
+      ],
+      "imdb": {
+        "id": "tt6645602",
+        "name": "Perdona Nuestros Pecados",
+        "source": "https://m.media-amazon.com/images/M/MV5BZmQ0MDYyMTItZmNmZS00N2U4LTk4ODQtYzczNTJjNjljOGJiXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/perdona-nuestros-pecados.jpg"
+    },
+    {
+      "slug": "por-ella-soy-eva",
+      "title": "Por ella soy Eva",
+      "members": [
+        {
+          "slug": "por-ella-soy-eva",
+          "title": "Por ella soy Eva",
+          "season": 1,
+          "episodes": 168,
+          "url": "https://l.ennovelas-tv.com/series/por-ella-soy-eva/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "quiero-amarte",
+      "title": "Quiero amarte",
+      "members": [
+        {
+          "slug": "quiero-amarte",
+          "title": "Quiero amarte",
+          "season": 1,
+          "episodes": 162,
+          "url": "https://l.ennovelas-tv.com/series/quiero-amarte/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "rafael-orozco-el-idolo",
+      "title": "Rafael Orozco, El Ídolo",
+      "members": [
+        {
+          "slug": "rafael-orozco-el-idolo",
+          "title": "Rafael Orozco, El Ídolo",
+          "season": 1,
+          "episodes": 90,
+          "url": "https://l.ennovelas-tv.com/series/rafael-orozco-el-idolo/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "resurreccion-ertugrul",
+      "title": "Resurreccion Ertugrul",
+      "members": [
+        {
+          "slug": "resurreccion-ertugrul",
+          "title": "Resurreccion Ertugrul",
+          "season": 1,
+          "episodes": 150,
+          "url": "https://l.ennovelas-tv.com/series/resurreccion-ertugrul/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "rigo",
+      "title": "Rigo",
+      "members": [
+        {
+          "slug": "rigo",
+          "title": "Rigo",
+          "season": 1,
+          "episodes": 53,
+          "url": "https://l.ennovelas-tv.com/series/rigo/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "rosa-diamante",
+      "title": "Rosa Diamante",
+      "members": [
+        {
+          "slug": "rosa-diamante",
+          "title": "Rosa Diamante",
+          "season": 1,
+          "episodes": 124,
+          "url": "https://l.ennovelas-tv.com/series/rosa-diamante/"
+        }
+      ],
+      "imdb": {
+        "id": "tt2270670",
+        "name": "Rosa Diamante",
+        "source": "https://m.media-amazon.com/images/M/MV5BN2U3Yzg2ZDEtYjY0MS00M2M4LTg5NDAtNjM1OTViOGZjNDg4XkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/rosa-diamante.jpg"
+    },
+    {
+      "slug": "rosario-tijeras",
+      "title": "Rosario Tijeras",
+      "members": [
+        {
+          "slug": "rosario-tijeras",
+          "title": "Rosario Tijeras",
+          "season": 1,
+          "episodes": 60,
+          "url": "https://l.ennovelas-tv.com/series/rosario-tijeras/"
+        },
+        {
+          "slug": "rosario-tijeras-2",
+          "title": "Rosario Tijeras 2",
+          "season": 2,
+          "episodes": 67,
+          "url": "https://l.ennovelas-tv.com/series/rosario-tijeras-2/"
+        },
+        {
+          "slug": "rosario-tijeras-3",
+          "title": "Rosario Tijeras 3",
+          "season": 3,
+          "episodes": 70,
+          "url": "https://l.ennovelas-tv.com/series/rosario-tijeras-3/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "sadakatsiz",
+      "title": "Sadakatsiz",
+      "members": [
+        {
+          "slug": "sadakatsiz",
+          "title": "Sadakatsiz",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/sadakatsiz/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "sahsiyet",
+      "title": "Sahsiyet",
+      "members": [
+        {
+          "slug": "sahsiyet",
+          "title": "Sahsiyet",
+          "season": 1,
+          "episodes": 12,
+          "url": "https://l.ennovelas-tv.com/series/sahsiyet/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "sakli",
+      "title": "Sakli",
+      "members": [
+        {
+          "slug": "sakli",
+          "title": "Sakli",
+          "season": 1,
+          "episodes": 6,
+          "url": "https://l.ennovelas-tv.com/series/sakli/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "salome",
+      "title": "Salomé",
+      "members": [
+        {
+          "slug": "salome",
+          "title": "Salomé",
+          "season": 1,
+          "episodes": 150,
+          "url": "https://l.ennovelas-tv.com/series/salome/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "samanyolu",
+      "title": "Samanyolu",
+      "members": [
+        {
+          "slug": "samanyolu",
+          "title": "Samanyolu",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/samanyolu/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "sana-soz",
+      "title": "Sana Soz",
+      "members": [
+        {
+          "slug": "sana-soz",
+          "title": "Sana Soz",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/sana-soz/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "secretos-de-familia",
+      "title": "Secretos de Familia",
+      "members": [
+        {
+          "slug": "secretos-de-familia",
+          "title": "Secretos de Familia",
+          "season": 1,
+          "episodes": 66,
+          "url": "https://l.ennovelas-tv.com/series/secretos-de-familia/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "secretos-de-familia-yargi",
+      "title": "Secretos de Familia (Yargi)",
+      "members": [
+        {
+          "slug": "secretos-de-familia-yargi",
+          "title": "Secretos de Familia (Yargi)",
+          "season": 1,
+          "episodes": 48,
+          "url": "https://l.ennovelas-tv.com/series/secretos-de-familia-yargi/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "segundo-sol",
+      "title": "Segundo Sol",
+      "members": [
+        {
+          "slug": "segundo-sol",
+          "title": "Segundo Sol",
+          "season": 1,
+          "episodes": 126,
+          "url": "https://l.ennovelas-tv.com/series/segundo-sol/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "senden-daha-guzel",
+      "title": "Senden Daha Guzel",
+      "members": [
+        {
+          "slug": "senden-daha-guzel",
+          "title": "Senden Daha Guzel",
+          "season": 1,
+          "episodes": 14,
+          "url": "https://l.ennovelas-tv.com/series/senden-daha-guzel/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "seni-kalbime-sakladim",
+      "title": "Seni Kalbime Sakladim",
+      "members": [
+        {
+          "slug": "seni-kalbime-sakladim",
+          "title": "Seni Kalbime Sakladim",
+          "season": 1,
+          "episodes": 7,
+          "url": "https://l.ennovelas-tv.com/series/seni-kalbime-sakladim/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "seni-kimler-aldi",
+      "title": "Seni Kimler Aldi",
+      "members": [
+        {
+          "slug": "seni-kimler-aldi",
+          "title": "Seni Kimler Aldi",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/seni-kimler-aldi/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "senora-acero-1-temporada",
+      "title": "Senora Acero",
+      "members": [
+        {
+          "slug": "senora-acero-1-temporada",
+          "title": "Senora Acero 1 Temporada",
+          "season": 1,
+          "episodes": 73,
+          "url": "https://l.ennovelas-tv.com/series/senora-acero-1-temporada/"
+        },
+        {
+          "slug": "senora-acero-3-temporada",
+          "title": "Senora Acero 3 Temporada",
+          "season": 3,
+          "episodes": 93,
+          "url": "https://l.ennovelas-tv.com/series/senora-acero-3-temporada/"
+        },
+        {
+          "slug": "senora-acero-4-temporada",
+          "title": "Senora Acero 4 Temporada",
+          "season": 4,
+          "episodes": 77,
+          "url": "https://l.ennovelas-tv.com/series/senora-acero-4-temporada/"
+        },
+        {
+          "slug": "senora-acero-5-temporada",
+          "title": "Senora Acero 5 Temporada",
+          "season": 5,
+          "episodes": 69,
+          "url": "https://l.ennovelas-tv.com/series/senora-acero-5-temporada/"
+        }
+      ],
+      "imdb": {
+        "id": "tt3904068",
+        "name": "Lady of Steel",
+        "source": "https://m.media-amazon.com/images/M/MV5BMThlZWI2NWYtYWJhMC00NmQxLWIxN2YtNmI5YzE3MzVkMGRmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/senora-acero-1-temporada.jpg"
+    },
+    {
+      "slug": "seref-sozu",
+      "title": "Seref Sozu",
+      "members": [
+        {
+          "slug": "seref-sozu",
+          "title": "Seref Sozu",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/seref-sozu/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "sevdam-alabora",
+      "title": "Sevdam Alabora",
+      "members": [
+        {
+          "slug": "sevdam-alabora",
+          "title": "Sevdam Alabora",
+          "season": 1,
+          "episodes": 4,
+          "url": "https://l.ennovelas-tv.com/series/sevdam-alabora/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "seven-ne-yapmaz",
+      "title": "Seven Ne Yapmaz",
+      "members": [
+        {
+          "slug": "seven-ne-yapmaz",
+          "title": "Seven Ne Yapmaz",
+          "season": 1,
+          "episodes": 11,
+          "url": "https://l.ennovelas-tv.com/series/seven-ne-yapmaz/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "seversin",
+      "title": "Seversin",
+      "members": [
+        {
+          "slug": "seversin",
+          "title": "Seversin",
+          "season": 1,
+          "episodes": 20,
+          "url": "https://l.ennovelas-tv.com/series/seversin/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "sevgili-gecmis",
+      "title": "Sevgili Gecmis",
+      "members": [
+        {
+          "slug": "sevgili-gecmis",
+          "title": "Sevgili Gecmis",
+          "season": 1,
+          "episodes": 8,
+          "url": "https://l.ennovelas-tv.com/series/sevgili-gecmis/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "sevmek-zamani",
+      "title": "Sevmek Zamani",
+      "members": [
+        {
+          "slug": "sevmek-zamani",
+          "title": "Sevmek Zamani",
+          "season": 1,
+          "episodes": 4,
+          "url": "https://l.ennovelas-tv.com/series/sevmek-zamani/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "sifirinci-gun",
+      "title": "Sifirinci Gun",
+      "members": [
+        {
+          "slug": "sifirinci-gun",
+          "title": "Sifirinci Gun",
+          "season": 1,
+          "episodes": 4,
+          "url": "https://l.ennovelas-tv.com/series/sifirinci-gun/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "sipahi",
+      "title": "Sipahi",
+      "members": [
+        {
+          "slug": "sipahi",
+          "title": "Sipahi",
+          "season": 1,
+          "episodes": 8,
+          "url": "https://l.ennovelas-tv.com/series/sipahi/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "siyah-inci",
+      "title": "Siyah Inci",
+      "members": [
+        {
+          "slug": "siyah-inci",
+          "title": "Siyah Inci",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/siyah-inci/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "sol-yanim",
+      "title": "Sol Yanim",
+      "members": [
+        {
+          "slug": "sol-yanim",
+          "title": "Sol Yanim",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/sol-yanim/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "son-nefesime-kadar",
+      "title": "Son nefesime kadar",
+      "members": [
+        {
+          "slug": "son-nefesime-kadar",
+          "title": "Son nefesime kadar",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/son-nefesime-kadar/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "son-yaz",
+      "title": "Son Yaz",
+      "members": [
+        {
+          "slug": "son-yaz",
+          "title": "Son Yaz",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/son-yaz/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "sortilegio",
+      "title": "Sortilegio",
+      "members": [
+        {
+          "slug": "sortilegio",
+          "title": "Sortilegio",
+          "season": 1,
+          "episodes": 90,
+          "url": "https://l.ennovelas-tv.com/series/sortilegio/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "sueno-de-amor",
+      "title": "Sueño de amor",
+      "members": [
+        {
+          "slug": "sueno-de-amor",
+          "title": "Sueño de amor",
+          "season": 1,
+          "episodes": 132,
+          "url": "https://l.ennovelas-tv.com/series/sueno-de-amor/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "tehlikeli-karim",
+      "title": "Tehlikeli Karim",
+      "members": [
+        {
+          "slug": "tehlikeli-karim",
+          "title": "Tehlikeli Karim",
+          "season": 1,
+          "episodes": 6,
+          "url": "https://l.ennovelas-tv.com/series/tehlikeli-karim/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "teskilat",
+      "title": "Teskilat",
+      "members": [
+        {
+          "slug": "teskilat",
+          "title": "Teskilat",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/teskilat/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "the-last-of-us",
+      "title": "The Last of Us",
+      "members": [
+        {
+          "slug": "the-last-of-us",
+          "title": "The Last of Us",
+          "season": 1,
+          "episodes": 9,
+          "url": "https://l.ennovelas-tv.com/series/the-last-of-us/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "tormenta-de-amor",
+      "title": "Tormenta De Amor",
+      "members": [
+        {
+          "slug": "tormenta-de-amor",
+          "title": "Tormenta De Amor",
+          "season": 1,
+          "episodes": 74,
+          "url": "https://l.ennovelas-tv.com/series/tormenta-de-amor/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "tozluyaka",
+      "title": "Tozluyaka",
+      "members": [
+        {
+          "slug": "tozluyaka",
+          "title": "Tozluyaka",
+          "season": 1,
+          "episodes": 26,
+          "url": "https://l.ennovelas-tv.com/series/tozluyaka/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "tuzak",
+      "title": "Tuzak",
+      "members": [
+        {
+          "slug": "tuzak",
+          "title": "Tuzak",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/tuzak/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "uc-kiz-kardes",
+      "title": "Uc kiz kardes",
+      "members": [
+        {
+          "slug": "uc-kiz-kardes",
+          "title": "Uc kiz kardes",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/uc-kiz-kardes/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "uc-kurus",
+      "title": "Uc Kurus",
+      "members": [
+        {
+          "slug": "uc-kurus",
+          "title": "Uc Kurus",
+          "season": 1,
+          "episodes": 28,
+          "url": "https://l.ennovelas-tv.com/series/uc-kurus/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "un-bandido-honrado",
+      "title": "Un Bandido Honrado",
+      "members": [
+        {
+          "slug": "un-bandido-honrado",
+          "title": "Un Bandido Honrado",
+          "season": 1,
+          "episodes": 63,
+          "url": "https://l.ennovelas-tv.com/series/un-bandido-honrado/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "una-maid-en-manhattan",
+      "title": "Una Maid en Manhattan",
+      "members": [
+        {
+          "slug": "una-maid-en-manhattan",
+          "title": "Una Maid en Manhattan",
+          "season": 1,
+          "episodes": 163,
+          "url": "https://l.ennovelas-tv.com/series/una-maid-en-manhattan/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "uyanis-buyuk-selcuklu",
+      "title": "Uyanis Buyuk Selcuklu",
+      "members": [
+        {
+          "slug": "uyanis-buyuk-selcuklu",
+          "title": "Uyanis Buyuk Selcuklu",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/uyanis-buyuk-selcuklu/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "uzak-sehrin-masali",
+      "title": "Uzak Sehrin Masali",
+      "members": [
+        {
+          "slug": "uzak-sehrin-masali",
+          "title": "Uzak Sehrin Masali",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/uzak-sehrin-masali/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "velo-de-novia",
+      "title": "Velo de novia",
+      "members": [
+        {
+          "slug": "velo-de-novia",
+          "title": "Velo de novia",
+          "season": 1,
+          "episodes": 135,
+          "url": "https://l.ennovelas-tv.com/series/velo-de-novia/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "vencer-el-miedo",
+      "title": "Vencer el miedo",
+      "members": [
+        {
+          "slug": "vencer-el-miedo",
+          "title": "Vencer el miedo",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/vencer-el-miedo/"
+        },
+        {
+          "slug": "vencer-el-miedo-2",
+          "title": "Vencer el miedo",
+          "season": 2,
+          "episodes": 47,
+          "url": "https://l.ennovelas-tv.com/series/vencer-el-miedo-2/"
+        }
+      ],
+      "imdb": {
+        "id": "tt10954104",
+        "name": "Vencer el miedo",
+        "source": "https://m.media-amazon.com/images/M/MV5BNTU2NzkwZDQtMzY3Mi00YjBhLTlmZDMtMjMxN2VmOGIwMGZmXkEyXkFqcGc@._V1_QL75_UX380_.jpg"
+      },
+      "poster": "/covers/enn/imdb/vencer-el-miedo.jpg"
+    },
+    {
+      "slug": "ventino-el-precio-de-la-gloria",
+      "title": "Ventino. El precio de la gloria",
+      "members": [
+        {
+          "slug": "ventino-el-precio-de-la-gloria",
+          "title": "Ventino. El precio de la gloria",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/ventino-el-precio-de-la-gloria/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "verano-en-venecia",
+      "title": "Verano en Venecia",
+      "members": [
+        {
+          "slug": "verano-en-venecia",
+          "title": "Verano en Venecia",
+          "season": 1,
+          "episodes": 125,
+          "url": "https://l.ennovelas-tv.com/series/verano-en-venecia/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "victoria",
+      "title": "Victoria",
+      "members": [
+        {
+          "slug": "victoria",
+          "title": "Victoria",
+          "season": 1,
+          "episodes": 171,
+          "url": "https://l.ennovelas-tv.com/series/victoria/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "victorinos",
+      "title": "Victorinos",
+      "members": [
+        {
+          "slug": "victorinos",
+          "title": "Victorinos",
+          "season": 1,
+          "episodes": 153,
+          "url": "https://l.ennovelas-tv.com/series/victorinos/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "vuelve-a-mi",
+      "title": "Vuelve a mí",
+      "members": [
+        {
+          "slug": "vuelve-a-mi",
+          "title": "Vuelve a mí",
+          "season": 1,
+          "episodes": 82,
+          "url": "https://l.ennovelas-tv.com/series/vuelve-a-mi/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "vuelveme-a-querer",
+      "title": "Vuelveme a querer",
+      "members": [
+        {
+          "slug": "vuelveme-a-querer",
+          "title": "Vuelveme a querer",
+          "season": 1,
+          "episodes": 139,
+          "url": "https://l.ennovelas-tv.com/series/vuelveme-a-querer/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "vuslat",
+      "title": "Vuslat",
+      "members": [
+        {
+          "slug": "vuslat",
+          "title": "Vuslat",
+          "season": 1,
+          "episodes": 44,
+          "url": "https://l.ennovelas-tv.com/series/vuslat/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "yalanci",
+      "title": "Yalanci",
+      "members": [
+        {
+          "slug": "yalanci",
+          "title": "Yalanci",
+          "season": 1,
+          "episodes": 10,
+          "url": "https://l.ennovelas-tv.com/series/yalanci/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "yalniz-kurt",
+      "title": "Yalniz Kurt",
+      "members": [
+        {
+          "slug": "yalniz-kurt",
+          "title": "Yalniz Kurt",
+          "season": 1,
+          "episodes": 31,
+          "url": "https://l.ennovelas-tv.com/series/yalniz-kurt/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "yargi",
+      "title": "Yargi",
+      "members": [
+        {
+          "slug": "yargi",
+          "title": "Yargi",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/yargi/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "yesilcam",
+      "title": "Yesilcam",
+      "members": [
+        {
+          "slug": "yesilcam",
+          "title": "Yesilcam",
+          "season": 1,
+          "episodes": 20,
+          "url": "https://l.ennovelas-tv.com/series/yesilcam/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "yuksek-sosyete",
+      "title": "Yuksek Sosyete",
+      "members": [
+        {
+          "slug": "yuksek-sosyete",
+          "title": "Yuksek Sosyete",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/yuksek-sosyete/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "yurek-cikmazi",
+      "title": "Yurek Cikmazi",
+      "members": [
+        {
+          "slug": "yurek-cikmazi",
+          "title": "Yurek Cikmazi",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/yurek-cikmazi/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "zemheri",
+      "title": "Zemheri",
+      "members": [
+        {
+          "slug": "zemheri",
+          "title": "Zemheri",
+          "season": 1,
+          "episodes": 10,
+          "url": "https://l.ennovelas-tv.com/series/zemheri/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "zengin-ve-yoksul",
+      "title": "Zengin ve Yoksul",
+      "members": [
+        {
+          "slug": "zengin-ve-yoksul",
+          "title": "Zengin ve Yoksul",
+          "season": 1,
+          "episodes": 0,
+          "url": "https://l.ennovelas-tv.com/series/zengin-ve-yoksul/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    },
+    {
+      "slug": "angela",
+      "title": "Ángela",
+      "members": [
+        {
+          "slug": "angela",
+          "title": "Ángela",
+          "season": 1,
+          "episodes": 78,
+          "url": "https://l.ennovelas-tv.com/series/angela/"
+        }
+      ],
+      "imdb": {},
+      "poster": ""
+    }
+  ]
+}
