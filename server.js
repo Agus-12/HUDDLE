@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v271'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
+const UI_VERSION = 'v272'; // 264: No verify goodstream master (single-use) re-resolve + no cache goodstream goodstream (FETCH_UA), fresco siempre (sin relay) (embed URL) para HLS sin 403 (cookie goodstream) (auto→max, buffer 60s, cache 60s goodstream) + calidad máxima Cuevana + fallback directo (corre en servidor, no se detiene al salir, restauración tras reinicio) — auditoría en página propia con 2 sondas separadas (pelis/series), preview card en dashboard, logs por sonda, diseño SVG sin emojis
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -7753,8 +7753,12 @@ async function catCaricaturas() {
   const items = [];
   for (const [slug, h] of home) {
     if (!cariEsSerie(slug) || CARI_LIVE.has(slug)) continue; /* v205: live action aparte */
+    if (LCT_SERIES.has(slug)) continue; /* v272: cartoons no van en caricaturas */
+    if (CARI_MUERTAS.has(slug)) continue; /* v272 */
     const meta = cariMeta.get(slug);
-    items.push({ title: (meta && meta.titulo) || cariLimpia(h.alt || cariBonito(slug)), url: CARI_BASE + slug + '/', img: CARI_PORTADAS.get(slug) || DANI_IMDB.get(slug) || (meta && (meta.cover || meta.poster)) || h.img || '', site: 'Caricaturas', extra: '' });
+    const rawImg = CARI_PORTADAS.get(slug) || DANI_IMDB.get(slug) || (meta && (meta.cover || meta.poster)) || h.img || '';
+    if (!rawImg) continue; /* sin portada no entra al feed */
+    items.push({ title: (meta && meta.titulo) || cariLimpia(h.alt || cariBonito(slug)), url: CARI_BASE + slug + '/', img: rawImg, site: 'Caricaturas', extra: '' });
   }
   if (items.length) catCache.set('cari-all', { at: Date.now(), items });
   return items;
@@ -10707,8 +10711,8 @@ async function afLatest() {
     const html = await r.text();
     const items = [];
     const seen = new Set();
-    // AnimeFLV home: <a href="/anime/slug"><img src="..."><h3>Title</h3>
-    const re = /href="\/anime\/([a-z0-9-]+)"[^>]*>[\s\S]{0,400}?src="([^"]+)"[\s\S]{0,400}?<h3[^>]*>([^<]+)<\/h3>/g;
+    // v272: soporta data-src, src, y estructura actual de AnimeFLV (article, figure)
+    const re = /href="\/anime\/([a-z0-9-]+)"[^>]*>[\s\S]{0,600}?(?:data-src|src)="([^"]+)"[\s\S]{0,600}?<h3[^>]*>([^<]+)<\/h3>/g;
     let m;
     while ((m = re.exec(html)) && items.length < 12) {
       const slug = m[1];
@@ -10716,10 +10720,35 @@ async function afLatest() {
       seen.add(slug);
       let img = m[2] || '';
       if (img.startsWith('/')) img = 'https://vww.animeflv.one' + img;
+      // limpia parámetros de cdn
+      if (img && !/animeflv|cdn/i.test(img) && img.includes('cover')) { /* ok */ }
       items.push({ title: m[3].trim().slice(0,80), url: 'https://vww.animeflv.one/anime/' + slug, img, site: 'AnimeFLV', extra: 'Sub' });
     }
-    if (items.length) { afLatestCache.at = Date.now(); afLatestCache.items = items; }
-    return items.length ? items : afLatestCache.items;
+    // fallback: busca en HTML animes sin imagen cerca pero con <img alt>
+    if (items.length < 6) {
+      const re2 = /\/anime\/([a-z0-9-]+)"[^>]*>\s*<figure[^>]*>\s*<img[^>]+(?:data-src|src)="([^"]+)"/g;
+      while ((m = re2.exec(html)) && items.length < 12) {
+        const slug = m[1];
+        if (seen.has(slug) || AF_OCULTAS.has(slug)) continue;
+        seen.add(slug);
+        let img = m[2] || '';
+        if (img.startsWith('/')) img = 'https://vww.animeflv.one' + img;
+        // title fallback
+        const tRe = new RegExp('href="\\/anime\\/' + slug + '"[\\s\\S]{0,800}?<h3[^>]*>([^<]+)</h3>');
+        const tm = tRe.exec(html);
+        const title = tm ? tm[1].trim().slice(0,80) : slug.replace(/-/g,' ').slice(0,80);
+        items.push({ title, url: 'https://vww.animeflv.one/anime/' + slug, img, site: 'AnimeFLV', extra: 'Sub' });
+      }
+    }
+    // v272: rellena portadas faltantes vía AniList
+    for (const it of items) {
+      if (!it.img || /triangle|placeholder|no-image|logo/i.test(it.img)) {
+        const cov = await aniListCover(it.title).catch(()=> '');
+        if (cov) it.img = cov;
+      }
+    }
+    if (items.length) { afLatestCache.at = Date.now(); afLatestCache.items = items.filter(x=> x.img); }
+    return items.length ? items.filter(x=> x.img || true) : afLatestCache.items;
   } catch { return afLatestCache.items; }
 }
 const d23LatestCache = { at: 0, items: [] };
@@ -10731,17 +10760,18 @@ async function d23Latest() {
     const html = await r.text();
     const items = [];
     const seen = new Set();
-    const re = /href="https:\/\/animed23\.com\/anime\/([a-z0-9-]+)\/"[^>]*>[\s\S]{0,500}?src="([^"]+)"[\s\S]{0,500}?<h3[^>]*>([^<]+)<\/h3>/g;
+    const re = /href="https:\/\/animed23\.com\/anime\/([a-z0-9-]+)\/"[^>]*>[\s\S]{0,800}?src="([^"]+)"[\s\S]{0,800}?<h3[^>]*>([^<]+)<\/h3>/g;
     let m;
     while ((m = re.exec(html)) && items.length < 12) {
       const slug = m[1];
       if (seen.has(slug) || D23_OCULTAS.has(slug)) continue;
       seen.add(slug);
       let img = m[2] || '';
-      if (img.startsWith('/')) img = 'https://animed23.com' + img;
+      if (img && img.startsWith('/')) img = 'https://animed23.com' + img;
+      // filtra imágenes de placeholder
+      if (img && /placeholder|no-image|logo/i.test(img)) img = '';
       items.push({ title: m[3].trim().slice(0,80), url: 'https://animed23.com/anime/' + slug + '/', img, site: 'AnimeD23', extra: 'Latino' });
     }
-    // fallback simple
     if (!items.length) {
       const re2 = /href="https:\/\/animed23\.com\/anime\/([a-z0-9-]+)\/"/g;
       while ((m = re2.exec(html)) && items.length < 12) {
@@ -10751,9 +10781,47 @@ async function d23Latest() {
         items.push({ title: slug.replace(/-/g,' ').slice(0,80), url: 'https://animed23.com/anime/' + slug + '/', img: '', site: 'AnimeD23', extra: 'Latino' });
       }
     }
-    if (items.length) { d23LatestCache.at = Date.now(); d23LatestCache.items = items; }
+    for (const it of items) {
+      if (!it.img) {
+        const cov = await aniListCover(it.title).catch(()=> '');
+        if (cov) it.img = cov;
+        else {
+          // intenta sacar de página del anime directa (og:image)
+          try{
+            const r2 = await fetchSeguro('https://animed23.com/anime/'+it.url.split('/')[4]+'/', 8000);
+            if(r2 && r2.ok){
+              const h2 = await r2.text();
+              const og = /property="og:image" content="([^"]+)"/.exec(h2);
+              if(og) it.img = og[1];
+            }
+          }catch{}
+        }
+      }
+    }
+    if (items.length) { d23LatestCache.at = Date.now(); d23LatestCache.items = items.filter(x=> x.img); }
     return items.length ? items : d23LatestCache.items;
   } catch { return d23LatestCache.items; }
+}
+// v272: fallback de portadas vía AniList (IMDb-like, sin key)
+const aniListCache = new Map();
+async function aniListCover(title){
+  if(!title) return '';
+  const key = title.toLowerCase().trim();
+  const c = aniListCache.get(key);
+  if(c && Date.now()-c.at < 7*24*3600*1000) return c.img;
+  try{
+    const q = `query($s:String){Media(search:$s,type:ANIME){coverImage{extraLarge large} title{romaji english}}}`;
+    const r = await fetch('https://graphql.anilist.co', {
+      method:'POST',
+      headers:{'Content-Type':'application/json', 'Accept':'application/json'},
+      body: JSON.stringify({ query:q, variables:{ s: title } })
+    });
+    if(!r.ok) return '';
+    const j = await r.json().catch(()=> ({}));
+    const img = j?.data?.Media?.coverImage?.extraLarge || j?.data?.Media?.coverImage?.large || '';
+    if(img){ aniListCache.set(key, { at: Date.now(), img }); if(aniListCache.size>400){ const k=[...aniListCache.keys()][0]; aniListCache.delete(k); } }
+    return img;
+  }catch{ return ''; }
 }
 async function animesMezclados() {
   const [la, af, d23] = await Promise.all([
@@ -11199,16 +11267,20 @@ async function estrenosMezclados(){
           return json(res, 200, trozo(items));
         }
         if (tipo === 'danimados') {
+          // v272: filtra live action y cartoons que no son caricaturas puras
+          const filtrados = DANI_CAT_ARR.filter(([sl])=> !CARI_LIVE.has(sl) && !LCT_SERIES.has(sl) && !DANI_MUERTAS.has(sl));
           const ini = (pag - 1) * por;
-          const items = DANI_CAT_ARR.slice(ini, ini + por).map(([sl, v]) => ({ title: String(v.t).replace(/\xa0/g, ' '), url: 'https://danimados.cc/serie/' + sl, img: daniCoverDe(sl), site: 'Caricaturas', extra: '' }));
-          return json(res, 200, { ok: true, pag, por, total: DANI_CAT_ARR.length, mas: ini + por < DANI_CAT_ARR.length, items });
+          const items = filtrados.slice(ini, ini + por).map(([sl, v]) => ({ title: String(v.t).replace(/\xa0/g, ' '), url: 'https://danimados.cc/serie/' + sl, img: daniCoverDe(sl), site: 'Caricaturas', extra: '' }));
+          return json(res, 200, { ok: true, pag, por, total: filtrados.length, mas: ini + por < filtrados.length, items });
         }
         if (tipo.startsWith('genero-')) {
           const slug = tipo.slice(7);
           const items = await peliculasPorGenero(slug, pag);
-          // v269: mezclado vivo — mas si alguna fuente tiene más paginas
           const cc = await generoPagina(slug, pag).catch(()=>({mas:false}));
-          return json(res, 200, { ok: true, pag, por: 20, items: items.slice(0, 20), mas: !!cc.mas || items.length>=20 });
+          const mas = !!cc.mas || items.length>=20;
+          // v272: total estimado para el numerito (si pag 1, calcula aprox)
+          const totalEst = (pag===1 && mas) ? (items.length * 4) : (pag*20 + (mas?20:0));
+          return json(res, 200, { ok: true, pag, por: 20, total: totalEst, mas, items: items.slice(0, 20) });
         }
         return json(res, 404, { ok: false, error: 'Catálogo desconocido' });
       } catch {
