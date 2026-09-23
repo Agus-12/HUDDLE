@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v300'; // v300: el detector de intros espera 3 min tras el arranque + caja negra de memoria en data/cajanegra.log
+const UI_VERSION = 'v301'; // v301: botón ON/OFF del detector de openings en el panel — apagado por defecto
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -4136,7 +4136,14 @@ function dispararDeteccionIntro(urlStr, serieKeyFija) {
   }).catch(() => {});
 }
 let INTRO_DETECTANDO = 0; /* v298: a lo más 1 detección a la vez */
+/* v301: INTERRUPTOR del detector de intros, con botón en el panel y apagado por
+ * defecto: la estabilidad primero; cuando el usuario quiera, lo enciende y el
+ * detector vuelve a aprender openings (de uno en uno y con medidor, v298/v299). */
+let INTRO_AUTO_ON = false;
+try { INTRO_AUTO_ON = !!((JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'intro-auto.json'), 'utf8')) || {}).on); } catch {}
+function introAutoGuardar() { try { fs.writeFileSync(path.join(DATA_DIR, 'intro-auto.json'), JSON.stringify({ on: INTRO_AUTO_ON })); } catch {} }
 async function detectarIntroSerie(serieKey, urls) {
+  if (!INTRO_AUTO_ON) return; /* v301: apagado por interruptor */
   /* v298: cada detección mete decenas de MB de video en RAM. En Oracle (con
    * fpcalc/ffmpeg instalados) varias corrían a la vez por el rastreo masivo y
    * reventaban el heap de 512 MB: el proceso moría cada pocos minutos y
@@ -13626,6 +13633,15 @@ async function estrenosMezclados(){
     if (url.pathname === '/api/novelas-vix/sondas' && req.method === 'GET') {
       return json(res, 200, { ok:true, ennovelas:{sonda:ENN_SONDA, catalogo:(await ennCatalogo()).map(c=>({slug:c.slug,titulo:c.title,fuente:'ennovelas',extra:c.extra}))} });
     }
+    if (url.pathname === '/api/intro-auto') { /* v301: interruptor del detector de intros */
+      if (req.method === 'POST') {
+        const b = await readBody(req);
+        INTRO_AUTO_ON = !!b.on;
+        introAutoGuardar();
+        console.log('[intro] v301: detector automático ' + (INTRO_AUTO_ON ? 'ENCENDIDO' : 'APAGADO') + ' desde el panel');
+      }
+      return json(res, 200, { ok: true, on: INTRO_AUTO_ON });
+    }
     if (url.pathname === '/api/sondas') { /* v293: salud de cada sonda + últimos eventos — para el panel */
       const ahora = Date.now();
       const sondas = {};
@@ -13662,6 +13678,7 @@ async function estrenosMezclados(){
         ok: true,
         version: UI_VERSION,
         encendidoHace: Math.floor(process.uptime()),
+        introAuto: INTRO_AUTO_ON, /* v301 */
         memoriaMb: Math.round(mem.rss / 1048576),
         heapMb: Math.round(mem.heapUsed / 1048576), /* v291 */
         heapLimiteMb: Math.round(require('v8').getHeapStatistics().heap_size_limit / 1048576), /* v291 */

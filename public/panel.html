@@ -516,6 +516,13 @@ function showPage(id){
   window.scrollTo(0,0);
 }
 function goBack(){showPage('Dash');}
+/* v301: interruptor del detector de openings — apagado por defecto */
+function toggleIntroAuto(){
+  var on=!(_estado&&_estado.introAuto);
+  fetch('/api/intro-auto',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({on:on})}).then(function(){
+    return fetch('/api/estado');
+  }).then(function(r){return r.json()}).then(renderDash).catch(function(){});
+}
 
 function toggleIntros(){
   var w=document.getElementById('introsWrap');
@@ -530,7 +537,8 @@ function renderDash(d){
     '<div class="card noclick"><div class="n">'+fmt(d.encendidoHace)+'</div><div class="t">Encendido</div></div>'
     +'<div class="card noclick"><div class="n">'+d.memoriaMb+' MB</div><div class="t">Memoria</div></div>'
     +'<div class="card noclick"><div class="n">'+d.salasActivas+'</div><div class="t">Salas</div></div>'
-    +'<div class="card" onclick="showPage(\'Users\')"><div class="n">'+d.usuarios+'</div><div class="t">Usuarios ▸</div></div>';
+    +'<div class="card" onclick="showPage(\'Users\')"><div class="n">'+d.usuarios+'</div><div class="t">Usuarios ▸</div></div>'
+    +'<div class="card" onclick="toggleIntroAuto()" title="Enciende o apaga el detector automático de openings (v301)"><div class="n" style="color:'+(d.introAuto?'#38e08a':'#9d93b5')+'">'+(d.introAuto?'ON':'OFF')+'</div><div class="t">Detector openings</div></div>';
   var ca=d.catalogos||{};
   var f=_stats?_stats.fuentes:{};
   var tp=0;for(var k in f){if(k!=='latanime'&&k!=='danimados'&&k!=='lacartoons'&&k!=='miscaricaturas'&&k!=='animeflv'&&k!=='ennovelas'&&k!=='animed23')tp+=Math.max(0,f[k].activas||0);}

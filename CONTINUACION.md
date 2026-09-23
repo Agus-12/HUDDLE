@@ -1,3 +1,38 @@
+## ESTADO ACTUAL — 23 SEP 2026 — v301: BOTÓN ON/OFF DEL DETECTOR DE OPENINGS
+
+### Lo que pidió el usuario
+Botón de encendido/apagado para el detector de intros (el culpable de las muertes).
+Dato clave: otro chat "lo detuvo" de palabra, pero en el código NUNCA quedó apagado
+(origin/main seguía en mis commits) — por eso el server seguía muriendo.
+
+### Qué hace v301
+- `INTRO_AUTO_ON` persistido en data/intro-auto.json, **OFF por defecto**.
+- `detectarIntroSerie` retorna al instante si está apagado: cero descargas de video.
+- API `/api/intro-auto` (GET/POST {on}) + campo `introAuto` en /api/estado.
+- Panel: tarjeta nueva «Detector openings» con ON verde / OFF gris; un clic lo
+  voltea y queda guardado (sobrevive reinicios).
+- `UI_VERSION v301`.
+
+### Verificado
+- POST on:true/on:false → logs «ENCENDIDO/APAGADO desde el panel»; /api/estado
+  reporta el estado; OFF por defecto al arrancar.
+
+### Respuesta a su duda
+Huddle no guarda los videos: solo presta la tubería (/api/hls). Para aprender el
+opening hay que bajar un pedazo del video; por eso el detector descarga. Con v301 el
+usuario decide cuándo; con v298/v299/v300, cuando esté ON, lo hace de a uno, con
+medidor de flujo y nunca durante los primeros 3 min de vida.
+
+### Pendiente tras despliegue
+- Usuario: `cd ~/huddle && bash actualizar.sh`. El panel mostrará la tarjeta
+  «Detector openings: OFF» → el server ya no morirá; cuando quiera, la enciende.
+
+### Archivos tocados
+- `server.js` (INTRO_AUTO_ON + /api/intro-auto + introAuto en /api/estado + UI_VERSION),
+  `public/panel.html` (tarjeta + toggleIntroAuto).
+
+---
+
 ## ESTADO ACTUAL — 23 SEP 2026 — v300: DETECTOR ESPERA AL ARRANQUE + CAJA NEGRA
 
 ### Seguía muriendo a los ~96 s (journal del usuario con v298/v299 sin confirmar deploy)
