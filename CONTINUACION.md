@@ -1,3 +1,33 @@
+## ESTADO ACTUAL — 23 SEP 2026 — v309: FIX SIGABRT AL ENCENDER INTROS
+
+### El incidente (confirmado con journalctl de Oracle)
+- Usuario encendió el detector de intros tras la v308 → 3 abortos seguidos:
+  07:33:20, 07:34:57, 07:37:24 «Main process exited, code=dumped, status=6/ABRT».
+- Causa: tormenta de arranque (las 13 sondas corrían todas juntas a los +90 s)
+  + rastreo de intros encima → heap pasa el tope de 768 MB (--max-old-space-size=768)
+  → V8 aborta. INTRO_AUTO_ON persistía en data/intro-auto.json → crash loop.
+- Los «Encendido=0» y «sondas apagadas» del usuario = el proceso muriendo y reviviendo.
+
+### Fix v309
+- sondasEscalonadas(): arranque y ciclo de 6 h lanzan una sonda cada 25 s (antes todas de golpe).
+- crawlTick(): nueva guarda heap>320 MB → el rastreo espera su turno (detectarIntroSerie ya tenía 300).
+- descargarInicioEp ya traía medidor de flujo v299 (tope por descarga); detectarIntroSerie ya limita a 1 a la vez.
+
+### Verificado local
+- Con intro-auto.json en ON y v309: arranque estable, crawl avanza (1/6679, 2/…),
+  ennovelas entró escalonada, sin abortos. (Local no tiene fpcalc; Oracle sí.)
+
+### Procedimiento dado al usuario
+- Apagar intros por API, actualizar a v309, volver a encender desde el panel (ya seguro).
+
+### Pendiente (siguiente versión)
+- Aprendizaje de intros POR TEMPORADA (comparar primer cap de cada temporada; igual → reutiliza,
+  distinto → aprende nuevo). Riendas intactas.
+
+### Archivos: server.js, CONTINUACION.md.
+
+---
+
 ## ESTADO ACTUAL — 23 SEP 2026 — v308: SONDA HUDDLE COMO FUENTE REAL
 
 ### Lo que pidió el usuario

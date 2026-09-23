@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v308'; // v308: Sonda Huddle como fuente con detalle propio + capítulos ocultados + Episodios en catálogo
+const UI_VERSION = 'v309'; // v309: sondas escalonadas + rienda de memoria en el rastreo de intros (fix SIGABRT al encender)
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -538,14 +538,20 @@ async function laRevizar() { /* apelaciones: ocultadas hace <7 días, una a una 
     console.log('[podredumbre] revisión terminada: ' + vivas2 + ' revivieron de ' + cands.length);
   } finally { laReviviendo = false; }
 }
+/* v309: SONDAS ESCALONADAS — una cada 25 s en vez de todas de golpe a los 90 s.
+ * Correr las 13 juntas disparaba el heap justo cuando el usuario encendía el
+ * rastreo de intros encima, y el tope de 768 MB reventaba (SIGABRT 07:33-07:37
+ * en Oracle: tres caídas seguidas al encender las intros). */
+function sondasEscalonadas(extra) {
+  const lista = [ ['laRevizar', laRevizar], ['revivir', revivirGeneral], ['pelisxd', sondaPelisxd], ['cuevana', sondaCuevana], ['cinecalidad', sondaCineCalidad], ['latanime', sondaLatanime], ['danimados', sondaDanimados], ['lacartoons', sondaLacartoons], ['miscaricaturas', sondaMisc], ['animeflv', sondaAnimeflv], ['novelas', sondaNovelas], ['animed23', sondaD23], ...(extra || []) ];
+  lista.forEach((par, i) => setTimeout(() => { try { sondaRun(par[0], par[1]); } catch {} }, i * 25000));
+}
 setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); /* v293: todo por sondaRun (estado en /api/sondas) */
-  sondaRun('laRevizar', laRevizar); sondaRun('revivir', revivirGeneral); sondaRun('pelisxd', sondaPelisxd); sondaRun('cuevana', sondaCuevana); sondaRun('cinecalidad', sondaCineCalidad); sondaRun('latanime', sondaLatanime); sondaRun('danimados', sondaDanimados); sondaRun('lacartoons', sondaLacartoons); sondaRun('miscaricaturas', sondaMisc); sondaRun('animeflv', sondaAnimeflv); sondaRun('novelas', sondaNovelas); sondaRun('animed23', sondaD23); /* v306: caricaturas separada en sus 3 sondas */
-  // v252 Huddle: si no hay auditoría activa, igual corre una pasada ligera 24/7 cada 6h
-  if(!HUDDLE_AUDITORIA.activo) sondaRun('huddle', sondaHuddleGeneral);
+  sondasEscalonadas(HUDDLE_AUDITORIA.activo ? [] : [['huddle', sondaHuddleGeneral]]); /* v309 escalonado */
 }, 90 * 1000); /* v287: + podredumbre de episodios */
 setTimeout(() => { sondaRun('epsPodredumbre', epsPodredumbre); }, 15 * 60 * 1000);
-setInterval(() => { sondaRun('laRevizar', laRevizar); sondaRun('revivir', revivirGeneral); sondaRun('pelisxd', sondaPelisxd); sondaRun('cuevana', sondaCuevana); sondaRun('cinecalidad', sondaCineCalidad); sondaRun('latanime', sondaLatanime); sondaRun('danimados', sondaDanimados); sondaRun('lacartoons', sondaLacartoons); sondaRun('miscaricaturas', sondaMisc); sondaRun('animeflv', sondaAnimeflv); /* v306 */ sondaRun('novelas', sondaNovelas); sondaRun('animed23', sondaD23);
-  if(!HUDDLE_AUDITORIA.activo) sondaRun('huddle', sondaHuddleGeneral);
+setInterval(() => {
+  sondasEscalonadas(HUDDLE_AUDITORIA.activo ? [] : [['huddle', sondaHuddleGeneral]]); /* v309 escalonado */
 }, 6 * 3600 * 1000); /* v287: el ciclo de 6h también corre la podredumbre de episodios */
 setInterval(() => { sondaRun('epsPodredumbre', epsPodredumbre); }, 6 * 3600 * 1000);
 
@@ -13918,6 +13924,7 @@ async function crawlTick() {
     series es trabajo al cohete — y en Oracle se colgaba justo ahí a los ~75 s de
     cada arranque, trabando el ciclo de eventos (por eso ni el SIGTERM entraba).
     El rastreo solo camina cuando el usuario enciende el detector en el panel. */
+  if (process.memoryUsage().heapUsed / 1048576 > 320) return; /* v309: heap caliente — el rastreo espera su turno; sin esto, encender las intros sobre la tormenta de arranque reventó los 768 MB (SIGABRT ×3) */
   if (crawlOcupado || !CRAWL.lista || !CRAWL.pend.length) return;
   if (rooms.size > 0 || Date.now() - crawlUltimaActividad < 60000) return; /* nadie viendo */
   crawlOcupado = true;
