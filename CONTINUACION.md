@@ -1,4 +1,47 @@
-## ESTADO ACTUAL — 23 SEP 2026 — v291: OPTIMIZACIÓN (memoria + velocidad del buscador)
+## ESTADO ACTUAL — 23 SEP 2026 — v292: BÚSQUEDA CUEVANA 100% LOCAL (catálogo)
+
+### Lo que pedía el usuario
+- «¿No es mejor buscar en el catálogo de Huddle en vez de buscar en Cuevana en vivo?»
+- Sí: el índice YA era local (sitemap de 8,191 slugs, caché 24 h), pero por cada
+  búsqueda se hacían hasta 12 llamadas en vivo a la API de Cuevana para sacar
+  título/póster y filtrar muertas. Eso era lo que pesaba.
+
+### Qué hace v292
+- **CVM_CAT**: catálogo local slug → {título, póster, extra}. Se enriquece GRATIS con
+  llamadas que YA se hacían (y antes se tiraban): la sonda (verificarCuevana) y cada
+  reproducción (resolverCuevanaMov). Persiste en public/cuevana-cat.json (throttle 5 s).
+- **buscarCuevanaMov ya no toca la red**: busca en el índice + CVM_CAT, filtra
+  CVM_OCULTAS. Lo que aún no está enriquecido sale con slug bonificado y sin póster;
+  al picar, el reproductor valida en vivo como siempre.
+- **Siembra única al arranque**: a los 60 s pide ~250 fichas a la API, 1 cada 1.5 s
+  (~6 min, cortés). Después siguen la sonda y las reproducciones. El índice se
+  pre-calienta a los 20 s del arranque.
+- `UI_VERSION v292`.
+
+### Verificado (server local, 23 SEP)
+- Índice: 8,191 slugs ✓ · cuevana-cat.json escrito con fichas reales (título+póster) ✓
+- Búsqueda "veloz": 3 hits Cuevana, 2 enriquecidos con póster y 1 aún con slug
+  (esperado en la siembra) ✓ · cero errores, `node --check` OK.
+- La búsqueda global fría desde el sandbox bajó a ~2-4 s (el trozo Cuevana ya es instantáneo).
+
+### Cobertura del catálogo
+- Crece con el uso y con la sonda (45 fichas/ciclo). Las fichas sin enriquecer se
+  muestran igual (título por slug). Muertas filtradas por CVM_OCULTAS (v235/v251).
+
+### Pendiente tras despliegue
+- Usuario: `cd ~/huddle && bash actualizar.sh`. Dejarlo correr ~10 min para la siembra.
+- Probar búsquedas de pelis (p. ej. "venom", "dragon") — deben salir rápido y cada vez
+  con más pósters.
+
+### Archivos tocados
+- `server.js`: CVM_CAT + persistencia + enriquecedores, buscarCuevanaMov local,
+  siembra + precalentado, UI_VERSION.
+- `public/cuevana-cat.json` (semilla inicial, 81 fichas).
+- `CONTINUACION.md` (esta nota).
+
+---
+
+## ESTADO ANTERIOR — 23 SEP 2026 — v291: OPTIMIZACIÓN (memoria + velocidad del buscador)
 
 ### Lo que pedía el usuario
 - Subidas de memoria hasta ~5,000 MB en Oracle.

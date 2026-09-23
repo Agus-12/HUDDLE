@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v291'; // v291: optimización — buscador con tope 12s y Cuevana en paralelo; higiene de Chrome (se cierra ocioso tras 2h); tope serieCache; diagnóstico RAM en /api/estado
+const UI_VERSION = 'v292'; // v292: búsqueda Cuevana 100% local (catálogo CVM_CAT que enriquecen sonda+reproductor); v291: topes de búsqueda e higiene de Chrome
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -677,6 +677,7 @@ async function verificarCuevana(slug) {
     const d = await r.json();
     const lat = ((d.videos || {}).latino || []).filter(e => e.url);
     if (!lat.length) return { ok: false, reason: 'no_latino' };
+    cvmCatEnriquecer(slug, d); /* v292: la sonda ya pagó la llamada — guardar meta al catálogo */
     /* Probar el primer host que funcione */
     const sorted = [...lat].sort((a, b) => {
       const ai = CUEVANA_HOSTS_OK.indexOf(new URL(a.url || 'https://x').hostname);
@@ -770,6 +771,33 @@ async function sondaCuevana() {
 const PXD_OCULTAS = new Set(), AF_OCULTAS = new Set(), CVM_OCULTAS = new Set();
 try { for (const l of fs.readFileSync(path.join(__dirname, 'public', 'pxd-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) PXD_OCULTAS.add(l.trim()); } catch {}
 try { for (const l of fs.readFileSync(path.join(__dirname, 'cuevana-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) CVM_OCULTAS.add(l.trim()); } catch {} /* v235: 180 Cuevana sin embeds */
+
+/* v292: CATÁLOGO LOCAL Cuevana (slug → {t: título, p: póster, e: extra}).
+ * Se enriquece GRATIS con lo que la sonda y el buscador viejo ya descargaban
+ * de la API (antes se tiraba). La búsqueda ya NO sale a la red: puro catálogo. */
+const CVM_CAT = new Map();
+try {
+  const cvj = JSON.parse(fs.readFileSync(path.join(__dirname, 'public', 'cuevana-cat.json'), 'utf8'));
+  for (const [k, v] of Object.entries(cvj.items || {})) if (v && v.t) CVM_CAT.set(k, v);
+} catch {}
+let cvmCatTimer = null;
+function cvmCatGuardar() {
+  /* v292: throttle (no debounce) — con debounce, la siembra continua postergaba
+   * la escritura para siempre; así escribe 1 vez cada 5 s como máximo */
+  if (cvmCatTimer) return;
+  cvmCatTimer = setTimeout(() => {
+    cvmCatTimer = null;
+    try { fs.writeFileSync(path.join(__dirname, 'public', 'cuevana-cat.json'), JSON.stringify({ items: Object.fromEntries(CVM_CAT) })); } catch {}
+  }, 5000);
+}
+function cvmCatEnriquecer(slug, d) {
+  if (!slug || !d || !d.titles) return;
+  const t = String(d.titles.name || '').trim().slice(0, 120);
+  if (!t) return;
+  const extra = ['Latino', d.runtime ? d.runtime + 'min' : '', d.releaseDate ? String(d.releaseDate).slice(0, 4) : ''].filter(Boolean).join(' · ');
+  CVM_CAT.set(slug, { t, p: (d.images && d.images.poster) || '', e: extra });
+  cvmCatGuardar();
+}
 
 /* v238: CineCalidad — vistas, ocultas, índice */
 const CC_VISTAS = new Set();
@@ -5581,29 +5609,57 @@ async function cuevanaIndice() {
   console.log('[cuevana] ' + cuevanaIdx.slugs.length + ' slugs en sitemap');
   return cuevanaIdx.slugs;
 }
+/* v292: pre-calentar el índice al arranque (para que la 1ª búsqueda no espere
+ * los 9 sitemaps) y sembrar el catálogo local con una pasada única y cortés:
+ * ~250 fichas a 1.5 s de distancia (~6 min). La sonda y cada reproducción
+ * siguen enriqueciéndolo después. */
+setTimeout(() => { cuevanaIndice().catch(() => {}); }, 20000);
+setTimeout(async () => {
+  try {
+    const slugs = await cuevanaIndice();
+    const faltan = slugs.filter((s) => !CVM_CAT.has(s));
+    let n = 0;
+    for (const s of faltan.slice(0, 250)) {
+      try { const r = await fetchSeguro(CUEVANA_API + encodeURIComponent(s), 8000); if (r && r.ok) cvmCatEnriquecer(s, await r.json().catch(() => null)); n++; } catch {}
+      await new Promise((ok2) => setTimeout(ok2, 1500));
+    }
+    console.log('[cuevana-cat] siembra inicial: ' + n + ' fichas pedidas, catálogo en ' + CVM_CAT.size);
+  } catch {}
+}, 60000);
 
 /* Buscar películas de Cuevana por query */
 async function buscarCuevanaMov(q) {
+  /* v292: búsqueda 100% LOCAL (cero red) — el catálogo viene del sitemap en
+   * memoria (24 h) y los títulos/pósters de CVM_CAT, que enriquecen la sonda
+   * y cada reproducción. Antes se hacían hasta 12 llamadas en vivo por búsqueda. */
   const nq = normalizarTxt(q);
   const tokens = nq.split(/\s+/).filter(Boolean);
   if (!tokens.length) return [];
   const slugs = await cuevanaIndice();
   const cand = [];
   for (const s of slugs) {
+    if (CVM_OCULTAS.has(s)) continue; /* v235: sin muertas — v251 muertas siempre ocultas */
+    const cat = CVM_CAT.get(s);
+    const nt = cat && cat.t ? normalizarTxt(cat.t) : '';
     let ok = true, score = 0;
     for (const t of tokens) {
       const i = s.indexOf(t);
-      if (i < 0) { ok = false; break; }
-      score += i === 0 ? 2 : 1;
+      const j = nt ? nt.indexOf(t) : -1;
+      if (i < 0 && j < 0) { ok = false; break; }
+      score += (i === 0 || j === 0 ? 2 : 1) + (j >= 0 ? 0.5 : 0); /* el título real pesa más que el slug */
     }
-    if (ok) cand.push({ s, score: score - s.length / 100 });
+    if (ok) cand.push({ s, cat, score: score - s.length / 100 });
   }
   cand.sort((a, b) => b.score - a.score);
-  const top = cand.slice(0, 12);
-  /* v291: metas EN PARALELO — antes iban en fila y cada una espera hasta 10 s:
-   * una Cuevana lenta trababa TODO el buscador 25-60 s. */
-  const metas = await Promise.all(top.map((c) => CVM_OCULTAS.has(c.s) ? Promise.resolve(null) : cuevanaMeta(c.s).catch(() => null))); /* v235: sin muertas — v251 muertas siempre ocultas */
-  return metas.filter(Boolean);
+  /* Lo que aún no está enriquecido en el catálogo sale con el slug bonificado
+   * y sin póster; al picar, el reproductor valida en vivo como siempre. */
+  return cand.slice(0, 12).map(({ s, cat }) => ({
+    title: cat && cat.t ? cat.t : s.replace(/-/g, ' '),
+    url: 'https://cuevana.mov/pelicula/0/' + s,
+    img: (cat && cat.p) || '',
+    site: 'Cuevana',
+    extra: (cat && cat.e) || 'Latino',
+  }));
 }
 
 /* Metadata de una película de Cuevana (cache 15 min) */
@@ -5642,6 +5698,7 @@ async function resolverCuevanaMov(pageUrl) {
   const r = await fetchSeguro(CUEVANA_API + encodeURIComponent(slug), 12000);
   if (!r.ok) throw new Error('API Cuevana error: ' + r.status);
   const d = await r.json();
+  cvmCatEnriquecer(slug, d); /* v292: cada peli reproducida enriquece el catálogo de búsqueda */
   const lat = (d.videos && d.videos.latino) || [];
   if (!lat.length) throw new Error('Cuevana: sin embeds latinos para ' + slug);
   /* Priorizar hosts que funcionan via HTTP puro */
