@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v290'; // v290: AnimeD23 flujo "multi" (options.php token rotativo → contenedor → videoTabs); v288: tarjetas muertas se ocultan al momento; v287: podredumbre de episodios
+const UI_VERSION = 'v290.2'; // v290.2: AnimeD23 JWT con selector (fuente=latino|sub|cast) + auditoría catálogo; v290: flujo multi; v288: tarjetas muertas
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -7132,6 +7132,32 @@ async function d23TabsDeHtml(html, referer) {
           if (contM) {
             const h5 = await (await fetchSeguro('https://animed23.online/multiplayer/contenedor.php?id=' + contM[1], 12000, { Referer: pUrl })).text().catch(() => '');
             for (const t of d23TabsDeContenedor(h5)) tabs.push(t);
+          } else {
+            /* v290.2: player.php devolvió el SELECTOR («¿Cómo quieres ver este episodio?») —
+             * los links llevan &fuente=latino|sub|cast; hay que dar un salto más hasta el
+             * iframe del contenedor. Preferencia latino → sub → cast (audio latino manda). */
+            const selHrefs = [...h4.matchAll(/href="([^"]*player\.php\?data=[^"]*fuente=(?:latino|sub|cast)[^"]*)"/gi)].map(m => m[1]);
+            if (selHrefs.length) {
+              const orden = ['latino', 'sub', 'cast'];
+              selHrefs.sort((a, b) => orden.findIndex(f => a.includes('fuente=' + f)) - orden.findIndex(f => b.includes('fuente=' + f)));
+              for (const sh of selHrefs.slice(0, 2)) {
+                let sUrl = sh.replace(/&#038;/g, '&').replace(/&amp;/g, '&');
+                if (sUrl.startsWith('/')) sUrl = 'https://animed23.online/opciones/' + sUrl.replace(/^\//, '');
+                else if (!/^https?:/i.test(sUrl)) sUrl = 'https://animed23.online/opciones/' + sUrl;
+                const h5 = await (await fetchSeguro(sUrl, 12000, { Referer: pUrl })).text().catch(() => '');
+                const mIfr = /<iframe[^>]+src="([^"]*multiplayer\/contenedor\.php\?id=[A-Za-z0-9_-]+)"/i.exec(h5);
+                const contM2 = /multiplayer\/contenedor\.php\?id=([A-Za-z0-9_-]+)/i.exec(h5);
+                let cUrl = '';
+                if (mIfr) cUrl = mIfr[1];
+                else if (contM2) cUrl = 'https://animed23.online/multiplayer/contenedor.php?id=' + contM2[1];
+                if (cUrl) {
+                  if (cUrl.startsWith('//')) cUrl = 'https:' + cUrl;
+                  const h6 = await (await fetchSeguro(cUrl, 12000, { Referer: sUrl })).text().catch(() => '');
+                  for (const t of d23TabsDeContenedor(h6)) tabs.push(t);
+                  if (tabs.length) break;
+                }
+              }
+            }
           }
         }
       } catch {}

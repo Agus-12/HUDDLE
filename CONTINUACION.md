@@ -1,4 +1,49 @@
-## ESTADO ACTUAL — 22 SEP 2026 — v290: AnimeD23 flujo "multi" (BAKI-DOU ya reproduce)
+## ESTADO ACTUAL — 22 SEP 2026 — v290.2: AUDITORÍA COMPLETA AnimeD23 (228 series) + fix del selector JWT
+
+### Lo que pedía el usuario
+- Tras arreglar BAKI-DOU (v290): auditar TODAS las series de AnimeD23 para que no vuelva
+  a pasar, y arreglar lo que saliera.
+
+### Auditoría (script nuevo `auditoria-animed23.js`, resultados en `auditorias/animed23-audit-v290.json`)
+- Barrido el catálogo completo (228 slugs de d23-slugs.txt): ficha → cap 1 → flujo → tabs.
+- Hallazgo fuerte: **26 series JWT cambiaron de formato** — `player.php?data=JWT` ya no
+  trae el contenedor directo: devuelve un SELECTOR («¿Cómo quieres ver este episodio?»)
+  con links `player.php?data=…&fuente=latino|sub|cast`; el contenedor va en el iframe de
+  ESA página. Huddle se quedaba a medio camino → mismas 26 con "sin fuente".
+
+### Qué hace v290.2
+- `d23TabsDeHtml` (rama JWT): si player.php no trae `contenedor.php?id=`, sigue los links
+  del selector en orden **latino → sub → cast** (regla de audio latino), extrae el iframe
+  del contenedor y lee los videoTabs. Aplica a Solo, Juntos y /api/d23/probar.
+- Quitado el slug basura `feed` de d23-slugs.txt/animed23-slugs.txt (era el catálogo, no serie).
+- `UI_VERSION v290.2`.
+
+### Resultado final de la auditoría (re-corrida post-fix)
+- **219/228 con reproductores**: 71 direct + 117 jwt (26 por el selector nuevo) + 31 multi.
+- 8 fichas SIN capítulos en el propio sitio (placeholders de pelis/temporadas aún no subidas:
+  all-you-need-is-kill, beastars-temporada-final, black-clover-temporada-2, enen-no-shouboutai
+  S3, fullmetal-alchemist-brotherhood, medalist T2, rezero S1, watari-kun). v288 ya las
+  oculta al primer clic con mensaje — no hay nada que Huddle pueda reproducir de ellas.
+- `gachiakuta`: solo el último cap (ep-24) viene con token VACÍO (el sitio aún no sube ese
+  video); el resto de la serie resuelve. No es bug de Huddle.
+
+### Verificado en vivo (server local, 22 SEP)
+- aishiteru-game-wo-owarasetai ep-12 (caso selector): 5 tabs → Byse → m3u8 ✓
+- baki-dou ep-3 (multi) ✓ · black-torch ep-12 (direct) ✓ · `node --check` OK.
+
+### Pendiente tras despliegue
+- Usuario: `cd ~/huddle && bash actualizar.sh`; probar alguna de las 26 JWT (p. ej.
+  «Aishiteru Game wo Owarasetai» o «Avatar: Aang») y BAKI-DOU otra vez.
+
+### Archivos tocados
+- `server.js`: rama selector en JWT de `d23TabsDeHtml` + UI_VERSION.
+- `auditoria-animed23.js` (nuevo) + `auditorias/animed23-audit-v290.json` (resultado).
+- `public/d23-slugs.txt`, `public/animed23-slugs.txt` (sin `feed`).
+- `ANIMED23-AUDIT.md` §18 · `CONTINUACION.md` (esta nota).
+
+---
+
+## ESTADO ANTERIOR — 22 SEP 2026 — v290: AnimeD23 flujo "multi" (BAKI-DOU ya reproduce)
 
 ### Lo que pedía el usuario
 - BAKI-DOU: The Invincible Samurai (2026) en AnimeD23 decía "sin fuente disponible".

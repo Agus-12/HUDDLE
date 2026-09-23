@@ -403,3 +403,20 @@ Convive con los dos flujos anteriores. Detectado en BAKI-DOU: The Invincible Sam
 3. El contenedor devuelve los `videoTabs` de siempre (Byse/Moon, Mytsumi, Mega, OK, Epsilon, Abyss, rpmvid).
 - **El TOKEN rota** (minutos/horas): un token viejo responde "Contenedor no encontrado". Extraerlo SIEMPRE fresco del HTML del episodio; nunca cachear tokens ni URLs del splash.
 - `d23TabsDeHtml` y `d23Probe` ya lo siguen (v290). Verificado ep-1/ep-2 de punta a punta (Byse → master 1080p → .ts real).
+
+## §18 (v290.2, 22 SEP 2026) — AUDITORÍA CATÁLOGO COMPLETO (228 series)
+Script: `auditoria-animed23.js` · Resultados: `auditorias/animed23-audit-v290.json`
+
+**Resultado tras los fixes: 219/228 traen reproductores y resuelven.**
+| flujo | series | notas |
+|---|---|---|
+| direct (`container.php?id=D23-…`) | 71 | flujo original v286, intacto |
+| jwt (`opciones/options.php`) | 117 | de estas, **26 cambiaron de formato**: player.php ahora devuelve un SELECTOR y hay que seguir `&fuente=latino\|sub\|cast` hasta el iframe del contenedor (fix v290.2 en `d23TabsDeHtml`; preferencia latino→sub→cast) |
+| multi (token rotativo, v290) | 31 | BAKI-DOU y cía. |
+
+**Casos restantes (NO son bug de Huddle):**
+- 8 fichas sin capítulos en el propio sitio (placeholders: pelis/temporadas anunciadas sin subir aún): all-you-need-is-kill, beastars-temporada-final, black-clover-temporada-2, enen-no-shouboutai-san-no-shou, fullmetal-alchemist-brotherhood, medalist-temporada-2, rezero-kara-hajimeru-isekai-seikatsu, watari-kun-no-xx-ga-houkai-sunzen. v288 las oculta al primer clic con mensaje.
+- `gachiakuta`: el último cap (ep-24) trae `value=` VACÍO (el sitio aún no le pone player); ep-1 y el resto sí resuelven.
+- Slug basura `feed` (era el catálogo, no una serie): eliminado de d23-slugs.txt/animed23-slugs.txt.
+
+**Verificado en vivo:** aishiteru ep-12 (jwt+selector → Byse → m3u8 ✓), baki-dou ep-3 ✓, black-torch ep-12 ✓.

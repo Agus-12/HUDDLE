@@ -1,0 +1,1609 @@
+{
+ "fecha": "2026-09-23T00:04:11.374Z",
+ "total": 228,
+ "resumen": {
+  "jwt|ok": 117,
+  "?|sin-capitulos": 8,
+  "multi|ok": 31,
+  "direct|ok": 71,
+  "multi|multi-sin-contenedor": 1
+ },
+ "resultados": [
+  {
+   "slug": "29-sai-dokushin-chuuken-boukensha-no-nichijou",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "aishiteru-game-wo-owarasetai",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "akuyaku-reijou-wa-ringoku-no-outaishi-ni-dekiai-sareru",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "all-you-need-is-kill",
+   "flujo": "?",
+   "tabs": 0,
+   "estado": "sin-capitulos",
+   "nota": ""
+  },
+  {
+   "slug": "android-wa-keiken-ninzuu-ni-hairimasu-ka",
+   "flujo": "multi",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "ansatsu-kyoushitsu-movie-minna-no-jikan",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "ansatsusha-de-aru-ore-no-status-ga-yuusha-yori-mo-akiraka-ni-tsuyoi-no-da-ga",
+   "flujo": "multi",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "arne-no-jikenbo",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "avatar-aang-el-ultimo-maestro-del-aire",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "awajima-hyakkei",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "azur-lane-bisoku-zenshin-ni",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "baki-dou-the-invincible-samurai",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "beastars-temporada-final",
+   "flujo": "?",
+   "tabs": 0,
+   "estado": "sin-capitulos",
+   "nota": ""
+  },
+  {
+   "slug": "black-clover-temporada-2",
+   "flujo": "?",
+   "tabs": 0,
+   "estado": "sin-capitulos",
+   "nota": ""
+  },
+  {
+   "slug": "black-torch",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "bleach-sennen-kessen-hen",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "boku-no-hero-academia-i-am-a-hero-too",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "boku-no-hero-academia-temporada-final",
+   "flujo": "multi",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "boku-no-kokoro-no-yabai-yatsu-movie",
+   "flujo": "jwt",
+   "tabs": 3,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "buchigire-reijou-wa-houfuku-wo-chikaimashita-madousho-no-chikara-de-sokoku-wo-tatakitsubushimasu",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "chainsaw-man-movie-reze-hen",
+   "flujo": "multi",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "champignon-no-majo",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "chichi-wa-eiyuu-haha-wa-seirei-musume-no-watashi-wa-tenseisha",
+   "flujo": "multi",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "class-de-2-banme-ni-kawaii-onnanoko-to-tomodachi-ni-natta",
+   "flujo": "jwt",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "clevatess-ii-majuu-no-ou-to-itsuwari-no-yuusha-denshou",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "crowned-in-a-hundred-days-bai-ri-cheng-wang",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "dark-moon-tsuki-no-saidan",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "darwin-jihen",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "dead-account",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "diamond-no-ace-act-ii-temporada-2",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "dorohedoro-temporada-2",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "douse-koishite-shimaunda-temporada-2",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "enen-no-shouboutai-san-no-shou",
+   "flujo": "?",
+   "tabs": 0,
+   "estado": "sin-capitulos",
+   "nota": ""
+  },
+  {
+   "slug": "eris-no-seihai",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "false-memory-jiyi-guanli-ju",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "fate-strange-fake",
+   "flujo": "jwt",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "fate-strange-fake-whispers-of-dawn",
+   "flujo": "multi",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "fullmetal-alchemist-brotherhood",
+   "flujo": "?",
+   "tabs": 0,
+   "estado": "sin-capitulos",
+   "nota": ""
+  },
+  {
+   "slug": "fumetsu-no-anata-e-temporada-3",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "futsutsuka-na-akujo-dewa-gozaimasu-ga-suuguu-chouso-torikae-den",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "gachiakuta",
+   "flujo": "multi",
+   "tabs": 0,
+   "estado": "multi-sin-contenedor",
+   "nota": "<!DOCTYPE html> <html lang=\"es\"> <head> <meta charset=\"UTF-8\"> <meta name=\"robots\" content=\"noindex, nofollow\"> <me"
+  },
+  {
+   "slug": "gaikotsu-kishi-sama-tadaima-isekai-e-odekakechuu-ii",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "ganbare-nakamura-kun",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "ghost-concert-missing-songs",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "ghost-meets-gal-2026",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "gnosia",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "golden-kamuy-saishuushou",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "goumon-baito-kun-no-nichijou",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "grand-blue-temporada-3",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "grow-up-show-himawari-no-circus-dan",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "haibara-kun-no-tsuyokute-seishun-new-game",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "hanaori-san-wa-tensei-shitemo-kenka-ga-shitai",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "hanazakari-no-kimitachi-e",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "hanazakari-no-kimitachi-e-temporada-2",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "hell-mode-yarikomizuki-no-gamer-wa-hai-settei-no-isekai-de-musou-suru",
+   "flujo": "jwt",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "hell-mode-yarikomizuki-no-gamer-wa-hai-settei-no-isekai-de-musou-suru-temporada-2",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "heroine-seijo-iie-all-works-maid-desu-hokori",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "hidarikiki-no-eren",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "higeki-no-genkyou-to-naru-saikyou-gedou-last-boss-joou-wa-tami-no-tame-ni-tsukushimasu-temporada-2",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "hikuidori-ushuu-boro-tobi-gumi",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "himekishi-wa-barbaroi-no-yome",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "himesama-goumon-no-jikan-desu-temporada-2",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "hitori-no-shita-the-outcast-temporada-6",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "hokuto-no-ken-fist-of-the-north-star",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "honzuki-no-gekokujou-shisho-ni-naru-tame-ni-wa-shudan-wo-erandeiraremasen-ryoushu-no-youjo",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "ichijouma-mankitsugurashi",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "ikoku-nikki",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "ingoku-danchi",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "isekai-no-sata-wa-shachiku-shidai",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "isekai-nonbiri-nouka-2",
+   "flujo": "jwt",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "iwamoto-senpai-no-suisen",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "jidou-hanbaiki-ni-umarekawatta-ore-wa-meikyuu-wo-samayou-temporada-3",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "jigokuraku",
+   "flujo": "multi",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "jigokuraku-temporada-2",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "jingai-kyoushitsu-no-ningengirai-kyoushi",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "jishou-akuyaku-reijou-na-konyakusha-no-kansatsu-kiroku",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "jujutsu-kaisen-temporada-3-shimetsu-kaiyuu-zenpen",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kabushikigaisha-magi-lumiere-temporada-2",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kami-no-niwatsuki-kusunoki-tei",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kami-no-shizuku",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kamiina-botan-yoeru-sugata-wa-yuri-no-hana",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kanan-sama-wa-akumade-choroi",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kanojo-okarishimasu-temporada-5",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "katainaka-no-ossan-kensei-ni-naru-ii",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kaya-chan-wa-kowakunai",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kekkon-yubiwa-monogatari-ii",
+   "flujo": "multi",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kill-ao",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kimetsu-no-yaiba-movie-1-mugenjou-hen-akaza-sairai",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kimi-ga-shinu-made-koi-wo-shitai",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kimi-no-koto-ga-daidaidaidaidaisuki-na-100-nin-no-kanojo-temporada-3",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kimi-wo-aisuru-ki-wa-nai-to-itta-jiki-koushaku-sama-ga-nazeka-dekiai-shitekimasu",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kirei-ni-shitemoraemasu-ka",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kizoku-tensei-megumareta-umare-kara-saikyou-no-chikara-wo-eru",
+   "flujo": "jwt",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kobayashi-san-chi-no-maid-dragon-samishigariya-no-ryuu",
+   "flujo": "multi",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "koko-wa-ore-ni-makasete-saki-ni-ike-to-itte-kara-10-nen-ga-tattara-densetsu-ni-natteita",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "koori-no-jouheki",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kore-kaite-shine",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "koukaku-kidoutai-the-ghost-in-the-shell",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kujima-utaeba-ie-hororo",
+   "flujo": "jwt",
+   "tabs": 4,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "kuroneko-to-majo-no-kyoushitsu",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "labyrinth-meikyuu-no-shiori",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "lets-go-kaiki-gumi",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "li-xiongmao-raised-by-demons-panda-li-li-xiongmao",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "liar-game",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "link-click-shiguang-dailiren-iii",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "lv999-no-murabito",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "mahou-shoujo-lyrical-nanoha-exceeds-gun-blaze-vengeance",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "maid-san-wa-taberu-dake",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "mairimashita-iruma-kun-temporada-4",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "majutsushi-kunon-wa-mieteiru",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "mao-2026",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "maou-no-musume-wa-yasashisugiru",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "marika-chan-no-koukando-wa-bukkowareteiru",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "marriagetoxin",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "mata-korosarete-shimatta-no-desu-ne-tantei-sama",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "mato-seihei-no-slave",
+   "flujo": "multi",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "mato-seihei-no-slave-temporada-2",
+   "flujo": "jwt",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "mayonaka-heart-tune",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "mebius-dust",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "medalist-temporada-2",
+   "flujo": "?",
+   "tabs": 0,
+   "estado": "sin-capitulos",
+   "nota": ""
+  },
+  {
+   "slug": "megami-isekai-tensei-nani-ni-naritai-desu-ka-ore-yuusha-no-rokkotsu-de",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "mf-ghost-temporada-3",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "migawari-reijou-wo-sukutta-no-wa-reikoku-mujihi-na-koori-no-ouji-no-ai-deshita",
+   "flujo": "direct",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "mikata-ga-yowasugite-hojo-mahou-ni-tesshiteita-kyuutei-mahoushi-tsuihou-sarete-saikyou-wo-mezasu",
+   "flujo": "multi",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "mugen-gacha",
+   "flujo": "multi",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "mujikaku-seijo-wa-kyou-mo-muishiki-ni-chikara-wo-tare-nagasu",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "mushoku-no-eiyuu-betsu-ni-skill-nanka-iranakatta-n-da-ga",
+   "flujo": "multi",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "mushoku-tensei-iii-isekai-ittara-honki-dasu",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "needy-girl-overdose",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "neko-to-ryuu",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "nigashita-sakana-wa-ookikatta-ga-tsuriageta-sakana-ga-ookisugita-ken",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "nige-jouzu-no-wakagimi-temporada-2",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "nijusseiki-denki-mokuroku-eureka-evrika",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "niwatori-fighter",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "odayaka-kizoku-no-kyuuka-no-susume",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "okiraku-ryoushu-no-tanoshii-ryouchi-bouei-seisankei-majutsu-de-na-mo-naki-mura-wo-saikyou-no-jousai-toshi-ni",
+   "flujo": "jwt",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "omae-gotoki-ga-maou-ni-kateru-to-omouna-to-yuusha-party-wo-tsuihou-sareta-node-outo-de-kimama-ni-kurashitai",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "one-piece",
+   "flujo": "multi",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "one-piece-arco-de-elbaph",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "one-piece-heroines",
+   "flujo": "jwt",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "one-punch-man-3",
+   "flujo": "multi",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "oni-no-hanayome",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "ookii-onnanoko-wa-suki-desu-ka",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "osananajimi-to-wa-love-comedy-ni-naranai",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "oshi-no-ko-temporada-3",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "otaku-ni-yasashii-gal-wa-inai",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "otome-game-sekai-wa-mob-ni-kibishii-sekai-desu-2",
+   "flujo": "direct",
+   "tabs": 4,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "otome-kaijuu-carameliser",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "otonari-no-tenshi-sama-ni-itsunomanika-dame-ningen-ni-sareteita-ken-temporada-2",
+   "flujo": "jwt",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "perfect-addiction",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "ponkotsu-fuuki-iin-to-skirt-take-ga-futekisetsu-na-jk-no-hanashi",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "rakudai-kenja-no-gakuin-musou-nidome-no-tensei-s-rank-cheat-majutsushi-boukenroku",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "record-of-ragnarok-shuumatsu-no-walkure-temporada-3-2025",
+   "flujo": "multi",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "reincarnation-no-kaben",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "reiwa-no-dara-san",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "replica-datte-koi-wo-suru",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "rezero-kara-hajimeru-isekai-seikatsu",
+   "flujo": "?",
+   "tabs": 0,
+   "estado": "sin-capitulos",
+   "nota": ""
+  },
+  {
+   "slug": "rezero-kara-hajimeru-isekai-seikatsu-temporada-4",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "ryoumin-0-nin-start-no-henkyou-ryoushu-sama",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "saigo-ni-hitotsu-dake-onegai-shitemo-yoroshii-deshou-ka",
+   "flujo": "multi",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "saijo-no-osewa-takane-no-hanadarake-na-meimonkou-de-gakuin-ichi-no-ojousama-seikatsu-nouryoku-kaimu-wo-kagenagara-osewa-suru-koto-ni-narimashita",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "saikyou-degarashi-ouji-no-anyaku-teii-arasoi",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "saikyou-no-shokugyou-wa-yuusha-demo-kenja-demo-naku-kanteishi-kari-rashii-desu-yo",
+   "flujo": "jwt",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "saioshi-no-gikei-wo-mederu-tame-nagaiki-shimasu",
+   "flujo": "multi",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "sanda",
+   "flujo": "multi",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "sawaranaide-kotesashi-kun",
+   "flujo": "multi",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "sayonara-lara",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "seihantai-na-kimi-to-boku",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "seihantai-na-kimi-to-boku-temporada-2",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "sekai-saikyou-no-kouei-meikyuukoku-no-shinjin-tansakusha",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "shibou-yuugi-de-meshi-wo-kuu",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "shibou-yuugi-de-meshi-wo-kuu-44-cloudy-beach",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "shunkashuutou-daikousha-haru-no-mai",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "snowball-earth",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "sora-wa-akai-kawa-no-hotori-red-river",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "sousou-no-frieren",
+   "flujo": "multi",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "sousou-no-frieren-temporada-2",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "sozai-saishuka-no-isekai-ryokouki",
+   "flujo": "multi",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "spy-x-family-temporada-3",
+   "flujo": "multi",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "steel-ball-run-jojo-no-kimyou-na-bouken-2026",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "super-no-ura-de-yani-suu-futari",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "suterare-seijo-no-isekai-gohan-tabi-kakure-skill-de-camping-car-wo-shoukan-shimashita",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "sword-art-online-unanswered-butterfly",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tadaima-ojamasaremasu",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tai-ari-deshita-ojousama-wa-kakutou-game-nante-shinai",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tamon-kun-ima-docchi",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tefuda-ga-oome-no-victoria",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tenkou-saki-no-seiso-karen-na-bishoujo-ga-mukashi-danshi-to-omotte-issho-ni-asonda-osananajimi-datta-ken",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tenmaku-no-jaadugar",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tensei-shitara-dragon-no-tamago-datta",
+   "flujo": "jwt",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tensei-shitara-slime-datta-ken-movie-2-soukai-no-namida-hen",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tensei-shitara-slime-datta-ken-temporada-4",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "terror-man",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tetsunabe-no-jan",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "the-beginning-after-the-end-temporada-2",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "the-daily-life-of-the-immortal-king",
+   "flujo": "multi",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "the-daily-life-of-the-immortal-king-temporada-5",
+   "flujo": "multi",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "the-fated-magical-princess-who-made-me-a-princess",
+   "flujo": "multi",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "the-ribbon-hero",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "to-be-winner-cheng-ye-xiao-he-2026",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tomb-raider-king",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tomodachi-no-imouto-ga-ore-ni-dake-uzai",
+   "flujo": "multi",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tondemo-skill-de-isekai-hourou-meshi-temporada-2",
+   "flujo": "multi",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tongari-boushi-no-atelier",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tougen-anki",
+   "flujo": "multi",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "toumei-na-yoru-ni-kakeru-kimi-to-me-ni-mienai-koi-wo-shita",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "toumei-otoko-to-ningen-onna-sonouchi-fuufu-ni-naru-futari",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "towa-no-yuugure",
+   "flujo": "multi",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "trigun-stargaze",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tsue-to-tsurugi-no-wistoria-temporada-2",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "tsuihou-sareta-tensei-juukishi-wa-game-chishiki-de-musou-suru",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "uchi-no-otouto-domo-ga-sumimasen",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "under-the-gate",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "uruwashi-no-yoi-no-tsuki",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "ushiro-no-shoumen-kamui-san",
+   "flujo": "jwt",
+   "tabs": 3,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "vigilante-boku-no-hero-academia-illegals-temporada-2",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "watari-kun-no-xx-ga-houkai-sunzen",
+   "flujo": "?",
+   "tabs": 0,
+   "estado": "sin-capitulos",
+   "nota": ""
+  },
+  {
+   "slug": "yani-neko",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "yasei-no-last-boss-ga-arawareta",
+   "flujo": "multi",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "yomi-no-tsugai",
+   "flujo": "direct",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "youjo-senki-ii",
+   "flujo": "direct",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "youkoso-jitsuryoku-shijou-shugi-no-kyoushitsu-e-temporada-4",
+   "flujo": "jwt",
+   "tabs": 4,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "yowayowa-sensei",
+   "flujo": "jwt",
+   "tabs": 3,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "yozakura-san-chi-no-daisakusen-temporada-2",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "yuusha-kei-ni-shosu-choubatsu-yuusha-9004-tai-keimu-kiroku",
+   "flujo": "jwt",
+   "tabs": 5,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "yuusha-no-kuzu",
+   "flujo": "jwt",
+   "tabs": 6,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "yuusha-party-ni-kawaii-ko-ga-ita-node-kokuhaku-shitemita",
+   "flujo": "jwt",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  },
+  {
+   "slug": "yuusha-party-wo-oidasareta-kiyoubinbou",
+   "flujo": "jwt",
+   "tabs": 7,
+   "estado": "ok",
+   "nota": ""
+  }
+ ]
+}
