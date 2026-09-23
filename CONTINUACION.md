@@ -1,3 +1,41 @@
+## ESTADO ACTUAL — 23 SEP 2026 — v297: TOPE DE MEMORIA — se acabaron los reinicios por gordura
+
+### Lo que pasaba (evidencia del usuario)
+El server en Oracle moría solo cada rato: «Encendido» volvía a 0/1m y las sondas se
+reiniciaban SIN que él tocara nada (capturas 19:42→19:43 con 406 MB al minuto de vida).
+Causa encontrada: `serieCache` (fichas completas de series, hasta 1000+ eps cada una)
+se guarda a disco y al arrancar se cargaba COMPLETA sin tope; tras días de uso el
+archivo pesa cientos de MB → el arranque infla la memoria → Oracle mata el proceso
+→ systemd lo revive → ciclo. El panel NO reinicia nada: solo mostraba el reinicio.
+
+### Qué hace v297
+- `serieCachePodar()`: tope de 1500 fichas (las más recientes) aplicado AL ARRANCAR
+  (antes no había) y antes de cada guardado a disco (el archivo queda acotado también).
+  (El recorte en caliente cada 10 min ya existía desde v291.)
+- Vigilante de memoria cada 30 s: heap > 500 MB → poda a 400 + `global.gc()` y lo loguea;
+  rss > 650 MB → aviso en log. Todo visible en `journalctl -u huddle`.
+- Logs `[vida]` al terminar el proceso y con SIGTERM, para que el journal cuente
+  quién/qué lo mató.
+- `UI_VERSION v297`.
+
+### Verificado (server local)
+- Cache fake de 2000 entradas → arranque: «serieCache podada al arranque: -500, quedan
+  1500» y /api/estado reporta 1500 (antes cargaba las 2000 completas).
+
+### Nota de la prueba
+Los «0» confusos durante la prueba eran un server zombi local que seguía dueño del
+puerto (fuser -k falló), no un fallo de la poda.
+
+### Pendiente tras despliegue
+- Usuario: `cd ~/huddle && bash actualizar.sh`. Si aun así viera reinicios, pegar la
+  salida de `sudo journalctl -u huddle -n 25 --no-pager`.
+
+### Archivos tocados
+- `server.js` (serieCachePodar + carga/acotada + vigilante + logs [vida] + UI_VERSION),
+  `public/cuevana-cat.json` (refresh).
+
+---
+
 ## ESTADO ACTUAL — 23 SEP 2026 — v296: BARRIDO CONTINUO REPARTIDO
 
 ### Lo que pedía el usuario

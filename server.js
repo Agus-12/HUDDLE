@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v296'; // v296: barrido continuo repartido — el catálogo completo se revisa solo, ~2 títulos cada 15 s
+const UI_VERSION = 'v297'; // v297: serieCache con tope + vigilante de memoria — se acabaron los reinicios por gordura
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -1133,6 +1133,25 @@ setInterval(() => {
     finally { barridoOcupado = false; }
   })();
 }, 15000);
+
+/* v297: VIGILANTE DE MEMORIA — cada 30 s mira el heap; si pasa de 500 MB poda
+ * la serieCache y fuerza GC (en Oracle corre con --expose-gc). Deja rastro en
+ * el log para que `journalctl -u huddle` cuente la historia completa. */
+setInterval(() => {
+  try {
+    const m = process.memoryUsage();
+    const hu = m.heapUsed / 1048576, rss = m.rss / 1048576;
+    if (hu > 500) {
+      const podados = serieCachePodar(400);
+      if (typeof global.gc === 'function') global.gc();
+      console.log('[mem] v297 purga: heap ' + hu.toFixed(0) + 'MB rss ' + rss.toFixed(0) + 'MB → serieCache -' + podados + ', quedan ' + serieCache.size);
+    } else if (rss > 650) {
+      console.log('[mem] v297 aviso: rss alto ' + rss.toFixed(0) + 'MB (heap ' + hu.toFixed(0) + 'MB)');
+    }
+  } catch {}
+}, 30000);
+process.on('exit', (c) => { try { console.log('[vida] proceso terminando, código ' + c + ', uptime ' + Math.floor(process.uptime()) + 's'); } catch {} });
+process.on('SIGTERM', () => { try { console.log('[vida] recibí SIGTERM (reinicio pedido por el sistema)'); } catch {} });
 
 /* v287: PODREDUMBRE DE EPISODIOS — los capítulos muertos salen solos de la
  * temporada, sin esperar a que el usuario los pique 3 veces. Solo cuenta
@@ -3407,6 +3426,7 @@ function cacheLeer(nombre) {
 }
 const cacheTimers = new Map();
 function cacheGuardar(nombre, entradas) {
+  if (nombre === 'serieCache') serieCachePodar(SERIECACHE_MAX); /* v297: el archivo en disco también queda acotado */
   if (cacheTimers.has(nombre)) return; /* se agrupan escrituras cada 4 s */
   const t = setTimeout(() => {
     cacheTimers.delete(nombre);
@@ -5982,6 +6002,18 @@ async function resolverCuevanaMov(pageUrl) {
 /* v70: fuera las búsquedas de AnimeFLV (código retirado) */
 const metaCache = new Map();
 const serieCache = new Map();
+/* v297: serieCache CON TOPE — en Oracle creció sin límite durante meses y el
+ * arranque la cargaba completa del disco (400+ MB de golpe → el proceso moría
+ * y Oracle lo revivía, por eso «Encendido» volvía a 0). Ahora se poda a lo más
+ * reciente y un vigilante de memoria la purga antes de que el heap reviente. */
+const SERIECACHE_MAX = 1500;
+function serieCachePodar(max) {
+  if (serieCache.size <= max) return 0;
+  const orden = [...serieCache.entries()].sort((a, b) => ((b[1] && b[1].at) || 0) - ((a[1] && a[1].at) || 0));
+  let n = 0;
+  for (const [k] of orden.slice(max)) { serieCache.delete(k); n++; }
+  return n;
+}
 async function metaDePelicula(url) {
   const u0 = String(url || '');
   if (!u0) return null;
@@ -7873,6 +7905,7 @@ try {
   for (const [k, v] of cacheLeer('cariMeta') || []) cariMeta.set(k, v);
   for (const [k, v] of cacheLeer('lctEps') || []) lctEps.set(k, v); /* v112: episodios de lacartoons */
   for (const [k, v] of cacheLeer('serieCache') || []) serieCache.set(k, v);
+  { const podados = serieCachePodar(SERIECACHE_MAX); if (podados) console.log('[mem] v297: serieCache podada al arranque: -' + podados + ' entradas viejas, quedan ' + serieCache.size); }
   for (const [k, v] of cacheLeer('postersSeries') || []) postersSeries.set(k, v);
   const ch = cacheLeer('cariHome');
   if (ch && ch.at) { cariHome.at = ch.at; for (const [k, v] of (ch.items || [])) cariHome.items.set(k, v); }
