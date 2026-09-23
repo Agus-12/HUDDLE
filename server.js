@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v290.2'; // v290.2: AnimeD23 JWT con selector (fuente=latino|sub|cast) + auditoría catálogo; v290: flujo multi; v288: tarjetas muertas
+const UI_VERSION = 'v291'; // v291: optimización — buscador con tope 12s y Cuevana en paralelo; higiene de Chrome (se cierra ocioso tras 2h); tope serieCache; diagnóstico RAM en /api/estado
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -3119,6 +3119,7 @@ let PUPPETEER = null; // require perezoso
  * abre UNO y se reutiliza (solo se cierran las pestañas): caricaturas y
  * lacartoons resuelven varios segundos más rápido. */
 let NAVEGADOR = null;
+let NAVEGADOR_ABIERTO_EN = 0; /* v291: para la higiene de memoria */
 async function getNavegador() {
   if (NAVEGADOR && NAVEGADOR.connected) return NAVEGADOR;
   if (!PUPPETEER) { try { PUPPETEER = require('puppeteer'); } catch { throw new Error('El navegador del servidor no está disponible'); } }
@@ -3127,10 +3128,27 @@ async function getNavegador() {
     ...(process.env.CHROME_PATH ? { executablePath: process.env.CHROME_PATH } : {}),
     args: ['--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--autoplay-policy=no-user-gesture-required', '--disable-blink-features=AutomationControlled'],
   }).catch(() => null);
-  if (NAVEGADOR) NAVEGADOR.on('disconnected', () => { NAVEGADOR = null; });
+  if (NAVEGADOR) { NAVEGADOR_ABIERTO_EN = Date.now(); NAVEGADOR.on('disconnected', () => { NAVEGADOR = null; }); }
   return NAVEGADOR;
 }
 const mirrors = new Map(); // roomCode -> mirror
+
+/* v291: HIGIENE DE CHROME — el navegador persistente acumula memoria con los
+ * días (intros, sondas, resoluciones de caricaturas/PelisXD). Si lleva más de
+ * 2 h abierto y NADIE lo está usando (sin salas, sin espejos, sin job de intro),
+ * se cierra; el próximo uso lo reabre solo (costo: ~1 s una sola vez). */
+setInterval(() => {
+  (async () => {
+    try {
+      if (!NAVEGADOR || !NAVEGADOR.connected) return;
+      if (rooms.size || mirrors.size || INTRO_JOBS.size) return;
+      if (Date.now() - NAVEGADOR_ABIERTO_EN < 2 * 3600 * 1000) return;
+      const b = NAVEGADOR; NAVEGADOR = null;
+      await b.close().catch(() => {});
+      console.log('[nav] higiene: Chrome cerrado tras 2+ h abierto — se reabre solo al próximo uso');
+    } catch {}
+  })();
+}, 10 * 60 * 1000);
 
 /* v61: difunde la posición de la peli (barrita con tiempo) cada 2 s */
 setInterval(async () => {
@@ -5413,6 +5431,24 @@ async function fetchSeguro(url, ms, extra) { /* v206: cabeceras opcionales (Refe
     });
   } finally { clearTimeout(t); }
 }
+/* v291: resumen de procesos (Chrome del navegador, ffmpeg/fpcalc de intros,
+ * node) leyendo /proc — para diagnosticar subidas de memoria sin entrar por SSH. */
+function procResumen() {
+  const out = { chrome: { n: 0, rssMb: 0 }, ffmpeg: { n: 0, rssMb: 0 }, node: { n: 0, rssMb: 0 } };
+  try {
+    for (const pid of fs.readdirSync('/proc')) {
+      if (!/^\d+$/.test(pid)) continue;
+      let cmd = '';
+      try { cmd = fs.readFileSync('/proc/' + pid + '/cmdline', 'utf8').split('\0').join(' '); } catch { continue; }
+      let rssKb = 0;
+      try { rssKb = parseInt((/VmRSS:\s+(\d+)/.exec(fs.readFileSync('/proc/' + pid + '/status', 'utf8')) || [])[1] || '0', 10); } catch { continue; }
+      const g = /headless_shell|chrome|chromium/i.test(cmd) ? 'chrome' : /ffmpeg|fpcalc/i.test(cmd) ? 'ffmpeg' : /node/i.test(cmd) ? 'node' : '';
+      if (g) { out[g].n++; out[g].rssMb += rssKb / 1024; }
+    }
+  } catch {}
+  for (const k of Object.keys(out)) out[k].rssMb = Math.round(out[k].rssMb);
+  return out;
+}
 async function infoDePagina(url) {
   const u = new URL(url);
   let title = '', desc = '', iconHref = '';
@@ -5564,13 +5600,10 @@ async function buscarCuevanaMov(q) {
   }
   cand.sort((a, b) => b.score - a.score);
   const top = cand.slice(0, 12);
-  const hits = [];
-  for (const c of top) {
-    if (CVM_OCULTAS.has(c.s)) continue; /* v235: sin muertas — v251 muertas siempre ocultas */
-    const meta = await cuevanaMeta(c.s);
-    if (meta) hits.push(meta);
-  }
-  return hits;
+  /* v291: metas EN PARALELO — antes iban en fila y cada una espera hasta 10 s:
+   * una Cuevana lenta trababa TODO el buscador 25-60 s. */
+  const metas = await Promise.all(top.map((c) => CVM_OCULTAS.has(c.s) ? Promise.resolve(null) : cuevanaMeta(c.s).catch(() => null))); /* v235: sin muertas — v251 muertas siempre ocultas */
+  return metas.filter(Boolean);
 }
 
 /* Metadata de una película de Cuevana (cache 15 min) */
@@ -5915,6 +5948,12 @@ setInterval(() => {
     for (let i = 0; i < entries.length - 500; i++) cuevanaMetaCache.delete(entries[i][0]);
   }
   for (const [k, v] of cuevanaGeneroCache) if (now - v.at > 3 * 3600 * 1000) cuevanaGeneroCache.delete(k);
+  /* v291: tope de serieCache — guarda fichas completas (series de 1000+ eps);
+   * sin tope crece para siempre con cada ficha distinta que se abre */
+  if (serieCache.size > 600) {
+    const ord = [...serieCache.entries()].sort((a, b) => (a[1].at || 0) - (b[1].at || 0));
+    for (let i = 0; i < ord.length - 500; i++) serieCache.delete(ord[i][0]);
+  }
   /* Limitar CVM_VISTAS a 10k para no consumir memoria infinita */
   if (CVM_VISTAS.size > 10000) { const arr = [...CVM_VISTAS]; CVM_VISTAS.clear(); arr.slice(-5000).forEach(s => CVM_VISTAS.add(s)); }
 }, 10 * 60 * 1000); /* v234: limpiar cachés de géneros cada 10 min + v235 Cuevana */
@@ -9154,17 +9193,27 @@ async function sondaCaricaturas() {
 
 async function buscarEnSitios(q) {
   const nq = normalizarTxt(q);
-  const [cuevana, cuevanaMov, latanime, animeflv, d23Anime, pelisxd, cari, cineCalidad, catalogo, movieCosecha] = await Promise.all([
-    buscarCuevana(q).catch(() => []),
-    buscarCuevanaMov(q).catch(() => []), /* v235: cuevana.mov — 8k películas latinas */
-    buscarLatanime(q).catch(() => []),
-    buscarAnimeflv(q).catch(() => []), /* v97 */
-    buscarAnimeD23(q).catch(() => []), /* v286: AnimeD23 (169 títulos únicos, portadas IMDb locales) */
-    buscarPelisxd(q).catch(() => []), /* v98: el catálogo grande de pelis */
-    buscarMiscaricaturas(q).catch(() => []), /* v102: caricaturas nick/CN */
-    buscarCineCalidad(q).catch(() => []), /* v236.7: CineCalidad (pelis + series) */
-    catalogoLocal().catch(() => []), /* v121 */
+  /* v291: cada fuente va con TOPE DURO de 12 s y las novelas entran al mismo
+   * Promise.all (antes se esperaban en fila después). Si una fuente se cuelga,
+   * el buscador entrega el resto en ≤12 s en vez de 25-60 s. */
+  const LIM_BUSCAR = 12000;
+  const conLimite = (p, nombre) => Promise.race([
+    p,
+    new Promise((r) => setTimeout(() => { console.warn('[buscar] ' + nombre + ' pasó de ' + (LIM_BUSCAR / 1000) + 's — seguimos sin esa fuente'); r([]); }, LIM_BUSCAR)),
+  ]);
+  const [cuevana, cuevanaMov, latanime, animeflv, d23Anime, pelisxd, cari, cineCalidad, catalogo, movieCosecha, novelas, nv2] = await Promise.all([
+    conLimite(buscarCuevana(q).catch(() => []), 'cuevana'),
+    conLimite(buscarCuevanaMov(q).catch(() => []), 'cuevana.mov'), /* v235: cuevana.mov — 8k películas latinas */
+    conLimite(buscarLatanime(q).catch(() => []), 'latanime'),
+    conLimite(buscarAnimeflv(q).catch(() => []), 'animeflv'), /* v97 */
+    conLimite(buscarAnimeD23(q).catch(() => []), 'animed23'), /* v286: AnimeD23 (169 títulos únicos, portadas IMDb locales) */
+    conLimite(buscarPelisxd(q).catch(() => []), 'pelisxd'), /* v98: el catálogo grande de pelis */
+    conLimite(buscarMiscaricaturas(q).catch(() => []), 'caricaturas'), /* v102: caricaturas nick/CN */
+    conLimite(buscarCineCalidad(q).catch(() => []), 'cinecalidad'), /* v236.7: CineCalidad (pelis + series) */
+    conLimite(catalogoLocal().catch(() => []), 'catalogo'), /* v121 */
     Promise.resolve(buscarMovieCosecha(q)), /* v228: catálogo cosechado 37k */
+    NOVELAS_EXTERNAS_ON ? conLimite(buscarNovelas(q).catch(() => []), 'novelas') : Promise.resolve([]), /* v206 — v208: ocultas */
+    NOVELAS_EXTERNAS_ON ? conLimite(nv2Buscar(q).catch(() => []), 'novelas2') : Promise.resolve([]), /* v206.2 — v208: ocultas */
   ]);
   /* v121: Cartoons (Lacartoons) entra a la búsqueda — se filtra LOCAL del
    * catálogo. Todo se puntúa por parecido y queda en UNA sola lista
@@ -9190,8 +9239,8 @@ async function buscarEnSitios(q) {
     ...puntuar(d23Anime), /* v286 */
     ...puntuar(cari),
     ...puntuar(cineCalidad), /* v236.7: CineCalidad pelis + series */
-    ...(NOVELAS_EXTERNAS_ON ? puntuar(await buscarNovelas(q).catch(() => [])) : []), /* v206 — v208: ocultas */
-    ...(NOVELAS_EXTERNAS_ON ? puntuar(await nv2Buscar(q).catch(() => [])) : []), /* v206.2 — v208: ocultas */
+    ...puntuar(novelas), /* v291: ahora viene del Promise.all con tope */
+    ...puntuar(nv2), /* v291: igual */
     ...puntuar(movieCosecha), /* v228: 37k títulos cosechados */
     ...puntuar(catalogo.filter((x) => x.site !== 'Cartoons')),
   ];
@@ -13302,6 +13351,10 @@ async function estrenosMezclados(){
         version: UI_VERSION,
         encendidoHace: Math.floor(process.uptime()),
         memoriaMb: Math.round(mem.rss / 1048576),
+        heapMb: Math.round(mem.heapUsed / 1048576), /* v291 */
+        heapLimiteMb: Math.round(require('v8').getHeapStatistics().heap_size_limit / 1048576), /* v291 */
+        procesos: procResumen(), /* v291: chrome/ffmpeg/node — cuántos y cuánta RAM */
+        serieCache: serieCache.size, /* v291 */
         salasActivas: rooms.size,
         usuarios: users.size,
         llaveCdn: !!movieCdnKey(),

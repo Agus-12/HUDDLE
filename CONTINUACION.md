@@ -1,4 +1,58 @@
-## ESTADO ACTUAL — 22 SEP 2026 — v290.2: AUDITORÍA COMPLETA AnimeD23 (228 series) + fix del selector JWT
+## ESTADO ACTUAL — 23 SEP 2026 — v291: OPTIMIZACIÓN (memoria + velocidad del buscador)
+
+### Lo que pedía el usuario
+- Subidas de memoria hasta ~5,000 MB en Oracle.
+- El buscador a veces tarda "demasiado, demasiado".
+
+### Diagnóstico (verificado contra producción y código)
+**Buscador lento (25.6 s medido en frío en producción; cacheado 0.13 s):**
+1. `buscarCuevanaMov` hacía hasta 12 llamadas a la API de Cuevana **EN FILA**
+   (10 s de timeout c/u → hasta 120 s si Cuevana va lenta). ← causa principal
+2. `buscarEnSitios` esperaba a TODAS las fuentes sin tope global; la más lenta
+   mandaba. Y las novelas (buscarNovelas + nv2Buscar) se esperaban EN FILA después.
+
+**Memoria:**
+- Node arranca en ~150 MB RSS; el service trae `--max-old-space-size=768` → el heap
+  de node por sí solo no llega a 5 GB. El pico viene de los procesos EXTRA:
+- **Chrome persistente (`NAVEGADOR`)**: se abre y NUNCA se reinicia. Lo usan las intros
+  (cola de 2,740 rastreando en segundo plano), sondas y resoluciones → con los días
+  acumula GBs. ← causa principal
+- Cachés: `serieCache` no tenía tope (fichas de 1000+ episodios); las demás ya topadas.
+- Nota: parte del "uso de memoria" que reportan algunas herramientas es page-cache de
+  Linux (inofensiva, se libera sola).
+
+### Qué hace v291
+- `buscarCuevanaMov`: las 12 metas van **en paralelo**.
+- `buscarEnSitios`: cada fuente con **tope duro de 12 s** (`conLimite`); novelas dentro
+  del mismo Promise.all. El buscador NUNCA pasa de ~12-13 s.
+- **Higiene de Chrome**: cada 10 min se revisa; si lleva >2 h abierto y no hay salas,
+  espejos ni jobs de intro → se cierra (se reabre solo al próximo uso, ~1 s).
+- `serieCache`: tope 600 entradas (se tiran las más viejas, quedan 500).
+- `/api/estado` ahora trae: `heapMb`, `heapLimiteMb`, `serieCache` y `procesos`
+  (cuántos chrome/ffmpeg/node hay y cuánta RAM usa cada grupo) — diagnóstico sin SSH.
+- `UI_VERSION v291`.
+
+### Verificado (server local en sandbox, 23 SEP)
+- `/api/estado` nuevo responde con el desglose de procesos ✓
+- Búsqueda en frío desde el sandbox (varias fuentes lentas/bloqueadas aquí): cortó en
+  **12.02 s exactos** con resultados de las fuentes que sí respondieron ✓
+- `node --check` OK.
+
+### Pendiente tras despliegue
+- Usuario: `cd ~/huddle && bash actualizar.sh`.
+- Comprobar búsqueda en la app (debe sentirse más rápida y NUNCA trabarse).
+- Vigilar memoria unos días abriendo `http://129.80.212.92:3000/api/estado`: el campo
+  `procesos` dice cuánta RAM usa chrome/ffmpeg/node. Si chrome.rssMb vuelve a crecer
+  de más, la higiene lo recorta en cuanto quede ocioso.
+
+### Archivos tocados
+- `server.js`: conLimite + Promise.all de búsqueda, cuevanaMeta en paralelo, higiene
+  de Chrome, tope serieCache, procResumen + campos nuevos en /api/estado, UI_VERSION.
+- `CONTINUACION.md` (esta nota).
+
+---
+
+## ESTADO ANTERIOR — 22 SEP 2026 — v290.2: AUDITORÍA COMPLETA AnimeD23 (228 series) + fix del selector JWT
 
 ### Lo que pedía el usuario
 - Tras arreglar BAKI-DOU (v290): auditar TODAS las series de AnimeD23 para que no vuelva
