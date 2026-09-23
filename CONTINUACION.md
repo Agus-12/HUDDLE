@@ -1,3 +1,28 @@
+## ESTADO ACTUAL — 23 SEP 2026 — v303/v304: ETIQUETA SINCERA + RASTREO CON INTERRUPTOR
+
+### v303
+- Resultó que los sed de UI_VERSION de v300-v302 fallaban en silencio: GitHub traía
+  TODO el código (medidor de flujo, SIGTERM limpio, botón, caja negra) pero la
+  etiqueta decía v301. v303 pone la etiqueta correcta con edit_file verificado.
+
+### v304 — el atoro definitivo
+- Forense: caja negra latía hasta uptime=70 s; al imprimir
+  "[intro-crawl] rastreando (3937/6676) kakegurui…" (t+75 s) el proceso se trababa en
+  algo síncrono del rastreo: CPU 69 %, event loop congelado, ni SIGTERM entraba →
+  cada stop de systemd = 90 s + SIGKILL. Con el detector apagado el rastreo era
+  trabajo inútil igualmente.
+- `crawlTick` retorna al instante si INTRO_AUTO_ON es falso; el rastreo de 6 676
+  series solo camina con el botón ON del panel.
+- Verificado local: 95 s sin un solo "rastreando".
+
+### Pendiente
+- Usuario: actualizar.sh + prueba de 20 min sin tocar; encendidoHace > 1200.
+
+### Archivos
+- `server.js` (guard en crawlTick + UI_VERSION v304).
+
+---
+
 ## ESTADO ACTUAL — 23 SEP 2026 — v302: SIGTERM LIMPIO — el restart ya no se atora
 
 ### Forense definitivo (cajanegra + journal del usuario en v300)
