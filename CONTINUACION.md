@@ -1,4 +1,35 @@
-## ESTADO ACTUAL — 23 SEP 2026 — v293: SONDAS — limpieza, realidad y observabilidad
+## ESTADO ACTUAL — 23 SEP 2026 — v294: PANEL — satélite con salud de sondas
+
+### Lo que pedía el usuario
+- Botón de satélite junto a la campanita del panel que muestre el estado de las sondas.
+- Confirmación de que las sondas ya hacen todo el trabajo correcto.
+
+### Qué hace v294
+- `public/panel.html`: botón satélite (SVG dish, sin emojis) a la izquierda de la campana.
+  Abre panel flotante con la salud de cada sonda: punto verde (corrió OK) / rojo (falló) /
+  gris (aún no corre), «hace cuánto» corrió, duración en s y error si lo hay. Badge rojo
+  en el satélite si alguna sonda está fallando. Se refresca solo cada 5 s con el resto del
+  panel (`tic()`); consume `/api/sondas` (v293).
+- `UI_VERSION v294`.
+
+### Verificado (server local, 23 SEP)
+- /panel.html sirve con el botón (200, cookie huddle_admin) ✓
+- /api/sondas: 14 sondas registradas, las rápidas ya OK; novelas* en 0-1 ms (guard) ✓
+
+### Confirmación para el usuario
+Sí: tras la v293 las sondas hacen el trabajo correcto — todas corren y avisan cuando algo
+muere/revive; las de la sección Novelas (que ya no existe) fueron apagadas. El satélite
+sirve justamente para comprobarlo de un vistazo en cualquier momento.
+
+### Pendiente tras despliegue
+- Usuario: `cd ~/huddle && bash actualizar.sh`; abrir su panel y probar el satélite.
+
+### Archivos tocados
+- `public/panel.html` (CSS + botón + panel + JS), `server.js` (UI_VERSION), `CONTINUACION.md`.
+
+---
+
+## ESTADO ANTERIOR — 23 SEP 2026 — v293: SONDAS — limpieza, realidad y observabilidad
 
 ### Lo que pedía el usuario
 - Panel seguía diciendo 228 AnimeD23 tras la auditoría («¿las sondas no perciben el cambio?»).
