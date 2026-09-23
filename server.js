@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v297'; // v297: serieCache con tope + vigilante de memoria — se acabaron los reinicios por gordura
+const UI_VERSION = 'v298'; // v298: detección de intros de una en una y con descargas ligeras — se acabó el reventar el heap en Oracle
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -3946,8 +3946,8 @@ async function descargarInicioEp(m3u8) {
        * índice (moov) AL FINAL: bajamos inicio + última porción y escribimos
        * un archivo CON HUECO (las posiciones cuadran) — ffmpeg encuentra el
        * moov y decodifica el principio, que es lo que importa */
-      const rH = await pedir(pl, 60000, 'bytes=0-36700160');
-      const rT = await pedir(pl, 30000, 'bytes=-8388608');
+      const rH = await pedir(pl, 60000, 'bytes=0-16777216'); /* v298: 16 MB de inicio (antes 35) — alcanza para el moov y el arranque */
+      const rT = await pedir(pl, 30000, 'bytes=-4194304'); /* v298: cola de 4 MB (antes 8) */
       if (!rH || !rT) return null;
       const cab = Buffer.from(await rH.arrayBuffer());
       const cola = Buffer.from(await rT.arrayBuffer());
@@ -4004,9 +4004,9 @@ async function descargarInicioEp(m3u8) {
       }
       console.log('[intro] bajando: ' + Math.round(100 * (i0 + lote.length) / segs.length) + '% (' + Math.round(bytes / 1e6) + 'MB, ' + Math.round(dseg) + 's de video)');
       if (fellas >= 6) break; /* el CDN se cayó: con lo que hay */
-      if (bytes > 30e6 || dseg >= 180) break; /* 3 min de video alcanzan de sobra */
+      if (bytes > 18e6 || dseg >= 120) break; /* v298: 18 MB / 2 min de video alcanzan (antes 30 MB / 3 min) */
     }
-    const buenoSeg = dseg >= 60 || bytes > 15e6; /* v187: por DURACIÓN — no por número de pedazos */
+    const buenoSeg = dseg >= 45 || bytes > 10e6; /* v298: umbral más ligero (antes 60 s / 15 MB) */
     if (!buenoSeg) return null;
     fs.writeFileSync(archivo, Buffer.concat(partes.filter(Boolean)));
     return archivo;
@@ -4103,7 +4103,19 @@ function dispararDeteccionIntro(urlStr, serieKeyFija) {
     }
   }).catch(() => {});
 }
+let INTRO_DETECTANDO = 0; /* v298: a lo más 1 detección a la vez */
 async function detectarIntroSerie(serieKey, urls) {
+  /* v298: cada detección mete decenas de MB de video en RAM. En Oracle (con
+   * fpcalc/ffmpeg instalados) varias corrían a la vez por el rastreo masivo y
+   * reventaban el heap de 512 MB: el proceso moría cada pocos minutos y
+   * «Encendido» quedaba siempre en 0/1m. Ahora: una a la vez y con tope. */
+  if (INTRO_DETECTANDO >= 1) return;
+  if (process.memoryUsage().heapUsed / 1048576 > 300) return; /* heap caliente: hoy no */
+  INTRO_DETECTANDO++;
+  try { return await detectarIntroSerieInterno(serieKey, urls); }
+  finally { INTRO_DETECTANDO--; }
+}
+async function detectarIntroSerieInterno(serieKey, urls) {
   /* v134: correr también cuando lo guardado es aprendido-a-mano (pudo salir de
    * un clic equivocado) — la huella de audio es la prueba fuerte; lo único que
    * NO se re-analiza es lo que ya vino de la huella misma */

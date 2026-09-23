@@ -1,3 +1,40 @@
+## ESTADO ACTUAL — 23 SEP 2026 — v298: EL REVENTÓN DE MEMORIA ERA LA DETECCIÓN DE INTROS
+
+### El síntoma (evidencia del usuario)
+«Encendido» siempre 0/1m aunque nadie toque nada; journalctl mostraba arranques que
+solo vivían unos minutos. `systemctl status`: heap limitado a 512 MB en su service.
+
+### Causa raíz encontrada
+En Oracle SÍ hay fpcalc+ffmpeg → la detección automática de intros corre: por cada
+serie rastreada, `detectarIntroSerie` baja el inicio de 2 episodios a RAM
+(descargarInicioEp: hasta 30-35 MB por episodio en HLS, 35+8 MB en mp4 directo) y el
+rastreo masivo lanzaba varias detecciones EN PARALELO (llamada sin await en el crawl).
+Pico de cientos de MB → heap 512 → V8 FATAL → systemd revive → ciclo. En el sandbox no
+se reproduce porque sin fpcalc la detección se apaga sola.
+
+### Qué hace v298
+- `INTRO_DETECTANDO`: máximo 1 detección a la vez; si ya hay una, las demás se saltan
+  (el rastreo la retomará después).
+- Guard de heap: con heapUsed > 300 MB no arranca ninguna detección.
+- Descargas más ligeras: mp4 directo 16+4 MB (antes 35+8); HLS corte en 18 MB / 120 s
+  (antes 30 MB / 180 s); umbral mínimo 45 s / 10 MB (antes 60/15). La detección sigue
+  funcionando igual de bien (la intro está en los primeros segundos).
+- `UI_VERSION v298`.
+
+### Verificado
+- node --check OK; arranque local limpio v298. (La bomba real solo existe con
+  fpcalc/ffmpeg instalados, o sea en Oracle; el límite de paralelismo es la cura.)
+
+### Pendiente tras despliegue
+- Usuario: `cd ~/huddle && bash actualizar.sh`. Tras esto, «Encendido» debe acumular
+  horas sin reiniciarse. (Su service usa 512 MB de heap; con v298 alcanza. Si un día
+  quisiera más: editar /etc/systemd/system/huddle.service a 768 y daemon-reload.)
+
+### Archivos tocados
+- `server.js` (semáforo INTRO_DETECTANDO + guard de heap + topes de descarga + UI_VERSION).
+
+---
+
 ## ESTADO ACTUAL — 23 SEP 2026 — v297: TOPE DE MEMORIA — se acabaron los reinicios por gordura
 
 ### Lo que pasaba (evidencia del usuario)
