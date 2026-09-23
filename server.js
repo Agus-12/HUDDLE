@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v304'; // v304: el rastreo de intros también espera al botón ON — ya no traba el arranque en Oracle
+const UI_VERSION = 'v305'; // v305: tarjeta y página de Rastreo de intros en el panel (reemplaza la tarjeta Ennovelas)
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -13637,6 +13637,26 @@ async function estrenosMezclados(){
     if (url.pathname === '/api/novelas-vix/sondas' && req.method === 'GET') {
       return json(res, 200, { ok:true, ennovelas:{sonda:ENN_SONDA, catalogo:(await ennCatalogo()).map(c=>({slug:c.slug,titulo:c.title,fuente:'ennovelas',extra:c.extra}))} });
     }
+    if (url.pathname === '/api/intros-panel' && req.method === 'GET') { /* v305: galería de intros aprendidas para el panel */
+      const out = [];
+      try {
+        for (const [k, v] of Object.entries(INTROS)) {
+          if (!v || typeof v.start !== 'number' || typeof v.end !== 'number') continue;
+          const p = k.indexOf(':');
+          const sitio = p > 0 ? k.slice(0, p) : '?';
+          const slug = p > 0 ? k.slice(p + 1) : k;
+          const ps = postersSeries.get(slug);
+          out.push({
+            key: k, sitio, slug,
+            titulo: slug.replace(/-/g, ' ').replace(/\b[a-z]/g, (c) => c.toUpperCase()).slice(0, 70),
+            poster: (ps && ps.poster) || '',
+            start: v.start, end: v.end, by: v.by || '?', at: v.at || 0,
+          });
+        }
+      } catch {}
+      out.sort((a, b) => (b.at || 0) - (a.at || 0));
+      return json(res, 200, { ok: true, on: INTRO_AUTO_ON, pendientes: (CRAWL && CRAWL.pend) ? CRAWL.pend.length : 0, total: out.length, intros: out.slice(0, 400) });
+    }
     if (url.pathname === '/api/intro-auto') { /* v301: interruptor del detector de intros */
       if (req.method === 'POST') {
         const b = await readBody(req);
@@ -13683,6 +13703,8 @@ async function estrenosMezclados(){
         version: UI_VERSION,
         encendidoHace: Math.floor(process.uptime()),
         introAuto: INTRO_AUTO_ON, /* v301 */
+        introAprendidas: (() => { let n = 0; try { for (const v of Object.values(INTROS)) if (v && typeof v.start === 'number') n++; } catch {} return n; })(), /* v305 */
+        introPendientes: (CRAWL && CRAWL.pend) ? CRAWL.pend.length : 0, /* v305 */
         memoriaMb: Math.round(mem.rss / 1048576),
         heapMb: Math.round(mem.heapUsed / 1048576), /* v291 */
         heapLimiteMb: Math.round(require('v8').getHeapStatistics().heap_size_limit / 1048576), /* v291 */

@@ -1,3 +1,33 @@
+## ESTADO ACTUAL — 23 SEP 2026 — v305: GALERÍA DE INTROS EN EL PANEL
+
+### Lo que pidió el usuario
+- Quitar la tarjeta Ennovelas (sin sentido ya) y poner ahí «Rastreo de intros» con
+  icono de rastreador, que abra un panel tipo Huddle con las intros aprendidas:
+  imagencita de la serie, nombre, y lo aprendido.
+- Pregunta: ¿la detección va más rápido ahora? Respuesta honesta: un poco (descargas
+  más chicas, v299) pero cada serie tarda ~1-2 min porque hay que ver de verdad el
+  inicio de 2 episodios; y ahora va de una en una y solo con el botón ON (estabilidad).
+- Aclaración incluida: hoy el aprendizaje es POR SERIE (compara los 2 primeros eps);
+  por temporada no existe todavía (siguiente paso si lo quiere).
+
+### Qué hace v305
+- server.js: `/api/intros-panel` (galería: key, sitio, slug, titulo, poster de
+  postersSeries, start/end, by auto|manual, at; orden reciente; tope 400) + contadores
+  `introAprendidas`/`introPendientes` en /api/estado.
+- panel.html: tarjeta «Rastreo de intros» (SVG radar, badge ON/OFF, aprendidas/en cola)
+  en lugar de la Ennovelas; página nueva pageIntros con buscador y grilla de pósters
+  (fallback a inicial si no hay póster), «salta Xs → Ys», badge AUTO/MANUAL.
+- `UI_VERSION v305`.
+
+### Verificado
+- /api/intros-panel OK (0 aprendidas local, 6679 en cola); /api/estado con contadores;
+  panel.html (con cookie) incluye pageIntros.
+
+### Archivos tocados
+- `server.js`, `public/panel.html`.
+
+---
+
 ## ESTADO ACTUAL — 23 SEP 2026 — v303/v304: ETIQUETA SINCERA + RASTREO CON INTERRUPTOR
 
 ### v303
