@@ -1,3 +1,32 @@
+## ESTADO ACTUAL — 23 SEP 2026 — v306: PANEL AMIGABLE
+
+### Lo que pidió el usuario
+- Tarjeta de intros con hover y «>» como la de Panel Huddle ✔ (clase audit-preview + chevron).
+- Pósters en la galería ✔ (fallback a serieCache si postersSeries no tiene).
+- Nombres claros en el satélite + descripciones ✔.
+- Quitar novelasVix/novelasEstrellas/novelas del satélite (descontinuadas) ✔.
+- Caricaturas en 3 sondas: Danimados, Lacartoons, MisCaricaturas ✔.
+- Tarjeta Huddle dentro de «Fuentes de video» con latido en vivo ✔ (abre pageHuddle).
+- Dudas respondidas: qué son Verificaciones / Barrido / revivir / laRevizar.
+- Por temporada: se anunció para v307.
+
+### Cambios
+- server.js: sondaRun separado (danimados/lacartoons/miscaricaturas) en arranque y ciclo 6 h;
+  /api/sondas con NOMBRES_SONDA (nombre+desc) y salto de novelas* si !NOVELAS_EXTERNAS_ON;
+  /api/intros-panel con póster fallback vía serieCache.
+- panel.html: cargarSondas pinta nombre+desc; descripciones en Verificaciones y Barrido;
+  tarjeta «Huddle — auditoría de fuentes» tras fuentesCards con hudSrcNote vivo;
+  tarjeta intros con audit-preview + chevron.
+- `UI_VERSION v306`.
+
+### Verificado local
+- /api/sondas: 12 sondas con nombres, novelas fuera, 3 caricaturas; panel con 8 coincidencias
+  de los elementos nuevos.
+
+### Archivos: server.js, public/panel.html, CONTINUACION.md.
+
+---
+
 ## ESTADO ACTUAL — 23 SEP 2026 — v305: GALERÍA DE INTROS EN EL PANEL
 
 ### Lo que pidió el usuario

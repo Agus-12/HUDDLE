@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v305'; // v305: tarjeta y página de Rastreo de intros en el panel (reemplaza la tarjeta Ennovelas)
+const UI_VERSION = 'v306'; // v306: panel amigable — nombres y descripciones de sondas, 3 sondas de caricaturas, tarjeta Huddle en fuentes, hover en intros
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -539,12 +539,12 @@ async function laRevizar() { /* apelaciones: ocultadas hace <7 días, una a una 
   } finally { laReviviendo = false; }
 }
 setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); /* v293: todo por sondaRun (estado en /api/sondas) */
-  sondaRun('laRevizar', laRevizar); sondaRun('revivir', revivirGeneral); sondaRun('pelisxd', sondaPelisxd); sondaRun('cuevana', sondaCuevana); sondaRun('cinecalidad', sondaCineCalidad); sondaRun('latanime', sondaLatanime); sondaRun('caricaturas', sondaCaricaturas); sondaRun('animeflv', sondaAnimeflv); sondaRun('novelas', sondaNovelas); sondaRun('animed23', sondaD23);
+  sondaRun('laRevizar', laRevizar); sondaRun('revivir', revivirGeneral); sondaRun('pelisxd', sondaPelisxd); sondaRun('cuevana', sondaCuevana); sondaRun('cinecalidad', sondaCineCalidad); sondaRun('latanime', sondaLatanime); sondaRun('danimados', sondaDanimados); sondaRun('lacartoons', sondaLacartoons); sondaRun('miscaricaturas', sondaMisc); sondaRun('animeflv', sondaAnimeflv); sondaRun('novelas', sondaNovelas); sondaRun('animed23', sondaD23); /* v306: caricaturas separada en sus 3 sondas */
   // v252 Huddle: si no hay auditoría activa, igual corre una pasada ligera 24/7 cada 6h
   if(!HUDDLE_AUDITORIA.activo) sondaRun('huddle', sondaHuddleGeneral);
 }, 90 * 1000); /* v287: + podredumbre de episodios */
 setTimeout(() => { sondaRun('epsPodredumbre', epsPodredumbre); }, 15 * 60 * 1000);
-setInterval(() => { sondaRun('laRevizar', laRevizar); sondaRun('revivir', revivirGeneral); sondaRun('pelisxd', sondaPelisxd); sondaRun('cuevana', sondaCuevana); sondaRun('cinecalidad', sondaCineCalidad); sondaRun('latanime', sondaLatanime); sondaRun('caricaturas', sondaCaricaturas); sondaRun('animeflv', sondaAnimeflv); sondaRun('novelas', sondaNovelas); sondaRun('animed23', sondaD23);
+setInterval(() => { sondaRun('laRevizar', laRevizar); sondaRun('revivir', revivirGeneral); sondaRun('pelisxd', sondaPelisxd); sondaRun('cuevana', sondaCuevana); sondaRun('cinecalidad', sondaCineCalidad); sondaRun('latanime', sondaLatanime); sondaRun('danimados', sondaDanimados); sondaRun('lacartoons', sondaLacartoons); sondaRun('miscaricaturas', sondaMisc); sondaRun('animeflv', sondaAnimeflv); /* v306 */ sondaRun('novelas', sondaNovelas); sondaRun('animed23', sondaD23);
   if(!HUDDLE_AUDITORIA.activo) sondaRun('huddle', sondaHuddleGeneral);
 }, 6 * 3600 * 1000); /* v287: el ciclo de 6h también corre la podredumbre de episodios */
 setInterval(() => { sondaRun('epsPodredumbre', epsPodredumbre); }, 6 * 3600 * 1000);
@@ -13646,10 +13646,11 @@ async function estrenosMezclados(){
           const sitio = p > 0 ? k.slice(0, p) : '?';
           const slug = p > 0 ? k.slice(p + 1) : k;
           const ps = postersSeries.get(slug);
+          const sc = ps ? null : (serieCache.get(k) || serieCache.get('latanime:' + slug) || serieCache.get('anime:' + slug) || serieCache.get('d23:' + slug));
           out.push({
             key: k, sitio, slug,
             titulo: slug.replace(/-/g, ' ').replace(/\b[a-z]/g, (c) => c.toUpperCase()).slice(0, 70),
-            poster: (ps && ps.poster) || '',
+            poster: (ps && ps.poster) || (sc && sc.d && sc.d.poster) || '',
             start: v.start, end: v.end, by: v.by || '?', at: v.at || 0,
           });
         }
@@ -13668,8 +13669,29 @@ async function estrenosMezclados(){
     }
     if (url.pathname === '/api/sondas') { /* v293: salud de cada sonda + últimos eventos — para el panel */
       const ahora = Date.now();
+      /* v306: nombres amigables + qué hace cada sonda, para el satélite del panel */
+      const NOMBRES_SONDA = {
+        pelisxd: ['PelisXD', 'pelis de PelisXD: nuevas, vivas y muertas'],
+        cuevana: ['Cuevana', 'pelis de Cuevana.mov con servidor'],
+        cinecalidad: ['CineCalidad', 'pelis y series de CineCalidad'],
+        latanime: ['Latanime', 'series de Latanime (mp4upload)'],
+        animeflv: ['AnimeFLV', 'series de AnimeFLV'],
+        animed23: ['AnimeD23', 'series de AnimeD23 con reproductor'],
+        ennovelas: ['Ennovelas', 'capítulos y portadas de Ennovelas'],
+        danimados: ['Danimados', 'caricaturas de Danimados'],
+        lacartoons: ['Lacartoons', 'caricaturas de Lacartoons'],
+        miscaricaturas: ['MisCaricaturas', 'caricaturas de MisCaricaturas'],
+        laRevizar: ['Revivir Latanime', 'revisa series ocultadas de Latanime por si revivieron'],
+        revivir: ['Revivir ocultas', 'revisa títulos ocultos de todas las fuentes y los revive'],
+        huddle: ['Auditoría Huddle', 'sonda maestra mientras haya auditoría activa'],
+        epsPodredumbre: ['Podredumbre de eps', 'oculta capítulos muertos sin esperar clicks'],
+      };
       const sondas = {};
-      for (const [k, v] of Object.entries(SONDAS_STATE)) sondas[k] = { veces: v.veces, haceSeg: v.ultima ? Math.round((ahora - v.ultima) / 1000) : null, ms: v.ms, ok: v.ok, err: v.err || undefined };
+      for (const [k, v] of Object.entries(SONDAS_STATE)) {
+        if (!NOVELAS_EXTERNAS_ON && (k === 'novelas' || k === 'novelasVix' || k === 'novelasEstrellas')) continue; /* v306: descontinuadas, fuera del satélite */
+        const nn = NOMBRES_SONDA[k];
+        sondas[k] = { veces: v.veces, haceSeg: v.ultima ? Math.round((ahora - v.ultima) / 1000) : null, ms: v.ms, ok: v.ok, err: v.err || undefined, nombre: nn ? nn[0] : k, desc: nn ? nn[1] : '' };
+      }
       return json(res, 200, {
         ok: true, novelasExternas: NOVELAS_EXTERNAS_ON,
         sondas,
