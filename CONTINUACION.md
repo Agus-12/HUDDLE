@@ -1,3 +1,28 @@
+## ESTADO ACTUAL — 23 SEP 2026 — v310: LIMPIEZA DE /tmp (26 GB de huérfanos)
+
+### Hallazgo del usuario
+- /tmp = 26 GB en Oracle; 685 archivos intro-*.ts huérfanos (pedazos de video de
+  detecciones de intros interrumpidas por los SIGKILL/SIGABRT — el finally de
+  limpieza no corre si el proceso muere).
+- Fuga extra detectada: detectarIntroSerieInterno devolvía sin borrar f0 cuando
+  f1 fallaba (!f0 || !f1 → f0 huérfano).
+
+### Fix v310
+- introTmpBarrer(edadMs): barre intro-*.ts viejos; al arranque (>30 min) y cada hora (>3 h).
+- Rama !f0||!f1 ahora hace unlink de lo que exista.
+- descargarInicioEp solo escribe archivo en éxito (verificado), así que la única
+  fuente de basura eran las muertes a mitad de trabajo.
+
+### Verificado local
+- touch de 2 dummy viejos + 1 nuevo → arranque → barredora borró 2, dejó 1 ✔.
+
+### Pendiente (siguiente versión)
+- Aprendizaje de intros POR TEMPORADA. Riendas intactas.
+
+### Archivos: server.js, CONTINUACION.md.
+
+---
+
 ## ESTADO ACTUAL — 23 SEP 2026 — v309: FIX SIGABRT AL ENCENDER INTROS
 
 ### El incidente (confirmado con journalctl de Oracle)

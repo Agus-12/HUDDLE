@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v309'; // v309: sondas escalonadas + rienda de memoria en el rastreo de intros (fix SIGABRT al encender)
+const UI_VERSION = 'v310'; // v310: barredora de intro-*.ts huérfanos en /tmp + fix de fuga cuando falla el ep2
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -4152,6 +4152,25 @@ let INTRO_DETECTANDO = 0; /* v298: a lo más 1 detección a la vez */
 let INTRO_AUTO_ON = false;
 try { INTRO_AUTO_ON = !!((JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'intro-auto.json'), 'utf8')) || {}).on); } catch {}
 function introAutoGuardar() { try { fs.writeFileSync(path.join(DATA_DIR, 'intro-auto.json'), JSON.stringify({ on: INTRO_AUTO_ON })); } catch {} }
+/* v310: BARREDORA de intro-*.ts huérfanos — si el proceso muere a media
+ * detección (SIGKILL/ABRT) la limpieza del finally no alcanza a correr y los
+ * pedazos de video se quedan en /tmp: en Oracle juntaron 26 GB (685 archivos).
+ * Al arrancar no hay detección viva, así que se barre lo viejo; y cada hora
+ * se revisa de nuevo por si un matarazo deja más basura. */
+function introTmpBarrer(edadMs) {
+  let borrados = 0;
+  try {
+    const dir = os.tmpdir(); const ahora = Date.now();
+    for (const f of fs.readdirSync(dir)) {
+      if (!/^intro-[0-9a-f]+\.ts$/.test(f)) continue;
+      const p = path.join(dir, f);
+      try { if (ahora - fs.statSync(p).mtimeMs > edadMs) { fs.unlinkSync(p); borrados++; } } catch {}
+    }
+  } catch {}
+  if (borrados) console.log('[intro-tmp] v310: barredora quitó ' + borrados + ' archivos huérfanos de /tmp');
+}
+setTimeout(() => introTmpBarrer(30 * 60 * 1000), 20000); /* residuos del proceso anterior */
+setInterval(() => introTmpBarrer(3 * 3600 * 1000), 3600 * 1000); /* red de seguridad continua */
 async function detectarIntroSerie(serieKey, urls) {
   if (!INTRO_AUTO_ON) return; /* v301: apagado por interruptor */
   /* v298: cada detección mete decenas de MB de video en RAM. En Oracle (con
@@ -4200,7 +4219,7 @@ async function detectarIntroSerieInterno(serieKey, urls) {
     console.log('[intro] ep1 bajado: ' + (f0 ? 'ok' : 'FALLO'));
     const f1 = f0 && await descargarInicioEp(listos[1]);
     console.log('[intro] ep2 bajado: ' + (f1 ? 'ok' : 'FALLO'));
-    if (!f0 || !f1) { penalizarIntro(serieKey, 15 * 60 * 1000); return console.log('[intro] descargas incompletas para ' + serieKey + ' — reintento en 15 min'); }
+    if (!f0 || !f1) { try { if (f0) fs.unlinkSync(f0); } catch {} try { if (f1) fs.unlinkSync(f1); } catch {} /* v310: sin huérfanos */ penalizarIntro(serieKey, 15 * 60 * 1000); return console.log('[intro] descargas incompletas para ' + serieKey + ' — reintento en 15 min'); }
     try {
         /* v184: VIDEO primero (robusto entre re-encodes), audio de respaldo */
       let guardado = false;
