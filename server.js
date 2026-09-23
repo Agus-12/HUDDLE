@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v299'; // v299: medidor de flujo en las descargas de intro — los CDNs que empujan el episodio completo ya no revientan el heap
+const UI_VERSION = 'v300'; // v300: el detector de intros espera 3 min tras el arranque + caja negra de memoria en data/cajanegra.log
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -1152,6 +1152,20 @@ setInterval(() => {
 }, 30000);
 process.on('exit', (c) => { try { console.log('[vida] proceso terminando, código ' + c + ', uptime ' + Math.floor(process.uptime()) + 's'); } catch {} });
 process.on('SIGTERM', () => { try { console.log('[vida] recibí SIGTERM (reinicio pedido por el sistema)'); } catch {} });
+
+/* v300: CAJA NEGRA — cada 10 s deja en data/cajanegra.log el latido del proceso
+ * (uptime, heap, rss, qué detectores/barridos activos). Si el proceso muere, el
+ * archivo conserva los últimos signos de vida y se puede leer sin cazar journals. */
+setInterval(() => {
+  try {
+    const m = process.memoryUsage();
+    fs.writeFileSync(path.join(DATA_DIR, 'cajanegra.log'),
+      new Date().toISOString() + ' uptime=' + Math.floor(process.uptime()) +
+      's heap=' + Math.round(m.heapUsed / 1048576) + 'MB rss=' + Math.round(m.rss / 1048576) +
+      'MB detectores=' + INTRO_DETECTANDO + ' barridoHechos=' + BARRIDO.hechos +
+      ' verifCola=' + VERIF_COLA.size + '\n');
+  } catch {}
+}, 10000);
 
 /* v287: PODREDUMBRE DE EPISODIOS — los capítulos muertos salen solos de la
  * temporada, sin esperar a que el usuario los pique 3 veces. Solo cuenta

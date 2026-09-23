@@ -1,3 +1,31 @@
+## ESTADO ACTUAL — 23 SEP 2026 — v300: DETECTOR ESPERA AL ARRANQUE + CAJA NEGRA
+
+### Seguía muriendo a los ~96 s (journal del usuario con v298/v299 sin confirmar deploy)
+La muerte SIEMPRE cae en la ventana t+75..96 s: arranque (catálogos CineCalidad,
+sitemaps, pósters IMDb) + 1er ciclo de sondas + detector de intros bajando video,
+TODO encimado. Aunque cada descarga ya tiene medidor (v299), la suma de todo en esa
+ventana reventaba el heap de 512.
+
+### Qué hace v300
+- `detectarIntroSerie` NO arranca durante los primeros 180 s de vida del proceso
+  (el arranque tiene prioridad; el detector toma su turno después).
+- CAJA NEGRA: cada 10 s escribe data/cajanegra.log con uptime/heap/rss/detectores/
+  barrido/verifCola. Si muere, el archivo queda con los últimos signos de vida:
+  `cat ~/huddle/data/cajanegra.log` da el forense sin journalctl.
+- `UI_VERSION v300`.
+
+### Verificado
+- Arranque local: caja negra escribe (uptime=20s heap=15MB rss=82MB detectores=0).
+
+### Pendiente tras despliegue
+- Usuario: `cd ~/huddle && bash actualizar.sh`.
+- Si volviera a morir: pegar `cat ~/huddle/data/cajanegra.log` + `journalctl -u huddle -n 60`.
+
+### Archivos tocados
+- `server.js` (guard uptime<180 en detectarIntroSerie + intervalo caja negra + UI_VERSION).
+
+---
+
 ## ESTADO ACTUAL — 23 SEP 2026 — v299: MEDIDOR DE FLUJO — la causa REAL de las muertes
 
 ### Evidencia definitiva (journal del usuario)
