@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v303'; // v303: etiqueta sincera — el código ya traía medidor de flujo, SIGTERM limpio, botón del detector y caja negra; esta versión por fin lo dice
+const UI_VERSION = 'v304'; // v304: el rastreo de intros también espera al botón ON — ya no traba el arranque en Oracle
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -13866,6 +13866,10 @@ async function crawlItemUrl(it) {
 }
 
 async function crawlTick() {
+  if (!INTRO_AUTO_ON) return; /* v304: con el detector apagado, el rastreo de 6 676
+    series es trabajo al cohete — y en Oracle se colgaba justo ahí a los ~75 s de
+    cada arranque, trabando el ciclo de eventos (por eso ni el SIGTERM entraba).
+    El rastreo solo camina cuando el usuario enciende el detector en el panel. */
   if (crawlOcupado || !CRAWL.lista || !CRAWL.pend.length) return;
   if (rooms.size > 0 || Date.now() - crawlUltimaActividad < 60000) return; /* nadie viendo */
   crawlOcupado = true;
