@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v306'; // v306: panel amigable — nombres y descripciones de sondas, 3 sondas de caricaturas, tarjeta Huddle en fuentes, hover en intros
+const UI_VERSION = 'v307'; // v307: tarjeta Sonda Huddle con % pelis/series + veredictos, satélites por fuente
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -13669,21 +13669,22 @@ async function estrenosMezclados(){
     }
     if (url.pathname === '/api/sondas') { /* v293: salud de cada sonda + últimos eventos — para el panel */
       const ahora = Date.now();
-      /* v306: nombres amigables + qué hace cada sonda, para el satélite del panel */
+      /* v307: cada sonda vigila TODA su página: nuevas, vivas, muertas y revive ocultas */
+      const VIGILA = 'vigila toda su página: nuevas, vivas, muertas · revive las ocultas';
       const NOMBRES_SONDA = {
-        pelisxd: ['PelisXD', 'pelis de PelisXD: nuevas, vivas y muertas'],
-        cuevana: ['Cuevana', 'pelis de Cuevana.mov con servidor'],
-        cinecalidad: ['CineCalidad', 'pelis y series de CineCalidad'],
-        latanime: ['Latanime', 'series de Latanime (mp4upload)'],
-        animeflv: ['AnimeFLV', 'series de AnimeFLV'],
-        animed23: ['AnimeD23', 'series de AnimeD23 con reproductor'],
-        ennovelas: ['Ennovelas', 'capítulos y portadas de Ennovelas'],
-        danimados: ['Danimados', 'caricaturas de Danimados'],
-        lacartoons: ['Lacartoons', 'caricaturas de Lacartoons'],
-        miscaricaturas: ['MisCaricaturas', 'caricaturas de MisCaricaturas'],
-        laRevizar: ['Revivir Latanime', 'revisa series ocultadas de Latanime por si revivieron'],
-        revivir: ['Revivir ocultas', 'revisa títulos ocultos de todas las fuentes y los revive'],
-        huddle: ['Auditoría Huddle', 'sonda maestra mientras haya auditoría activa'],
+        pelisxd: ['PelisXD', VIGILA],
+        cuevana: ['Cuevana', VIGILA],
+        cinecalidad: ['CineCalidad', VIGILA],
+        latanime: ['Latanime', VIGILA],
+        animeflv: ['AnimeFLV', VIGILA],
+        animed23: ['AnimeD23', VIGILA],
+        danimados: ['Danimados', VIGILA],
+        lacartoons: ['Lacartoons', VIGILA],
+        miscaricaturas: ['MisCaricaturas', VIGILA],
+        ennovelas: ['Ennovelas', 'capítulos y portadas: vivas y muertas · solo gratis'],
+        laRevizar: ['Latanime — revive ocultas', 'va con la sonda Latanime: repasa series ocultadas por si ya revivieron'],
+        revivir: ['Revivir todas las fuentes', 'repasa títulos ocultos de todo Huddle y los revive si ya responden'],
+        huddle: ['Sonda Huddle', 'la única que revisa Huddle mismo: sus series y películas, si mueren o reviven'],
         epsPodredumbre: ['Podredumbre de eps', 'oculta capítulos muertos sin esperar clicks'],
       };
       const sondas = {};

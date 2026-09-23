@@ -1,3 +1,34 @@
+## ESTADO ACTUAL — 23 SEP 2026 — v307: TARJETA SONDA HUDDLE + SATÉLITES POR FUENTE
+
+### Lo que pidió el usuario
+- Tarjeta Huddle como una fuente más: % revisado de películas y series, con veredictos
+  vivos/muertos con logos ✔ (hudPctBar/hudPelisPct/hudSeriesPct/hudChecks/hudColaChip/hudVeredictos).
+- Satélite por fuente a la derecha de cada tarjeta: parpadea verde encendida, roja colapsada,
+  blanco apagada ✔ (satIcon-<fuente>, CSS .sat-ico/.sat-on/@keyframes satblink).
+- Confirmar que todas las sondas vigilan nuevas/vivas/muertas/revivir ✔ (descripción VIGILA).
+- «Revivir Latanime» renombrada a «Latanime — revive ocultas» (va con la sonda Latanime) ✔.
+- «revivir» renombrada a «Revivir todas las fuentes» ✔.
+
+### Cambios
+- server.js: NOMBRES_SONDA v307 con VIGILA; huddle = «la única que revisa Huddle mismo».
+  UI_VERSION v307 (editada vía python, verificada con grep).
+- panel.html: renderFuentes agrega satIcon por fuente; cargarSondas pinta satélites
+  (verde/rojo/blanco según ok/err/veces), % pelis vs series del barrido y veredictos
+  recientes vía /api/sonda-log?limit=6 con logo de cada fuente (throttle cada 3 tics).
+
+### Verificado local
+- /api/sondas a los 100 s: descripciones nuevas correctas en pelisxd/latanime/huddle/
+  laRevizar/revivir/danimados; barrido.totales = 11 339 títulos; panel con 8 coincidencias
+  de los nuevos ids; /api/sonda-log devuelve items reales.
+
+### Pendiente (siguiente versión)
+- Aprendizaje de intros POR TEMPORADA (comparar primer cap de cada temporada; igual → reutiliza,
+  distinto → aprende nuevo). Mantener riendas: una a la vez, medidores, ON/OFF.
+
+### Archivos: server.js, public/panel.html, CONTINUACION.md.
+
+---
+
 ## ESTADO ACTUAL — 23 SEP 2026 — v306: PANEL AMIGABLE
 
 ### Lo que pidió el usuario

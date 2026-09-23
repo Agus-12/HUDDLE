@@ -102,6 +102,11 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
 .badge-pause{background:#451a03;color:#f59e0b;border:1px solid #7c2d12;padding:5px 11px;border-radius:99px;font-size:11px;font-weight:800;letter-spacing:.6px}
 .live-dot{width:7px;height:7px;border-radius:50%;background:#22c55e;box-shadow:0 0 8px #22c55e;animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.55;transform:scale(.92)}}
+/* v307: satélite por fuente — parpadea verde encendida, roja colapsada, blanco apagada */
+.sat-ico{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px}
+.sat-ico svg{display:block}
+.sat-on svg{animation:satblink 1.6s ease-in-out infinite}
+@keyframes satblink{0%,100%{opacity:1;filter:drop-shadow(0 0 4px currentColor)}50%{opacity:.3;filter:none}}
 .stat-row{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
 .stat-mini{background:#0d0b14;border:1px solid #2a2338;border-radius:10px;padding:7px 10px;min-width:72px;flex:1}
 .stat-mini .k{font-size:10px;color:#9d93b5;text-transform:uppercase;letter-spacing:.5px}
@@ -221,7 +226,7 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
   <div class="sec-title">Fuentes de video <span class="line"></span></div>
   <div id="fuentesCards"></div>
 
-  <!-- v306: Huddle como fuente auditable, con su latido en vivo -->
+  <!-- v307: tarjeta Huddle — una fuente más: % revisado de pelis y series, veredictos con logos -->
   <div class="fcard audit-preview" onclick="showPage('Huddle')" style="margin-top:12px">
     <div class="fhead" style="position:relative;z-index:1">
       <div style="position:absolute;right:14px;top:14px;color:#9d93b5;z-index:1"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
@@ -230,14 +235,22 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
         </div>
         <div>
-          <div style="font-size:15px;font-weight:800;color:#ede9fe;display:flex;align-items:center;gap:8px">Huddle — auditoría de fuentes <span class="badge-idle" style="font-size:10px;padding:3px 8px">24/7</span></div>
-          <div style="font-size:11px;color:#a99bc9;margin-top:2px">revisa todas las fuentes, oculta lo muerto, revive lo curado · toca para ver el registro completo</div>
+          <div style="font-size:15px;font-weight:800;color:#ede9fe;display:flex;align-items:center;gap:8px">Sonda Huddle <span class="badge-idle" style="font-size:10px;padding:3px 8px">24/7</span></div>
+          <div style="font-size:11px;color:#a99bc9;margin-top:2px">la única que revisa Huddle mismo: sus series y películas, si mueren o reviven</div>
         </div>
       </div>
     </div>
-    <div style="font-size:10px;color:#7c6fa0;margin-top:10px;position:relative;z-index:1;display:flex;gap:6px;align-items:center">
-      <span class="live-dot" style="display:inline-block"></span>
-      <span id="hudSrcNote">barrido en curso…</span>
+    <div style="position:relative;z-index:1;margin-top:12px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:#c9bfe0;margin-bottom:5px">
+        <span id="hudPctTxt">revisando catálogo…</span><span id="hudChecks" style="color:#9d93b5"></span>
+      </div>
+      <div class="barra"><i id="hudPctBar" style="width:0%;background:linear-gradient(90deg,#7c3aed,#38e08a)"></i></div>
+      <div class="chips" style="margin-top:10px">
+        <span class="chip">🎬 Películas <b id="hudPelisPct">—</b></span>
+        <span class="chip">📺 Series <b id="hudSeriesPct">—</b></span>
+        <span class="chip warn" id="hudColaChip">0 en cola</span>
+      </div>
+      <div id="hudVeredictos" style="margin-top:10px;display:flex;flex-direction:column;gap:4px"></div>
     </div>
   </div>
 
@@ -504,9 +517,49 @@ function cargarSondas(){
     var pct=tAll?Math.round(pAll/tAll*100):0;
     html+='<div class="sonda-row"><span class="sonda-dot" style="background:#4f8ef7"></span>'
       +'<span class="sonda-name">Barrido del catálogo<div style="font-size:9px;color:#7c6fa0;font-weight:400;margin-top:1px">recorre TODO el catálogo poco a poco; oculta muertos y revive ocultos</div></span><span class="sonda-meta">'+pct+'% · '+(b.hechos||0)+' revisiones'+(b.vueltas?' · vueltas: '+b.vueltas:'')+'</span></div>';
-    /* v306: la tarjeta Huddle de fuentes muestra el último latido del barrido/auditoría */
-    var hb=document.getElementById('hudSrcNote');
-    if(hb) hb.textContent='barrido '+pct+'% · '+(b.hechos||0)+' revisiones · '+(v.enCola||0)+' verificaciones en cola';
+    /* v307: tarjeta Huddle completa — % pelis y series, revisiones, cola */
+    var PELIS_F=['pelisxd','cuevana','cinecalidad'],SERIES_F=['latanime','animeflv','animed23'];
+    function chkP(arr){var t=0,p=0;arr.forEach(function(fk){var ft=tot[fk]||0;t+=ft;p+=Math.min(b.pos&&b.pos[fk]||0,ft);});return t?Math.round(p*100/t):0;}
+    var pPct=chkP(PELIS_F),sPct=chkP(SERIES_F);
+    var hb=document.getElementById('hudPctBar');if(hb)hb.style.width=pct+'%';
+    var ht=document.getElementById('hudPctTxt');if(ht)ht.textContent=pct+'% del catálogo revisado';
+    var hc=document.getElementById('hudChecks');if(hc)hc.textContent=(b.hechos||0)+' revisiones';
+    var hp=document.getElementById('hudPelisPct');if(hp)hp.textContent=pPct+'%';
+    var hs=document.getElementById('hudSeriesPct');if(hs)hs.textContent=sPct+'%';
+    var hq=document.getElementById('hudColaChip');if(hq)hq.textContent=(v.enCola||0)+' en cola';
+    /* v307: satélite de cada fuente — parpadea verde encendida, roja colapsada, blanco apagada */
+    var SAT_SVG='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 10a8 8 0 0 0 10 10"/><path d="M4 14a4 4 0 0 0 6 6"/><circle cx="15" cy="9" r="2.5"/><path d="M17 7l4-4"/></svg>';
+    ['pelisxd','cuevana','cinecalidad','latanime','danimados','lacartoons','miscaricaturas','animeflv','ennovelas','animed23'].forEach(function(fk){
+      var el=document.getElementById('satIcon-'+fk);if(!el)return;
+      var st=d.sondas[fk];
+      var col='#e8e4f2',tip='sonda apagada o aún no corre',cls='';
+      if(st&&st.veces>0){ if(st.err||!st.ok){col='#ff5c7a';tip='sonda colapsada: '+(st.err||'error en la última corrida');} else {col='#38e08a';tip='sonda encendida · corrió '+fmtHace(st.haceSeg);cls=' sat-on';} }
+      el.className='sat-ico'+cls;el.style.color=col;el.title=tip;el.innerHTML=SAT_SVG;
+    });
+    /* v307: veredictos recientes con logo de cada fuente (murió / revivió / viva) */
+    if(!window._hudVTic)window._hudVTic=0;
+    if((window._hudVTic++)%3===0){
+      fetch('/api/sonda-log?limit=6').then(function(r){return r.json()}).then(function(lg){
+        var LOGOS={'PelisXD':'pelisxd.png','Cuevana':'cuevana.png','CineCalidad':'cinecalidad.png','Latanime':'latanime.png','AnimeFLV':'animeflv.png','AnimeD23':'animed23.png','Danimados':'danimados.png','Lacartoons':'lacartoons.png','MisCaricaturas':'caricaturas.png','Ennovelas':'novelas.png'};
+        var box=document.getElementById('hudVeredictos');if(!box)return;
+        var items=(lg.items||[]).slice(0,5);
+        if(!items.length){box.innerHTML='<div style="font-size:10px;color:#7c6fa0">aún sin veredictos recientes</div>';return;}
+        var vh='';
+        items.forEach(function(n){
+          var dead=n.tipo==='muerto',rev=n.tipo==='revivio';
+          var col=dead?'#ff5c7a':(rev?'#ffb020':'#38e08a');
+          var ico=dead?'M18 6L6 18M6 6l12 12':(rev?'M12 3v18M7 8l5-5 5 5':'M5 13l4 4L19 7');
+          var lg2=LOGOS[n.fuente];
+          vh+='<div style="display:flex;align-items:center;gap:6px;font-size:10px">'
+            +(lg2?'<img src="/sites/'+lg2+'" alt="" style="width:14px;height:14px;object-fit:contain;border-radius:3px" onerror="this.style.display=\'none\'">':'')
+            +'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="'+col+'" stroke-width="2.5" style="flex-shrink:0"><path d="'+ico+'"/></svg>'
+            +'<span style="color:'+col+';font-weight:600;flex-shrink:0">'+(dead?'murió':(rev?'revivió':'viva'))+'</span>'
+            +'<span style="color:#9d93b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+n.slug+'</span>'
+            +'<span style="color:#5f5678;margin-left:auto;flex-shrink:0">'+timeAgo(n.ts)+'</span></div>';
+        });
+        box.innerHTML=vh;
+      }).catch(function(){});
+    }
     document.getElementById('sondasList').innerHTML=html;
     var badge=document.getElementById('satBadge'),btn=document.getElementById('satBtn');
     if(malas>0){badge.textContent=malas;badge.style.display='';btn.classList.add('err');}
@@ -645,7 +698,8 @@ function renderFuentes(stats){
     html+='<div class="fcard" onclick="showFuente(\''+k+'\')">'
       +'<div class="fhead"><div style="display:flex;align-items:center;gap:10px">'+logo+'<div><div class="fname" style="color:'+c+'">'+s.nombre+'</div>'
       +'<div class="fsub">'+s.total+' total · '+s.ocultas+' ocultas</div></div></div>'
-      +'<div class="fcount" style="color:'+c+'">'+act+'</div></div>'
+      +'<div style="display:flex;align-items:center;gap:8px"><div class="fcount" style="color:'+c+'">'+act+'</div>'
+      +'<span class="sat-ico" id="satIcon-'+k+'" title="sonda"></span></div></div>'
       +'<div class="bar"><i style="width:'+pct+'%;background:'+c+'"></i></div></div>';
   }
   document.getElementById('fuentesCards').innerHTML=html;
