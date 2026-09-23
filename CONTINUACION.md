@@ -1,3 +1,27 @@
+## ESTADO ACTUAL — 23 SEP 2026 — v302: SIGTERM LIMPIO — el restart ya no se atora
+
+### Forense definitivo (cajanegra + journal del usuario en v300)
+cajanegra: uptime=10s heap=39MB rss=164MB → NO era OOM esta vez.
+journal: `State 'stop-sigterm' timed out. Killing.` + `code=killed, status=9/KILL` +
+`Failed with result 'timeout'` → ALGUIEN/ALGO ordena `systemctl restart` y el proceso
+no moría con SIGTERM porque el handler de v297 solo logueaba (¡bug mío!) → cada
+restart = 90 s atorado + SIGKILL + arranque nuevo → contador a 0.
+
+### Qué hace v302
+- Handlers SIGTERM/SIGINT: loguean y `process.exit(0)` al instante. Los restarts
+  externos ahora tardan <1 s en vez de 90 s + matanza.
+
+### Pendiente
+- Empujar v302; usuario actualiza.
+- CAZAR AL REINICIADOR EXTERNO: pedir al usuario `crontab -l; sudo crontab -l;
+  ls /etc/cron.d; ls ~` — el otro chat pudo dejar un watchdog/cron que reinicia
+  el servicio cada rato.
+
+### Archivos tocados
+- `server.js` (handlers de salida + UI_VERSION).
+
+---
+
 ## ESTADO ACTUAL — 23 SEP 2026 — v301: BOTÓN ON/OFF DEL DETECTOR DE OPENINGS
 
 ### Lo que pidió el usuario

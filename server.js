@@ -1151,7 +1151,11 @@ setInterval(() => {
   } catch {}
 }, 30000);
 process.on('exit', (c) => { try { console.log('[vida] proceso terminando, código ' + c + ', uptime ' + Math.floor(process.uptime()) + 's'); } catch {} });
-process.on('SIGTERM', () => { try { console.log('[vida] recibí SIGTERM (reinicio pedido por el sistema)'); } catch {} });
+/* v302: OJO — el handler de v297 solo logueaba y DEJABA VIVO al proceso: cada
+ * `systemctl restart` se atoraba 90 s ('stop-sigterm timed out') y terminaba en
+ * SIGKILL. Ahora salimos limpios al instante. */
+process.on('SIGTERM', () => { try { console.log('[vida] recibí SIGTERM — saliendo limpio'); } catch {} process.exit(0); });
+process.on('SIGINT', () => { try { console.log('[vida] recibí SIGINT — saliendo limpio'); } catch {} process.exit(0); });
 
 /* v300: CAJA NEGRA — cada 10 s deja en data/cajanegra.log el latido del proceso
  * (uptime, heap, rss, qué detectores/barridos activos). Si el proceso muere, el
