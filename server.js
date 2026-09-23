@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v292'; // v292: búsqueda Cuevana 100% local (catálogo CVM_CAT que enriquecen sonda+reproductor); v291: topes de búsqueda e higiene de Chrome
+const UI_VERSION = 'v293'; // v293: sondas — novelas externas apagadas (ya no existen), estado por sonda en /api/sondas, 8 fichas D23 vacías pre-ocultadas
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -538,15 +538,16 @@ async function laRevizar() { /* apelaciones: ocultadas hace <7 días, una a una 
     console.log('[podredumbre] revisión terminada: ' + vivas2 + ' revivieron de ' + cands.length);
   } finally { laReviviendo = false; }
 }
-setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); laRevizar().catch((e) => console.log("[podredumbre] ERROR:", String(e).slice(0,120))); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); sondaNovelas().catch(() => {}); sondaD23().catch(() => {}); 
+setTimeout(() => { console.log("[podredumbre] temporizador de arranque disparando..."); /* v293: todo por sondaRun (estado en /api/sondas) */
+  sondaRun('laRevizar', laRevizar); sondaRun('revivir', revivirGeneral); sondaRun('pelisxd', sondaPelisxd); sondaRun('cuevana', sondaCuevana); sondaRun('cinecalidad', sondaCineCalidad); sondaRun('latanime', sondaLatanime); sondaRun('caricaturas', sondaCaricaturas); sondaRun('animeflv', sondaAnimeflv); sondaRun('novelas', sondaNovelas); sondaRun('animed23', sondaD23);
   // v252 Huddle: si no hay auditoría activa, igual corre una pasada ligera 24/7 cada 6h
-  if(!HUDDLE_AUDITORIA.activo) sondaHuddleGeneral().catch(()=>{});
+  if(!HUDDLE_AUDITORIA.activo) sondaRun('huddle', sondaHuddleGeneral);
 }, 90 * 1000); /* v287: + podredumbre de episodios */
-setTimeout(() => { epsPodredumbre().catch(() => {}); }, 15 * 60 * 1000);
-setInterval(() => { laRevizar().catch(() => {}); revivirGeneral().catch(() => {}); sondaPelisxd().catch(() => {}); sondaCuevana().catch(() => {}); sondaCineCalidad().catch(() => {}); sondaLatanime().catch(() => {}); sondaCaricaturas().catch(() => {}); sondaAnimeflv().catch(() => {}); sondaNovelas().catch(() => {}); sondaD23().catch(() => {}); 
-  if(!HUDDLE_AUDITORIA.activo) sondaHuddleGeneral().catch(()=>{});
+setTimeout(() => { sondaRun('epsPodredumbre', epsPodredumbre); }, 15 * 60 * 1000);
+setInterval(() => { sondaRun('laRevizar', laRevizar); sondaRun('revivir', revivirGeneral); sondaRun('pelisxd', sondaPelisxd); sondaRun('cuevana', sondaCuevana); sondaRun('cinecalidad', sondaCineCalidad); sondaRun('latanime', sondaLatanime); sondaRun('caricaturas', sondaCaricaturas); sondaRun('animeflv', sondaAnimeflv); sondaRun('novelas', sondaNovelas); sondaRun('animed23', sondaD23);
+  if(!HUDDLE_AUDITORIA.activo) sondaRun('huddle', sondaHuddleGeneral);
 }, 6 * 3600 * 1000); /* v287: el ciclo de 6h también corre la podredumbre de episodios */
-setInterval(() => { epsPodredumbre().catch(() => {}); }, 6 * 3600 * 1000);
+setInterval(() => { sondaRun('epsPodredumbre', epsPodredumbre); }, 6 * 3600 * 1000);
 
 /* v234: SONDA PELISXD — revisa películas ocultas para ver si volvieron */
 /* v234: SONDA PELISXD COMPLETA — 3 frentes:
@@ -811,6 +812,18 @@ for (const s of CC_AUDIT_DEAD) if (!CC_OCULTAS.has(s)) CC_OCULTAS.add(s);
 const SONDALOG_FILE = path.join(DATA_DIR, 'sonda-log.json');
 const SONDALOG = []; /* {ts, fuente, tipo, slug, msg} — max 500 */
 const SONDALOG_MAX = 500;
+/* v293: estado de cada sonda (cuándo corrió, cuánto tardó, si falló) — visible
+ * en /api/sondas para saber de un vistazo cuáles trabajan y cuáles no. */
+const SONDAS_STATE = {};
+function sondaRun(nombre, fn) {
+  return Promise.resolve().then(async () => {
+    const st = SONDAS_STATE[nombre] || (SONDAS_STATE[nombre] = { veces: 0, ultima: 0, ms: 0, ok: true, err: '' });
+    const t0 = Date.now();
+    try { await fn(); st.ok = true; st.err = ''; }
+    catch (e) { st.ok = false; st.err = String(e.message || e).slice(0, 120); }
+    st.ultima = t0; st.ms = Date.now() - t0; st.veces++;
+  });
+}
 try { const _sl = JSON.parse(fs.readFileSync(SONDALOG_FILE, 'utf8')); if (Array.isArray(_sl)) SONDALOG.push(..._sl); } catch {} /* v240: persistir log */
 let sondaLogTimer = null;
 function sondaNotify(fuente, tipo, slug, msg) {
@@ -1169,6 +1182,7 @@ const VIX_SONDA = { at:0, estado:'idle', anvack:'', error:'', bettyOk:false, ros
 for(const _c of VIX_CATALOGO){ if(_c.slug==='betty-la-fea') VIX_PROGRESO.set(_c.slug,{pct:100, estado:'lista 335 caps — Ennovelas', msg:'OK', at:Date.now()}); else VIX_PROGRESO.set(_c.slug,{pct:0, estado:'encolado — va desencriptando', msg:'en cola', at:Date.now()}); }
 function vixTarjetas(){ return []; } // v279: VIX eliminado (no se muestra)
 async function sondaVixNovelas(){
+  if (!NOVELAS_EXTERNAS_ON) return; /* v293: sección novelas externa apagada — no gastar ni notificar */
   const t0=Date.now();
   try{
     VIX_SONDA.at=Date.now(); VIX_SONDA.estado='chequeando';
@@ -1201,8 +1215,8 @@ async function sondaVixNovelas(){
     console.log(`[sonda] vix-novelas (${el}s): betty=${bettyOk?'OK':'FAIL'} rosa=${rosaOk?'OK':'FAIL'} autocuras=${VIX_SONDA.autocuras}`);
   }catch(e){ VIX_SONDA.estado='error'; VIX_SONDA.error=String(e).slice(0,80); console.warn('[sonda] vix-novelas error', String(e).slice(0,60)); }
 }
-setTimeout(()=>{ sondaVixNovelas().catch(()=>{}); }, 25000);
-setInterval(()=>{ sondaVixNovelas().catch(()=>{}); }, 10*60*1000);
+setTimeout(()=>{ sondaRun('novelasVix', sondaVixNovelas); }, 25000);
+setInterval(()=>{ sondaRun('novelasVix', sondaVixNovelas); }, 10*60*1000);
 /* v278: LASESTRELLAS — fallback gratis de La Rosa (y Como dice) si VIX rota.
  * Televisa: capítulos gratis 43min, límite "Te quedan: 8 días", ~50 caps visibles.
  * Cada fuente con su SONDA separada; el panel muestra VIX / Ennovelas / LasEstrellas por separado. */
@@ -1215,6 +1229,7 @@ const ESTRELLAS_SONDA = { at:0, estado:'idle', error:'', rosaOk:false, dichoOk:f
 for(const _e of ESTRELLAS_CATALOGO){ ESTRELLAS_PROGRESO.set(_e.slug,{pct:0, estado:'encolado — chequeando LasEstrellas', msg:'en cola', at:Date.now()}); }
 function estrellasTarjetas(){ return []; } // v279: Estrellas eliminado
 async function sondaEstrellasNovelas(){
+  if (!NOVELAS_EXTERNAS_ON) return; /* v293: sección novelas externa apagada */
   const t0=Date.now();
   try{
     ESTRELLAS_SONDA.at=Date.now(); ESTRELLAS_SONDA.estado='chequeando';
@@ -1261,8 +1276,8 @@ async function sondaEstrellasNovelas(){
     console.log(`[sonda] estrellas-novelas (${el}s): rosa=${rosaOk?'OK':'FAIL'} dicho=${dichoOk?'OK':'FAIL'} caps=${caps} dias=${dias} autocuras=${ESTRELLAS_SONDA.autocuras}`);
   }catch(e){ ESTRELLAS_SONDA.estado='error'; ESTRELLAS_SONDA.error=String(e).slice(0,80); console.warn('[sonda] estrellas-novelas error', String(e).slice(0,60)); }
 }
-setTimeout(()=>{ sondaEstrellasNovelas().catch(()=>{}); }, 27000);
-setInterval(()=>{ sondaEstrellasNovelas().catch(()=>{}); }, 10*60*1000);
+setTimeout(()=>{ sondaRun('novelasEstrellas', sondaEstrellasNovelas); }, 27000);
+setInterval(()=>{ sondaRun('novelasEstrellas', sondaEstrellasNovelas); }, 10*60*1000);
 const FALLOS_NV = new Map();
 fallosCargar(FALLOS_NV, 'fallos-nv.json');
 function nvOcultar(slug) {
@@ -1393,6 +1408,7 @@ async function enpProbe(pref) {
 }
 /* v245: SONDA NOVELAS — 3+3 vivas, 4 muertas (vigila aunque las externas estén apagadas) */
 async function sondaNovelas() {
+  if (!NOVELAS_EXTERNAS_ON) return; /* v293: sección novelas externa apagada */
   try {
     const memMB = process.memoryUsage().heapUsed / 1024 / 1024;
     if (memMB > 350) { console.warn('[sonda] nv saltado — memoria alta: ' + memMB.toFixed(0) + 'MB'); return; }
@@ -2890,7 +2906,7 @@ async function sondaEnnovelas(){
     ENN_SONDA.visibles=ENN_VISTAS.size;ENN_SONDA.auditadas=ENN_VISTAS.size;ENN_SONDA.ocultas=ENN_OCULTAS.size;ENN_SONDA.episodiosOcultos=ENN_EPS_OCULTOS.size;ENN_SONDA.ultima=new Date().toISOString();ENN_SONDA.estado='vivo';ENN_STATS.total=ENN_SONDA.total;ENN_STATS.vistas=ENN_SONDA.auditadas;ENN_STATS.ocultas=ENN_SONDA.ocultas;console.log('[sonda] ennovelas: '+ENN_SONDA.visibles+' visibles / '+ENN_SONDA.ocultas+' ocultas; revisadas='+ENN_SONDA.revisadas);
   }catch(e){ENN_SONDA.estado='error';ENN_SONDA.error=String(e?.message||e).slice(0,160);console.warn('[sonda] ennovelas error',ENN_SONDA.error);}
 }
-setTimeout(()=>sondaEnnovelas().catch(()=>{}),95000);setInterval(()=>sondaEnnovelas().catch(()=>{}),10*60*1000);
+setTimeout(()=>sondaRun('ennovelas', sondaEnnovelas),95000);setInterval(()=>sondaRun('ennovelas', sondaEnnovelas),10*60*1000);
 async function ennCatalogoTrending(){
   try{const it=await ennCatalogo();return it.slice(0,24).map(x=>({title:x.title,url:x.url,img:x.img,site:x.site,extra:x.extra}));}
   catch{return [{title:'Yo Soy Betty, La Fea',url:ENN_BASE+'series/'+ENN_BETTY_SLUG+'/',img:ENN_BETTY_COVER,site:'Ennovelas',extra:'335 caps'}];}
@@ -6670,7 +6686,7 @@ function auditoriaIniciar(alcance){
   // Lanzar ciclo inmediato y luego cada 6h + intervalo corto 90s para auditoría activa
   setTimeout(()=> sondaHuddleGeneral().catch(()=>{}), 5000);
   if(HUDDLE_AUDITORIA._timer) clearInterval(HUDDLE_AUDITORIA._timer);
-  HUDDLE_AUDITORIA._timer = setInterval(()=> sondaHuddleGeneral().catch(()=>{}), 90*1000);
+  HUDDLE_AUDITORIA._timer = setInterval(()=> sondaRun('huddle', sondaHuddleGeneral), 90*1000);
 }
 function auditoriaPausar(){ if(HUDDLE_AUDITORIA.activo && !HUDDLE_AUDITORIA.pausado){ HUDDLE_AUDITORIA.pausado=true; HUDDLE_AUDITORIA.pausadoEn=Date.now(); auditoriaLog('Huddle','pausado','auditoria','Auditoría pausada'); auditoriaGuardarProgreso(); } }
 function auditoriaReanudar(){ if(HUDDLE_AUDITORIA.activo && HUDDLE_AUDITORIA.pausado){ HUDDLE_AUDITORIA.pausado=false; auditoriaLog('Huddle','reanudado','auditoria','Auditoría reanudada'); auditoriaGuardarProgreso(); setTimeout(()=> sondaHuddleGeneral().catch(()=>{}), 2000); } }
@@ -13393,6 +13409,16 @@ async function estrenosMezclados(){
     // v285: endpoint legacy sin VIX/Estrellas; conserva solo Ennovelas.
     if (url.pathname === '/api/novelas-vix/sondas' && req.method === 'GET') {
       return json(res, 200, { ok:true, ennovelas:{sonda:ENN_SONDA, catalogo:(await ennCatalogo()).map(c=>({slug:c.slug,titulo:c.title,fuente:'ennovelas',extra:c.extra}))} });
+    }
+    if (url.pathname === '/api/sondas') { /* v293: salud de cada sonda + últimos eventos — para el panel */
+      const ahora = Date.now();
+      const sondas = {};
+      for (const [k, v] of Object.entries(SONDAS_STATE)) sondas[k] = { veces: v.veces, haceSeg: v.ultima ? Math.round((ahora - v.ultima) / 1000) : null, ms: v.ms, ok: v.ok, err: v.err || undefined };
+      return json(res, 200, {
+        ok: true, novelasExternas: NOVELAS_EXTERNAS_ON,
+        sondas,
+        eventos: SONDALOG.slice(0, 60).map((e) => ({ ts: new Date(e.ts).toISOString(), fuente: e.fuente, tipo: e.tipo, slug: e.slug, msg: e.msg })),
+      });
     }
     if (url.pathname === '/api/estado') { /* v205.4: todo el estado en un JSON para el panel; v223: + cosecha; v227: + llave CDN */
       

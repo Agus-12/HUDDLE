@@ -1,4 +1,59 @@
-## ESTADO ACTUAL — 23 SEP 2026 — v292: BÚSQUEDA CUEVANA 100% LOCAL (catálogo)
+## ESTADO ACTUAL — 23 SEP 2026 — v293: SONDAS — limpieza, realidad y observabilidad
+
+### Lo que pedía el usuario
+- Panel seguía diciendo 228 AnimeD23 tras la auditoría («¿las sondas no perciben el cambio?»).
+- Siguen llegando notificaciones de sondas de Novelas aunque esa sección ya no existe.
+- Quiere saber si todas las sondas funcionan y si hay método más rápido.
+
+### Qué se encontró
+1. Las 8 fichas D23 sin capítulos (placeholders del sitio) NO se ocultaban solas hasta el
+   primer clic (v288) — por eso el panel seguía en 228. Ya pre-ocultadas en
+   public/d23-ocultas.txt → panel = 220. `sondaD23` las re-prueba (3 por ciclo) y las
+   revivirá sola si el sitio les sube capítulos.
+2. `NOVELAS_EXTERNAS_ON = false` (la sección novelas externa está apagada) PERO 3 sondas
+   seguían corriendo: `sondaNovelas` (ciclo 6 h) y `sondaVixNovelas` + `sondaEstrellasNovelas`
+   ¡cada 10 MINUTOS! (de ahí el spam «LasEstrellas Rosa curada»). Ahora hacen return
+   inmediato con la bandera apagada.
+3. TODAS las sondas tienen sondaNotify (animeflv, d23, caricaturas incluidas): si no llegan
+   avisos de una fuente es porque no ha muerto/revivido NADA desde el último ciclo, no porque
+   esté rota. Verificado en vivo con /api/sondas nuevo: en el ciclo de arranque corrieron
+   pelisxd (11 s), cuevana (52 s), animed23 (21 s), animeflv (19 s), caricaturas (38 s),
+   ennovelas (31 s), novelas* en 0 ms (guard).
+4. El catálogo Cuevana local (v292) crece: la siembra + sonda ya enriquecen fichas con
+   título y póster.
+
+### Qué hace v293
+- **`/api/sondas`** (nuevo): estado por sonda {veces, haceSeg, ms, ok, err} + últimos 60
+  eventos (SONDALOG). El panel/usuario puede verificar de un vistazo qué sonda trabajó.
+- **`sondaRun(nombre, fn)`** envuelve TODAS las sondas (ciclo 6 h, arranque 90 s,
+  epsPodredumbre, vix/estrellas/ennovelas/huddle 90 s) y alimenta SONDAS_STATE.
+- Guards `if (!NOVELAS_EXTERNAS_ON) return;` en sondaNovelas/sondaVixNovelas/sondaEstrellasNovelas.
+- public/d23-ocultas.txt (+ alias animed23-ocultas.txt): 8 slugs placeholder pre-ocultados.
+- `UI_VERSION v293`.
+
+### ¿Hay método más rápido que las sondas? (respuesta para el usuario)
+- La arquitectura actual YA es la óptima: muestreo cortés por ciclo + verificación al clic
+  (contadores de fallo) + re-chequeo de ocultas + panel. Un barrido COMPLETO de todos los
+  catálogos (3,453 LA + 8,191 CV + ...) tardaría horas y martillaría los sitios.
+- Mejora futura opcional (no hecha): priorizar en las sondas lo más VISTO (listas de vistas
+  ya existen) para que lo que la gente ve se revise primero.
+
+### Verificado (server local, 23 SEP)
+- /api/estado: animed23 = 220 ✓ · /api/sondas: ciclo de arranque completo con duraciones ✓
+- novelas* en 0 ms (guard) ✓ · eventos con muerto/revivio reales ✓ · node --check OK.
+
+### Pendiente tras despliegue
+- Usuario: `cd ~/huddle && bash actualizar.sh`. El panel debe decir 220 en AnimeD23 y ya no
+  llegarán avisos de Novelas. `http://129.80.212.92:3000/api/sondas` para revisarlas cuando quiera.
+
+### Archivos tocados
+- `server.js`: SONDAS_STATE + sondaRun + /api/sondas + guards novelas + UI_VERSION.
+- `public/d23-ocultas.txt`, `public/animed23-ocultas.txt` (8 slugs).
+- `CONTINUACION.md` (esta nota).
+
+---
+
+## ESTADO ANTERIOR — 23 SEP 2026 — v292: BÚSQUEDA CUEVANA 100% LOCAL (catálogo)
 
 ### Lo que pedía el usuario
 - «¿No es mejor buscar en el catálogo de Huddle en vez de buscar en Cuevana en vivo?»
