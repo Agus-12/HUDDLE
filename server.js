@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v307'; // v307: tarjeta Sonda Huddle con % pelis/series + veredictos, satélites por fuente
+const UI_VERSION = 'v308'; // v308: Sonda Huddle como fuente con detalle propio + capítulos ocultados + Episodios en catálogo
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -13690,6 +13690,7 @@ async function estrenosMezclados(){
       const sondas = {};
       for (const [k, v] of Object.entries(SONDAS_STATE)) {
         if (!NOVELAS_EXTERNAS_ON && (k === 'novelas' || k === 'novelasVix' || k === 'novelasEstrellas')) continue; /* v306: descontinuadas, fuera del satélite */
+        if (k === 'laRevizar') continue; /* v308: fuera del satélite — la sonda Latanime + el barrido ya reviven sus ocultas */
         const nn = NOMBRES_SONDA[k];
         sondas[k] = { veces: v.veces, haceSeg: v.ultima ? Math.round((ahora - v.ultima) / 1000) : null, ms: v.ms, ok: v.ok, err: v.err || undefined, nombre: nn ? nn[0] : k, desc: nn ? nn[1] : '' };
       }
@@ -13702,6 +13703,8 @@ async function estrenosMezclados(){
         },
         barrido: { /* v296: barrido continuo repartido */
           hechos: BARRIDO.hechos, vueltas: BARRIDO.vueltas, pos: BARRIDO.pos,
+          capsOcultos: EPS_MUERTOS.size, /* v308: capítulos ocultados (nivel episodio) */
+          epsTotales: CRAWL.total || 0, /* v308: episodios conocidos de series (base del catálogo de episodios) */
           totales: {
             pelisxd: (pelisxdIdx && pelisxdIdx.slugs ? pelisxdIdx.slugs.length : 0),
             cuevana: cuevanaIdx.slugs.length,

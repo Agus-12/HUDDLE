@@ -1,3 +1,36 @@
+## ESTADO ACTUAL — 23 SEP 2026 — v308: SONDA HUDDLE COMO FUENTE REAL
+
+### Lo que pidió el usuario
+- La tarjeta Huddle de «Fuentes de video» no debe abrir el Panel Huddle: es algo separado ✔
+  afuera queda como las demás fuentes (barra de progreso) y al entrar abre SU detalle
+  (mostrarHuddleFuente → pageFuente): % global, % pelis/% series con ICONOS svg (sin emojis),
+  verificaciones en cola, capítulos ocultados, registro del barrido con logos.
+- «Latanime — revive ocultas» fuera del satélite: la sonda Latanime + el barrido ya lo cubren ✔
+  (laRevizar sigue corriendo internamente pero no se lista en /api/sondas).
+- Capítulos ocultados: barrido.capsOcultos = EPS_MUERTOS.size ✔.
+- Catálogo total: nueva tarjeta «Episodios» = intros.total − moderacion.epsOcultos
+  (si se oculta un capítulo se resta de episodios, no de series) ✔.
+- Números de fuentes: /api/stats se calcula en vivo de los Sets de ocultas (CVM_OCULTAS etc.),
+  se actualizan al ocultar/revivir ✔.
+
+### Cambios
+- server.js: /api/sondas salta laRevizar; barrido += capsOcultos + epsTotales. UI v308.
+- panel.html: tarjeta Huddle simplificada (ids hudTAll/hudOcultas/hudCaps/hudRevisados/hudBar/
+  satIcon-huddle parpadea si hechos avanza); pintarVeredictos() reutilizable; rama
+  showFuente('huddle'); catCards += Episodios (#a78bfa).
+
+### Verificado local
+- laRevizar oculto ✔ · capsOcultos/epsTotales presentes (6679 eps locales) ✔ ·
+  panel sin emojis 🎬📺 ✔ · 8 coincidencias de elementos nuevos.
+
+### Pendiente (siguiente versión)
+- Aprendizaje de intros POR TEMPORADA (comparar primer cap de cada temporada; igual → reutiliza,
+  distinto → aprende nuevo). Riendas intactas: una a la vez, medidores, ON/OFF.
+
+### Archivos: server.js, public/panel.html, CONTINUACION.md.
+
+---
+
 ## ESTADO ACTUAL — 23 SEP 2026 — v307: TARJETA SONDA HUDDLE + SATÉLITES POR FUENTE
 
 ### Lo que pidió el usuario

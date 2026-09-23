@@ -226,32 +226,24 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
   <div class="sec-title">Fuentes de video <span class="line"></span></div>
   <div id="fuentesCards"></div>
 
-  <!-- v307: tarjeta Huddle — una fuente más: % revisado de pelis y series, veredictos con logos -->
-  <div class="fcard audit-preview" onclick="showPage('Huddle')" style="margin-top:12px">
-    <div class="fhead" style="position:relative;z-index:1">
-      <div style="position:absolute;right:14px;top:14px;color:#9d93b5;z-index:1"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
-      <div style="display:flex;align-items:center;gap:12px">
-        <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#4c1d95,#7c3aed);display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(124,58,237,.25)">
+  <!-- v308: Sonda Huddle = una fuente más — tarjeta como las demás; al entrar abre SU detalle (no el Panel Huddle) -->
+  <div class="fcard" onclick="showFuente('huddle')" style="margin-top:12px">
+    <div class="fhead">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#4c1d95,#7c3aed);display:flex;align-items:center;justify-content:center;flex-shrink:0">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
         </div>
         <div>
-          <div style="font-size:15px;font-weight:800;color:#ede9fe;display:flex;align-items:center;gap:8px">Sonda Huddle <span class="badge-idle" style="font-size:10px;padding:3px 8px">24/7</span></div>
-          <div style="font-size:11px;color:#a99bc9;margin-top:2px">la única que revisa Huddle mismo: sus series y películas, si mueren o reviven</div>
+          <div class="fname" style="color:#c4b5fd">Sonda Huddle</div>
+          <div class="fsub"><span id="hudTAll">—</span> títulos · <span id="hudOcultas">—</span> ocultas · <span id="hudCaps">—</span> capítulos ocultados</div>
         </div>
       </div>
-    </div>
-    <div style="position:relative;z-index:1;margin-top:12px">
-      <div style="display:flex;justify-content:space-between;font-size:12px;color:#c9bfe0;margin-bottom:5px">
-        <span id="hudPctTxt">revisando catálogo…</span><span id="hudChecks" style="color:#9d93b5"></span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="fcount" style="color:#c4b5fd" id="hudRevisados">—</div>
+        <span class="sat-ico" id="satIcon-huddle" title="barrido"></span>
       </div>
-      <div class="barra"><i id="hudPctBar" style="width:0%;background:linear-gradient(90deg,#7c3aed,#38e08a)"></i></div>
-      <div class="chips" style="margin-top:10px">
-        <span class="chip">🎬 Películas <b id="hudPelisPct">—</b></span>
-        <span class="chip">📺 Series <b id="hudSeriesPct">—</b></span>
-        <span class="chip warn" id="hudColaChip">0 en cola</span>
-      </div>
-      <div id="hudVeredictos" style="margin-top:10px;display:flex;flex-direction:column;gap:4px"></div>
     </div>
+    <div class="bar"><i id="hudBar" style="width:0%;background:#8a5cf6"></i></div>
   </div>
 
   <!-- v305: el rastreador ahora vive en su propia tarjeta/página -->
@@ -517,17 +509,7 @@ function cargarSondas(){
     var pct=tAll?Math.round(pAll/tAll*100):0;
     html+='<div class="sonda-row"><span class="sonda-dot" style="background:#4f8ef7"></span>'
       +'<span class="sonda-name">Barrido del catálogo<div style="font-size:9px;color:#7c6fa0;font-weight:400;margin-top:1px">recorre TODO el catálogo poco a poco; oculta muertos y revive ocultos</div></span><span class="sonda-meta">'+pct+'% · '+(b.hechos||0)+' revisiones'+(b.vueltas?' · vueltas: '+b.vueltas:'')+'</span></div>';
-    /* v307: tarjeta Huddle completa — % pelis y series, revisiones, cola */
-    var PELIS_F=['pelisxd','cuevana','cinecalidad'],SERIES_F=['latanime','animeflv','animed23'];
-    function chkP(arr){var t=0,p=0;arr.forEach(function(fk){var ft=tot[fk]||0;t+=ft;p+=Math.min(b.pos&&b.pos[fk]||0,ft);});return t?Math.round(p*100/t):0;}
-    var pPct=chkP(PELIS_F),sPct=chkP(SERIES_F);
-    var hb=document.getElementById('hudPctBar');if(hb)hb.style.width=pct+'%';
-    var ht=document.getElementById('hudPctTxt');if(ht)ht.textContent=pct+'% del catálogo revisado';
-    var hc=document.getElementById('hudChecks');if(hc)hc.textContent=(b.hechos||0)+' revisiones';
-    var hp=document.getElementById('hudPelisPct');if(hp)hp.textContent=pPct+'%';
-    var hs=document.getElementById('hudSeriesPct');if(hs)hs.textContent=sPct+'%';
-    var hq=document.getElementById('hudColaChip');if(hq)hq.textContent=(v.enCola||0)+' en cola';
-    /* v307: satélite de cada fuente — parpadea verde encendida, roja colapsada, blanco apagada */
+    /* v307→v308: satélite de cada fuente — parpadea verde encendida, roja colapsada, blanco apagada */
     var SAT_SVG='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 10a8 8 0 0 0 10 10"/><path d="M4 14a4 4 0 0 0 6 6"/><circle cx="15" cy="9" r="2.5"/><path d="M17 7l4-4"/></svg>';
     ['pelisxd','cuevana','cinecalidad','latanime','danimados','lacartoons','miscaricaturas','animeflv','ennovelas','animed23'].forEach(function(fk){
       var el=document.getElementById('satIcon-'+fk);if(!el)return;
@@ -536,29 +518,20 @@ function cargarSondas(){
       if(st&&st.veces>0){ if(st.err||!st.ok){col='#ff5c7a';tip='sonda colapsada: '+(st.err||'error en la última corrida');} else {col='#38e08a';tip='sonda encendida · corrió '+fmtHace(st.haceSeg);cls=' sat-on';} }
       el.className='sat-ico'+cls;el.style.color=col;el.title=tip;el.innerHTML=SAT_SVG;
     });
-    /* v307: veredictos recientes con logo de cada fuente (murió / revivió / viva) */
-    if(!window._hudVTic)window._hudVTic=0;
-    if((window._hudVTic++)%3===0){
-      fetch('/api/sonda-log?limit=6').then(function(r){return r.json()}).then(function(lg){
-        var LOGOS={'PelisXD':'pelisxd.png','Cuevana':'cuevana.png','CineCalidad':'cinecalidad.png','Latanime':'latanime.png','AnimeFLV':'animeflv.png','AnimeD23':'animed23.png','Danimados':'danimados.png','Lacartoons':'lacartoons.png','MisCaricaturas':'caricaturas.png','Ennovelas':'novelas.png'};
-        var box=document.getElementById('hudVeredictos');if(!box)return;
-        var items=(lg.items||[]).slice(0,5);
-        if(!items.length){box.innerHTML='<div style="font-size:10px;color:#7c6fa0">aún sin veredictos recientes</div>';return;}
-        var vh='';
-        items.forEach(function(n){
-          var dead=n.tipo==='muerto',rev=n.tipo==='revivio';
-          var col=dead?'#ff5c7a':(rev?'#ffb020':'#38e08a');
-          var ico=dead?'M18 6L6 18M6 6l12 12':(rev?'M12 3v18M7 8l5-5 5 5':'M5 13l4 4L19 7');
-          var lg2=LOGOS[n.fuente];
-          vh+='<div style="display:flex;align-items:center;gap:6px;font-size:10px">'
-            +(lg2?'<img src="/sites/'+lg2+'" alt="" style="width:14px;height:14px;object-fit:contain;border-radius:3px" onerror="this.style.display=\'none\'">':'')
-            +'<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="'+col+'" stroke-width="2.5" style="flex-shrink:0"><path d="'+ico+'"/></svg>'
-            +'<span style="color:'+col+';font-weight:600;flex-shrink:0">'+(dead?'murió':(rev?'revivió':'viva'))+'</span>'
-            +'<span style="color:#9d93b5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+n.slug+'</span>'
-            +'<span style="color:#5f5678;margin-left:auto;flex-shrink:0">'+timeAgo(n.ts)+'</span></div>';
-        });
-        box.innerHTML=vh;
-      }).catch(function(){});
+    /* v308: tarjeta Sonda Huddle — igual que las demás fuentes; su detalle abre al hacer click */
+    var oc6=0;
+    if(_stats&&_stats.fuentes){['pelisxd','cuevana','cinecalidad','latanime','animeflv','animed23'].forEach(function(fk){var fs2=_stats.fuentes[fk];if(fs2)oc6+=fs2.ocultas||0;});}
+    var e1=document.getElementById('hudTAll');if(e1)e1.textContent=tAll;
+    var e2=document.getElementById('hudOcultas');if(e2)e2.textContent=oc6||'—';
+    var e3=document.getElementById('hudCaps');if(e3)e3.textContent=(b.capsOcultos!=null?b.capsOcultos:'—');
+    var e4=document.getElementById('hudRevisados');if(e4)e4.textContent=pAll;
+    var e5=document.getElementById('hudBar');if(e5)e5.style.width=pct+'%';
+    var sh=document.getElementById('satIcon-huddle');
+    if(sh){
+      var sigue=(window._hudHechosPrev==null||b.hechos>window._hudHechosPrev);
+      window._hudHechosPrev=b.hechos;
+      sh.className='sat-ico'+(sigue?' sat-on':'');sh.style.color=sigue?'#38e08a':'#e8e4f2';
+      sh.title=sigue?'barrido en marcha · '+(b.hechos||0)+' revisiones':'barrido en pausa';sh.innerHTML=SAT_SVG;
     }
     document.getElementById('sondasList').innerHTML=html;
     var badge=document.getElementById('satBadge'),btn=document.getElementById('satBtn');
@@ -658,10 +631,14 @@ function renderDash(d){
   var ts=(ca.animes||0)+(ca.animeflv||0)+(ca.animed23||0);
   var tc=((f.danimados?Math.max(0,f.danimados.activas||0):0)+(f.lacartoons?Math.max(0,f.lacartoons.activas||0):0)+(f.miscaricaturas?Math.max(0,f.miscaricaturas.activas||0):0))||((ca.caricaturas||0)+(ca.cartoons||0)+(ca.liveaction||0));
   var gt=tp+ts+tc;
+  /* v308: Episodios = episodios conocidos de series menos los capítulos ocultados
+   * (si se oculta un capítulo se resta de aquí, no del número de series) */
+  var epsVivos=Math.max(0,((d.intros&&d.intros.total)||0)-((d.moderacion&&d.moderacion.epsOcultos)||0));
   document.getElementById('catCards').innerHTML=
     '<div class="card noclick"><div class="n" style="color:#38e08a">'+tp+'</div><div class="t">Películas</div></div>'
     +'<div class="card noclick"><div class="n" style="color:#8a5cf6">'+ts+'</div><div class="t">Series</div></div>'
     +'<div class="card noclick"><div class="n" style="color:#38bdf8">'+tc+'</div><div class="t">Caricaturas</div></div>'
+    +'<div class="card noclick"><div class="n" style="color:#a78bfa">'+epsVivos+'</div><div class="t">Episodios</div></div>'
     +'<div class="card noclick"><div class="n" style="color:#ffb020">'+gt+'</div><div class="t">Total</div></div>';
   document.getElementById('catDetail').innerHTML=
     'Caricaturas: <b>'+ca.caricaturas+'</b> · Cartoons: <b>'+ca.cartoons+'</b> · Live Action: <b>'+ca.liveaction+'</b> · Danimados: <b>'+ca.danimados+'</b> · Animes: <b>'+ca.animes+'</b> · AnimeFLV: <b>'+ca.animeflv+'</b> · AnimeD23: <b>'+(ca.animed23||0)+'</b>';
@@ -712,7 +689,60 @@ function renderFuentes(stats){
   }
 }
 
+/* v308: veredictos con logo de cada fuente (murió / revivió / viva) — usado por la Sonda Huddle */
+var LOGOS_FUENTE={'PelisXD':'pelisxd.png','Cuevana':'cuevana.png','CineCalidad':'cinecalidad.png','Latanime':'latanime.png','AnimeFLV':'animeflv.png','AnimeD23':'animed23.png','Danimados':'danimados.png','Lacartoons':'lacartoons.png','MisCaricaturas':'caricaturas.png','Ennovelas':'novelas.png'};
+function pintarVeredictos(items,elId,max){
+  var box=document.getElementById(elId);if(!box)return;
+  items=(items||[]).slice(0,max||12);
+  if(!items.length){box.innerHTML='<div style="color:#9d93b5;font-size:12px">Aún sin movimientos recientes</div>';return;}
+  var vh='';
+  items.forEach(function(n){
+    var dead=n.tipo==='muerto',rev=n.tipo==='revivio';
+    var col=dead?'#ff5c7a':(rev?'#ffb020':'#38e08a');
+    var ico=dead?'M18 6L6 18M6 6l12 12':(rev?'M12 3v18M7 8l5-5 5 5':'M5 13l4 4L19 7');
+    var lg2=LOGOS_FUENTE[n.fuente];
+    var ts=typeof n.ts==='string'?new Date(n.ts).getTime():n.ts;
+    vh+='<div class="log-entry">'
+      +'<div class="log-icon">'+(lg2?'<img src="/sites/'+lg2+'" alt="" style="width:16px;height:16px;object-fit:contain" onerror="this.style.display=\'none\'">':'')+'</div>'
+      +'<div class="log-msg" style="color:'+col+';display:flex;gap:6px;align-items:center"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="'+col+'" stroke-width="2.5" style="flex-shrink:0"><path d="'+ico+'"/></svg><span>'+(dead?'murió':(rev?'revivió':'viva'))+' — '+n.slug+'</span></div>'
+      +'<div class="log-time">'+timeAgo(ts)+'</div></div>';
+  });
+  box.innerHTML=vh;
+}
+/* v308: detalle de la Sonda Huddle — página aparte del Panel Huddle */
+function mostrarHuddleFuente(){
+  var html='<div class="detail-section"><h3 style="color:#c4b5fd">'
+    +'<span style="display:inline-flex;width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#4c1d95,#7c3aed);align-items:center;justify-content:center;vertical-align:middle;margin-right:10px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg></span>Sonda Huddle</h3>'
+    +'<div style="font-size:12px;color:#9d93b5;margin:4px 0 12px">La única que revisa Huddle mismo: recorre su propio catálogo (películas y series de todas las fuentes) para ocultar lo muerto y revivir lo que volvió. Revisa 2 títulos cada 15 segundos — una vuelta completa cada ~2 días.</div>'
+    +'<div id="hudFBody"><div style="color:#9d93b5;font-size:12px">Cargando…</div></div></div>'
+    +'<div class="detail-section"><h3>Registro del barrido</h3><div id="hudFLog"><div style="color:#9d93b5;font-size:12px">Cargando…</div></div></div>';
+  document.getElementById('fuenteContent').innerHTML=html;
+  showPage('Fuente');
+  fetch('/api/sondas').then(function(r){return r.json()}).then(function(d){
+    var b=d.barrido||{},tot=b.totales||{};
+    var PELIS_F=['pelisxd','cuevana','cinecalidad'],SERIES_F=['latanime','animeflv','animed23'];
+    var tAll=0,pAll=0;for(var fk in tot){tAll+=tot[fk]||0;pAll+=Math.min(b.pos&&b.pos[fk]||0,tot[fk]||0);}
+    var pct=tAll?Math.round(pAll/tAll*100):0;
+    function chkP(arr){var t=0,p=0;arr.forEach(function(x){var ft=tot[x]||0;t+=ft;p+=Math.min(b.pos&&b.pos[x]||0,ft);});return t?Math.round(p*100/t):0;}
+    var pPct=chkP(PELIS_F),sPct=chkP(SERIES_F);
+    var v=d.verificaciones||{};
+    var ICO_PELI='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9h4M3 15h4M17 9h4M17 15h4"/></svg>';
+    var ICO_SERIE='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M8 21h8"/></svg>';
+    document.getElementById('hudFBody').innerHTML=
+      '<div class="barra"><i style="width:'+pct+'%;background:linear-gradient(90deg,#7c3aed,#38e08a)"></i></div>'
+      +'<div style="display:flex;justify-content:space-between;font-size:12px;color:#9d93b5;margin:6px 0"><span>'+pAll+' de '+tAll+' títulos revisados</span><span>'+pct+'%'+(b.vueltas?' · '+b.vueltas+' vueltas completas':'')+'</span></div>'
+      +'<div class="chips">'
+      +'<span class="chip" style="display:inline-flex;align-items:center;gap:5px">'+ICO_PELI+' Películas <b>'+pPct+'%</b></span>'
+      +'<span class="chip" style="display:inline-flex;align-items:center;gap:5px">'+ICO_SERIE+' Series <b>'+sPct+'%</b></span>'
+      +'<span class="chip warn">Verificaciones en cola <b>'+(v.enCola||0)+'</b></span>'
+      +'<span class="chip bad">Capítulos ocultados <b>'+(b.capsOcultos||0)+'</b></span></div>'
+      +'<div style="font-size:11px;color:#7c6fa0;margin-top:10px">Episodios conocidos de series: <b>'+(b.epsTotales||0)+'</b> · un título se oculta tras 2 fallos seguidos y revive solo si responde de nuevo.</div>';
+    pintarVeredictos(d.eventos,'hudFLog',14);
+  }).catch(function(){var x=document.getElementById('hudFBody');if(x)x.innerHTML='<div style="color:#ff5c7a;font-size:12px">Sin datos por ahora</div>';});
+}
+
 function showFuente(k){
+  if(k==='huddle'){mostrarHuddleFuente();return;} /* v308: detalle propio, separado del Panel Huddle */
   var f=_stats?_stats.fuentes[k]:null;if(!f)return;
   var colors={cuevana:'#38e08a',pelisxd:'#8a5cf6',cinecalidad:'#38bdf8',latanime:'#ffb020',danimados:'#fb7185',lacartoons:'#2dd4bf',miscaricaturas:'#ffd93b',animeflv:'#feac5d',ennovelas:'#38e08a',animed23:'#22c55e'};
   var names={cuevana:'Cuevana',pelisxd:'PelisXD',cinecalidad:'CineCalidad',latanime:'Latanime',danimados:'Danimados',lacartoons:'Lacartoons',miscaricaturas:'MisCaricaturas',animeflv:'AnimeFLV',ennovelas:'Ennovelas',animed23:'AnimeD23'};
