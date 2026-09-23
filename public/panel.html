@@ -472,6 +472,12 @@ function cargarSondas(){
     var v=d.verificaciones||{};var susp=Object.keys(v.sospechasHuddle||{});
     html+='<div class="sonda-row" style="border-top:1px solid #241d33;margin-top:4px"><span class="sonda-dot" style="background:'+(susp.length?'#ffb020':'#8a5cf6')+'"></span>'
       +'<span class="sonda-name">Verificaciones</span><span class="sonda-meta">'+(v.enCola||0)+' en cola'+(susp.length?' · sospecha Huddle: '+susp.map(function(k){return k+' ('+v.sospechasHuddle[k]+')'}).join(', '):'')+'</span></div>';
+    /* v296: progreso del barrido continuo */
+    var b=d.barrido||{};var tot=b.totales||{};var tAll=0,pAll=0;
+    for(var fk in tot){tAll+=tot[fk]||0;var pp=Math.min(b.pos&&b.pos[fk]||0,tot[fk]||0);pAll+=pp;}
+    var pct=tAll?Math.round(pAll/tAll*100):0;
+    html+='<div class="sonda-row"><span class="sonda-dot" style="background:#4f8ef7"></span>'
+      +'<span class="sonda-name">Barrido total</span><span class="sonda-meta">'+pct+'% del catálogo · '+(b.hechos||0)+' revisiones'+(b.vueltas?' · vueltas: '+b.vueltas:'')+'</span></div>';
     document.getElementById('sondasList').innerHTML=html;
     var badge=document.getElementById('satBadge'),btn=document.getElementById('satBtn');
     if(malas>0){badge.textContent=malas;badge.style.display='';btn.classList.add('err');}

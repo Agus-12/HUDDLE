@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v295'; // v295: verificación dirigida — fallo al reproducir → re-prueba el título en concreto y da veredicto (fuente muerta vs bug de Huddle)
+const UI_VERSION = 'v296'; // v296: barrido continuo repartido — el catálogo completo se revisa solo, ~2 títulos cada 15 s
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -1058,6 +1058,81 @@ setInterval(() => {
     }
   })();
 }, 60000);
+
+/* v296: BARRIDO CONTINUO REPARTIDO — aunque el usuario nunca pique un título,
+ * Huddle barre el catálogo COMPLETO poco a poco: 2 títulos consecutivos cada
+ * 15 s, en orden y retomando donde quedó (cursor en barrido-pos.json). Cubre
+ * ~20 500 títulos vivos+ocultos de las 6 fuentes grandes en ~2 días, sin
+ * tumbar sitios (0.13 req/s). Lo muerto se oculta con los mismos contadores
+ * de las sondas; lo oculto que reviva, revive. Se pausa solo mientras corre
+ * una auditoría manual para no duplicar trabajo. */
+const BARRIDO_FUENTES = ['pelisxd', 'cuevana', 'cinecalidad', 'latanime', 'animeflv', 'animed23'];
+const BARRIDO = { pos: {}, fallos: new Map(), hechos: 0, vueltas: 0 };
+try { const bp = JSON.parse(fs.readFileSync(path.join(__dirname, 'barrido-pos.json'), 'utf8')); if (bp && typeof bp === 'object') BARRIDO.pos = bp; } catch {}
+async function barridoLista(fuente) {
+  try {
+    if (fuente === 'pelisxd') { if (!pelisxdIdx || !pelisxdIdx.slugs || !pelisxdIdx.slugs.length) await pelisxdIndice().catch(() => {}); return (pelisxdIdx && pelisxdIdx.slugs) ? [...pelisxdIdx.slugs] : []; }
+    if (fuente === 'cuevana') { if (!cuevanaIdx.slugs.length) await cuevanaIndice().catch(() => {}); return [...cuevanaIdx.slugs]; }
+    if (fuente === 'cinecalidad') return (ccIdx && ccIdx.slugs) ? ccIdx.slugs.map((x) => String(x).split('|')[0]) : [];
+    if (fuente === 'latanime') return [...LA_TODOS];
+    if (fuente === 'animeflv') return [...AF_TODOS];
+    if (fuente === 'animed23') return [...D23_TODOS];
+  } catch {}
+  return [];
+}
+function barridoOcultar(fuente, slug) {
+  if (fuente === 'pelisxd') { if (!PXD_OCULTAS.has(slug)) { PXD_OCULTAS.add(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt'); pxdOcultar(slug); sondaNotify('PelisXD', 'muerto', slug, slug + ' murió — barrido completo'); } }
+  else if (fuente === 'cuevana') { if (!CVM_OCULTAS.has(slug)) { CVM_OCULTAS.add(slug); ocultasReescribir(CVM_OCULTAS, 'cuevana-ocultas.txt'); sondaNotify('Cuevana', 'muerto', slug, slug + ' murió — barrido completo'); } }
+  else if (fuente === 'cinecalidad') { if (!CC_OCULTAS.has(slug)) { CC_OCULTAS.add(slug); ocultasReescribir(CC_OCULTAS, 'cc-ocultas.txt'); sondaNotify('CineCalidad', 'muerto', slug, slug + ' murió — barrido completo'); } }
+  else if (fuente === 'latanime') laFallosRegistrar(slug); /* 3 fallos espaciados la ocultan, igual que con usuarios */
+  else if (fuente === 'animeflv') { if (!AF_OCULTAS.has(slug)) { AF_OCULTAS.add(slug); ocultasReescribir(AF_OCULTAS, 'af-ocultas.txt'); sondaNotify('AnimeFLV', 'muerto', slug, slug + ' murió — barrido completo'); } }
+  else if (fuente === 'animed23') { if (!D23_OCULTAS.has(slug)) { d23Ocultar(slug); sondaNotify('AnimeD23', 'muerto', slug, slug + ' murió — barrido completo'); } }
+}
+function barridoRevivir(fuente, slug) {
+  if (fuente === 'pelisxd' && PXD_OCULTAS.has(slug)) { PXD_OCULTAS.delete(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt'); pxdPerdonar(slug); sondaNotify('PelisXD', 'revivio', slug, slug + ' revivió — barrido completo'); }
+  else if (fuente === 'cuevana' && CVM_OCULTAS.has(slug)) { CVM_OCULTAS.delete(slug); ocultasReescribir(CVM_OCULTAS, 'cuevana-ocultas.txt'); sondaNotify('Cuevana', 'revivio', slug, slug + ' revivió — barrido completo'); }
+  else if (fuente === 'cinecalidad' && CC_OCULTAS.has(slug)) { CC_OCULTAS.delete(slug); ocultasReescribir(CC_OCULTAS, 'cc-ocultas.txt'); sondaNotify('CineCalidad', 'revivio', slug, slug + ' revivió — barrido completo'); }
+  else if (fuente === 'latanime') { laFallosPerdonar(slug); if (LA_MUERTAS_SET.has(slug)) { laMuertaQuitar(slug); sondaNotify('Latanime', 'revivio', slug, slug + ' revivió — barrido completo'); } }
+  else if (fuente === 'animeflv' && AF_OCULTAS.has(slug)) { AF_OCULTAS.delete(slug); ocultasReescribir(AF_OCULTAS, 'af-ocultas.txt'); afPerdonar(slug); sondaNotify('AnimeFLV', 'revivio', slug, slug + ' revivió — barrido completo'); }
+  else if (fuente === 'animed23' && D23_OCULTAS.has(slug)) { D23_OCULTAS.delete(slug); ocultasReescribir(D23_OCULTAS, 'd23-ocultas.txt'); d23Perdonar(slug); sondaNotify('AnimeD23', 'revivio', slug, slug + ' revivió — barrido completo'); }
+}
+let barridoOcupado = false;
+setInterval(() => {
+  (async () => {
+    if (barridoOcupado) return;
+    barridoOcupado = true;
+    try {
+      if (AUDITORIA_COMPLETA.activo || (HUDDLE_AUDITORIA.activo && !HUDDLE_AUDITORIA.pausado)) return; /* no estorbar auditorías manuales */
+      if (process.memoryUsage().heapUsed / 1048576 > 350) return;
+      for (let n = 0; n < 2; n++) {
+        const fuente = BARRIDO_FUENTES[(BARRIDO.hechos + n) % BARRIDO_FUENTES.length];
+        const lista = await barridoLista(fuente);
+        if (!lista.length) { BARRIDO.pos[fuente] = 0; continue; }
+        const pos = (BARRIDO.pos[fuente] | 0) % lista.length;
+        if (pos === 0 && BARRIDO.pos[fuente] >= lista.length) BARRIDO.vueltas++; /* dio la vuelta completa */
+        BARRIDO.pos[fuente] = pos + 1;
+        const slug = lista[pos];
+        let viva = false;
+        try {
+          viva = (fuente === 'pelisxd' || fuente === 'cuevana' || fuente === 'cinecalidad')
+            ? !!(await huddleProbePelicula(slug, fuente)).huddle
+            : !!(await huddleProbeSerie(slug, fuente)).huddle;
+        } catch { viva = false; }
+        const clave = fuente + ':' + slug;
+        if (viva) { BARRIDO.fallos.delete(clave); barridoRevivir(fuente, slug); }
+        else if (fuente === 'latanime') laFallosRegistrar(slug); /* sus contadores ya traen antifráfaga y umbral de 3 */
+        else {
+          const f = (BARRIDO.fallos.get(clave) || 0) + 1;
+          if (f >= 2) { BARRIDO.fallos.delete(clave); barridoOcultar(fuente, slug); }
+          else BARRIDO.fallos.set(clave, f);
+        }
+      }
+      BARRIDO.hechos += 2;
+      if (BARRIDO.hechos % 40 === 0) try { fs.writeFileSync(path.join(__dirname, 'barrido-pos.json'), JSON.stringify(BARRIDO.pos)); } catch {}
+    } catch (e) { console.warn('[barrido] error: ' + String(e).slice(0, 80)); }
+    finally { barridoOcupado = false; }
+  })();
+}, 15000);
 
 /* v287: PODREDUMBRE DE EPISODIOS — los capítulos muertos salen solos de la
  * temporada, sin esperar a que el usuario los pique 3 veces. Solo cuenta
@@ -13484,6 +13559,15 @@ async function estrenosMezclados(){
         verificaciones: { /* v295: circuito fallo → revisión dirigida */
           enCola: VERIF_COLA.size,
           sospechasHuddle: Object.fromEntries([...VERIF_SOSPECHAS].filter(([, v]) => Date.now() - v.ts < 3600000).map(([k, v]) => [k, v.n])),
+        },
+        barrido: { /* v296: barrido continuo repartido */
+          hechos: BARRIDO.hechos, vueltas: BARRIDO.vueltas, pos: BARRIDO.pos,
+          totales: {
+            pelisxd: (pelisxdIdx && pelisxdIdx.slugs ? pelisxdIdx.slugs.length : 0),
+            cuevana: cuevanaIdx.slugs.length,
+            cinecalidad: (ccIdx && ccIdx.slugs ? ccIdx.slugs.length : 0),
+            latanime: LA_TODOS.size, animeflv: AF_TODOS.size, animed23: D23_TODOS.size,
+          },
         },
         eventos: SONDALOG.slice(0, 60).map((e) => ({ ts: new Date(e.ts).toISOString(), fuente: e.fuente, tipo: e.tipo, slug: e.slug, msg: e.msg })),
       });

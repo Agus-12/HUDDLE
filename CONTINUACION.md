@@ -1,3 +1,46 @@
+## ESTADO ACTUAL — 23 SEP 2026 — v296: BARRIDO CONTINUO REPARTIDO
+
+### Lo que pedía el usuario
+- "Tiene que barrer todo el catálogo, porque si el usuario nunca le da click, ¿cómo
+  saber que está fallando?" → barrido completo sin depender de clicks.
+- Duda del ENCENDIDO del panel: ¿por qué se reinicia al entrar/salir del panel?
+
+### Qué hace v296
+- Módulo BARRIDO en server.js: cada 15 s revisa 2 títulos CONSECUTIVOS del catálogo
+  completo (PelisXD 4703 + Cuevana 8191 + CineCalidad ~2000 + Latanime 3453 +
+  AnimeFLV ~2955 + AnimeD23 228 ≈ 20 500), en orden y retomando donde quedó
+  (cursor persistido en barrido-pos.json). Vuelta completa ≈ 2-3 días, a 0.13 req/s
+  (no tumba sitios). Lo muerto se oculta con los contadores de siempre (2 fallos
+  seguidos, o 3 espaciados en Latanime); lo oculto que reviva, revive y avisa.
+- Usa las mismas sondas internas (huddleProbePelicula/Serie: Byse, wp-json de
+  Cuevana, API de CineCalidad, laProbe/afProbe/d23Probe).
+- Se pausa solo mientras corre una auditoría manual o con memoria alta.
+- /api/sondas añade `barrido` (hechos, vueltas, pos, totales) y el panel satélite
+  muestra la fila "Barrido total: N% del catálogo".
+- `UI_VERSION v296`.
+
+### Verificado (server local, 23 SEP)
+- hechos=6 a los 70 s; posiciones avanzando por fuente; sin errores [barrido].
+- Probes reales: "[pxd-meta] treinta-dias-de-noche alive=true" en orden alfabético;
+  nada vivo ocultado por accidente.
+
+### Respuesta sobre el ENCENDIDO (para el usuario)
+Sí: Encendido = tiempo real del proceso del server; el panel vive en el server y
+abrirlo/cerrarlo NO lo reinicia. Si marca 1m, el proceso arrancó hace 1 min: o fue
+`actualizar.sh` (hace systemctl restart) o el proceso murió y systemd (Restart=always)
+lo levantó de nuevo. Para ver la causa real: `sudo journalctl -u huddle -n 25 --no-pager`
+justo después de verlo en 0/1m.
+
+### Pendiente tras despliegue
+- Usuario: `cd ~/huddle && bash actualizar.sh`; en el satélite verá la fila Barrido
+  avanzar sola.
+
+### Archivos tocados
+- `server.js` (módulo BARRIDO + /api/sondas + UI_VERSION), `public/panel.html`
+  (fila Barrido total), `public/cuevana-cat.json` (refresh).
+
+---
+
 ## ESTADO ACTUAL — 23 SEP 2026 — v295: VERIFICACIÓN DIRIGIDA — fallo → re-prueba → veredicto
 
 ### Lo que pedía el usuario
