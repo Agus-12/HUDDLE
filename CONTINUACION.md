@@ -1,3 +1,34 @@
+## ESTADO ACTUAL — 23 SEP 2026 — v299: MEDIDOR DE FLUJO — la causa REAL de las muertes
+
+### Evidencia definitiva (journal del usuario)
+`FATAL ERROR: Reached heap limit ... 577.6 MB` a los 96 s de cada arranque, justo en
+"[intro] bajando inicio del episodio 1…". v298 limitaba a 1 detección y pedía
+"solo 16 MB" con Range — pero ALGUNOS CDNs IGNORAN el Range y empujan el episodio
+COMPLETO (200-300 MB) en un solo arrayBuffer() → heap 512 revienta al instante.
+
+### Qué hace v299
+- `cuerpoLimitado(r, max)`: lee el cuerpo por goteo; si pasa del tope, cancela el
+  stream y devuelve null (se cuelga a tiempo, sin meter nada gigante al heap).
+- mp4 directo: inicio ≤18 MB y cola ≤5 MB por goteo; HLS: cada segmento ≤10 MB.
+- El vigilante de memoria ahora purga con heap > 400 MB (el service de Oracle limita
+  a 512; con 500 ya no daba tiempo).
+- `UI_VERSION v299`.
+
+### Verificado
+- Prueba de flujo: servidor que ignora Range y empuja 30 MB → con tope 18 MB
+  "COLGÓ A TIEMPO ✔"; con tope 40 MB bajó completo ✔.
+- Arranque local v299 limpio.
+
+### Pendiente tras despliegue
+- Usuario: `cd ~/huddle && bash actualizar.sh`. Con esto el proceso ya no debería
+  morir: «Encendido» acumula horas. Si algún día muere, el journal dirá otra cosa
+  y se ve con `journalctl -u huddle -n 60`.
+
+### Archivos tocados
+- `server.js` (cuerpoLimitado en descargarInicioEp/uno + watchdog 400 + UI_VERSION).
+
+---
+
 ## ESTADO ACTUAL — 23 SEP 2026 — v298: EL REVENTÓN DE MEMORIA ERA LA DETECCIÓN DE INTROS
 
 ### El síntoma (evidencia del usuario)

@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v298'; // v298: detección de intros de una en una y con descargas ligeras — se acabó el reventar el heap en Oracle
+const UI_VERSION = 'v299'; // v299: medidor de flujo en las descargas de intro — los CDNs que empujan el episodio completo ya no revientan el heap
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -1141,7 +1141,7 @@ setInterval(() => {
   try {
     const m = process.memoryUsage();
     const hu = m.heapUsed / 1048576, rss = m.rss / 1048576;
-    if (hu > 500) {
+    if (hu > 400) { /* v299: antes 500 — el service de Oracle limita a 512, hay que purgar antes */
       const podados = serieCachePodar(400);
       if (typeof global.gc === 'function') global.gc();
       console.log('[mem] v297 purga: heap ' + hu.toFixed(0) + 'MB rss ' + rss.toFixed(0) + 'MB → serieCache -' + podados + ', quedan ' + serieCache.size);
@@ -3921,6 +3921,23 @@ async function descargarInicioEp(m3u8) {
   const archivo = path.join(os.tmpdir(), 'intro-' + crypto.randomBytes(5).toString('hex') + '.ts');
   let ref = '';
   try { ref = hlsReferers.get(new URL(m3u8).hostname) || ''; } catch {}
+  /* v299: MEDIDOR DE FLUJO — algunos CDNs IGNORAN el Range y empujan el episodio
+   * COMPLETO (200-300 MB) de golpe: eso reventaba el heap en Oracle aunque v298
+   * pedía "solo 16 MB". Ahora se lee por goteo y al pasar del tope se cuelga. */
+  const cuerpoLimitado = async (r, maxBytes) => {
+    try {
+      const chunks = []; let n = 0;
+      const reader = r.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        n += value.length;
+        if (n > maxBytes) { try { reader.cancel(); } catch {} return null; }
+        chunks.push(Buffer.from(value));
+      }
+      return Buffer.concat(chunks);
+    } catch { return null; }
+  };
   const pedir = async (u, ms, range) => {
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), ms);
@@ -3949,8 +3966,9 @@ async function descargarInicioEp(m3u8) {
       const rH = await pedir(pl, 60000, 'bytes=0-16777216'); /* v298: 16 MB de inicio (antes 35) — alcanza para el moov y el arranque */
       const rT = await pedir(pl, 30000, 'bytes=-4194304'); /* v298: cola de 4 MB (antes 8) */
       if (!rH || !rT) return null;
-      const cab = Buffer.from(await rH.arrayBuffer());
-      const cola = Buffer.from(await rT.arrayBuffer());
+      const cab = await cuerpoLimitado(rH, 18e6); /* v299: si el CDN ignora el Range y empuja de más, se cuelga a tiempo */
+      const cola = cab ? await cuerpoLimitado(rT, 5e6) : null;
+      if (!cab || !cola) return null;
       if (!cab || cab.length < 3e5 || !cola || !cola.length) return null;
       const total = +((/\/(\d+)\s*$/).exec(rT.headers.get('content-range') || '') || [])[1] || 0;
       if (total && total > cab.length + cola.length) {
@@ -3989,8 +4007,8 @@ async function descargarInicioEp(m3u8) {
       try {
         const r = await fetch(s, { headers: { 'User-Agent': MIRROR_UA, ...(ref ? { Referer: ref } : {}) }, signal: ctl.signal, redirect: 'follow' });
         if (!r.ok) return null;
-        const ab = await r.arrayBuffer();
-        return ab && ab.byteLength ? Buffer.from(ab) : null;
+        const ab = await cuerpoLimitado(r, 10e6); /* v299: segmento con tope de 10 MB por goteo */
+        return ab && ab.length ? ab : null;
       } catch { return null; } finally { clearTimeout(t); }
     };
     for (let i0 = 0; i0 < segs.length; i0 += 8) {
