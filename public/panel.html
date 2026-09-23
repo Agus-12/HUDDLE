@@ -468,6 +468,10 @@ function cargarSondas(){
         +'<span class="sonda-name">'+k+'</span><span class="sonda-meta">'+meta+'</span></div>';
     });
     if(!nombres.length)html='<div style="color:#9d93b5;font-size:12px;padding:8px 0">Aún sin datos: las sondas corren a los 90 s del arranque y luego cada 6 h.</div>';
+    /* v295: verificaciones dirigidas (fallo → revisión → veredicto) */
+    var v=d.verificaciones||{};var susp=Object.keys(v.sospechasHuddle||{});
+    html+='<div class="sonda-row" style="border-top:1px solid #241d33;margin-top:4px"><span class="sonda-dot" style="background:'+(susp.length?'#ffb020':'#8a5cf6')+'"></span>'
+      +'<span class="sonda-name">Verificaciones</span><span class="sonda-meta">'+(v.enCola||0)+' en cola'+(susp.length?' · sospecha Huddle: '+susp.map(function(k){return k+' ('+v.sospechasHuddle[k]+')'}).join(', '):'')+'</span></div>';
     document.getElementById('sondasList').innerHTML=html;
     var badge=document.getElementById('satBadge'),btn=document.getElementById('satBtn');
     if(malas>0){badge.textContent=malas;badge.style.display='';btn.classList.add('err');}

@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v294'; // v294: panel — botón satélite con salud de sondas junto a la campana
+const UI_VERSION = 'v295'; // v295: verificación dirigida — fallo al reproducir → re-prueba el título en concreto y da veredicto (fuente muerta vs bug de Huddle)
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -326,7 +326,7 @@ function resolverNativo(url) {
   const k = String(url || '');
   const enVuelo = RESOLVIENDO.get(k);
   if (enVuelo) return enVuelo;
-  const p = resolverNativoInterno(url).catch((e) => { if (esEpUrl(k)) epsFallo(k); throw e; }).finally(() => RESOLVIENDO.delete(k)); /* v287: los fallos en Juntos también cuentan (antes solo Solo, y el contador se reiniciaba en cada deploy) */
+  const p = resolverNativoInterno(url).catch((e) => { if (esEpUrl(k)) epsFallo(k); verifEncolar(k); throw e; }).finally(() => RESOLVIENDO.delete(k)); /* v287: los fallos en Juntos también cuentan; v295: y se encolan para verificación dirigida */
   RESOLVIENDO.set(k, p);
   return p;
 }
@@ -985,6 +985,79 @@ function epsPerdonar(u) {
   }
 }
 const epsVivos = (eps) => (eps || []).filter((e) => e && e.url && !EPS_MUERTOS.has(e.url)); /* v251 muertas siempre ocultas */
+
+/* v295: CADENA ÚNICA DE RESOLUCIÓN — la misma que usa /api/solo; la reutiliza
+ * la verificación dirigida para que el veredicto sea por el MISMO camino del player. */
+async function resolverPagina(target) {
+  const esEpAnime = /latanime\.org\/ver\/|animeflv\.one\/ver\//i.test(target); /* v97 */
+  const esPeliXd = /pelisxd\.com\/pelicula\//i.test(target); /* v98 */
+  const esCuevanaMov = /cuevana\.mov\/pelicula\//i.test(target); /* v235 */
+  const esCari = /miscaricaturas\.com\//i.test(target); /* v102 */
+  const esLct = /lacartoons\.com\/serie\/capitulo\//i.test(target); /* v112 */
+  const esDani = /danimados\.cc\/episodios\//i.test(target); /* v179 */
+  const esNv = /novelas360\.com\/video\//i.test(target); /* v206 */
+  const esEnp = /enpantallatv\.com\/[a-z0-9-]*capitulo/i.test(target); /* v206.2 */
+  const esEnn = /ennovelas-tv\.com\/[a-z0-9-]+-capitulo-\d+/i.test(target); /* v278.4 */
+  const esD23 = /animed23\.com\/capitulo\//i.test(target); /* v286 */
+  const esMovie = new RegExp(MOVIE_HOST_VIRTUAL.replace(/\./g, '\\.') + '\\/ver\\/', 'i').test(target); /* v207 */
+  return (esMovie ? resolverMovie(target) : esEpAnime ? resolverAnime(target) : esD23 ? resolverD23(target) : esCuevanaMov ? resolverCuevanaMov(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esNv ? resolverNovela(target) : esEnp ? resolverEnp(target) : esEnn ? resolverEnnovelas(target) : resolverSolo(target));
+}
+
+/* v295: VERIFICACIÓN DIRIGIDA — cuando una peli/capítulo FALLA al reproducir,
+ * se encola y se re-prueba EN CONCRETO ~90 s después por el mismo camino del
+ * player (resolverPagina):
+ *  - si la fuente SÍ responde → fue fallo puntual o BUG DE HUDDLE: se avisa a
+ *    la campana y se lleva cuenta por fuente (3+ en una hora = sospecha fuerte,
+ *    como nos pasó con AnimeD23);
+ *  - si vuelve a fallar → cuenta para podredumbre (la resuelven los contadores
+ *    y ocultadores de cada fuente) y se avisa que murió. */
+const VERIF_COLA = new Map(); /* url -> {fuente, slug, al, ok, mal} */
+const VERIF_SOSPECHAS = new Map(); /* fuente -> {n, ts} */
+function verifFuenteDe(url) {
+  if (/animed23\.com\/capitulo\//i.test(url)) return { f: 'AnimeD23', s: d23SlugDeEp(url) };
+  if (/latanime\.org\//i.test(url)) return { f: 'Latanime', s: (/latanime\.org\/\w+\/([a-z0-9-]+)/i.exec(url) || [])[1] || '' };
+  if (/animeflv\.one\//i.test(url)) return { f: 'AnimeFLV', s: (/animeflv\.one\/\w+\/([a-z0-9-]+)/i.exec(url) || [])[1] || '' };
+  if (/pelisxd\.com\//i.test(url)) return { f: 'PelisXD', s: (/pelisxd\.com\/pelicula\/([a-z0-9-]+)/i.exec(url) || [])[1] || '' };
+  if (/cuevana\.mov\//i.test(url)) return { f: 'Cuevana', s: (/\/pelicula\/\d+\/([^/?#]+)/i.exec(url) || [])[1] || '' };
+  if (/cine-calidad\.mx\//i.test(url)) return { f: 'CineCalidad', s: '' };
+  if (/miscaricaturas\.com\//i.test(url)) return { f: 'Caricaturas', s: '' };
+  if (/lacartoons\.com\//i.test(url)) return { f: 'Cartoons', s: '' };
+  if (/danimados\.cc\//i.test(url)) return { f: 'Danimados', s: '' };
+  if (/ennovelas-tv\.com\//i.test(url)) return { f: 'Ennovelas', s: '' };
+  return { f: 'Huddle', s: '' };
+}
+function verifEncolar(url) {
+  try {
+    if (!url || !/^https?:/i.test(url) || VERIF_COLA.size > 300) return;
+    if (VERIF_COLA.has(url)) { VERIF_COLA.get(url).al = Date.now() + 90000; return; }
+    const { f, s } = verifFuenteDe(url);
+    VERIF_COLA.set(url, { fuente: f, slug: s, al: Date.now() + 90000, ok: 0, mal: 0 });
+    console.log('[verif] encolado tras fallo: ' + f + ' ' + String(url).slice(0, 80));
+  } catch {}
+}
+setInterval(() => {
+  (async () => {
+    const ahora = Date.now(); let hechos = 0;
+    for (const [url, it] of [...VERIF_COLA]) {
+      if (hechos >= 2) break;
+      if (ahora < it.al) continue;
+      VERIF_COLA.delete(url); hechos++;
+      let vivo = false, err = '';
+      try { const r = await resolverPagina(url); vivo = !!(r && (r.m3u8 || r.mp4)); if (!vivo) err = 'sin stream'; }
+      catch (e) { err = String(e.message || e).slice(0, 90); }
+      if (vivo) {
+        const sp = VERIF_SOSPECHAS.get(it.fuente) || { n: 0, ts: ahora };
+        if (ahora - sp.ts > 3600000) { sp.n = 0; sp.ts = ahora; }
+        sp.n++; VERIF_SOSPECHAS.set(it.fuente, sp);
+        sondaNotify(it.fuente, 'revision', it.slug || url.slice(0, 60),
+          'falló al reproducir pero la fuente SÍ responde — fallo puntual o bug de Huddle' + (sp.n >= 3 ? ' (ojo: ' + sp.n + ' en 1 h en ' + it.fuente + ')' : ''));
+      } else {
+        try { epsFallo(url); } catch {}
+        sondaNotify(it.fuente, 'muerto', it.slug || url.slice(0, 60), 'revisión dirigida tras fallo: la fuente NO responde — ' + err);
+      }
+    }
+  })();
+}, 60000);
 
 /* v287: PODREDUMBRE DE EPISODIOS — los capítulos muertos salen solos de la
  * temporada, sin esperar a que el usuario los pique 3 veces. Solo cuenta
@@ -12931,26 +13004,17 @@ async function estrenosMezclados(){
       }
       if (!/^https?:\/\/[a-z0-9.-]+/i.test(target)) return json(res, 400, { ok: false, error: 'URL no válida' });
       try {
-        /* v90: episodio de Latanime → resolver de animes (mp4 directo) */
-        const esEpAnime = /latanime\.org\/ver\/|animeflv\.one\/ver\//i.test(target); /* v97: también AnimeFLV */
-        const esPeliXd = /pelisxd\.com\/pelicula\//i.test(target); /* v98 */
-        const esCuevanaMov = /cuevana\.mov\/pelicula\//i.test(target); /* v235 */
-        const esCari = /miscaricaturas\.com\//i.test(target); /* v102: caricaturas */
-        const esLct = /lacartoons\.com\/serie\/capitulo\//i.test(target); /* v112: lacartoons */
-        const esDani = /danimados\.cc\/episodios\//i.test(target); /* v179: danimados en Solo — sin esto TODO el catálogo nuevo caía al resolutor viejo de Cuevana: «Este título no tiene servidor goodstream» */
-        const esNv = /novelas360\.com\/video\//i.test(target); /* v206 novelas */
-        const esEnp = /enpantallatv\.com\/[a-z0-9-]*capitulo/i.test(target); /* v206.2 */
-        const esEnn = /ennovelas-tv\.com\/[a-z0-9-]+-capitulo-\d+/i.test(target); /* v278.4 */
-        const esD23 = /animed23\.com\/capitulo\//i.test(target); /* v286: AnimeD23 (Byse→OK→rpmvid, HTTP puro) */
-        const esMovie = new RegExp(MOVIE_HOST_VIRTUAL.replace(/\./g, '\\.') + '\\/ver\\/', 'i').test(target); /* v207: Movie (mapa local) */
+        /* v295: la cadena de resolución vive en resolverPagina() (la misma que
+           usa la verificación dirigida tras un fallo) */
         let r;
-        try { r = await (esMovie ? resolverMovie(target) : esEpAnime ? resolverAnime(target) : esD23 ? resolverD23(target) : esCuevanaMov ? resolverCuevanaMov(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esNv ? resolverNovela(target) : esEnp ? resolverEnp(target) : esEnn ? resolverEnnovelas(target) : resolverSolo(target)); epsPerdonar(target); } /* v205.5 + v206 + v206.2 + v207 + v235 + v286 d23 */
+        try { r = await resolverPagina(target); epsPerdonar(target); } /* v205.5 + v206 + v206.2 + v207 + v235 + v286 d23 */
         catch (e2r) { epsFallo(target); throw e2r; } /* v205.5: episodios muertos al contador */
         const out2 = { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy };
         if (healedToken) out2.newToken = healedToken;
         return json(res, 200, out2);
       } catch (e) {
         console.warn('[solo] no pude resolver', target.slice(0, 70), '→', String(e.message || e).slice(0, 90));
+        verifEncolar(target); /* v295: revisar en concreto ~90 s después y dar veredicto */
         return json(res, 404, { ok: false, error: String(e.message || e).slice(0, 200), ocultado: EPS_MUERTOS.has(target) || /ya no está disponible en el sitio/.test(String(e.message || e)) }); /* v205.5: el cliente quita la tarjeta al momento */
       }
     }
@@ -13417,6 +13481,10 @@ async function estrenosMezclados(){
       return json(res, 200, {
         ok: true, novelasExternas: NOVELAS_EXTERNAS_ON,
         sondas,
+        verificaciones: { /* v295: circuito fallo → revisión dirigida */
+          enCola: VERIF_COLA.size,
+          sospechasHuddle: Object.fromEntries([...VERIF_SOSPECHAS].filter(([, v]) => Date.now() - v.ts < 3600000).map(([k, v]) => [k, v.n])),
+        },
         eventos: SONDALOG.slice(0, 60).map((e) => ({ ts: new Date(e.ts).toISOString(), fuente: e.fuente, tipo: e.tipo, slug: e.slug, msg: e.msg })),
       });
     }

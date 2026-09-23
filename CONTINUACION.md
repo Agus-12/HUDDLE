@@ -1,3 +1,53 @@
+## ESTADO ACTUAL — 23 SEP 2026 — v295: VERIFICACIÓN DIRIGIDA — fallo → re-prueba → veredicto
+
+### Lo que pedía el usuario
+1. Confirmar que TODAS las sondas están verificadas, incluidas las "sondas Huddle" de películas/series.
+2. Hacer las sondas más eficientes.
+3. Que cuando una peli/serie/capítulo falle en Huddle, una sonda re-revise ESE título en concreto y
+   diga: si la fuente responde → fue bug de Huddle (tipo caso AnimeD23); si murió en la fuente → ocultarlo.
+
+### Respuestas
+1. Verificado: las sondas por fuente (Latanime, AnimeFLV, AnimeD23, Cuevana, PelisXD, CineCalidad,
+   Caricaturas, Cartoons, Danimados, Ennovelas, Vix/Estrellas) corren en ciclo de 6 h y avisan a la
+   campana. Las "sondas Huddle de películas/series" (sondaHuddleGeneral/Peliculas/Series) son el
+   SISTEMA DE AUDITORÍA: solo corren cuando se lanza una auditoría desde el panel; si no hay auditoría
+   activa retornan al instante (verificado: hacen early-return correcto, no gastan nada).
+2. Eficiencia: la mejora de v295 ES la eficiencia — ahora solo se re-verifica lo que el usuario
+   realmente intenta ver y falla, en vez de barrer catálogos enteros a ciegas.
+3. Hecho: nuevo circuito de verificación dirigida (abajo).
+
+### Qué hace v295
+- `resolverPagina(target)`: cadena única de resolución (la misma del modo Solo), reutilizada por el
+  player y por la verificación para que el veredicto sea por el MISMO camino que ve el usuario.
+- `VERIF_COLA` + hooks: cuando /api/solo o el modo Juntos fallan al resolver un URL, se encola
+  (cap 300) y ~90 s después se re-prueba con resolverPagina:
+  - fuente SÍ responde → aviso a campana "falló al reproducir pero la fuente SÍ responde — fallo
+    puntual o bug de Huddle" + contador de sospecha por fuente (3+ en 1 h = alerta reforzada).
+  - fuente NO responde → aviso "revisión dirigida: la fuente NO responde" + cuenta para los
+    contadores/ocultadores existentes (epsFallo, etc.).
+- `/api/sondas` añade `verificaciones` (enCola + sospechasHuddle); el panel satélite muestra una
+  línea extra "Verificaciones: N en cola · sospecha Huddle: fuente (n)".
+- `UI_VERSION v295`.
+
+### Verificado (server local, 23 SEP)
+- Reproducción tras refactor: /api/solo episodio vivo D23 → ok:true con proxy /api/xd ✓
+- Rama MUERTA: 3 fallos reales (incl. baki-dou slug viejo que ya da 404 en el sitio) → encolados →
+  veredicto "fuente NO responde" llegó a la campana ([sonda-notif] x AnimeD23 ×3) ✓
+- Rama BUG: fetch precargado simuló fallo de Huddle en ep vivo → a los ~2 min veredicto
+  "falló al reproducir pero la fuente SÍ responde — fallo puntual o bug de Huddle" +
+  sospechasHuddle {AnimeD23:1} ✓
+- Hallazgo extra: D23 sigue rotando slugs (formato viejo "-1" ya 404, nuevo "-ep-N"); episodios en
+  emisión pueden no traer reproductor todavía ("no trae reproductores" = real en el sitio).
+
+### Pendiente tras despliegue
+- Usuario: `cd ~/huddle && bash actualizar.sh`. Las verificaciones aparecen solas cuando algo falle.
+
+### Archivos tocados
+- `server.js` (resolverPagina + módulo VERIF + hooks + /api/sondas + UI_VERSION),
+  `public/panel.html` (línea Verificaciones), `public/cuevana-cat.json` (refresh de datos).
+
+---
+
 ## ESTADO ACTUAL — 23 SEP 2026 — v294: PANEL — satélite con salud de sondas
 
 ### Lo que pedía el usuario
