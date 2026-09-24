@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v319'; // v319: sondas de caricaturas con disyuntor (caído no juzga + barrido pos-caída) + re-resolución automática a mitad de película
+const UI_VERSION = 'v320'; // v320: regla del dueño — lacartoons caído ⇒ sus series NO se muestran (vuelven solas cuando el sitio regrese)
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -8442,15 +8442,20 @@ const CARI_ORDEN = [
 async function caricaturasDestacadas() {
   // v276: si el cache viejo tenía chavo en caricaturas, invalídalo
   if(cariFeedCache.items.some(x=> /chavo|chapulin|chespirito/i.test(x.title||'') )) cariFeedCache.at = 0;
-  const listo = () => ({ caricaturas: cariFeedCache.items, cartoons: cariFeedCache.toons, liveaction: cariFeedCache.live });
-  if (Date.now() - cariFeedCache.at < 60 * 60 * 1000 && (cariFeedCache.items.length || cariFeedCache.toons.length)) return listo();
-  if (cariFeedCache.items.length || cariFeedCache.toons.length) { refrescarCariFeed().catch(() => {}); return listo(); }
+  /* v320: la regla del dueño se aplica AL SERVIR — aunque el caché traiga
+   * cartoons de una ronda anterior, si lacartoons está caído se filtran */
+  const listo = async () => {
+    if (await lctVivoAhora()) return { caricaturas: cariFeedCache.items, cartoons: cariFeedCache.toons, liveaction: cariFeedCache.live };
+    return { caricaturas: cariFeedCache.items, cartoons: [], liveaction: cariFeedCache.live.filter((x) => x.site !== 'Cartoons') };
+  };
+  if (Date.now() - cariFeedCache.at < 60 * 60 * 1000 && (cariFeedCache.items.length || cariFeedCache.toons.length)) return await listo();
+  if (cariFeedCache.items.length || cariFeedCache.toons.length) { refrescarCariFeed().catch(() => {}); return await listo(); }
   // v274: arranque en frío espera 6s a que se llene, no devuelve vacío que deja feed sin 3 filas
   try { await Promise.race([refrescarCariFeed(), new Promise(r=>setTimeout(r,6000))]); }catch{}
-  if (cariFeedCache.items.length || cariFeedCache.toons.length || cariFeedCache.live.length) return listo();
+  if (cariFeedCache.items.length || cariFeedCache.toons.length || cariFeedCache.live.length) return await listo();
   // aún vacío, reintenta una vez más en 2s por detrás
   refrescarCariFeed().catch(()=>{});
-  return listo();
+  return await listo();
 }
 async function refrescarCariFeed() {
   if (refrescarCariFeed._enCurso) return refrescarCariFeed._enCurso; /* v318: una sola ronda a la vez */
@@ -8530,29 +8535,15 @@ async function refrescarCariFeedInterno() {
   // v276: orden alfabético final
   toons.sort((a,b)=> a.title.localeCompare(b.title,'es'));
   liveToons.sort((a,b)=> a.title.localeCompare(b.title,'es'));
-  /* v318: lacartoons CAÍDO (522 del 24 Sep) no borra tus filas — rescate
-   * POR LISTA: 1) ronda anterior, 2) caché local de metadatos (cariDatos) */
-  const faltanToons = !toons.length, faltanLive = !liveToons.length;
-  if (faltanToons || faltanLive) {
-    const prevToons = cariFeedCache.toons;
-    const prevLive = cariFeedCache.live.filter((x) => x.site === 'Cartoons');
-    if (faltanToons && prevToons.length) { toons.push(...prevToons); console.log('[cari] Cartoons de la ronda anterior (' + toons.length + ')'); }
-    if (faltanLive && prevLive.length) { liveToons.push(...prevLive); console.log('[cari] Live lacartoons de la ronda anterior (' + liveToons.length + ')'); }
-    const siguenFaltando = (!toons.length && faltanToons) || (!liveToons.length && faltanLive);
-    if (siguenFaltando) {
-      let nt = 0, nl = 0;
-      for (const lct of LCT_SERIES.values()) {
-        if (LCT_MUERTAS.has(lct.slug)) continue;
-        const c = cariDatos.get(lct.slug);
-        const d = c && c.d;
-        if (d && (d.cover || d.poster) && d.episodios && d.episodios.length) {
-          const it = { title: d.titulo, url: LCT_BASE + 'serie/' + lct.lctId, img: d.cover || d.poster, site: 'Cartoons' };
-          if (esLctLive(lct.slug)) { if (faltanLive) { liveToons.push(it); nl++; } }
-          else if (faltanToons) { toons.push(it); nt++; }
-        }
-      }
-      if (nt || nl) console.log('[cari] lacartoons caído — reconstruidos ' + nt + ' cartoons + ' + nl + ' live desde caché local');
-    }
+  /* v320: REGLA DEL DUEÑO — lacartoons caído → sus series NO se muestran
+   * (sus episodios viven en ese sitio: entrar sería error seguro). La fila
+   * Cartoons desaparece y Live Action queda solo con las de MisCaricaturas.
+   * Al volver el sitio, la ronda las repone SOLA. Nada se oculta en
+   * LCT_MUERTAS mientras tanto (disyuntor v319) — la ausencia es temporal. */
+  if (!lctVivo) console.log('[cari] lacartoons caído — Cartoons/Live de lacartoons ocultas hasta que vuelva');
+  if (lctVivo) { /* sitio vivo pero ronda trunca → conserva la ronda anterior (fallos transitorios) */
+    if (!toons.length && cariFeedCache.toons.length) toons.push(...cariFeedCache.toons);
+    if (!liveToons.length) { const pl = cariFeedCache.live.filter((x) => x.site === 'Cartoons'); if (pl.length) liveToons.push(...pl); }
   }
   const live = [...liveCari, ...liveToons].sort((a,b)=> a.title.localeCompare(b.title,'es'));
   items.sort((a,b)=> a.title.localeCompare(b.title,'es'));
@@ -9718,6 +9709,13 @@ async function sitioCaricaturasVivo(base) {
     try { if (r.body) await r.body.cancel(); } catch {}
     return ok;
   } catch { return false; }
+}
+let LCT_VIVO_CHK = { at: 0, vivo: true };
+async function lctVivoAhora() { /* v320: estado con 5 min de TTL — una sonda cada 5 min, no por pedido */
+  if (Date.now() - LCT_VIVO_CHK.at < 5 * 60 * 1000) return LCT_VIVO_CHK.vivo;
+  LCT_VIVO_CHK.at = Date.now();
+  LCT_VIVO_CHK.vivo = await sitioCaricaturasVivo(LCT_BASE);
+  return LCT_VIVO_CHK.vivo;
 }
 async function sondaLacartoons() {
   /* v319: DISYUNTOR — con lacartoons caído no se oculta NADA; al volver,

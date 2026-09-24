@@ -2963,3 +2963,16 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   se conserva por tReconexion. Tope 3 re-resoluciones por sesión (reresolves no
   se resetea); reintentos sí vuelven a 0 en FRAG_LOADED (video sano).
   Fin de 'Se cortó el video — vuelve a abrirlo' por un solo nodo muerto.
+
+## v320 (24 Sep 2026) — regla del dueño: sitio caído ⇒ no se muestra
+- v318 mostraba el rescate de caché con lacartoons en 522 — series inutilizables
+  (sus episodios viven en el sitio caído). Regla corregida:
+  * AL SERVIR (caricaturasDestacadas.listo): lctVivoAhora() (sondeo 6 s, TTL 5 min)
+    caído → cartoons:[] y liveaction sin site 'Cartoons' — aplica también a cachés
+    viejas/stale. Vivo → todo normal.
+  * EN LA RONDA: sondeo 5 s → caído salta el bucle lct (v318) y NO conserva ronda
+    anterior (eso solo con sitio vivo y fallos transitorios).
+  * SONDAS (v319 intacto): caído NO oculta en LCT_MUERTAS; al volver, barrido
+    completo revive inocentes → la ausencia es TEMPORAL, todo regresa solo.
+- Verificado local (lacartoons en 522): Caricaturas 15, Cartoons 0, Live 3
+  (Chavo/Kenan/Sabrina de MisCaricaturas — iCarly y Drake ocultas hasta que vuelva).
