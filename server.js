@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v316'; // v316: relay persistente en data/relay.txt (antes moría en /tmp con cada reinicio)
+const UI_VERSION = 'v317'; // v317: login solo bloquea en línea + sonda con gracia 2 ciclos y disyuntor de saturación + reparación de falsos positivos
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -834,6 +834,15 @@ const CC_SEED_SIN_VIDEO = ['movie:115290' /* La laguna azul: El despertar */, 'm
   let ns = 0;
   for (const s of CC_SEED_SIN_VIDEO) if (!CC_OCULTAS.has(s)) { CC_OCULTAS.add(s); CC_VISTAS.add(s); ns++; }
   if (ns) console.log('[cq] semilla v314: ' + ns + ' títulos con video podrido ocultados (auditoría 24 Sep)');
+}
+/* v317: falsos positivos del ciclo del 24 Sep — la sonda los ocultó durante
+ * una VENTANA DE SATURACIÓN de vimeos (verificados SIRVIENDO desde el taller).
+ * Reparación idempotente en cada arranque. */
+const CC_REPARAR_FALSOS = ['movie:1710008' /* Hasta el final */, 'movie:487672' /* Reino de los Supermanes */, 'movie:329981' /* Presencia siniestra */, 'movie:980026' /* El Bastardo */, 'movie:441728' /* Una cita en el parque */, 'movie:127380' /* Buscando a Dory */, 'movie:74465' /* Un Zoológico en Casa */, 'movie:653588' /* Deep: Into the Submarine Murder Case */];
+{
+  let nr = 0;
+  for (const s of CC_REPARAR_FALSOS) if (CC_OCULTAS.has(s)) { CC_OCULTAS.delete(s); nr++; }
+  if (nr) console.log('[cq] reparados ' + nr + ' falsos positivos de la ventana de saturación (v317)');
 }
 /* v239.13: Notificaciones de sonda — log de eventos recientes */
 const SONDALOG_FILE = path.join(DATA_DIR, 'sonda-log.json');
@@ -9447,14 +9456,35 @@ async function sondaCineCalidad() {
     let nuevas_ok = 0, nuevas_fail = 0, vivas_muertas = 0, muertas_vivas = 0;
     const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
     const tituloDe = (entry) => (entry.split('|')[2] || entry.split('|')[0]).slice(0, 60);
+    /* v317: DISYUNTOR DE SATURACIÓN — si las últimas 8 pruebas de video seguidas
+     * fallaron, es una ventana mala de vimeos, NO podredumbre: se difieren los
+     * veredictos de este ciclo (los muertos de verdad caen en el próximo). */
+    const CC_SAT = sondaCineCalidad._sat || (sondaCineCalidad._sat = []);
+    const saturacion = () => CC_SAT.length >= 8 && CC_SAT.slice(-8).every((x) => !x);
+    const apunta = (v) => { CC_SAT.push(!!v); if (CC_SAT.length > 12) CC_SAT.shift(); };
+    const GRACIA = sondaCineCalidad._gracia || (sondaCineCalidad._gracia = new Map()); /* id → ciclos fallidos */
     /* v314: veredicto con VIDEO REAL — la API dice «vivo» pero el embed puede
      * estar podrido (auditoría 24 Sep: 14% pelis). Si el code no entrega
-     * m3u8 en 2 intentos → muerto de verdad. */
+     * m3u8 en 3 intentos → candidato a muerto (v317: 2 ciclos de gracia). */
     const viveDeVerdad = async (r) => {
       if (!r.ok) return false;
       const code = r.code || r.epCode;
       if (!code) return r.ok; /* sin code que probar: confianza de la API */
-      return await cqEmbedSirve(code);
+      const vive = await cqEmbedSirve(code);
+      apunta(vive);
+      return vive;
+    };
+    const condena = (id, titulo, conVideo) => {
+      /* v317: solo la API muerta es inmediata; la muerte por VIDEO exige 2
+       * ciclos seguidos fallando Y que no haya saturación declarada */
+      if (!conVideo) { CC_OCULTAS.add(id); return true; }
+      if (saturacion()) return false;
+      const g = (GRACIA.get(id) || 0) + 1;
+      GRACIA.set(id, g);
+      if (g < 2) return false;
+      GRACIA.delete(id);
+      CC_OCULTAS.add(id);
+      return true;
     };
     /* NUEVAS */
     const desconocidas = shuffle(sitemap.filter((s) => { const id = s.split('|')[0]; return !CC_VISTAS.has(id) && !CC_OCULTAS.has(id); })).slice(0, 10);
@@ -9463,8 +9493,9 @@ async function sondaCineCalidad() {
       const r = await verificarCC(id);
       CC_VISTAS.add(id);
       const vive = await viveDeVerdad(r);
-      if (vive) nuevas_ok++;
-      else { CC_OCULTAS.add(id); nuevas_fail++; sondaNotify('CineCalidad', 'muerto', id, tituloDe(entry) + (r.ok ? ' — el sitio lo anuncia vivo pero el video está podrido' : ' — sin video en la API (nueva verificada)')); }
+      if (vive) { GRACIA.delete(id); nuevas_ok++; }
+      else if (condena(id, tituloDe(entry), r.ok)) { nuevas_fail++; sondaNotify('CineCalidad', 'muerto', id, tituloDe(entry) + (r.ok ? ' — el sitio lo anuncia vivo pero el video está podrido' : ' — sin video en la API (nueva verificada)')); }
+      else console.log('[sonda] cc: ' + tituloDe(entry) + (saturacion() ? ' — veredicto diferido (saturación de vimeos)' : ' — en observación (1º ciclo sin video)'));
     }
     /* VIVAS */
     const vivas = shuffle(sitemap.filter((s) => !CC_OCULTAS.has(s.split('|')[0]))).slice(0, 10);
@@ -9472,14 +9503,15 @@ async function sondaCineCalidad() {
       const id = entry.split('|')[0];
       const r = await verificarCC(id);
       const vive = await viveDeVerdad(r);
-      if (!vive) { CC_OCULTAS.add(id); vivas_muertas++; sondaNotify('CineCalidad', 'muerto', id, tituloDe(entry) + (r.ok ? ' murió — video podrido detrás del code' : ' murió — playable desapareció')); }
+      if (!vive && condena(id, tituloDe(entry), r.ok)) { vivas_muertas++; sondaNotify('CineCalidad', 'muerto', id, tituloDe(entry) + (r.ok ? ' murió — video podrido detrás del code' : ' murió — playable desapareció')); }
+      else if (vive) GRACIA.delete(id);
     }
     /* MUERTAS — para revivir exige video real, no solo metadatos */
     const muertas = shuffle([...CC_OCULTAS].filter((id) => /^(movie|tvshow|anime):\d+$/.test(id))).slice(0, 10);
     for (const id of muertas) {
       const r = await verificarCC(id);
       const vive = await viveDeVerdad(r);
-      if (vive) { CC_OCULTAS.delete(id); muertas_vivas++; sondaNotify('CineCalidad', 'revivio', id, id.split(':')[1] + ' revivió — video real de vuelta'); }
+      if (vive) { CC_OCULTAS.delete(id); GRACIA.delete(id); muertas_vivas++; sondaNotify('CineCalidad', 'revivio', id, id.split(':')[1] + ' revivió — video real de vuelta'); }
     }
     /* Persistir */
     try { fs.writeFileSync(path.join(__dirname, 'cc-ocultas.txt'), [...CC_OCULTAS].join('\n') + '\n'); } catch {}
@@ -13310,11 +13342,22 @@ async function estrenosMezclados(){
           console.log(`[usuarios] heal ${name} -> nuevo token`);
           return json(res, 200, { ok: true, name: existing.name, token: existing.token, healed: true });
         }
-        if (Date.now() - (existing.lastSeenAt || 0) > NAME_RECLAIM_MS) {
-          existing.token = uid(); existing.lastSeenAt = Date.now(); saveUsers();
-          return json(res, 200, { ok: true, name: existing.name, token: existing.token, reclaimed: true });
-        }
-        return json(res, 409, { ok: false, error: 'Ese nombre ya está tomado — elige otro' });
+        /* v317: regla nueva del dueño — un perfil se reclama SIEMPRE que esté
+         * en desconexión. Solo se bloquea si está EN LÍNEA ahora mismo:
+         * conectado a alguna sala o con actividad de los últimos 3 minutos. */
+        let enLinea = false;
+        try {
+          for (const room of rooms.values()) {
+            for (const u of room.users.values()) {
+              if (String(u.name || '').toLowerCase() === key) { enLinea = true; break; }
+            }
+            if (enLinea) break;
+          }
+        } catch {}
+        if (!enLinea && Date.now() - (existing.lastSeenAt || 0) < 3 * 60 * 1000) enLinea = true;
+        if (enLinea) return json(res, 409, { ok: false, error: 'Ese perfil está EN LÍNEA ahora mismo. Cierra sesión allá o espera unos minutos y vuelve a intentar.', enLinea: true });
+        existing.token = uid(); existing.lastSeenAt = Date.now(); saveUsers();
+        return json(res, 200, { ok: true, name: existing.name, token: existing.token, reclaimed: true });
       }
       const rec = { name, token: uid(), createdAt: Date.now(), lastSeenAt: Date.now() };
       users.set(key, rec); saveUsers();
