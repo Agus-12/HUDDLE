@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v312'; // v312: vimeos con reintento por relay + logs [cq] de diagnóstico por salto
+const UI_VERSION = 'v313'; // v313: vimeos con triple intento + m3u8 verificado (lotería de nodos, como goodstream v99)
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -11438,17 +11438,42 @@ async function resolverGoodstream(embed, pageUrl) {
 }
 /* v90: vimeos — el HLS (720p) vive dentro de un eval(p,a,c,k,e,d) */
 async function resolverVimeos(embed, pageUrl) {
-  /* v312: el embed a veces bloquea la IP del datacenter — si hay relay, reintenta por ahí */
-  let em;
-  try { em = await fetchTexto(embed, pageUrl); }
-  catch (eDir) {
-    if (!CDN_RELAY) throw eDir;
-    console.log('[vimeos] directo falló (' + String(eDir.message || eDir).slice(0, 60) + ') — reintento por relay');
-    em = await (await fetchRelay(embed, 15000)).text();
-  }
-  const out = desempacar(em);
-  const m3u8 = out && (out.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
-  if (!m3u8) throw new Error('vimeos no entregó el video');
+  /* v313: el embed reparte NODO de salida por fetch (Fundación cayó en
+   * s10.vimeos.net muerto para el Oracle mientras s1 servía La Odisea —
+   * la misma lotería que goodstream en v99). Pedimos el embed 3 veces
+   * desfasadas, verificamos cada m3u8 con un pedido real y nos quedamos
+   * con el primero que SIRVA de verdad. Si el embed mismo bloquea la IP
+   * del datacenter, reintenta por relay (v312). */
+  const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+  const pedirEmbed = async (desfase) => {
+    if (desfase) await espera(desfase);
+    try {
+      let em;
+      try { em = await fetchTexto(embed, pageUrl); }
+      catch (eDir) {
+        if (!CDN_RELAY) throw eDir;
+        console.log('[vimeos] embed directo falló (' + String(eDir.message || eDir).slice(0, 50) + ') — por relay');
+        em = await (await fetchRelay(embed, 15000)).text();
+      }
+      const out = desempacar(em);
+      const m3u8 = out && (out.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
+      if (!m3u8) return null; /* cuerpo racionado o sin video */
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 3500);
+      let sirve = false;
+      try {
+        const r = await fetch(m3u8, { headers: { 'User-Agent': MIRROR_UA, Referer: 'https://vimeos.net/' }, signal: ctl.signal, redirect: 'follow' });
+        sirve = r.ok;
+        try { if (r.body) await r.body.cancel(); } catch {}
+      } catch {}
+      clearTimeout(t);
+      if (!sirve && m3u8) console.log('[vimeos] nodo ' + (new URL(m3u8).hostname) + ' no contestó — probando otro');
+      return sirve ? m3u8 : null;
+    } catch { return null; }
+  };
+  const m3u8s = (await Promise.all([pedirEmbed(0), pedirEmbed(700), pedirEmbed(1400)])).filter(Boolean);
+  if (!m3u8s.length) throw new Error('vimeos no entregó el video (nodos ocupados — reintenta)');
+  const m3u8 = [...new Set(m3u8s)][0];
   /* los segmentos piden el Referer del embed: lo recordamos */
   try { hlsReferers.set(new URL(m3u8).hostname, embed); } catch {}
   return { m3u8, proxy: true, subs: [] }; /* directo no sirve → siempre proxy */

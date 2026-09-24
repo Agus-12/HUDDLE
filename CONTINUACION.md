@@ -2895,3 +2895,16 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - resolverVimeos: si el embed falla directo Y hay CDN_RELAY → reintenta por relay (patrón resolverGoodstream).
 - resolverCineCalidad: logs '[cq] embed {code} falló: …' y '[cq] ep/título sin code' para journalctl.
 - tools/diag-cq.js: prueba cada salto (API→code→embed→m3u8→master→segmento) desde la IP del servidor; marca el salto muerto.
+
+## v313 (24 Sep 2026) — vimeos con nodos verificados
+- Diagnóstico del Oracle (tools/diag-cq.js): la CDN NO bloquea el datacenter
+  (La Odisea 200/200/206 completo). El embed reparte NODO por fetch: a
+  Fundación le tocó s10.vimeos.net MUERTO («fetch failed») mientras s1 servía
+  La Odisea. resolverVimeos tomaba el primer m3u8 sin verificar.
+- Fix (patrón goodstream v99): 3 pedidos del embed desfasados 0/700/1400 ms,
+  cada m3u8 se verifica con un pedido real (3.5 s timeout), gana el primero
+  que sirva. Log '[vimeos] nodo X no contestó — probando otro'.
+- Probado local: Fundación descartó s10 (y p5 racionado) y entregó p5 vivo;
+  La Odisea por p4. Ambos ok:true por /api/solo.
+- NOTA: las entradas de «Continuar viendo» con URLs cine-calidad.mx siguen
+  cayendo a resolverSolo (522) — no tienen arreglo; re-abrir desde tarjeta nueva.
