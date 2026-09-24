@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v315'; // v315: vimeos con verificación PROFUNDA (master+variante), 2 oleadas y escape por relay — adiós pantallas negras
+const UI_VERSION = 'v316'; // v316: relay persistente en data/relay.txt (antes moría en /tmp con cada reinicio)
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -5793,7 +5793,19 @@ function mismaPagina(a, b) {
 }
 const FETCH_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'; /* v199: compartida — vimeos amarra el token a ESTA UA */
 let CDN_RELAY = ''; /* v236: Mac Mini relay para CDNs que bloquean datacenter. Set via /api/set-relay?url=... */
-try { const _rl = require('fs').readFileSync('/tmp/huddle-relay.txt', 'utf8').trim(); if (_rl) { if (_rl.includes('lhr.life') || _rl.includes('localhost')) { console.log('[relay] ignorado (lento) ' + _rl); } else { CDN_RELAY = _rl; console.log('[relay] Cargado de disco:', _rl); } } } catch {} /* v236.8: persistir relay */
+/* v316: PERSISTENTE de verdad — antes vivía solo en /tmp (se borraba con cada
+ * reinicio del servidor y el relay «desaparecía»). Ahora data/relay.txt manda
+ * y /tmp queda como respaldo de compatibilidad. */
+try {
+  const fsRL = require('fs');
+  let _rl = '';
+  try { _rl = fsRL.readFileSync(path.join(DATA_DIR, 'relay.txt'), 'utf8').trim(); } catch {}
+  if (!_rl) { try { _rl = fsRL.readFileSync('/tmp/huddle-relay.txt', 'utf8').trim(); } catch {} }
+  if (_rl) {
+    if (_rl.includes('lhr.life') || _rl.includes('localhost')) { console.log('[relay] ignorado (lento) ' + _rl); }
+    else { CDN_RELAY = _rl; console.log('[relay] Cargado de disco:', _rl); }
+  }
+} catch {}
 async function fetchRelay(url, ms) { /* v236: fetch a través del relay — NUNCA cae al directo (el token se liga a la IP) */
   if (!CDN_RELAY) return fetchSeguro(url, ms);
   const relayUrl = CDN_RELAY + '/?u=' + encodeURIComponent(url);
@@ -13686,7 +13698,8 @@ async function estrenosMezclados(){
       if (!newUrl) return json(res, 400, { ok: false, error: 'Falta ?url=' });
       CDN_RELAY = newUrl;
       console.log('[relay] CDN relay actualizado:', CDN_RELAY);
-      try { require('fs').writeFileSync('/tmp/huddle-relay.txt', newUrl); } catch {} /* v236.8: persistir relay */
+      try { require('fs').writeFileSync(path.join(DATA_DIR, 'relay.txt'), newUrl); } catch {} /* v316: persistente */
+      try { require('fs').writeFileSync('/tmp/huddle-relay.txt', newUrl); } catch {} /* compat v236.8 */
       return json(res, 200, { ok: true, relay: CDN_RELAY });
     }
 

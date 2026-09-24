@@ -2928,3 +2928,9 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   por relay (el player vimeos ya rueda por relay en /api/hls); 3 oleadas de embeds
   (3× / 2× tras 1.5 s / 2× tras 3.5 s) — las saturaciones duran segundos.
 - Error final más claro: 'vimeos está saturado en este momento — reintenta en un minuto'.
+
+## v316 (24 Sep 2026) — relay persistente
+- El relay se guardaba SOLO en /tmp/huddle-relay.txt → /tmp se limpia con reinicios
+  y el relay «desaparecía» (Oracle quedó sin relay sin que nadie lo quitara).
+- Ahora: data/relay.txt es la fuente (sobrevive reinicios), /tmp queda por compat.
+- /api/set-relay escribe en ambos. DATA_DIR definido antes de línea 5795 (sí: línea ~520).
