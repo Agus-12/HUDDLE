@@ -2934,3 +2934,20 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   y el relay «desaparecía» (Oracle quedó sin relay sin que nadie lo quitara).
 - Ahora: data/relay.txt es la fuente (sobrevive reinicios), /tmp queda por compat.
 - /api/set-relay escribe en ambos. DATA_DIR definido antes de línea 5795 (sí: línea ~520).
+
+## v318 (24 Sep 2026) — Cartoons/Live Action a prueba de caídas de lacartoons
+- CAUSA: lacartoons.com en 522 (24 Sep, como cine-calidad.mx el día anterior) +
+  los cachés de disco se invalidan por versión (d.v===UI_VERSION) → al desplegar
+  v311-v317 el Oracle descartó cariDatos.json → reconstrucción imposible → filas
+  vacías (Cartoons fuera, Live Action solo los 3 de MisCaricaturas) PERSISTIDAS 1h.
+- FIX (4 capas):
+  1. cariDatos.json se lee AUNQUE sea de otra versión (forma validada) — el
+     metadata de meses vuelve a estar disponible tras cada deploy.
+  2. Sondeo de 5 s a lacartoons antes del bucle: caído → se salta la ronda
+     completa (iba a tardar 6+ min con 522s de ~20 s por serie).
+  3. Rescate POR LISTA: ronda anterior → caché local cariDatos → filas al instante.
+  4. refrescarCariFeed con candado (una sola ronda a la vez).
+- Verificado local con lacartoons caído: ronda 5.4 s; Caricaturas 15, Cartoons 3
+  (semilla local), Live 5 (Chavo/Drake/iCarly/Kenan/Sabrina). En el Oracle el
+  rescate traerá las ~77 cartoons + ~10 live reales de su cariDatos histórico.
+- Cuando lacartoons reviva, la ronda normal refresca todo sola (cache 1 h).

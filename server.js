@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v317'; // v317: login solo bloquea en línea + sonda con gracia 2 ciclos y disyuntor de saturación + reparación de falsos positivos
+const UI_VERSION = 'v318'; // v318: Cartoons/Live sobreviven a caídas de lacartoons — rescate por lista + refresco único + cachés entre versiones
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -8077,7 +8077,11 @@ const lctEps = new Map(); /* lctId → {at, eps} — 6 h */
  * cada actualizar.sh dejaba todo lento otra vez). Si la versión cambió,
  * los archivos se ignoran y se empieza de cero. */
 try {
-  for (const [k, v] of cacheLeer('cariDatos') || []) cariDatos.set(k, v);
+  /* v318: cariDatos vale AUNQUE sea de otra versión — su forma es estable desde
+   * v112 y es lo que permite reconstruir Cartoons/Live con el sitio caído */
+  let _cd = cacheLeer('cariDatos');
+  if (!_cd) { try { const dc = JSON.parse(fs.readFileSync(path.join(CACHE_DIR, 'cariDatos.json'), 'utf8')); if (dc && Array.isArray(dc.e)) _cd = dc.e; } catch {} }
+  for (const [k, v] of _cd || []) if (v && v.d && v.d.titulo) cariDatos.set(k, v);
   for (const [k, v] of cacheLeer('cariMeta') || []) cariMeta.set(k, v);
   for (const [k, v] of cacheLeer('lctEps') || []) lctEps.set(k, v); /* v112: episodios de lacartoons */
   for (const [k, v] of cacheLeer('serieCache') || []) serieCache.set(k, v);
@@ -8449,7 +8453,16 @@ async function caricaturasDestacadas() {
   return listo();
 }
 async function refrescarCariFeed() {
-  // v276: invalida cache viejo que tenía live en caricaturas
+  if (refrescarCariFeed._enCurso) return refrescarCariFeed._enCurso; /* v318: una sola ronda a la vez */
+  refrescarCariFeed._enCurso = (async () => {
+  try { return await refrescarCariFeedInterno(); }
+  finally { refrescarCariFeed._enCurso = null; }
+  })();
+  return refrescarCariFeed._enCurso;
+}
+async function refrescarCariFeedInterno() {
+  const t0 = Date.now();
+  console.log('[cari] ronda iniciada…');
   if(cariFeedCache.items.some(x=> /chavo|chapulin/i.test(x.title) )) cariFeedCache.at = 0;
   const home = await cariHomeImgs();
   if (!home.size) return { caricaturas: cariFeedCache.items, cartoons: cariFeedCache.toons, liveaction: cariFeedCache.live };
@@ -8481,8 +8494,23 @@ async function refrescarCariFeed() {
    * sitio por ráfaga); el arranque en frío tarda unos segundos más pero
    * queda en cache 1 h y después se sirve al instante. */
   const lctLista = [...LCT_SERIES.values()].filter((x) => !LCT_MUERTAS.has(x.slug)); /* v241 — v251 muertas siempre ocultas */
+  /* v318: SONDEO de 5 s — lacartoons caído (522 tarda ~20 s por pedido) no
+   * merece 5 bloques de esperas: saltamos la ronda completa y rescatamos
+   * las filas de la caché local al instante */
+  let lctVivo = true;
+  if (lctLista.length) {
+    try {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 5000);
+      const r = await fetch(LCT_BASE, { headers: { 'User-Agent': FETCH_UA }, signal: ctl.signal, redirect: 'follow' }).finally(() => clearTimeout(t));
+      lctVivo = r.ok;
+      try { if (r.body) await r.body.cancel(); } catch {}
+    } catch { lctVivo = false; }
+    if (!lctVivo) console.log('[cari] lacartoons caído (sondeo 5s) — ronda lct saltada, rescato de caché local');
+  }
   const toons = [];
   const liveToons = []; /* v205: iCarly, Drake & Josh, Power Rangers… apartado propio */
+  let lctVacias = 0;
+  if (lctVivo)
   for (let i = 0; i < lctLista.length; i += 16) {
     const parte = await Promise.all(lctLista.slice(i, i + 16).map(async (lct) => {
       try {
@@ -8494,11 +8522,38 @@ async function refrescarCariFeed() {
       } catch {}
       return null;
     }));
+    const buenas = parte.filter(Boolean).length;
     for (const p of parte) if (p) (p.vivo ? liveToons : toons).push(p.it);
+    if (!buenas && i === 0) lctVacias = 1; else if (!buenas && lctVacias) lctVacias++; else lctVacias = 0;
+    if (lctVacias >= 1 && i > 0) { console.log('[cari] lacartoons no rinde (' + i + '+ series sin datos) — corto la ronda y rescate de caché local'); break; } /* v318: sitio caído → al rescate ya */
   }
   // v276: orden alfabético final
   toons.sort((a,b)=> a.title.localeCompare(b.title,'es'));
   liveToons.sort((a,b)=> a.title.localeCompare(b.title,'es'));
+  /* v318: lacartoons CAÍDO (522 del 24 Sep) no borra tus filas — rescate
+   * POR LISTA: 1) ronda anterior, 2) caché local de metadatos (cariDatos) */
+  const faltanToons = !toons.length, faltanLive = !liveToons.length;
+  if (faltanToons || faltanLive) {
+    const prevToons = cariFeedCache.toons;
+    const prevLive = cariFeedCache.live.filter((x) => x.site === 'Cartoons');
+    if (faltanToons && prevToons.length) { toons.push(...prevToons); console.log('[cari] Cartoons de la ronda anterior (' + toons.length + ')'); }
+    if (faltanLive && prevLive.length) { liveToons.push(...prevLive); console.log('[cari] Live lacartoons de la ronda anterior (' + liveToons.length + ')'); }
+    const siguenFaltando = (!toons.length && faltanToons) || (!liveToons.length && faltanLive);
+    if (siguenFaltando) {
+      let nt = 0, nl = 0;
+      for (const lct of LCT_SERIES.values()) {
+        if (LCT_MUERTAS.has(lct.slug)) continue;
+        const c = cariDatos.get(lct.slug);
+        const d = c && c.d;
+        if (d && (d.cover || d.poster) && d.episodios && d.episodios.length) {
+          const it = { title: d.titulo, url: LCT_BASE + 'serie/' + lct.lctId, img: d.cover || d.poster, site: 'Cartoons' };
+          if (esLctLive(lct.slug)) { if (faltanLive) { liveToons.push(it); nl++; } }
+          else if (faltanToons) { toons.push(it); nt++; }
+        }
+      }
+      if (nt || nl) console.log('[cari] lacartoons caído — reconstruidos ' + nt + ' cartoons + ' + nl + ' live desde caché local');
+    }
+  }
   const live = [...liveCari, ...liveToons].sort((a,b)=> a.title.localeCompare(b.title,'es'));
   items.sort((a,b)=> a.title.localeCompare(b.title,'es'));
   if (items.length || toons.length || live.length) {
@@ -8508,6 +8563,7 @@ async function refrescarCariFeed() {
     cariFeedCache.live = live;
     cacheGuardar('cariFeed', () => ({ at: cariFeedCache.at, items: cariFeedCache.items, toons: cariFeedCache.toons, live: cariFeedCache.live }));
   } /* v111: a disco */
+  console.log('[cari] ronda terminada en ' + ((Date.now() - t0) / 1000).toFixed(1) + 's — items=' + items.length + ' toons=' + toons.length + ' live=' + live.length);
   return { caricaturas: items, cartoons: toons, liveaction: live };
 }
 
