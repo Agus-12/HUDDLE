@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v322'; // v322: bóveda AUTO-RELLENABLE (pelis completas + series en cola) + respaldo cruzado vía Cuevana + /api/boveda para el panel
+const UI_VERSION = 'v323'; // v323: BÓVEDA UNIVERSAL — cosecha y reproducción sin sitio en TODAS las fuentes (d23, lacartoons, miscaricaturas, ennovelas, latanime, animeflv, danimados)
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -2114,6 +2114,11 @@ async function resolverVk(vkEmbedUrl, pageUrl){
 }
 
 async function resolverEnnovelas(pageUrl){
+  const bvEnn = BOVEDA.get('enn:' + pageUrl); /* v323: camino rápido sin sitio */
+  if (bvEnn && Array.isArray(bvEnn.embeds) && bvEnn.embeds.length) {
+    const rB = await bovedaEmbeds(bvEnn.embeds, pageUrl, 'ennovelas …' + pageUrl.slice(-34));
+    if (rB) return rB;
+  }
   const r = await fetchSeguro(pageUrl, 18000).catch(()=>null);
   if(!r || !r.ok) throw new Error('No pude abrir ese capítulo en Ennovelas');
   const html = await r.text();
@@ -2130,6 +2135,7 @@ async function resolverEnnovelas(pageUrl){
     if(/\/emb\/\?vid=/i.test(pageUrl)) cands=[pageUrl];
     else throw new Error('Ese capítulo no trae reproductor — prueba otro');
   }
+  try { bovedaPon('enn:' + pageUrl, { embeds: cands.slice(0, 3) }); } catch {} /* v323: cosecha (ids ok/goodstream/vk/vid estables) */
   // intenta ok.ru / goodstream / vk primero
   for(const emb of cands){
     try{
@@ -3221,6 +3227,12 @@ function htmlDecode(s) { return String(s || '').replace(/&#(\d+);/g, (m2, d2) =>
 async function daniEpToStream(urlEp) {
   const c = DANI_STREAMS.get(urlEp);
   if (c && Date.now() - c.at < 2 * 3600e3) return c.nat;
+  const bvDan = BOVEDA.get('dan:' + urlEp); /* v323: camino rápido sin sitio (players amables) */
+  if (bvDan && Array.isArray(bvDan.embeds) && bvDan.embeds.length) {
+    const rB = await bovedaEmbeds(bvDan.embeds, urlEp, 'danimados …' + urlEp.slice(-30));
+    if (rB) return rB;
+  }
+  const embedsVistosDan = []; /* v323: cosecha */
   const r1 = await fetchSeguro(urlEp, 12000);
   if (!r1.ok) throw new Error('el capítulo no abrió (' + r1.status + ')');
   const html1 = await r1.text();
@@ -3252,6 +3264,7 @@ async function daniEpToStream(urlEp) {
       if (r2.ok) { const j2 = await r2.json().catch(() => null); if (j2 && j2.embed_url) embedUrl = j2.embed_url; }
     } finally { clearTimeout(t); }
     if (!embedUrl) continue;
+    embedsVistosDan.push(embedUrl); /* v323 */
     /* v183: el ajax a veces regresa la ETIQUETA iframe completa, no la URL
      * (episodios con player «Vimeus») — sacar la src de dentro */
     if (/^</.test(embedUrl)) {
@@ -3291,6 +3304,7 @@ async function daniEpToStream(urlEp) {
               } catch {} finally { clearTimeout(t3); }
             }
             if (bodyV) {
+              try { if (embedsVistosDan.length) bovedaPon('dan:' + urlEp, { embeds: embedsVistosDan.slice(0, 3) }); } catch {} /* v323 */
               const tok2 = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
               pelisxdStreams.set(tok2, { body: bodyV, base: rv.m3u8, ref: ev, slug: 'dani', at: ahora });
               const natV = { m3u8: '/api/xd/' + tok2 + '/index.m3u8', proxy: true, subs: rv.subs || [] };
@@ -3323,6 +3337,7 @@ async function daniEpToStream(urlEp) {
       } catch {} finally { clearTimeout(t2); }
     }
     if (!bodyM) continue; /* v179: siguiente player */
+    try { if (embedsVistosDan.length) bovedaPon('dan:' + urlEp, { embeds: embedsVistosDan.slice(0, 3) }); } catch {} /* v323 */
     const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
     pelisxdStreams.set(tok, { body: bodyM, base: m3u8, ref: '', slug: 'dani', at: ahora });
     const nat = { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
@@ -7701,6 +7716,7 @@ async function resolverD23ConTabs(tabs, epLabel, serie, conContabilidad) {
       /* Byse entrega {body,url} (se cachea en /api/xd/ abajo); el resto trae m3u8 directo */
       if (!out || !(out.m3u8 || (out.body && out.url))) { fallos.push(nombre + ' (sin stream)'); continue; }
       if (conContabilidad) d23Perdonar(serie);
+      try { const tb = tabs.filter(Boolean).slice(0, 3); if (tb.length) bovedaPon('d23:' + epLabel, { t: serie || '', embeds: tb }); } catch {} /* v323: cosecha */
       console.log('[d23] ' + epLabel.slice(-40) + ' → ' + nombre + ' en ' + ((Date.now() - t0) / 1000).toFixed(1) + 's');
       /* Byse entrega el cuerpo descifrado — cachearlo (su m3u8 original es
        * de un solo uso) y servirlo por /api/xd/ como hace PelisXD */
@@ -7717,6 +7733,12 @@ async function resolverD23ConTabs(tabs, epLabel, serie, conContabilidad) {
   throw new Error('Los servidores de este episodio de AnimeD23 están caídos (probé: ' + (fallos.join(', ') || 'ninguno') + '). Prueba otro capítulo');
 }
 async function resolverD23(epUrl) {
+  const bvD23 = BOVEDA.get('d23:' + epUrl); /* v323: camino rápido sin sitio */
+  if (bvD23 && Array.isArray(bvD23.embeds) && bvD23.embeds.length) {
+    const rB = await bovedaEmbeds(bvD23.embeds, epUrl, 'd23 …' + epUrl.slice(-34));
+    if (rB) return rB;
+    console.log('[boveda] d23 embeds guardados sin video — camino normal');
+  }
   const r = await fetchSeguro(epUrl, 15000);
   if (!r || !r.ok) throw new Error('No pude abrir ese capítulo en AnimeD23 — intenta luego');
   const html = await r.text();
@@ -8712,6 +8734,12 @@ async function resolverCaricaturaHttp(epUrl) {
   const t0 = Date.now();
   const slug = cariSlugDe(epUrl);
   if (!slug) throw new Error('Capítulo de caricatura no válido');
+  const bvM = BOVEDA.get('misc:' + slug); /* v323: camino rápido sin sitio */
+  if (bvM && Array.isArray(bvM.embeds) && bvM.embeds.length) {
+    for (const euM of bvM.embeds) {
+      try { const outM = await miscDesdeEmbed(new URL(euM), slug); if (outM && outM.m3u8) { console.log('[boveda] miscaricaturas ' + slug + ' desde bóveda'); return outM; } } catch {}
+    }
+  }
   /* 1) la página del capítulo trae el contenedor con el id de publicación */
   const r1 = await fetchSeguro(CARI_BASE + slug + '/', 9000);
   if (!r1 || !r1.ok) throw new Error('La página del capítulo no respondió');
@@ -8729,6 +8757,13 @@ async function resolverCaricaturaHttp(epUrl) {
   const im = j2 && j2.success && j2.data && j2.data.html ? /<iframe[^>]*src="(https?:\/\/[^"]+)"/i.exec(j2.data.html) : null;
   if (!im) throw new Error('El sitio no entregó el player');
   const embed = new URL(im[1].replace(/\//g, '/'));
+  try { bovedaPon('misc:' + slug, { embeds: [embed.href] }); } catch {} /* v323: cosecha */
+  return await miscDesdeEmbed(embed, slug);
+}
+/* v323: del embed del player al video — pasos 3 a 5 de resolverCaricaturaHttp,
+ * reutilizables por la bóveda SIN tocar el sitio */
+async function miscDesdeEmbed(embed, slug) {
+  const t0 = Date.now();
   /* 3) los datos del video (playback cifrado) */
   const r3 = await fetchSeguro(embed.origin + '/api/videos/' + encodeURIComponent(embed.pathname.split('/').pop() || ''), 10000);
   if (!r3 || !r3.ok) throw new Error('No pude leer los datos del video');
@@ -9017,6 +9052,11 @@ async function resolverLacartoons(epUrl) {
       return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
     }
   }
+  const bvL = BOVEDA.get('lct:' + m[1]); /* v323: camino rápido sin sitio */
+  if (bvL && Array.isArray(bvL.embeds) && bvL.embeds.length) {
+    const rB = await bovedaEmbeds(bvL.embeds, epUrl, 'lacartoons cap ' + m[1]);
+    if (rB) return rB;
+  }
   /* v112: chequeo rápido — si la página ya no trae el iframe del player
    * (embed retirado), el error sale claro sin abrir el navegador */
   let idRpm = '';
@@ -9033,6 +9073,12 @@ async function resolverLacartoons(epUrl) {
       }
       idRpm = (/cubeembed\.rpmvid\.com\/#([a-z0-9]+)/i.exec(html) || [])[1] || '';
     }
+    /* v323: cosecha — los ids de ok.ru/rpmvid son estables; cuando el sitio
+     * vuelva, cada capítulo visto queda replicable SIN el sitio */
+    const bvLct = [];
+    if (mOk) bvLct.push('https://ok.ru/videoembed/' + mOk[1]);
+    if (idRpm) bvLct.push('https://cubeembed.rpmvid.com/#' + idRpm);
+    if (bvLct.length) bovedaPon('lct:' + m[1], { embeds: bvLct.slice(0, 3) });
   }
   /* v159: HTTP PRIMERO — la página ya nos dio el id del player; si algo
    * falla, el navegador de respaldo toma el turno como siempre */
@@ -11824,6 +11870,45 @@ const normaBv = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]
  * muertos o código podrido), buscamos la MISMA película en la bóveda de
  * Cuevana y probamos sus embeds (goodstream primero). Dos CDNs distintos
  * para el mismo título. */
+/* v323: REPRODUCTOR UNIVERSAL DE LA BÓVEDA — un embed guardado de CUALQUIER
+ * fuente se convierte en video con los extractores que ya tenemos. Los ids
+ * de los players (ok.ru, rpmvid, vimeos, mp4upload, goodstream, vk, byse)
+ * son estables; lo único efímero es el stream, y ese se re-deriva al play. */
+async function bovedaEmbedASink(embed, ctx) {
+  const e = String(embed || '');
+  if (!/^https?:\/\//i.test(e)) return null;
+  let m;
+  if ((m = /ok\.ru\/videoembed\/(\d+)/i.exec(e))) return resolverOkRu(m[1]);
+  if ((m = /rpmvid\.com\/#([a-z0-9]+)/i.exec(e))) return resolverRpmvidD23(e, m[1]);
+  if (/goodstream\.one/i.test(e)) return resolverGoodstream(e, ctx);
+  if (/vimeos?\.net|hlswish\.com/i.test(e)) return resolverVimeos(e, ctx);
+  if (/mp4upload\.com/i.test(e)) return extraerMp4([e], ctx);
+  if (/vk\.com\/video_ext\.php/i.test(e)) return resolverVk(e, ctx);
+  if (/l\.ennovelas-tv\.com\/emb/i.test(e)) {
+    const rE = await fetchSeguro(e, 15000, { Referer: ctx || 'https://ennovelas-tv.com/' }).catch(() => null);
+    const th = rE && rE.ok ? await rE.text().catch(() => '') : '';
+    const inner = (/src="(https:\/\/vk\.com\/video_ext\.php[^"]+)"/i.exec(th) || [])[1];
+    if (inner) return resolverVk(inner, ctx);
+    return null;
+  }
+  if (/bysesukior|byseqekaho|dood/i.test(e)) {
+    const out = await extraerByse(e).catch(() => null);
+    if (out && out.body && out.url) {
+      const tok = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      pelisxdStreams.set(tok, { body: out.body, base: out.url, ref: out.ref || 'https://animed23.com/', slug: 'boveda', at: Date.now() });
+      for (const u of out.body.match(/https?:\/\/[^\s"']+\.ts[^\s"']*/gi) || []) { try { hlsReferers.set(new URL(u).hostname, out.ref); } catch {} }
+      return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
+    }
+    return null;
+  }
+  return null;
+}
+async function bovedaEmbeds(embeds, ctx, etiqueta) {
+  for (const eu of embeds) {
+    try { const out = await bovedaEmbedASink(eu, ctx); if (out && out.m3u8) { console.log('[boveda] ' + etiqueta + ' desde bóveda'); return out; } } catch {}
+  }
+  return null;
+}
 async function bovedaRespaldo(titulo) {
   const nb = normaBv(titulo);
   if (!nb) return null;
@@ -11938,10 +12023,16 @@ async function resolverAnime(epUrl) {
   /* v97: AnimeFLV también resuelve — sus servidores salen de un POST
    * al sitio (data-encrypt en hex) y trae mp4upload entre ellos */
   if (/animeflv\./i.test(epUrl)) return resolverAnimeflv(epUrl);
+  const bvLat = BOVEDA.get('lat:' + epUrl); /* v323: camino rápido sin sitio */
+  if (bvLat && Array.isArray(bvLat.embeds) && bvLat.embeds.length) {
+    const rB = await bovedaEmbeds(bvLat.embeds, epUrl, 'latanime …' + epUrl.slice(-30));
+    if (rB) return rB;
+  }
   const html = await fetchTexto(epUrl, 'https://latanime.org/');
   const links = [...html.matchAll(/<a\b[^>]*class="[^"]*play-video[^"]*"[^>]*data-player="([^"]+)"[^>]*>/gi)];
   const embeds = links.map((m) => { try { return Buffer.from(m[1], 'base64').toString('utf8'); } catch { return ''; } }).filter((u) => /^https?:\/\//i.test(u));
   const laSlugM = /latanime\.org\/ver\/([a-z0-9-]+)-episodio-\d+/i.exec(epUrl || '');
+  try { const bvList = [...new Set([...embeds.filter((u) => /mp4upload/i.test(u)), ...embeds])].slice(0, 3); if (bvList.length) bovedaPon('lat:' + epUrl, { embeds: bvList }); } catch {} /* v323: cosecha */
   const candidatos = [...new Set(embeds.filter((u) => /mp4upload\./i.test(u)))];
   const directo = candidatos.length ? await extraerMp4(candidatos, epUrl) : null;
   if (directo) { if (laSlugM) { laMuertaQuitar(laSlugM[1]); laFallosPerdonar(laSlugM[1]); } return directo; }
@@ -11961,6 +12052,11 @@ async function resolverAnime(epUrl) {
  * (hex); un POST a /flv devuelve los servidores como <li encrypt="hex">
  * y cada hex es la URL del embed. Preferimos los mp4upload (extraíbles) */
 async function resolverAnimeflv(epUrl) {
+  const bvFlv = BOVEDA.get('flv:' + epUrl); /* v323: camino rápido sin sitio */
+  if (bvFlv && Array.isArray(bvFlv.embeds) && bvFlv.embeds.length) {
+    const rB = await bovedaEmbeds(bvFlv.embeds, epUrl, 'animeflv …' + epUrl.slice(-30));
+    if (rB) return rB;
+  }
   const html = await fetchTexto(epUrl, 'https://vww.animeflv.one/');
   const enc = (/class="opt"[^>]*data-encrypt="([0-9a-f]+)"/i.exec(html) || [])[1];
   if (!enc) throw new Error('No pude leer los servidores de este episodio en AnimeFLV');
@@ -11988,6 +12084,7 @@ async function resolverAnimeflv(epUrl) {
     .map((m) => { try { return Buffer.from(m[1], 'hex').toString('utf8'); } catch { return ''; } })
     .filter((u) => /^https?:\/\//i.test(u));
   const afSlug = (/\/ver\/([a-z0-9-]+)-\d+/.exec(epUrl || '') || [])[1] || ''; /* v205.2 */
+  try { const bvListF = [...new Set([...embeds.filter((u) => /mp4upload/i.test(u)), ...embeds])].slice(0, 3); if (bvListF.length) bovedaPon('flv:' + epUrl, { embeds: bvListF }); } catch {} /* v323: cosecha */
   const candidatos = [...new Set(embeds.filter((u) => /mp4upload\./i.test(u)))];
   const directo = candidatos.length ? await extraerMp4(candidatos, epUrl).catch(() => null) : null;
   if (directo) {
@@ -14007,9 +14104,12 @@ async function estrenosMezclados(){
     if (url.pathname === '/api/boveda' && req.method === 'GET') {
       const resumen = url.searchParams.get('resumen') === '1';
       let pelis = 0, series = 0, animes = 0, cv = 0, caps = 0, completadas = 0, enCola = bovedaSeriesCola.lista.length;
+      const NOMBRES_BV = { cq: 'CineCalidad', cv: 'Cuevana', d23: 'AnimeD23', lct: 'Lacartoons', misc: 'MisCaricaturas', enn: 'Ennovelas', lat: 'Latanime', flv: 'AnimeFLV', dan: 'Danimados' };
+      const fuentes = {};
       const items = [];
       for (const [clave, v] of BOVEDA) {
         if (clave.startsWith('_meta')) continue;
+        const nfBv = NOMBRES_BV[clave.split(':')[0]]; if (nfBv) fuentes[nfBv] = (fuentes[nfBv] || 0) + 1; /* v323 */
         if (clave.startsWith('cq:movie:')) { pelis++; items.push({ clave, t: v.t || '', tipo: 'Película', poster: v.poster || '', y: v.y || '', estado: 'Película', caps: 1 }); continue; }
         if (clave.startsWith('cq:tvshow:') || clave.startsWith('cq:anime:')) {
           const esAni = clave.startsWith('cq:anime:');
@@ -14028,8 +14128,8 @@ async function estrenosMezclados(){
         if (clave.startsWith('cv:')) { cv++; caps += (v.embeds || []).length; items.push({ clave, t: v.t || clave.replace('cv:', ''), tipo: 'Película', poster: '', y: '', estado: 'Película · respaldo Cuevana', caps: (v.embeds || []).length }); }
       }
       items.sort((a, b) => a.t.localeCompare(b.t, 'es'));
-      if (resumen) return json(res, 200, { ok: true, pelis, series, animes, cuevana: cv, caps, completadas, enCola, titulos: pelis + series + animes + cv });
-      return json(res, 200, { ok: true, pelis, series, animes, cuevana: cv, caps, completadas, enCola, titulos: items.length, items });
+      if (resumen) return json(res, 200, { ok: true, pelis, series, animes, cuevana: cv, caps, completadas, enCola, titulos: pelis + series + animes + cv, fuentes });
+      return json(res, 200, { ok: true, pelis, series, animes, cuevana: cv, caps, completadas, enCola, titulos: items.length, fuentes, items });
     }
 
     /* v238: estadísticas por fuente */

@@ -3007,3 +3007,22 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   barra % completadas; página con pósters, filtro por nombre y chips de estado.
 - Verificado local: 7 591 pelis auto, Fundación 'Serie completada', cola 1 945,
   +20/ciclo (~4 h para todo el catálogo de series).
+
+## v323 (24 Sep 2026) — BÓVEDA UNIVERSAL: todas las fuentes
+- bovedaEmbedASink(embed, ctx): convierte UN embed guardado en video con los
+  extractores existentes — ok.ru→resolverOkRu, rpmvid→resolverRpmvidD23,
+  goodstream/vimeos/mp4upload/vk directos, enn-emb→vk interno, byse/dood→
+  extraerByse (envuelto en /api/xd/). bovedaEmbeds(): prueba la lista, log
+  '[boveda] {fuente} … desde bóveda'.
+- Cosecha + camino rápido por fuente (clave → embeds estables):
+  d23:{epUrl} (tabs tras éxito) · lct:{capId} (ok/rpm de la página) ·
+  misc:{slug} (embed del player; pasos 3-5 extraídos a miscDesdeEmbed) ·
+  enn:{pageUrl} (cands ok/goodstream/vk/vid) · lat:{epUrl} y flv:{epUrl}
+  (data-player / POST /flv; mp4upload primero) · dan:{urlEp} (embeds vistos).
+- PelisXD sigue fuera (capturas por sesión del navegador; meta-cache propia).
+- Verificado EN VIVO: latanime (tomb-raider-king E9 → mp4upload/dsvplay/bysekoze)
+  y ennovelas (Betty E1) — 2º play 'desde bóveda' en ambos, sin tocar el sitio.
+  /api/boveda ahora devuelve 'fuentes' {CineCalidad:7612, Latanime:1, …};
+  el panel muestra chips por fuente en la página Bóveda.
+- Lacartoons: cosecha preparada — en cuanto el sitio reviva (522 hoy), cada
+  capítulo visto queda replicable sin él para siempre.

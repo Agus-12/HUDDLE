@@ -818,7 +818,15 @@ function showFuenteBoveda(){
   fetch('/api/boveda').then(function(r){return r.json()}).then(function(b){
     if(!b||!b.ok){document.getElementById('bvLista').innerHTML='<div style="color:#9d93b5;font-size:12px">Bóveda no disponible</div>';return;}
     window._bvData=b;
-    var chips='<span class="chip ok">Películas <b>'+b.pelis+'</b></span>'
+    var chips='';
+    var fnt=b.fuentes||{}; var hayF=false;
+    for(var kf in fnt){hayF=true;chips+='<span class="chip ok">'+kf+' <b>'+fnt[kf]+'</b></span>';}
+    if(hayF)chips+='<span class="chip bad">Películas <b>'+b.pelis+'</b></span>'
+      +'<span class="chip">Series <b>'+b.series+'</b></span>'
+      +'<span class="chip">Animes <b>'+b.animes+'</b></span>'
+      +'<span class="chip ok">Completadas <b>'+b.completadas+'</b></span>'
+      +'<span class="chip">Capítulos <b>'+b.caps+'</b></span>';
+    else chips='<span class="chip ok">Películas <b>'+b.pelis+'</b></span>'
       +'<span class="chip">Series <b>'+b.series+'</b></span>'
       +'<span class="chip">Animes <b>'+b.animes+'</b></span>'
       +'<span class="chip">Cuevana <b>'+b.cuevana+'</b></span>'
