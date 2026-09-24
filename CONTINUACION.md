@@ -2839,3 +2839,54 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - **Memoria:** Límites en todas las cachés + batch de géneros
 - **DoodStream:** Videos eliminados, hosts redirigen a playmogo.com
 - **Streamwish:** JS packed desempacado, CDN devuelve 502
+
+---
+
+## v311 — MIGRACIÓN A CINECALIDAD.AM (24 Sep 2026) `HASH`
+
+### Por qué
+- cine-calidad.mx (WordPress) murió el 23 Sep 2026: Cloudflare 522 en TODO el sitio.
+- El sitio renació como SPA React en https://www.cinecalidad.am con API propia:
+  - `https://tmdb.cinecalidad.am` — /v1/items (kind=movie|tvshow|anime, page, limit, genre, year, sort),
+    /v1/search?q=, /v1/items/{kind}/{id}, …/seasons, …/seasons/{n} (episodios ANIDADOS en season.episodes),
+    …/seasons/{n}/episodes/{e}, /v1/now, /v1/top, /v1/stats, /health/ready
+  - Catálogo al migrar: 7 622 películas + 976 series + 973 animes = 9 571 títulos, 40 640 episodios reproducibles
+  - Cada título/episodio trae `code` → player SIEMPRE `https://vimeos.net/embed-{code}.html`
+    (el MISMO embed de vimeos que ya resolvíamos: desempacar eval → m3u8 pN.vimeos.zip + VTT)
+- La API distingue acentos («fundacion»→0, «fundación»→3): buscarCineCalidad tiene respaldo
+  LOCAL sobre el catálogo completo comparando sin acentos (normaTxt).
+
+### Identidad nueva
+- Títulos/ocultas/vistas/índice: «{kind}:{tmdb_id}» (movie:123) — estable entre syncs del sitio.
+- URLs canónicas en tarjetas/salas: `https://www.cinecalidad.am/#/pelicula/{id}/{slug}`,
+  `#/serie/{id}/{slug}` (OJO: la ruta es /serie/, NO /tvshow), `#/anime/{id}/{slug}`,
+  episodios: `…/#/serie/{id}/{slug}/temporada/{s}/episodio/{e}`.
+- app.js abre el picker con regex `(?:serie|anime)\/(\d+)` → el id llega a /api/serie/{id} (dígitos).
+
+### Archivos modificados (todo en server.js)
+- NUEVO módulo CQ (~línea 9230): cqApi (cache TTL), cqTodas (catálogo completo 3h), cqCard,
+  cqUrlItem/cqUrlEpDe, cqVivaCard/cqOcultaId, resolverCineCalidad, datosSerieCineCalidad.
+- buscarCuevana (HABÍA DOS definiciones; ambas) → alias de buscarCineCalidad (12).
+- buscarCineCalidad → /v1/search + respaldo local sin acentos.
+- cinecalidadIndice → «kind:id|kind|título» desde cqTodas (9 571 entradas).
+- verificarCC → API: movie playable+code; serie Σ playable_count>0 (1 request, 3.3 s/10 títulos).
+- sondaCineCalidad → 3 frentes con identidad nueva (mismo formato de log/notificaciones).
+- catCvFull/catCv → cqTodas; tendenciasCuevana/popularesDeHoy → /v1/now movie; seriesRecientes → /v1/now tvshow.
+- mapearGenero/generoPagina → filtrado LOCAL por género (genres[] del ítem, sin taxonomías del sitio).
+- resolverNativoInterno + resolverPagina → cinecalidad.am; /api/serie con id numérico → ficha nueva.
+- serieCtxFromUrl (cadena sig/prev) + clave de intros «cv:{id}:{temp}» + esEpUrl + verifFuenteDe.
+- crawlConstruir/crawlItemUrl: siembra «cqid:{id}» (sitemaps viejos muertos) — primeras 400 series + 200 animes.
+- huddleProbePelicula(cc) → resolverNativo real por el player; totales auditoría con conteo vivo.
+- refrescarPosterSerie: id numérico → póster por API. /api/stats: total vivo (9 571).
+- CC_AUDIT_DEAD=[] (identidades viejas) + migración única: archiva cc-ocultas/cc-vistas (marker cc-migrado-v311).
+
+### Verificado en local (PORT=3997)
+- Boot limpio; catálogo 9 571; búsqueda «fundacion» SIN acento → Fundación + película;
+- /api/serie/93740 → 30 episodios, T2E6 «Por qué los dioses crearon el vino»;
+- /api/solo con URL hash → m3u8 vimeos en 1.6 s (proxy:true);
+- sonda cc 3.3 s nuevas_ok=10; /api/stats total/activas 9 571.
+
+### Pendientes / notas
+- Subs VTT: el embed trae spa/eng .vtt pero resolverVimeos devuelve subs:[] (igual que en Cuevana) — mejora futura.
+- Continue-viendo viejo con URLs cine-calidad.mx queda muerto (sitio caído) — el veredicto v295 lo maneja.
+- CV_OCULTAS_RT revive-checker aún pega al host viejo (falla rápido, sin romper) — limpiar en v312 si molesta.

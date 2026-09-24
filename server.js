@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v310'; // v310: barredora de intro-*.ts huérfanos en /tmp + fix de fuga cuando falla el ep2
+const UI_VERSION = 'v311'; // v311: migración a cinecalidad.am — API TMDB nueva, player vimeos, sonda reescrita
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -811,9 +811,20 @@ const CC_VISTAS = new Set();
 const CC_OCULTAS = new Set();
 try { for (const l of fs.readFileSync(path.join(__dirname, 'cc-vistas.txt'), 'utf8').split('\n')) if (l.trim()) CC_VISTAS.add(l.trim()); } catch {}
 try { for (const l of fs.readFileSync(path.join(__dirname, 'cc-ocultas.txt'), 'utf8').split('\n')) if (l.trim()) CC_OCULTAS.add(l.trim()); } catch {}
-/* v239: muertas de auditoría inicial */
-const CC_AUDIT_DEAD = new Set(["motor-city", "brainbugs", "end-of-the-rope", "la-pelicula-de-heffalump", "the-group", "efsunlu-ayin", "guadalupe-madre-de-la-humanidad", "vampira-humanista-busca-suicida", "mi-perfecto-ex", "corina", "vera-y-el-placer-de-los-otros", "angeles-caidos-guerreros-de-paz", "rift", "thundercats", "krypto-saves-the-day"]);
+/* v239→v311: la auditoría inicial era del sitio VIEJO (identidades por slug) —
+ * el sitio nuevo va por tmdb_id, así que arranca LIMPIO: las ocultas/vistas
+ * viejas se archivan una sola vez y la sonda nueva reconstruye todo */
+const CC_AUDIT_DEAD = new Set();
 for (const s of CC_AUDIT_DEAD) if (!CC_OCULTAS.has(s)) CC_OCULTAS.add(s);
+try {
+  if (!fs.existsSync(path.join(__dirname, 'cc-migrado-v311'))) {
+    CC_OCULTAS.clear(); CC_VISTAS.clear();
+    fs.writeFileSync(path.join(__dirname, 'cc-ocultas.txt'), '');
+    fs.writeFileSync(path.join(__dirname, 'cc-vistas.txt'), '');
+    fs.writeFileSync(path.join(__dirname, 'cc-migrado-v311'), String(Date.now()));
+    console.log('[cq] migración v311: ocultas/vistas del sitio viejo archivadas — arranque limpio en cinecalidad.am');
+  }
+} catch {}
 /* v239.13: Notificaciones de sonda — log de eventos recientes */
 const SONDALOG_FILE = path.join(DATA_DIR, 'sonda-log.json');
 const SONDALOG = []; /* {ts, fuente, tipo, slug, msg} — max 500 */
@@ -971,6 +982,7 @@ function esEpUrl(u) {
     || /lacartoons\.com\/serie\/capitulo\//i.test(u) || /danimados\.cc\/episodios\//i.test(u)
     || /miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}/i.test(u)
     || /cine-calidad\.mx\/(?:episode\/|serie\/[a-z0-9-]+\/)/i.test(u)
+    || /cinecalidad\.am\/#\/(?:serie|anime)\/\d+\/.*\/temporada\/\d+\/episodio\/\d+/i.test(u) /* v311 */
     || /novelas360\.com\/video\//i.test(u)
     || /enpantallatv\.com\/[a-z0-9-]*capitulo[a-z0-9-]*\//i.test(u) /* v206.2 */
     || /ennovelas-tv\.com\/[a-z0-9-]+-capitulo-\d+/i.test(u); /* v278.4 */
@@ -1006,7 +1018,8 @@ async function resolverPagina(target) {
   const esEnn = /ennovelas-tv\.com\/[a-z0-9-]+-capitulo-\d+/i.test(target); /* v278.4 */
   const esD23 = /animed23\.com\/capitulo\//i.test(target); /* v286 */
   const esMovie = new RegExp(MOVIE_HOST_VIRTUAL.replace(/\./g, '\\.') + '\\/ver\\/', 'i').test(target); /* v207 */
-  return (esMovie ? resolverMovie(target) : esEpAnime ? resolverAnime(target) : esD23 ? resolverD23(target) : esCuevanaMov ? resolverCuevanaMov(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esNv ? resolverNovela(target) : esEnp ? resolverEnp(target) : esEnn ? resolverEnnovelas(target) : resolverSolo(target));
+  const esCq = /cinecalidad\.am\//i.test(target); /* v311 */
+  return (esMovie ? resolverMovie(target) : esCq ? resolverCineCalidad(target) : esEpAnime ? resolverAnime(target) : esD23 ? resolverD23(target) : esCuevanaMov ? resolverCuevanaMov(target) : esPeliXd ? resolverPelisxd(target) : esCari ? resolverCaricatura(target) : esLct ? resolverLacartoons(target) : esDani ? resolverDani(target) : esNv ? resolverNovela(target) : esEnp ? resolverEnp(target) : esEnn ? resolverEnnovelas(target) : resolverSolo(target));
 }
 
 /* v295: VERIFICACIÓN DIRIGIDA — cuando una peli/capítulo FALLA al reproducir,
@@ -1025,6 +1038,7 @@ function verifFuenteDe(url) {
   if (/animeflv\.one\//i.test(url)) return { f: 'AnimeFLV', s: (/animeflv\.one\/\w+\/([a-z0-9-]+)/i.exec(url) || [])[1] || '' };
   if (/pelisxd\.com\//i.test(url)) return { f: 'PelisXD', s: (/pelisxd\.com\/pelicula\/([a-z0-9-]+)/i.exec(url) || [])[1] || '' };
   if (/cuevana\.mov\//i.test(url)) return { f: 'Cuevana', s: (/\/pelicula\/\d+\/([^/?#]+)/i.exec(url) || [])[1] || '' };
+  if (/cinecalidad\.am\//i.test(url)) return { f: 'CineCalidad', s: '' }; /* v311 */
   if (/cine-calidad\.mx\//i.test(url)) return { f: 'CineCalidad', s: '' };
   if (/miscaricaturas\.com\//i.test(url)) return { f: 'Caricaturas', s: '' };
   if (/lacartoons\.com\//i.test(url)) return { f: 'Cartoons', s: '' };
@@ -3310,6 +3324,7 @@ async function resolverNativoInterno(url) {
      (/api/movie/v-vid?url=…): se reproduce nativo, tal cual, sin resolver nada */
   if (esStreamPropioUS(url)) return { m3u8: url, mp4: false, proxy: false, subs: [] };
   if (new RegExp(MOVIE_HOST_VIRTUAL.replace(/\./g, '\\.') + '\\/ver\\/', 'i').test(url)) return resolverMovie(url); /* v207: Movie nativo en sala (playlist local) */
+  if (/cinecalidad\.am\//i.test(url)) return resolverCineCalidad(url); /* v311: cinecalidad.am nativo */
   if (/latanime\.org\/ver\//i.test(url)) return resolverAnime(url);
   if (/animed23\.com\/capitulo\//i.test(url)) return resolverD23(url); /* v286: AnimeD23 nativo en sala (mismo que en Solo) */
   if (/pelisxd\.com\/pelicula\//i.test(url)) return resolverPelisxd(url); /* v98 */
@@ -3470,6 +3485,41 @@ async function datosSerieCuevana(slug) {
   if (c) { refrescarSerieCuevana(slug).catch(() => {}); return c.d; } /* v111: vencido → se sirve YA y se refresca por detrás */
   return await refrescarSerieCuevana(slug);
 }
+/* v311: ficha completa de una serie de cinecalidad.am por tmdb_id —
+ * todas las temporadas con episodios reproducibles (playable+code) */
+async function datosSerieCineCalidad(id) {
+  const clave = 'cqid:' + id;
+  const c = serieCache.get(clave);
+  if (c && Date.now() - c.at < 30 * 60 * 1000) return c.d;
+  try {
+    let it = null, kind = 'tvshow';
+    const dT = await cqApi('/v1/items/tvshow/' + id, null, 20 * 60 * 1000).catch(() => null);
+    if (dT && dT.item) it = dT.item;
+    if (!it) {
+      const dA = await cqApi('/v1/items/anime/' + id, null, 20 * 60 * 1000).catch(() => null);
+      if (dA && dA.item) { it = dA.item; kind = 'anime'; }
+    }
+    if (!it) return null;
+    const ds = await cqApi('/v1/items/' + kind + '/' + id + '/seasons', null, 20 * 60 * 1000).catch(() => null);
+    const seasons = (ds && ds.seasons) || [];
+    const eps = [];
+    for (const s of seasons) {
+      if (!s.playable_count) continue;
+      const dd = await cqApi('/v1/items/' + kind + '/' + id + '/seasons/' + s.season, null, 20 * 60 * 1000).catch(() => null);
+      const epsArr = (dd && (dd.episodes || (dd.season && dd.season.episodes))) || []; /* v311.1: anidan en season.episodes */
+      for (const e of epsArr) {
+        if (!e.playable || !e.code) continue;
+        eps.push({ temporada: e.season, ep: e.episode, url: cqUrlEpDe(it, e.season, e.episode), titulo: String(e.title || ('Episodio ' + e.episode)).slice(0, 90), img: cqPoster(e.still_path, 'w300') });
+      }
+    }
+    eps.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep);
+    if (!eps.length) return null;
+    const out = { ok: true, slug: String(id), titulo: String(it.title || it.original_title || '').slice(0, 80), poster: cqPoster(it.poster_path), episodios: eps };
+    serieCache.set(clave, { at: Date.now(), d: out });
+    try { precargarIntroDeSerie(eps.map((e) => ({ url: e.url }))); } catch {}
+    return out;
+  } catch { return null; }
+}
 async function refrescarSerieCuevana(slug) {
   try {
     const r = await fetchSeguro(`https://cine-calidad.mx/serie/${slug}/`, 10000);
@@ -3522,6 +3572,14 @@ async function posterDeSerie(slug) {
 }
 async function refrescarPosterSerie(slug) {
   try {
+    /* v311: series de cinecalidad.am van por id numérico → póster de la API */
+    if (/^\d+$/.test(slug)) {
+      const dCq = await cqApi('/v1/items/tvshow/' + slug, null, 60 * 60 * 1000).catch(() => null)
+        || await cqApi('/v1/items/anime/' + slug, null, 60 * 60 * 1000).catch(() => null);
+      const itCq = dCq && dCq.item;
+      if (itCq && itCq.poster_path) { const p = cqPoster(itCq.poster_path); if (p) return p; }
+      return '';
+    }
     /* v99: un fallo (póster vacío) se cachea solo 2 minutos — antes quedaba
      * envenenado un DÍA y el still del capítulo seguía apareciendo aunque
      * el sitio ya respondiera.
@@ -3652,6 +3710,17 @@ async function serieCtxFromUrl(u) {
           eps: capsAF.map((n) => ({ url: 'https://vww.animeflv.one/ver/' + afSlug + '-' + n, num: 'Episodio ' + n })) };
       }
       return null;
+    }
+    /* v311: cinecalidad.am — la ruta vive en el hash (#/serie/93740/…/temporada/2/episodio/6) */
+    if (/cinecalidad\.am$/i.test(host)) {
+      const mh = /^#\/(?:serie|anime)\/(\d+)(?:\/[^#]*?)?\/temporada\/(\d+)\/episodio\/(\d+)/i.exec(url.hash || '');
+      if (!mh) return null;
+      const dCq = await datosSerieCineCalidad(mh[1]);
+      if (!dCq || !dCq.episodios || !dCq.episodios.length) return null;
+      const idxCq = dCq.episodios.findIndex((e) => e.temporada === +mh[2] && e.ep === +mh[3]);
+      if (idxCq < 0) return null;
+      return { tipo: 'cinecalidad', titulo: dCq.titulo, poster: dCq.poster, idx: idxCq,
+        eps: dCq.episodios.map((e) => ({ url: e.url, num: e.temporada + 'x' + e.ep, temporada: e.temporada, ep: e.ep })) };
     }
     m = /\/episode\/([a-z0-9-]+)-(\d+)x(\d+)/i.exec(url.pathname);
     if (m && /(cine-calidad\.mx|cuevana\.)$/.test(host)) {
@@ -3848,6 +3917,10 @@ function introKeysDe(url) {
     } else if (/animeflv\./.test(host)) {
       const m = /\/ver\/([a-z0-9-]+)-(?:\d+|episodio-\d+)/.exec(new URL(url).pathname); /* v189: animeflv usa /ver/slug-N */
       if (m) serie = 'af:' + m[1].replace(/-\d+$/, '');
+    } else if (/cinecalidad\.am$/i.test(host)) {
+      /* v311: misma clave cv:{id}:{temp} — el intro-learning por temporada sigue valiendo */
+      const mh = /#\/(?:serie|anime)\/(\d+)(?:\/[^#]*?)?\/temporada\/(\d+)\//i.exec(url.hash || '');
+      if (mh) serie = 'cv:' + mh[1] + ':' + mh[2];
     } else if (/(cine-calidad\.mx|cuevana\.)/.test(host)) {
       const m = /\/episode\/([a-z0-9-]+)-(\d+)x\d+/.exec(new URL(url).pathname);
       if (m) serie = 'cv:' + m[1] + ':' + m[2]; /* v189: POR TEMPORADA, como danimados */
@@ -5811,19 +5884,10 @@ async function agregarSitio(urlRaw) {
 
 /* ---------------------- servidor ---------------------- */
 
-/* v45: búsqueda en las páginas del directorio — v46: Cuevana por su
- * APIs internas (con póster); resultados listos para crear la sala */
+/* v45→v311: búsqueda para salas — ahora la API nueva de cinecalidad.am
+ * (había DOS buscarCuevana; esta era la activa — ambas quedan como alias) */
 async function buscarCuevana(q) {
-  const r = await fetchSeguro(`https://cine-calidad.mx/wp-json/mycustom/v1/search/?s=${encodeURIComponent(q)}&page=1`, 9000);
-  if (!r.ok) return [];
-  const d = await r.json().catch(() => ({}));
-  return (d.posts || []).slice(0, 12).map((p) => ({
-    title: String(p.title || ''),
-    url: (p.type === 'movies') ? `https://cine-calidad.mx/pelicula/${p.slug}/` : `https://cine-calidad.mx/serie/${p.slug}`, /* v87: cuevana.mov ya responde 404 — las pelis viven en cine-calidad */
-    img: String(p.featured_image || '').replace('/w780/', '/w342/'),
-    site: 'CineCalidad',
-    extra: [p.year, p.duration ? `${p.duration} min` : ''].filter(Boolean).join(' · '),
-  })).filter((x) => x.title && x.url);
+  return (await buscarCineCalidad(q)).slice(0, 12);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -6181,40 +6245,25 @@ async function metaDePelicula(url) {
 let tendenciasCache = { at: 0, items: [] };
 let seriesCache = { at: 0, items: [] };
 async function tendenciasCuevana(periodo, cache) {
+  /* v311: «tendencias» = novedades de la API nueva (/v1/now, películas) */
   if (Date.now() - cache.at < 30 * 60 * 1000 && cache.items.length) return cache.items;
-  const r = await fetchSeguro(`https://cine-calidad.mx/wp-json/mycustom/v1/trends/${periodo}`, 10000);
-  if (!r.ok) return cache.items; /* si falla, lo de antes es mejor que nada */
-  const d = await r.json().catch(() => ({}));
-  const items = (d.posts || []).slice(0, 16).map((p) => ({
-    title: String(p.title || ''),
-    url: (p.type === 'serie') ? `https://cine-calidad.mx/serie/${p.slug}` : `https://cine-calidad.mx/pelicula/${p.slug}/`, /* v87: fix 404 — cuevana.mov ya no sirve esas URLs */
-    img: String(p.featured_image || '').replace('/w780/', '/w342/'),
-    site: 'CineCalidad',
-    extra: [p.year, p.duration ? `${p.duration} min` : ''].filter(Boolean).join(' · '),
-  })).filter((x) => x.title && x.url).filter((x) => !cvOcultaUrl(x.url)); /* v191: sin series muertas */
-  if (items.length) { cache.at = Date.now(); cache.items = items; }
-  return items;
+  try {
+    const d = await cqApi('/v1/now', { kind: 'movie' }, 20 * 60 * 1000);
+    const items = ((d && d.items) || []).slice(0, 16).map(cqCard).filter(cqVivaCard);
+    if (items.length) { cache.at = Date.now(); cache.items = items; }
+  } catch {}
+  return cache.items;
 }
 async function popularesDeHoy() { return tendenciasCuevana('movies_day', tendenciasCache); }
-/* v57: series recién agregadas — reemplaza "tendencias de la semana",
- * que salía casi igual que los populares del día (21 de 22 repetidas) */
+/* v57→v311: series recién agregadas = /v1/now de tvshows */
 async function seriesRecientes() {
   if (Date.now() - seriesCache.at < 30 * 60 * 1000 && seriesCache.items.length) return seriesCache.items;
-  const r = await fetchSeguro('https://cine-calidad.mx/wp-json/mycustom/v1/series', 10000);
-  if (!r.ok) return seriesCache.items; /* si falla, lo de antes es mejor que nada */
-  const d = await r.json().catch(() => ({}));
-  const items = (Array.isArray(d) ? d : d.posts || []).slice(0, 16).map((p) => ({
-    title: String(p.title || ''),
-    slug: String(p.slug || ''),
-    /* v59: las páginas de series de cuevana.mov están rotas (app que no
-     * carga) — las series abren en cine-calidad.mx, que sí renderiza */
-    url: `https://cine-calidad.mx/serie/${p.slug}`,
-    img: String(p.featured_image || '').replace('/w780/', '/w342/'),
-    site: 'CineCalidad',
-    extra: p.year ? String(p.year) : '',
-  })).filter((x) => x.title && x.slug);
-  if (items.length) { seriesCache.at = Date.now(); seriesCache.items = items; }
-  return items;
+  try {
+    const d = await cqApi('/v1/now', { kind: 'tvshow' }, 20 * 60 * 1000);
+    const items = ((d && d.items) || []).slice(0, 16).map(cqCard).filter(cqVivaCard);
+    if (items.length) { seriesCache.at = Date.now(); seriesCache.items = items; }
+  } catch {}
+  return seriesCache.items;
 }
 
 /* v101: filas de GÉNERO — el feed se ve más vivo: además de populares,
@@ -6241,24 +6290,19 @@ function generosDelDia() {
   }
   return arr;
 }
-/* v205: SOLO películas en las filas/género de pelis (las series tienen su
- * área) + pag para el catálogo «Ver todo» (cine-calidad pagina de verdad) */
-const mapearGenero = (posts) => (posts || []).filter((p) => p.type !== 'serie').map((p) => ({
-  title: String(p.title || ''),
-  url: `https://cine-calidad.mx/pelicula/${p.slug}/`,
-  img: String(p.featured_image || '').replace('/w780/', '/w342/'),
-  site: 'CineCalidad',
-  extra: [
-    String(p.date || '').slice(0, 4),
-    p.rating ? `★ ${(+p.rating).toFixed(1)}` : '',
-  ].filter(Boolean).join(' · '),
-})).filter((x) => x.title && x.img);
+/* v205→v311: SOLO películas en las filas de género — la API nueva trae el
+ * arreglo `genres` en cada ítem, filtramos el catálogo completo LOCALMENTE
+ * (sin depender de taxonomías del sitio) */
+const normaTxt = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const mapearGenero = (posts) => (posts || []).map(cqCard).filter(cqVivaCard);
 async function generoPagina(slug, pag) {
-  const r = await fetchSeguro(`https://cine-calidad.mx/wp-json/mycustom/v1/list-posts?category=${slug}&page=${pag}`, 10000);
-  if (!r.ok) return { items: [], mas: false };
-  const d = await r.json().catch(() => ({}));
-  const posts = d.posts || [];
-  return { items: mapearGenero(posts), mas: posts.length >= 20 }; /* v205: mas del tamaño crudo */
+  const gen = GENEROS_ES.find((g) => g[0] === slug);
+  const nombre = gen ? normaTxt(gen[1]) : normaTxt(slug);
+  const todas = await cqTodas('movie').catch(() => []);
+  const items = todas.filter((it) => (it.genres || []).some((g) => normaTxt(g.name || g.slug) === nombre)).map(cqCard).filter(cqVivaCard);
+  const por = 20;
+  const ini = ((pag || 1) - 1) * por;
+  return { items: items.slice(ini, ini + por), mas: ini + por < items.length };
 }
 /* v234: PelisXD por género — mezcla con Cuevana para feed más lleno */
 const PXD_GENERO_MAP = {
@@ -6668,13 +6712,13 @@ async function huddleProbePelicula(slug, fuente){
       return { huddle: !!r.ok, reason: r.ok?'ok':(r.reason||'no_servidor') };
     }
     if(fuente==='cinecalidad'){
-      // CineCalidad via API search
-      const u = 'https://cine-calidad.mx/wp-json/mycustom/v1/search/?s='+encodeURIComponent(slug.replace(/-/g,' '))+'&page=1';
-      const rr = await fetchSeguro(u,10000).catch(()=>null);
-      if(!rr||!rr.ok) return { huddle:false, reason:'api_'+(rr?rr.status:'fail') };
-      const d = await rr.json().catch(()=>({}));
-      const found = (d.posts||[]).some(x=>x.slug===slug);
-      return { huddle: found, reason: found?'ok':'no_en_api' };
+      /* v311: la identidad es «kind:id» — resolver de verdad por el MISMO
+       * camino del player (API → vimeos). Identidades viejas (slugs) mueren. */
+      const mmCq = /^(movie|tvshow|anime):(\d+)$/.exec(String(slug));
+      if(!mmCq) return { huddle:false, reason:'identidad-vieja' };
+      const urlCq = mmCq[1]==='movie' ? CQ_WEB+'/#/pelicula/'+mmCq[2] : CQ_WEB+'/#/'+(mmCq[1]==='anime'?'anime':'serie')+'/'+mmCq[2];
+      const nCq = await resolverNativo(urlCq).catch(()=>null);
+      return { huddle: !!nCq, reason: nCq?'nativo-ok':'no_resolvio' };
     }
   }catch(e){ return { huddle:false, reason: String(e).slice(0,40) }; }
   return { huddle:false, reason:'fuente_desc' };
@@ -6928,7 +6972,7 @@ function auditoriaIniciar(alcance){
   try{
     let totP=0; if(HUDDLE_AUDITORIA.alcance.fuentes.pelisxd) totP+= [...(pelisxdIdx?.slugs||[])].filter(s=>!PXD_OCULTAS.has(s)).length || 4700;
     if(HUDDLE_AUDITORIA.alcance.fuentes.cuevana) totP+= 8000 - CVM_OCULTAS.size;
-    if(HUDDLE_AUDITORIA.alcance.fuentes.cinecalidad) totP+= 10950 - CC_OCULTAS.size;
+    if(HUDDLE_AUDITORIA.alcance.fuentes.cinecalidad){ const ccP = ccIdx.slugs.filter(s=>s.startsWith('movie:')).length; totP+= (ccP||7622) - [...CC_OCULTAS].filter(s=>s.startsWith('movie:')).length; } /* v311: conteo vivo de la API nueva */
     HUDDLE_AUDITORIA.progreso.peliculas.total = totP || 1000;
   }catch{}
   try{
@@ -6968,7 +7012,7 @@ async function auditoriaCompletaIniciar(concurrencia){
   let pelis=[], series=[];
   try{ if(!pelisxdIdx) await pelisxdIndice().catch(()=>{}); pelis = [...(pelisxdIdx?.slugs||[])].filter(s=>!PXD_OCULTAS.has(s)).map(s=>({fuente:'pelisxd', slug:s})); }catch{}
   try{ const idxC = await cuevanaIndice().catch(()=>[]); for(const s of idxC) if(!CVM_OCULTAS.has(s)) pelis.push({fuente:'cuevana', slug:s}); }catch{}
-  try{ const totCC = ccIdx.slugs.map(x=>x.split('|')[0]).filter(s=>!CC_OCULTAS.has(s)); for(const s of totCC) pelis.push({fuente:'cinecalidad', slug:s}); }catch{}
+  try{ const totCC = ccIdx.slugs.map(x=>x.split('|')[0]).filter(s=>s.startsWith('movie:')&&!CC_OCULTAS.has(s)); for(const s of totCC) pelis.push({fuente:'cinecalidad', slug:s}); }catch{} /* v311: solo pelis (kind:id) */
   try{ for(const s of LA_TODOS) if(!LA_OCULTAS_SET.has(s)&&!LA_MUERTAS_SET.has(s)) series.push({fuente:'latanime', slug:s}); }catch{}
   try{ for(const s of AF_TODOS) if(!AF_OCULTAS.has(s)) series.push({fuente:'animeflv', slug:s}); }catch{}
   try{ for(const s of D23_TODOS) if(!D23_OCULTAS.has(s)) series.push({fuente:'animed23', slug:s}); }catch{}
@@ -9019,31 +9063,16 @@ const cvFullCache = { movies: { items: [], at: 0 }, series: { items: [], at: 0 }
 const CV_FULL_TTL = 2 * 3600 * 1000; /* 2h */
 
 async function catCvFull(kind) {
+  /* v311: catálogo completo desde la API nueva (cqTodas cachea 3h) */
   const cached = cvFullCache[kind];
   if (cached.items.length && Date.now() - cached.at < CV_FULL_TTL) return cached.items;
-  console.log('[catCv] descargando catálogo completo de CineCalidad (' + kind + ')...');
-  const allItems = [];
-  for (let page = 1; page <= 600; page++) {
-    try {
-      const r = await fetchSeguro('https://cine-calidad.mx/wp-json/mycustom/v1/' + kind + '?page=' + page, 10000);
-      if (!r.ok) break;
-      const d = await r.json().catch(() => []);
-      const arr = Array.isArray(d) ? d : (d.posts || []);
-      if (!arr.length) break;
-      const items = arr.map((p) => ({
-        title: String(p.title || '').replace(/&amp;/g, '&'),
-        url: kind === 'series' ? 'https://cine-calidad.mx/serie/' + p.slug : 'https://cine-calidad.mx/pelicula/' + p.slug + '/',
-        img: String(p.featured_image || '').replace('/w780/', '/w342/'),
-        site: 'CineCalidad',
-        extra: [String(p.date || '').slice(0, 4), p.rating ? '★ ' + (+p.rating).toFixed(1) : ''].filter(Boolean).join(' · '),
-      })).filter((x) => x.title && !cvOcultaUrl(x.url));
-      allItems.push(...items);
-      if (arr.length < 20) break;
-    } catch { break; }
-  }
-  cvFullCache[kind] = { items: allItems, at: Date.now() };
-  console.log('[catCv] ' + kind + ': ' + allItems.length + ' títulos cacheados');
-  return allItems;
+  console.log('[catCv] descargando catálogo completo de CineCalidad (' + kind + ')…');
+  try {
+    const todas = await cqTodas(kind === 'series' ? 'tvshow' : 'movie');
+    const items = todas.map(cqCard).filter(cqVivaCard);
+    if (items.length) { cvFullCache[kind] = { items, at: Date.now() }; console.log('[catCv] ' + kind + ': ' + items.length + ' títulos cacheados'); }
+  } catch {}
+  return cvFullCache[kind].items;
 }
 
 setTimeout(() => { catCvFull('movies').catch(() => {}); catCvFull('series').catch(() => {}); }, 30 * 1000);
@@ -9056,35 +9085,10 @@ async function catCv(kind, pag) {
     const ini = (pag - 1) * por;
     return { items: cached.items.slice(ini, ini + por), mas: ini + por < cached.items.length, total: cached.items.length };
   }
-  // v275: sin cache, trae solo la página pedida (rápido, no 600 páginas)
-  try{
-    const r = await fetchSeguro('https://cine-calidad.mx/wp-json/mycustom/v1/' + kind + '?page=' + pag, 10000);
-    if(r.ok){
-      const d = await r.json().catch(()=> []);
-      const arr = Array.isArray(d) ? d : (d.posts || []);
-      const items = arr.map((p)=>({
-        title: String(p.title||'').replace(/&amp;/g,'&'),
-        url: kind==='series' ? 'https://cine-calidad.mx/serie/'+p.slug : 'https://cine-calidad.mx/pelicula/'+p.slug+'/',
-        img: String(p.featured_image||'').replace('/w780/','/w342/'),
-        site:'CineCalidad',
-        extra:[String(p.date||'').slice(0,4), p.rating? '★ '+(+p.rating).toFixed(1):''].filter(Boolean).join(' · '),
-      })).filter(x=>x.title && !cvOcultaUrl(x.url));
-      // dispara descarga completa por detrás para próximas páginas
-      if(pag===1) setTimeout(()=> catCvFull(kind).catch(()=>{}), 2000);
-      // total estimado: si trae 20, hay más
-      const mas = arr.length >= 20;
-      const totalEst = mas ? 200 : items.length; // estimado
-      // si hay cache parcial, úsalo para total
-      const total = cached.items.length ? cached.items.length : totalEst;
-      return { items, mas, total };
-    }
-  }catch{}
-  // fallback a cache aunque esté vencido
-  if(cached.items.length){
-    const ini=(pag-1)*por;
-    return { items: cached.items.slice(ini, ini+por), mas: ini+por < cached.items.length, total: cached.items.length };
-  }
-  return { items: [], mas:false, total:0 };
+  // v311: sin cache → trae el catálogo completo (API nueva, rápido) y pagina
+  const allItems = await catCvFull(kind).catch(() => cached.items || []);
+  const ini = (pag - 1) * por;
+  return { items: allItems.slice(ini, ini + por), mas: ini + por < allItems.length, total: allItems.length };
 }
 async function catAnimes(pag) {
   const key = 'la-' + pag;
@@ -9222,81 +9226,149 @@ function buscarMovieCosecha(q) {
 }
 
 
-/* v236.7: búsqueda en CineCalidad API */
-async function buscarCineCalidad(q) {
-  const r = await fetchSeguro('https://cine-calidad.mx/wp-json/mycustom/v1/search/?s=' + encodeURIComponent(q) + '&page=1', 10000);
-  if (!r.ok) return [];
+/* ═══════════════════════════════════════════════════════════════════
+ * v311: CINECALIDAD NUEVA — cinecalidad.am (24 Sep 2026)
+ * El sitio viejo (cine-calidad.mx, WordPress) murió el 23 Sep 2026: Cloudflare
+ * devolvía 522 en TODO. El sitio renació como SPA React con API propia:
+ *   https://tmdb.cinecalidad.am  (/v1/items, /v1/search, /v1/items/{kind}/{id},
+ *   …/seasons, …/seasons/{s}/episodes/{e}, /v1/now, /v1/top)
+ * Cada título/episodio trae `code` → el player es https://vimeos.net/embed-{code}.html
+ * — el MISMO embed de vimeos que ya resolvemos (desempacar → m3u8 + vtt).
+ * URLs canónicas que viajan en tarjetas/salas (hash-routing del sitio):
+ *   peli  → https://www.cinecalidad.am/#/pelicula/{id}/{slug}
+ *   serie → https://www.cinecalidad.am/#/serie/{id}/{slug}   (animes: /anime/…)
+ *   ep    → …/#/serie/{id}/{slug}/temporada/{s}/episodio/{e}
+ * Identidad para ocultas/vistas/índice: «{kind}:{tmdb_id}» (estable entre syncs).
+ * ═══════════════════════════════════════════════════════════════════ */
+const CQ_API = 'https://tmdb.cinecalidad.am';
+const CQ_WEB = 'https://www.cinecalidad.am';
+const cqPoster = (p, w) => (p ? 'https://image.tmdb.org/t/p/' + (w || 'w342') + p : '');
+const cqCache = new Map(); /* url → {at, d} */
+async function cqApi(ruta, params, ttl) {
+  const u = CQ_API + ruta + (params ? '?' + new URLSearchParams(params).toString() : '');
+  const c = cqCache.get(u);
+  if (c && Date.now() - c.at < (ttl || 10 * 60 * 1000)) return c.d;
+  const r = await fetchSeguro(u, 12000);
+  if (!r.ok) throw new Error('cq HTTP ' + r.status);
   const d = await r.json();
-  const posts = d.posts || d || [];
-  console.log('[buscar-cc] q=' + q + ' posts=' + posts.length);
-  return posts.map((p) => {
-    const slug = p.slug || '';
-    const esSerie = (p.type || '').toLowerCase().includes('series');
-    const url = slug ? 'https://cine-calidad.mx/' + (esSerie ? 'serie/' : 'pelicula/') + slug + '/' : '';
-    return {
-      title: p.title || '',
-      url,
-      img: p.featured_image || '',
-      site: 'CineCalidad',
-      extra: esSerie ? 'Serie · Latino' : 'Película · Latino',
-      _apiFresh: true, /* v236.9: bypass cvOcultaUrl — la API ya refleja contenido activo */
-    };
-  }).filter((p) => p.title && p.url);
+  cqCache.set(u, { at: Date.now(), d });
+  if (cqCache.size > 1200) cqCache.delete(cqCache.keys().next().value);
+  return d;
+}
+function cqKindDe(it) { return it && it.kind === 'anime' ? 'anime' : it && it.kind === 'tvshow' ? 'tvshow' : 'movie'; }
+function cqUrlItem(it) { const k = cqKindDe(it); return CQ_WEB + '/#/' + (k === 'movie' ? 'pelicula' : k === 'anime' ? 'anime' : 'serie') + '/' + it.tmdb_id + '/' + (it.slug || String(it.tmdb_id)); } /* v311.1: la ruta del sitio es /serie/, no /tvshow */
+function cqUrlEpDe(it, s, e) { return cqUrlItem(it) + '/temporada/' + s + '/episodio/' + e; }
+function cqCard(it) {
+  const kind = cqKindDe(it);
+  return {
+    title: it.title || it.original_title || '',
+    url: cqUrlItem(it),
+    img: cqPoster(it.poster_path),
+    site: 'CineCalidad',
+    extra: [it.year ? String(it.year) : '', it.vote_average ? '★ ' + (+it.vote_average).toFixed(1) : '', it.quality || ''].filter(Boolean).join(' · '),
+    _cq: { id: it.tmdb_id, kind },
+  };
+}
+const cqOcultaId = (kind, id) => CC_OCULTAS.has(kind + ':' + id);
+const cqVivaCard = (c) => c.title && c.url && c.img && !(c._cq && cqOcultaId(c._cq.kind, c._cq.id));
+
+/* catálogo completo por kind (para catCv, géneros e índice del barrido) */
+const cqFull = { movie: { items: [], at: 0, p: null }, tvshow: { items: [], at: 0, p: null }, anime: { items: [], at: 0, p: null } };
+const CQ_FULL_TTL = 3 * 3600 * 1000; /* 3h — el sitio sincroniza TMDB a diario */
+async function cqTodas(kind) {
+  const c = cqFull[kind] || (cqFull[kind] = { items: [], at: 0, p: null });
+  if (c.items.length && Date.now() - c.at < CQ_FULL_TTL) return c.items;
+  if (c.p) return c.p;
+  c.p = (async () => {
+    const all = [];
+    for (let page = 1; page <= 120; page++) {
+      try {
+        const d = await cqApi('/v1/items', { kind, page, limit: 100 }, 30 * 60 * 1000);
+        const arr = (d && d.items) || [];
+        all.push(...arr);
+        const pg = (d && d.pagination) || {};
+        if (!arr.length || pg.has_next === false || page >= (pg.total_pages || 1)) break;
+      } catch (e) { console.log('[cq] ' + kind + ' pág ' + page + ' falló: ' + String(e.message || e).slice(0, 60)); break; }
+    }
+    c.p = null;
+    if (all.length) { c.items = all; c.at = Date.now(); console.log('[cq] ' + kind + ': ' + all.length + ' títulos en catálogo'); }
+    else console.log('[cq] ' + kind + ': sin respuesta — siguen ' + c.items.length + ' cacheados');
+    return c.items;
+  })();
+  return c.p;
 }
 
-/* v238: CineCalidad — índice lazy via API de búsqueda */
+/* v236.7→v311: búsqueda en la API nueva. v311.1: la API distingue acentos
+ * («fundacion» sin acento da 0) → respaldo LOCAL sobre el catálogo completo
+ * comparando sin acentos ( Fundacion = Fundación ), mezclando ambos */
+async function buscarCineCalidad(q) {
+  const query = String(q || '').trim();
+  if (!query) return [];
+  let out = [];
+  try {
+    const d = await cqApi('/v1/search', { q: query }, 10 * 60 * 1000);
+    out = ((d && d.items) || []).map(cqCard).filter(cqVivaCard);
+  } catch {}
+  const nq = normaTxt(query);
+  if (nq.length >= 3) {
+    try {
+      const visto = new Set(out.map((c) => c._cq && c._cq.id));
+      const extra = [];
+      for (const kind of ['movie', 'tvshow', 'anime']) {
+        for (const it of await cqTodas(kind)) {
+          if (visto.has(it.tmdb_id)) continue;
+          if (normaTxt(it.title).includes(nq) || normaTxt(it.original_title).includes(nq)) {
+            extra.push(it); visto.add(it.tmdb_id);
+            if (extra.length >= 40) break;
+          }
+        }
+        if (extra.length >= 40) break;
+      }
+      if (extra.length) out = out.concat(extra.map(cqCard).filter(cqVivaCard));
+    } catch {}
+  }
+  console.log('[buscar-cc] q=' + query + ' items=' + out.length);
+  return out;
+}
+
+/* v238→v311: índice completo para barrido/auditoría — «kind:id|kind|título» */
 async function cinecalidadIndice() {
   if (ccIdx.slugs.length && Date.now() - ccIdx.at < CC_IDX_TTL) return ccIdx.slugs;
   if (ccIdx.buscando) return ccIdx.buscando;
   ccIdx.buscando = (async () => {
-    const slugs = new Set();
-    const letras = ['a','e','i','o','s','d','l','c','p','m','t','r'];
-    for (const q of letras) {
-      for (let page = 1; page <= 8; page++) {
-        try {
-          const r = await fetchSeguro('https://cine-calidad.mx/wp-json/mycustom/v1/search/?s=' + q + '&page=' + page, 10000);
-          if (!r.ok) break;
-          const d = await r.json();
-          const posts = d.posts || [];
-          if (!posts.length) break;
-          for (const p of posts) { if (p.slug) slugs.add(p.slug + '|' + (p.type || 'movies') + '|' + (p.title || '')); }
-        } catch { break; }
-      }
+    const out = [];
+    for (const kind of ['movie', 'tvshow', 'anime']) {
+      try { for (const it of await cqTodas(kind)) out.push(kind + ':' + it.tmdb_id + '|' + kind + '|' + (it.title || '')); } catch {}
     }
-    ccIdx = { slugs: [...slugs], at: Date.now(), buscando: null };
-    console.log('[cinecalidad] ' + ccIdx.slugs.length + ' slugs en índice');
+    if (out.length) ccIdx = { slugs: out, at: Date.now(), buscando: null };
+    else ccIdx.buscando = null;
+    console.log('[cq] índice: ' + out.length + ' entradas');
     return ccIdx.slugs;
   })();
   return ccIdx.buscando;
 }
 
-/* v238: verificar si una peli/serie de CineCalidad sirve */
-async function verificarCC(slug, tipo) {
+/* v238→v311: ¿sirve un título? — la API nueva trae playable+code por ítem y
+ * playable_count por temporada (1 request, sin HTML) */
+async function verificarCC(idKind, tipoViejo) {
   try {
-    const esSerie = (tipo || '').includes('series');
-    const url = 'https://cine-calidad.mx/' + (esSerie ? 'serie/' : 'pelicula/') + slug + '/';
-    const r = await fetchSeguro(url, 12000);
-    if (!r.ok) return { ok: false, reason: 'HTTP ' + r.status };
-    const html = await r.text();
-    if (esSerie) {
-      /* v239: para series, verificar episodios individualmente */
-      const eps = [...html.matchAll(/href="https?:\/\/cine-calidad\.mx\/episode\/([^/"]+)\//g)];
-      if (!eps.length) return { ok: false, reason: 'sin-episodios' };
-      /* Verificar primer episodio — si tiene embed, la serie sirve */
-      const epUrl = 'https://cine-calidad.mx/episode/' + eps[0][1] + '/';
-      const er = await fetchSeguro(epUrl, 10000);
-      if (!er.ok) return { ok: false, reason: 'ep-http-' + er.status };
-      const epHtml = await er.text();
-      const hasEmbed = /goodstream\.one|vimeos\.(net|zip)|hlswish\.com|videoapp\.zip|data-domain="/i.test(epHtml);
-      return { ok: hasEmbed, reason: hasEmbed ? 'ep-embed' : 'ep-no-embed', eps: eps.length };
+    const mm = /^(movie|tvshow|anime):(\d+)$/.exec(String(idKind));
+    if (!mm) return { ok: false, reason: 'identidad-vieja' };
+    const kind = mm[1], id = mm[2];
+    if (kind === 'movie') {
+      const d = await cqApi('/v1/items/movie/' + id, null, 30 * 60 * 1000).catch(() => null);
+      const it = d && d.item;
+      if (!it) return { ok: false, reason: 'no-en-api' };
+      return { ok: !!(it.playable && it.code), reason: it.playable && it.code ? 'playable' : 'sin-code' };
     }
-    /* Películas: verificar embed directo */
-    const hasEmbed = /goodstream\.one|vimeos\.(net|zip)|hlswish\.com|videoapp\.zip|data-domain="/i.test(html);
-    return { ok: hasEmbed, reason: hasEmbed ? 'embed' : 'no-embed' };
+    const d = await cqApi('/v1/items/' + kind + '/' + id + '/seasons', null, 30 * 60 * 1000).catch(() => null);
+    if (!d || !Array.isArray(d.seasons)) return { ok: false, reason: 'no-en-api' };
+    const play = d.seasons.reduce((a, s) => a + (s.playable_count || 0), 0);
+    return play > 0 ? { ok: true, reason: 'eps:' + play, eps: play } : { ok: false, reason: 'sin-episodios' };
   } catch (e) { return { ok: false, reason: String(e.message || e).slice(0, 60) }; }
 }
 
-/* v238: sonda CineCalidad — mismo patrón que Cuevana/PelisXD */
+/* v238→v311: sonda CineCalidad — 3 frentes sobre la identidad nueva */
 async function sondaCineCalidad() {
   try {
     const memMB = process.memoryUsage().heapUsed / 1024 / 1024;
@@ -9306,29 +9378,28 @@ async function sondaCineCalidad() {
     const start = Date.now();
     let nuevas_ok = 0, nuevas_fail = 0, vivas_muertas = 0, muertas_vivas = 0;
     const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    const tituloDe = (entry) => (entry.split('|')[2] || entry.split('|')[0]).slice(0, 60);
     /* NUEVAS */
-    const desconocidas = shuffle(sitemap.filter(s => { const slug = s.split('|')[0]; return !CC_VISTAS.has(slug) && !CC_OCULTAS.has(slug); })).slice(0, 10);
+    const desconocidas = shuffle(sitemap.filter((s) => { const id = s.split('|')[0]; return !CC_VISTAS.has(id) && !CC_OCULTAS.has(id); })).slice(0, 10);
     for (const entry of desconocidas) {
-      const [slug, tipo] = entry.split('|');
-      const r = await verificarCC(slug, tipo);
-      CC_VISTAS.add(slug);
+      const id = entry.split('|')[0];
+      const r = await verificarCC(id);
+      CC_VISTAS.add(id);
       if (r.ok) nuevas_ok++;
-      else { CC_OCULTAS.add(slug); nuevas_fail++; sondaNotify("CineCalidad", "muerto", slug, slug + " — sin embed (nueva verificada)"); }
+      else { CC_OCULTAS.add(id); nuevas_fail++; sondaNotify('CineCalidad', 'muerto', id, tituloDe(entry) + ' — sin video en la API (nueva verificada)'); }
     }
     /* VIVAS */
-    const vivas = shuffle(sitemap.filter(s => !CC_OCULTAS.has(s.split('|')[0]))).slice(0, 10);
+    const vivas = shuffle(sitemap.filter((s) => !CC_OCULTAS.has(s.split('|')[0]))).slice(0, 10);
     for (const entry of vivas) {
-      const [slug, tipo] = entry.split('|');
-      const r = await verificarCC(slug, tipo);
-      if (!r.ok) { CC_OCULTAS.add(slug); vivas_muertas++; sondaNotify("CineCalidad", "muerto", slug, slug + " murio — embed desaparecido"); }
+      const id = entry.split('|')[0];
+      const r = await verificarCC(id);
+      if (!r.ok) { CC_OCULTAS.add(id); vivas_muertas++; sondaNotify('CineCalidad', 'muerto', id, tituloDe(entry) + ' murió — playable desapareció'); }
     }
     /* MUERTAS */
-    const muertas = shuffle([...CC_OCULTAS]).slice(0, 10);
-    for (const slug of muertas) {
-      const entry = sitemap.find(s => s.split('|')[0] === slug);
-      const tipo = entry ? entry.split('|')[1] : 'movies';
-      const r = await verificarCC(slug, tipo);
-      if (r.ok) { CC_OCULTAS.delete(slug); muertas_vivas++; sondaNotify("CineCalidad", "revivio", slug, slug + " revivio — embed encontrado"); }
+    const muertas = shuffle([...CC_OCULTAS].filter((id) => /^(movie|tvshow|anime):\d+$/.test(id))).slice(0, 10);
+    for (const id of muertas) {
+      const r = await verificarCC(id);
+      if (r.ok) { CC_OCULTAS.delete(id); muertas_vivas++; sondaNotify('CineCalidad', 'revivio', id, id.split(':')[1] + ' revivió — playable de vuelta'); }
     }
     /* Persistir */
     try { fs.writeFileSync(path.join(__dirname, 'cc-ocultas.txt'), [...CC_OCULTAS].join('\n') + '\n'); } catch {}
@@ -11375,6 +11446,27 @@ async function resolverVimeos(embed, pageUrl) {
   try { hlsReferers.set(new URL(m3u8).hostname, embed); } catch {}
   return { m3u8, proxy: true, subs: [] }; /* directo no sirve → siempre proxy */
 }
+/* v311: cinecalidad.am — el hash de la URL trae kind/id/temporada/episodio;
+ * la API da el `code` y el player es SIEMPRE vimeos (ya resuelto por arriba) */
+async function resolverCineCalidad(pageUrl) {
+  const h = String(pageUrl || '').split('#')[1] || '';
+  let m = /^\/(serie|anime)\/(\d+)(?:\/[^#]*?)?\/temporada\/(\d+)\/episodio\/(\d+)/i.exec(h);
+  if (m) {
+    const d = await cqApi('/v1/items/' + m[1] + '/' + m[2] + '/seasons/' + m[3] + '/episodes/' + m[4], null, 15 * 60 * 1000).catch(() => null);
+    const code = d && d.episode && d.episode.code;
+    if (!code) throw new Error('Este episodio no está disponible en CineCalidad — prueba otro capítulo');
+    return await resolverVimeos('https://vimeos.net/embed-' + code + '.html', CQ_WEB + '/');
+  }
+  m = /^\/pelicula\/(\d+)|^\/(?:serie|anime)\/(\d+)/i.exec(h);
+  if (m) {
+    const kind = /^\/pelicula\//i.test(h) ? 'movie' : (/^\/anime\//i.test(h) ? 'anime' : 'tvshow');
+    const d = await cqApi('/v1/items/' + kind + '/' + (m[1] || m[2]), null, 15 * 60 * 1000).catch(() => null);
+    const code = d && d.item && d.item.code;
+    if (!code) throw new Error('Este título no está disponible en CineCalidad — prueba otro parecido');
+    return await resolverVimeos('https://vimeos.net/embed-' + code + '.html', CQ_WEB + '/');
+  }
+  throw new Error('URL de CineCalidad no reconocida');
+}
 /* v90: episodios de Latanime en modo individual — el embed de mp4upload
  * trae el mp4 DIRECTO en su HTML (player.src), sin navegador remoto.
  * v93: a veces mp4upload responde 200 con el cuerpo VACÍO por ráfagas
@@ -12785,6 +12877,13 @@ async function estrenosMezclados(){
       /* v61: temporadas y episodios de una serie (para elegirla bonito) */
       const slug = decodeURIComponent(url.pathname.split('/')[3] || '').toLowerCase();
       if (!/^[a-z0-9-]{2,90}$/.test(slug)) return json(res, 400, { ok: false, error: 'Serie inválida' });
+      if (/^\d+$/.test(slug)) { /* v311: cinecalidad.am — las series van por tmdb_id */
+        const dCq = await datosSerieCineCalidad(slug);
+        if (!dCq) return json(res, 502, { ok: false, error: 'No pude leer la serie en CineCalidad' });
+        dCq.episodios = epsVivos(dCq.episodios);
+        precargarIntroDeSerie(dCq.episodios);
+        return json(res, 200, dCq);
+      }
       const dS = await datosSerieCuevana(slug); /* v74: compartida con los botones de episodio */
       if (!dS) return json(res, 502, { ok: false, error: 'No pude leer la serie' });
       dS.episodios = epsVivos(dS.episodios); /* v205.5: episodios muertos fuera */
@@ -13464,7 +13563,7 @@ async function estrenosMezclados(){
        * Vistas = cuántas se han verificado hasta ahora (metadata de sonda). */
       const CV_KNOWN_TOTAL = 8200;   /* ~8200 películas en sitemap cuevana.mov */
       const PXD_KNOWN_TOTAL = 4700;  /* ~4700 películas en sitemap pelisxd.com */
-      const CC_KNOWN_TOTAL = 10950;  /* ~10950 títulos (películas+series) en cine-calidad.mx */
+      const CC_KNOWN_TOTAL = ccIdx.slugs.length || 9571;  /* v311: catálogo vivo de cinecalidad.am (9 571 al migrar) */
       const stats = {
         ok: true,
         fuentes: {
@@ -13865,15 +13964,9 @@ let crawlOcupado = false;
 async function crawlConstruir() {
   const items = [];
   try { for (const sl of DANI_CAT.keys()) if (!DANI_OCULTAS.has(sl) && !DANI_MUERTAS.has(sl)) items.push({ u: 'dani:' + sl }); } catch {}
-  try {
-    for (const sm of ['tvshow-sitemap.xml', 'tvshow-sitemap2.xml']) {
-      const r = await fetchSeguro('https://cine-calidad.mx/' + sm, 15000).catch(() => null);
-      if (!r || !r.ok) continue;
-      const txt = await r.text();
-      for (const mm of txt.matchAll(/<loc>https:\/\/cine-calidad\.mx\/serie\/([a-z0-9-]+)\/?<\/loc>/gi)) {
-        if (mm[1] && mm[1] !== 'serie') items.push({ u: 'cv:' + mm[1] });
-      }
-    }
+  try { /* v311: cinecalidad.am — series/animes por tmdb_id (los sitemaps del sitio viejo murieron) */
+    for (const it of (await cqTodas('tvshow').catch(() => [])).slice(0, 400)) items.push({ u: 'cqid:' + it.tmdb_id });
+    for (const it of (await cqTodas('anime').catch(() => [])).slice(0, 200)) items.push({ u: 'cqid:' + it.tmdb_id });
   } catch {}
   /* v202: latanime desde los ARCHIVOS locales — la paginación ?page= del
    * sitio no funciona (repetía la página 1: la cola vieja venía con
@@ -13899,6 +13992,12 @@ async function crawlItemUrl(it) {
   if (t === 'dani') return 'https://danimados.cc/episodios/' + sl + '-1x1/';
   if (t === 'cv') {
     const d = await datosSerieCuevana(sl).catch(() => null);
+    if (!d || !d.episodios || !d.episodios.length) return null;
+    const t1 = d.episodios.find((e) => e.temporada === 1) || d.episodios[0];
+    return t1.url || null;
+  }
+  if (t === 'cqid') { /* v311: series de cinecalidad.am por id */
+    const d = await datosSerieCineCalidad(sl).catch(() => null);
     if (!d || !d.episodios || !d.episodios.length) return null;
     const t1 = d.episodios.find((e) => e.temporada === 1) || d.episodios[0];
     return t1.url || null;
