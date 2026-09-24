@@ -2890,3 +2890,8 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - Subs VTT: el embed trae spa/eng .vtt pero resolverVimeos devuelve subs:[] (igual que en Cuevana) — mejora futura.
 - Continue-viendo viejo con URLs cine-calidad.mx queda muerto (sitio caído) — el veredicto v295 lo maneja.
 - CV_OCULTAS_RT revive-checker aún pega al host viejo (falla rápido, sin romper) — limpiar en v312 si molesta.
+
+## v312 (24 Sep 2026) — vimeos con relay + diagnóstico
+- resolverVimeos: si el embed falla directo Y hay CDN_RELAY → reintenta por relay (patrón resolverGoodstream).
+- resolverCineCalidad: logs '[cq] embed {code} falló: …' y '[cq] ep/título sin code' para journalctl.
+- tools/diag-cq.js: prueba cada salto (API→code→embed→m3u8→master→segmento) desde la IP del servidor; marca el salto muerto.

@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v311'; // v311: migración a cinecalidad.am — API TMDB nueva, player vimeos, sonda reescrita
+const UI_VERSION = 'v312'; // v312: vimeos con reintento por relay + logs [cq] de diagnóstico por salto
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -11438,7 +11438,14 @@ async function resolverGoodstream(embed, pageUrl) {
 }
 /* v90: vimeos — el HLS (720p) vive dentro de un eval(p,a,c,k,e,d) */
 async function resolverVimeos(embed, pageUrl) {
-  const em = await fetchTexto(embed, pageUrl);
+  /* v312: el embed a veces bloquea la IP del datacenter — si hay relay, reintenta por ahí */
+  let em;
+  try { em = await fetchTexto(embed, pageUrl); }
+  catch (eDir) {
+    if (!CDN_RELAY) throw eDir;
+    console.log('[vimeos] directo falló (' + String(eDir.message || eDir).slice(0, 60) + ') — reintento por relay');
+    em = await (await fetchRelay(embed, 15000)).text();
+  }
   const out = desempacar(em);
   const m3u8 = out && (out.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
   if (!m3u8) throw new Error('vimeos no entregó el video');
@@ -11454,16 +11461,18 @@ async function resolverCineCalidad(pageUrl) {
   if (m) {
     const d = await cqApi('/v1/items/' + m[1] + '/' + m[2] + '/seasons/' + m[3] + '/episodes/' + m[4], null, 15 * 60 * 1000).catch(() => null);
     const code = d && d.episode && d.episode.code;
-    if (!code) throw new Error('Este episodio no está disponible en CineCalidad — prueba otro capítulo');
-    return await resolverVimeos('https://vimeos.net/embed-' + code + '.html', CQ_WEB + '/');
+    if (!code) { console.log('[cq] ep sin code: ' + m[1] + '/' + m[2] + ' T' + m[3] + 'E' + m[4]); throw new Error('Este episodio no está disponible en CineCalidad — prueba otro capítulo'); }
+    try { return await resolverVimeos('https://vimeos.net/embed-' + code + '.html', CQ_WEB + '/'); }
+    catch (eV) { console.log('[cq] embed ' + code + ' falló: ' + String(eV.message || eV).slice(0, 90)); throw eV; }
   }
   m = /^\/pelicula\/(\d+)|^\/(?:serie|anime)\/(\d+)/i.exec(h);
   if (m) {
     const kind = /^\/pelicula\//i.test(h) ? 'movie' : (/^\/anime\//i.test(h) ? 'anime' : 'tvshow');
     const d = await cqApi('/v1/items/' + kind + '/' + (m[1] || m[2]), null, 15 * 60 * 1000).catch(() => null);
     const code = d && d.item && d.item.code;
-    if (!code) throw new Error('Este título no está disponible en CineCalidad — prueba otro parecido');
-    return await resolverVimeos('https://vimeos.net/embed-' + code + '.html', CQ_WEB + '/');
+    if (!code) { console.log('[cq] título sin code: ' + kind + '/' + (m[1] || m[2])); throw new Error('Este título no está disponible en CineCalidad — prueba otro parecido'); }
+    try { return await resolverVimeos('https://vimeos.net/embed-' + code + '.html', CQ_WEB + '/'); }
+    catch (eV) { console.log('[cq] embed ' + code + ' falló: ' + String(eV.message || eV).slice(0, 90)); throw eV; }
   }
   throw new Error('URL de CineCalidad no reconocida');
 }
