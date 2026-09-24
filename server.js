@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v326'; // v326: chips de la Bóveda CLICKEABLES — filtra por fuente (Ennovelas…), películas, series, animes y completadas
+const UI_VERSION = 'v327'; // v327: cosecha de Cuevana — tercer escape: el navegador del servidor pasa el desafío de Cloudflare
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -9521,6 +9521,26 @@ async function bovedaAutoSeries() {
     if (rebanada.length) console.log('[boveda] auto: +' + ok + ' series/animes (quedan ' + bovedaSeriesCola.lista.length + ' en cola)');
   } catch (e) { console.log('[boveda] auto-series: ' + String(e.message || e).slice(0, 60)); }
 }
+/* v327: TERCER ESCAPE — el navegador del servidor abre la URL del API,
+ * ejecuta el JS del desafío de Cloudflare (como ya hace con PelisXD/AnimeFLV)
+ * y cuando pasa, el cuerpo YA es el JSON. */
+async function bovedaCvNavegador(slug) {
+  const nav = await getNavegador();
+  if (!nav) return null;
+  const page = await nav.newPage().catch(() => null);
+  if (!page) return null;
+  try {
+    await page.setUserAgent(MIRROR_UA).catch(() => {});
+    await page.evaluateOnNewDocument(() => { try { Object.defineProperty(navigator, 'webdriver', { get: () => false }); } catch {} });
+    await page.goto(CUEVANA_API + encodeURIComponent(slug), { waitUntil: 'domcontentloaded', timeout: 30000 });
+    for (let i = 0; i < 4; i++) { /* Cloudflare tarda 3-8 s en soltarse */
+      const txt = await page.evaluate(() => (document.body && document.body.innerText) || '').catch(() => '');
+      if (txt && txt.trim().startsWith('{')) { try { return JSON.parse(txt); } catch {} }
+      await new Promise((r2) => setTimeout(r2, 3000));
+    }
+  } catch {} finally { try { await page.close(); } catch {} }
+  return null;
+}
 /* v324: BÓVEDA DE CUEVANA AUTOMÁTICA — el catálogo local ya trae los slugs;
  * 1 GET por título guarda sus embeds (goodstream/vimeos primero) para
  * reproducir sin sitio y alimentar el respaldo cruzado. */
@@ -9534,7 +9554,7 @@ async function bovedaAutoCuevana() {
       if (!bovedaCvCola.lista.length) return;
     }
     const rebanada = bovedaCvCola.lista.splice(0, 10);
-    let ok = 0;
+    let ok = 0, cvNavegadorUsos = 0; /* v327: máx 3 intentos por ciclo (el navegador es de todos) */
     for (const slug of rebanada) {
       try {
         let r = await fetchSeguro(CUEVANA_API + encodeURIComponent(slug), 12000);
@@ -9548,6 +9568,11 @@ async function bovedaAutoCuevana() {
             const rr = await fetchRelay(CUEVANA_API + encodeURIComponent(slug), 15000);
             if (rr && rr.ok && /json/i.test(String((rr.headers && rr.headers.get && rr.headers.get('content-type')) || ''))) { r = rr; desafioCv = false; }
           } catch {}
+        }
+        if (desafioCv && cvNavegadorUsos < 3) { /* v327: el navegador pasa el desafío con JS real */
+          cvNavegadorUsos++;
+          const dN = await bovedaCvNavegador(slug).catch(() => null);
+          if (dN && dN.videos) { r = { ok: true, status: 200, json: async () => dN }; desafioCv = false; console.log('[boveda] auto-cv: ' + slug + ' pasó el desafío vía navegador'); }
         }
         if (desafioCv) {
           const idxCv = rebanada.indexOf(slug);

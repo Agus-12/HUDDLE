@@ -3074,3 +3074,17 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   Caricatura y caps+=1.
 - Verificado local: Ennovelas→8, Latanime→1, películas→7591,
   series/completadas→93; panel servido con bovedaFiltro presente.
+
+## v327 (24 Sep 2026) — cosecha de Cuevana: TERCER escape (navegador)
+- Diagnóstico del usuario con el curl del relay: HTTP 200 text/html → el relay
+  de la Mac está VIVO, pero Cloudflare desafía TAMBIÉN la IP de casa.
+- v327: bovedaCvNavegador(slug) — Puppeteer (getNavegador, UA+webdriver oculto)
+  abre la URL del API, espera 3-8 s a que el desafío se resuelva y parsea el
+  JSON del body. Enganchado tras relay fallido, MÁX 3 intentos por ciclo
+  (el navegador es compartido), silencioso en fallar (el camino de pausa queda).
+- En el taller NO pasó (CF también desafía browsers de datacenter) — probado
+  que el resto del circuito queda intacto: 'desafía (200 html) — pausa',
+  cola 676 sin daño, series +12/ciclo (105 completadas).
+- Apuesta: en el Oracle su navegador pasa guardas de otros sitios a diario; si
+  CF no lo castiga igual ahí, la cola drena sola. Si tampoco, esperar ventana
+  (hoy hubo una ~15:05 en el taller: la API respondió 200 JSON intermitente).
