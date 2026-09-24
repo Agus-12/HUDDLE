@@ -3061,3 +3061,16 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   3 estados en vivo: 503 duro → 429/otros → 200-html.
 - Falta observar en el Oracle: si su Mac-relay está vivo la cosecha entra por
   ahí; log 'incluso vía relay — revisa la Mac' si falla también.
+
+## v326 (24 Sep 2026) — Chips de la Bóveda CLICKEABLES
+- Panel: los chips de la página Bóveda ahora son filtros — Ennovelas, Latanime,
+  cualquier fuente (por prefijo BV_FUENTES), Películas, Series, Animes y
+  Completadas. Clic = filtra (chip se pinta ámbar), otro clic = suelta.
+  bovedaChips() re-renderiza con estado activo; bovedaFiltro(c) alterna.
+- API: BUG v323 corregido — las fuentes sin prefijo cq/cv contaban en
+  'fuentes' pero NO aparecían en items (chip Ennovelas habría salido vacío).
+  Ahora cada capítulo guardado (enn/lat/flv/dan/lct/misc/d23) sale con
+  estado '<Fuente> · capítulo listo · N servidores', tipo Novela/Anime/
+  Caricatura y caps+=1.
+- Verificado local: Ennovelas→8, Latanime→1, películas→7591,
+  series/completadas→93; panel servido con bovedaFiltro presente.

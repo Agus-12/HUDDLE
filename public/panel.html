@@ -802,47 +802,59 @@ function showFuente(k){
     }).catch(function(){});
 }
 
-/* v322: página de la BÓVEDA — todo lo guardado, con carátula y estado */
+/* v322+v326: página de la BÓVEDA — todo lo guardado, con carátula, estado y
+ * CHIPS CLICKEABLES: pícale a Ennovelas/Series/Animes/Películas/Completadas
+ * (o a cualquier fuente) para ver SOLO ese grupo; pícale de nuevo para soltar */
+var BV_FUENTES={'CineCalidad':'cq:','Cuevana':'cv:','AnimeD23':'d23:','Lacartoons':'lct:','MisCaricaturas':'misc:','Ennovelas':'enn:','Latanime':'lat:','AnimeFLV':'flv:','Danimados':'dan:'};
 function showFuenteBoveda(){
   var html='<div class="detail-section"><h3 style="color:#fbbf24">'
     +'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:8px"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>'
     +'Bóveda Huddle</h3>'
-    +'<div style="font-size:12px;color:#9d93b5;margin:6px 0">Lo que Huddle ya cosechó: se reproduce directo del CDN sin depender de los sitios. Crece sola — cada ficha que abres y cada ciclo del auto-relleno suman.</div>'
+    +'<div style="font-size:12px;color:#9d93b5;margin:6px 0">Lo que Huddle ya cosechó: se reproduce directo del CDN sin depender de los sitios. Pícale a cualquier chip para ver solo ese grupo; pícale de nuevo para ver todo.</div>'
     +'<input id="bvFiltro" placeholder="Filtrar por nombre…" oninput="bovedaPintar()" style="width:100%;margin-top:8px;padding:8px 10px;border-radius:8px;border:1px solid #3a3348;background:#191522;color:#efeaf7;font-size:13px;outline:none">'
     +'<div id="bvResumen" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>'
     +'</div>'
     +'<div class="detail-section"><div id="bvLista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px"><div style="color:#9d93b5;font-size:12px">Cargando bóveda…</div></div></div>';
   document.getElementById('fuenteContent').innerHTML=html;
   showPage('Fuente');
-  window._bvData=null;
+  window._bvData=null; window._bvCat='';
   fetch('/api/boveda').then(function(r){return r.json()}).then(function(b){
     if(!b||!b.ok){document.getElementById('bvLista').innerHTML='<div style="color:#9d93b5;font-size:12px">Bóveda no disponible</div>';return;}
     window._bvData=b;
-    var chips='';
-    var fnt=b.fuentes||{}; var hayF=false;
-    for(var kf in fnt){hayF=true;chips+='<span class="chip ok">'+kf+' <b>'+fnt[kf]+'</b></span>';}
-    if(hayF)chips+='<span class="chip bad">Películas <b>'+b.pelis+'</b></span>'
-      +'<span class="chip">Series <b>'+b.series+'</b></span>'
-      +'<span class="chip">Animes <b>'+b.animes+'</b></span>'
-      +'<span class="chip ok">Completadas <b>'+b.completadas+'</b></span>'
-      +'<span class="chip">Capítulos <b>'+b.caps+'</b></span>';
-    else chips='<span class="chip ok">Películas <b>'+b.pelis+'</b></span>'
-      +'<span class="chip">Series <b>'+b.series+'</b></span>'
-      +'<span class="chip">Animes <b>'+b.animes+'</b></span>'
-      +'<span class="chip">Cuevana <b>'+b.cuevana+'</b></span>'
-      +'<span class="chip ok">Completadas <b>'+b.completadas+'</b></span>'
-      +'<span class="chip">Capítulos <b>'+b.caps+'</b></span>';
-    document.getElementById('bvResumen').innerHTML=chips;
+    bovedaChips();
     bovedaPintar();
   }).catch(function(){ var el=document.getElementById('bvLista'); if(el)el.innerHTML='<div style="color:#9d93b5;font-size:12px">No pude leer la bóveda</div>'; });
 }
+function bovedaChips(){
+  var b=window._bvData;if(!b)return;
+  var el=document.getElementById('bvResumen');if(!el)return;
+  var fnt=b.fuentes||{};var h='';var act='border:1px solid #fbbf24;color:#fbbf24;';
+  for(var kf in fnt){h+='<span class="chip ok" onclick="bovedaFiltro(\''+kf+'\')" style="cursor:pointer;'+(window._bvCat===kf?act:'')+'">'+kf+' <b>'+fnt[kf]+'</b></span>';}
+  h+='<span class="chip" onclick="bovedaFiltro(\'peliculas\')" style="cursor:pointer;'+(window._bvCat==='peliculas'?act:'')+'">Películas <b>'+b.pelis+'</b></span>'
+    +'<span class="chip" onclick="bovedaFiltro(\'series\')" style="cursor:pointer;'+(window._bvCat==='series'?act:'')+'">Series <b>'+b.series+'</b></span>'
+    +'<span class="chip" onclick="bovedaFiltro(\'animes\')" style="cursor:pointer;'+(window._bvCat==='animes'?act:'')+'">Animes <b>'+b.animes+'</b></span>'
+    +'<span class="chip ok" onclick="bovedaFiltro(\'completadas\')" style="cursor:pointer;'+(window._bvCat==='completadas'?act:'')+'">Completadas <b>'+b.completadas+'</b></span>'
+    +'<span class="chip">Capítulos <b>'+b.caps+'</b></span>';
+  el.innerHTML=h;
+}
+function bovedaFiltro(c){window._bvCat=(window._bvCat===c)?'':c;bovedaChips();bovedaPintar();}
 function bovedaPintar(){
-  var b=window._bvData; if(!b)return;
+  var b=window._bvData;if(!b)return;
   var q=(document.getElementById('bvFiltro')||{}).value||'';
   var nq=q.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-  var items=(b.items||[]).filter(function(x){return !nq||((x.t+' '+x.tipo+' '+x.estado).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().indexOf(nq)>=0);});
+  var cat=window._bvCat||'';
+  var items=(b.items||[]).filter(function(x){
+    if(cat==='peliculas'&&x.tipo!=='Película')return false;
+    if(cat==='series'&&x.tipo!=='Serie')return false;
+    if(cat==='animes'&&x.tipo!=='Anime')return false;
+    if(cat==='completadas'&&x.estado!=='Serie completada')return false;
+    var pre=BV_FUENTES[cat];
+    if(pre&&String(x.clave||'').indexOf(pre)!==0)return false;
+    if(!nq)return true;
+    return (x.t+' '+x.tipo+' '+x.estado).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().indexOf(nq)>=0;
+  });
   var el=document.getElementById('bvLista');
-  if(!items.length){el.innerHTML='<div style="color:#9d93b5;font-size:12px">Sin resultados'+(q?' para «'+q+'»':'')+' — la bóveda crece sola con el uso</div>';return;}
+  if(!items.length){el.innerHTML='<div style="color:#9d93b5;font-size:12px">Sin resultados'+(q?' para «'+q+'»':' en «'+cat+'»')+' — la bóveda crece sola con el uso</div>';return;}
   var h='';
   items.slice(0,600).forEach(function(x){
     var col=x.estado==='Serie completada'?'#38e08a':(x.estado.indexOf('Falta')===0?'#fbbf24':'#7dd3fc');

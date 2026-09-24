@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v325'; // v325: cosecha de Cuevana blindada — detecta el desafío 'suave' (200+HTML), escapa por relay, jamás oculta de más
+const UI_VERSION = 'v326'; // v326: chips de la Bóveda CLICKEABLES — filtra por fuente (Ennovelas…), películas, series, animes y completadas
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -14187,11 +14187,20 @@ async function estrenosMezclados(){
       const resumen = url.searchParams.get('resumen') === '1';
       let pelis = 0, series = 0, animes = 0, cv = 0, caps = 0, completadas = 0, enCola = bovedaSeriesCola.lista.length + bovedaCvCola.lista.length; /* v324: suma ambas colas */
       const NOMBRES_BV = { cq: 'CineCalidad', cv: 'Cuevana', d23: 'AnimeD23', lct: 'Lacartoons', misc: 'MisCaricaturas', enn: 'Ennovelas', lat: 'Latanime', flv: 'AnimeFLV', dan: 'Danimados' };
+      const TIPO_BV = { d23: 'Anime', lct: 'Caricatura', misc: 'Caricatura', enn: 'Novela', lat: 'Anime', flv: 'Anime', dan: 'Anime' }; /* v326 */
       const fuentes = {};
       const items = [];
       for (const [clave, v] of BOVEDA) {
         if (clave.startsWith('_meta')) continue;
         const nfBv = NOMBRES_BV[clave.split(':')[0]]; if (nfBv) fuentes[nfBv] = (fuentes[nfBv] || 0) + 1; /* v323 */
+        const preBv2 = clave.split(':')[0];
+        if (TIPO_BV[preBv2]) { /* v326: las demás fuentes TAMBIÉN salen en la lista del panel */
+          const neBv = (v.embeds || []).length;
+          const segBv = clave.replace(/^[a-z0-9]+:/, '').replace(/\/$/, '').split('/').pop() || clave;
+          items.push({ clave, t: v.t || segBv, tipo: TIPO_BV[preBv2], poster: '', y: '', estado: NOMBRES_BV[preBv2] + ' · capítulo listo' + (neBv > 1 ? ' · ' + neBv + ' servidores' : ''), caps: 1 });
+          caps++;
+          continue;
+        }
         if (clave.startsWith('cq:movie:')) { pelis++; items.push({ clave, t: v.t || '', tipo: 'Película', poster: v.poster || '', y: v.y || '', estado: 'Película', caps: 1 }); continue; }
         if (clave.startsWith('cq:tvshow:') || clave.startsWith('cq:anime:')) {
           const esAni = clave.startsWith('cq:anime:');
