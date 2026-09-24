@@ -2976,3 +2976,18 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
     completo revive inocentes → la ausencia es TEMPORAL, todo regresa solo.
 - Verificado local (lacartoons en 522): Caricaturas 15, Cartoons 0, Live 3
   (Chavo/Kenan/Sabrina de MisCaricaturas — iCarly y Drake ocultas hasta que vuelva).
+
+## v321 (24 Sep 2026) — BÓVEDA HUDDLE (data/boveda.json)
+- Concepto: la m3u8 firmada expira (e=43200), pero el CÓDIGO del archivo en el
+  CDN es estable. Bóveda = JSON con lo estable por título/capítulo.
+- Claves: 'cq:movie:{id}' {t,kind,code} · 'cq:tvshow|anime:{id}' {t,kind,eps{s:{e:code}}}
+  · 'cv:{slug}' {t, embeds[≤4 goodstream/vimeos/hlswish]}.
+- Cosecha automática: datosSerieCineCalidad (TODA la serie al abrir ficha) +
+  resolverCineCalidad episodio/película al resolver + resolverCuevanaMov al
+  extraer embeds. Guardado atómico (tmp+rename, throttle 2 s).
+- Playback: bóveda → embed del CDN DIRECTO — sin API del sitio, sin búsqueda.
+  Código podrido → se descarta y cae al camino normal (autocuración). PelisXD
+  queda fuera (sus capturas son por sesión del navegador; ya tiene su cache TTL).
+- Verificado local: ficha Fundación → 30 caps en bóveda; /api/solo T2E6 dos veces
+  ('desde bóveda'); tras REINICIAR el server → play OK 'desde bóveda' sin tocar
+  el sitio — reproducción independiente de cinecalidad.am/tmdb API (solo vimeos).

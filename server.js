@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v320'; // v320: regla del dueño — lacartoons caído ⇒ sus series NO se muestran (vuelven solas cuando el sitio regrese)
+const UI_VERSION = 'v321'; // v321: BÓVEDA HUDDLE — códigos estables en data/boveda.json: reproducción instantánea aunque el sitio esté caído
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -3543,18 +3543,21 @@ async function datosSerieCineCalidad(id) {
     const ds = await cqApi('/v1/items/' + kind + '/' + id + '/seasons', null, 20 * 60 * 1000).catch(() => null);
     const seasons = (ds && ds.seasons) || [];
     const eps = [];
+    const codigos = {}; /* v321: para la bóveda */
     for (const s of seasons) {
       if (!s.playable_count) continue;
       const dd = await cqApi('/v1/items/' + kind + '/' + id + '/seasons/' + s.season, null, 20 * 60 * 1000).catch(() => null);
       const epsArr = (dd && (dd.episodes || (dd.season && dd.season.episodes))) || []; /* v311.1: anidan en season.episodes */
       for (const e of epsArr) {
         if (!e.playable || !e.code) continue;
+        (codigos[e.season] = codigos[e.season] || {})[e.episode] = e.code; /* v321 */
         eps.push({ temporada: e.season, ep: e.episode, url: cqUrlEpDe(it, e.season, e.episode), titulo: String(e.title || ('Episodio ' + e.episode)).slice(0, 90), img: cqPoster(e.still_path, 'w300') });
       }
     }
     eps.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep);
     if (!eps.length) return null;
     const out = { ok: true, slug: String(id), titulo: String(it.title || it.original_title || '').slice(0, 80), poster: cqPoster(it.poster_path), episodios: eps };
+    if (Object.keys(codigos).length) bovedaPon('cq:' + kind + ':' + id, { t: out.titulo, kind, eps: codigos }); /* v321: cosecha de TODA la serie al abrir su ficha */
     serieCache.set(clave, { at: Date.now(), d: out });
     try { precargarIntroDeSerie(eps.map((e) => ({ url: e.url }))); } catch {}
     return out;
@@ -6075,6 +6078,21 @@ async function resolverCuevanaMov(pageUrl) {
   } else if (cc) {
     CUEVANA_M3U8_CACHE.delete(slug);
   }
+  /* v321: BÓVEDA — embeds guardados: reproducir sin tocar la API del sitio */
+  const bvCv = BOVEDA.get('cv:' + slug);
+  if (bvCv && Array.isArray(bvCv.embeds) && bvCv.embeds.length) {
+    for (const euCv of bvCv.embeds) {
+      try {
+        const hCv = new URL(euCv).hostname;
+        let outCv = null;
+        if (/goodstream\.one/i.test(hCv)) outCv = await resolverGoodstream(euCv, 'https://cuevana.mov/');
+        else if (/vimeos?\.(net|zip)|hlswish\.com/i.test(hCv)) outCv = await resolverVimeos(euCv, 'https://cuevana.mov/');
+        if (outCv && outCv.m3u8) { console.log('[boveda] cuevana ' + slug + ' desde bóveda'); return outCv; }
+      } catch {}
+    }
+    console.log('[boveda] cuevana ' + slug + ' — embeds guardados sin video, camino normal');
+    BOVEDA.delete('cv:' + slug); bovedaGuardar();
+  }
   const r = await fetchSeguro(CUEVANA_API + encodeURIComponent(slug), 12000);
   if (!r.ok) throw new Error('API Cuevana error: ' + r.status);
   const d = await r.json();
@@ -6087,6 +6105,7 @@ async function resolverCuevanaMov(pageUrl) {
     const bi = CUEVANA_HOSTS_OK.indexOf(new URL(b.url || 'https://x').hostname);
     return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
   });
+  try { const ebCv = sorted.map((x) => x.url).filter(Boolean).slice(0, 4); if (ebCv.length) bovedaPon('cv:' + slug, { t: (d.titles && (d.titles.name || d.titles.title)) || '', embeds: ebCv }); } catch {} /* v321: cosecha */
   for (const embed of sorted) {
     if (!embed.url) continue;
     const host = new URL(embed.url).hostname;
@@ -11712,25 +11731,79 @@ async function resolverVimeos(embed, pageUrl) {
   try { hlsReferers.set(new URL(elegido).hostname, embed); } catch {}
   return { m3u8: elegido, proxy: true, subs: [] }; /* directo no sirve → siempre proxy */
 }
+/* ═══ v321: BÓVEDA HUDDLE — data/boveda.json ═══
+ * La dirección completa (m3u8 firmada) expira en horas, pero el CÓDIGO del
+ * archivo en el CDN es estable. Aquí guardamos lo estable por título/capítulo:
+ *   'cq:movie:123'     → { t, kind:'movie', code }        (vimeos code)
+ *   'cq:tvshow:93740'  → { t, kind, eps:{ '2':{'6':'code'} } }
+ *   'cv:slug'          → { t, embeds:[goodstream/vimeos…] }
+ * Al reproducir: bóveda → embed del CDN DIRECTO — sin API del sitio, sin
+ * búsqueda. Instantáneo y funciona aunque el sitio esté caído (solo depende
+ * de que el CDN conserve el archivo; para sus rachas, el relay). */
+const BOVEDA_FILE = path.join(DATA_DIR, 'boveda.json');
+const BOVEDA = new Map();
+try { const _bv = JSON.parse(fs.readFileSync(BOVEDA_FILE, 'utf8')); for (const [k, v] of Object.entries(_bv || {})) if (v && typeof v === 'object') BOVEDA.set(k, v); } catch {}
+let bovedaT = null;
+function bovedaGuardar() {
+  if (bovedaT) return;
+  bovedaT = setTimeout(() => {
+    bovedaT = null;
+    try { fs.writeFileSync(BOVEDA_FILE + '.tmp', JSON.stringify(Object.fromEntries(BOVEDA))); fs.renameSync(BOVEDA_FILE + '.tmp', BOVEDA_FILE); } catch {}
+  }, 2000);
+}
+function bovedaPon(clave, datos) {
+  const prev = BOVEDA.get(clave) || {};
+  BOVEDA.set(clave, Object.assign(prev, datos, { at: Date.now() }));
+  bovedaGuardar();
+}
+
 /* v311: cinecalidad.am — el hash de la URL trae kind/id/temporada/episodio;
  * la API da el `code` y el player es SIEMPRE vimeos (ya resuelto por arriba) */
 async function resolverCineCalidad(pageUrl) {
   const h = String(pageUrl || '').split('#')[1] || '';
   let m = /^\/(serie|anime)\/(\d+)(?:\/[^#]*?)?\/temporada\/(\d+)\/episodio\/(\d+)/i.exec(h);
   if (m) {
+    const bkEp = 'cq:' + (m[1] === 'anime' ? 'anime' : 'tvshow') + ':' + m[2];
+    /* v321: BÓVEDA — código local → embed directo (sin API del sitio) */
+    const bEp = BOVEDA.get(bkEp);
+    const codeB = bEp && bEp.eps && bEp.eps[m[3]] && bEp.eps[m[3]][m[4]];
+    if (codeB) {
+      try {
+        const outB = await resolverVimeos('https://vimeos.net/embed-' + codeB + '.html', CQ_WEB + '/');
+        console.log('[boveda] cq ' + m[2] + ' T' + m[3] + 'E' + m[4] + ' desde bóveda');
+        return outB;
+      } catch (eB) { console.log('[boveda] código ' + codeB + ' ya no sirve — camino normal'); }
+    }
     const d = await cqApi('/v1/items/' + m[1] + '/' + m[2] + '/seasons/' + m[3] + '/episodes/' + m[4], null, 15 * 60 * 1000).catch(() => null);
     const code = d && d.episode && d.episode.code;
     if (!code) { console.log('[cq] ep sin code: ' + m[1] + '/' + m[2] + ' T' + m[3] + 'E' + m[4]); throw new Error('Este episodio no está disponible en CineCalidad — prueba otro capítulo'); }
+    const bvEp = BOVEDA.get(bkEp) || { t: '', kind: m[1] === 'anime' ? 'anime' : 'tvshow', eps: {} };
+    bvEp.eps = bvEp.eps || {}; (bvEp.eps[m[3]] = bvEp.eps[m[3]] || {})[m[4]] = code;
+    bovedaPon(bkEp, bvEp); /* v321: cosecha */
     try { return await resolverVimeos('https://vimeos.net/embed-' + code + '.html', CQ_WEB + '/'); }
     catch (eV) { console.log('[cq] embed ' + code + ' falló: ' + String(eV.message || eV).slice(0, 90)); throw eV; }
   }
   m = /^\/pelicula\/(\d+)|^\/(?:serie|anime)\/(\d+)/i.exec(h);
   if (m) {
     const kind = /^\/pelicula\//i.test(h) ? 'movie' : (/^\/anime\//i.test(h) ? 'anime' : 'tvshow');
+    const bkP = 'cq:' + kind + ':' + (m[1] || m[2]);
+    /* v321: BÓVEDA películas */
+    const bP = BOVEDA.get(bkP);
+    if (bP && bP.code) {
+      try {
+        const outPB = await resolverVimeos('https://vimeos.net/embed-' + bP.code + '.html', CQ_WEB + '/');
+        console.log('[boveda] cq peli ' + (m[1] || m[2]) + ' desde bóveda');
+        return outPB;
+      } catch (ePB) { console.log('[boveda] código de peli vencido — camino normal'); }
+    }
     const d = await cqApi('/v1/items/' + kind + '/' + (m[1] || m[2]), null, 15 * 60 * 1000).catch(() => null);
     const code = d && d.item && d.item.code;
     if (!code) { console.log('[cq] título sin code: ' + kind + '/' + (m[1] || m[2])); throw new Error('Este título no está disponible en CineCalidad — prueba otro parecido'); }
-    try { return await resolverVimeos('https://vimeos.net/embed-' + code + '.html', CQ_WEB + '/'); }
+    try {
+      const outCq = await resolverVimeos('https://vimeos.net/embed-' + code + '.html', CQ_WEB + '/');
+      if (kind === 'movie') bovedaPon(bkP, { t: (d.item && d.item.title) || '', kind: 'movie', code }); /* v321: cosecha */
+      return outCq;
+    }
     catch (eV) { console.log('[cq] embed ' + code + ' falló: ' + String(eV.message || eV).slice(0, 90)); throw eV; }
   }
   throw new Error('URL de CineCalidad no reconocida');
