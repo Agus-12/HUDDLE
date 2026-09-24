@@ -851,7 +851,7 @@ function bovedaPintar(){
     var pre=BV_FUENTES[cat];
     if(pre&&String(x.clave||'').indexOf(pre)!==0)return false;
     if(!nq)return true;
-    return (x.t+' '+x.tipo+' '+x.estado).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().indexOf(nq)>=0;
+    return (x.t+' '+x.tipo+' '+x.estado+' '+(x.clave||'')).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().indexOf(nq)>=0; /* v329: también por clave */
   });
   var el=document.getElementById('bvLista');
   if(!items.length){el.innerHTML='<div style="color:#9d93b5;font-size:12px">Sin resultados'+(q?' para «'+q+'»':' en «'+cat+'»')+' — la bóveda crece sola con el uso</div>';return;}

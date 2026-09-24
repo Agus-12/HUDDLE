@@ -3110,3 +3110,20 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   adiós ocultamientos por el cascarón HTML.
 - VERIFICADO EN VIVO: play 'un-tiempo-para-recordar' → OK 'desde bóveda'
   (vimeos, nodo s14 muerto descartado solo). /api/boveda cv ya trae póster.
+
+## v329 (24 Sep 2026) — FUNDACIÓN desocultada + prioridad en cola
+- Reporte del usuario: 17 040 títulos en bóveda pero 'Fundación no aparece al
+  buscar'. Causa raíz: quedó en cc-ocultas.txt del servidor del usuario desde
+  la era 'lotería de nodos' (v312); la reparación v317 solo incluía 8 PELÍCULAS
+  — ninguna serie. La cola de la bóveda salta ocultas (cqOcultaId) → nunca
+  cosechada, ni visible en el catálogo de la app.
+- v329: 'tvshow:93740' añadido a CC_REPARAR_FALSOS (30 códigos verificados
+  sirviendo repetidamente); el bloque de reparación ahora también borra de
+  CC_VISTAS y REESCRIBE cc-ocultas.txt (limpieza persistente). Nueva
+  BOVEDA_PRIORIDAD: los reparados van PRIMEROS en bovedaSeriesPendientes
+  (Fundación le toca en el primer ciclo). Panel: el filtro de la Bóveda también
+  busca por clave.
+- Verificado simulando el estado exacto del usuario (oculta + ausente):
+  '[cq] reparación v317/v329: 1 falsos positivos desocultados (incluye
+  Fundación)' → primer ciclo → 'Fundación | Serie completada | 30 caps |
+  poster sí' y buscable por 'fundaci'.

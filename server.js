@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v328'; // v328: CUEVANA RECONECTADA — motor nuevo tmdb.allcalidad.re (mismo motor de CineCalidad): cosecha masiva, resolver y sonda
+const UI_VERSION = 'v329'; // v329: Fundación desocultada (condenada injustamente por la lotería de nodos v312) + prioridad en la cola de la bóveda
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -800,11 +800,15 @@ const CC_SEED_SIN_VIDEO = ['movie:115290' /* La laguna azul: El despertar */, 'm
 /* v317: falsos positivos del ciclo del 24 Sep — la sonda los ocultó durante
  * una VENTANA DE SATURACIÓN de vimeos (verificados SIRVIENDO desde el taller).
  * Reparación idempotente en cada arranque. */
-const CC_REPARAR_FALSOS = ['movie:1710008' /* Hasta el final */, 'movie:487672' /* Reino de los Supermanes */, 'movie:329981' /* Presencia siniestra */, 'movie:980026' /* El Bastardo */, 'movie:441728' /* Una cita en el parque */, 'movie:127380' /* Buscando a Dory */, 'movie:74465' /* Un Zoológico en Casa */, 'movie:653588' /* Deep: Into the Submarine Murder Case */];
+const CC_REPARAR_FALSOS = ['movie:1710008' /* Hasta el final */, 'movie:487672' /* Reino de los Supermanes */, 'movie:329981' /* Presencia siniestra */, 'movie:980026' /* El Bastardo */, 'movie:441728' /* Una cita en el parque */, 'movie:127380' /* Buscando a Dory */, 'movie:74465' /* Un Zoológico en Casa */, 'movie:653588' /* Deep: Into the Submarine Murder Case */, 'tvshow:93740' /* v329: FUNDACIÓN — condenada por la lotería de nodos v312; sus 30 códigos verificados sirviendo una y otra vez desde el taller */];
+const BOVEDA_PRIORIDAD = new Set(['cq:tvshow:93740']); /* v329: primero en la cola de cosecha */
 {
   let nr = 0;
-  for (const s of CC_REPARAR_FALSOS) if (CC_OCULTAS.has(s)) { CC_OCULTAS.delete(s); nr++; }
-  if (nr) console.log('[cq] reparados ' + nr + ' falsos positivos de la ventana de saturación (v317)');
+  for (const s of CC_REPARAR_FALSOS) if (CC_OCULTAS.has(s)) { CC_OCULTAS.delete(s); CC_VISTAS.delete(s); nr++; }
+  if (nr) {
+    try { fs.writeFileSync(path.join(__dirname, 'cc-ocultas.txt'), [...CC_OCULTAS].join('\n') + '\n'); } catch {}
+    console.log('[cq] reparación v317/v329: ' + nr + ' falsos positivos desocultados (incluye Fundación)');
+  }
 }
 /* v239.13: Notificaciones de sonda — log de eventos recientes */
 const SONDALOG_FILE = path.join(DATA_DIR, 'sonda-log.json');
@@ -9444,6 +9448,7 @@ async function bovedaSeriesPendientes() {
       series.push({ id: it.tmdb_id, kind, t: it.title || '', poster: cqPoster(it.poster_path), y: it.year || '', faltan: null });
     }
   }
+  series.sort((a, b) => (BOVEDA_PRIORIDAD.has('cq:' + b.kind + ':' + b.id) ? 1 : 0) - (BOVEDA_PRIORIDAD.has('cq:' + a.kind + ':' + a.id) ? 1 : 0)); /* v329: reparados van primero */
   return series;
 }
 async function bovedaAutoSeries() {
