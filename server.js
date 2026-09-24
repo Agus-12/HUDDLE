@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v327'; // v327: cosecha de Cuevana — tercer escape: el navegador del servidor pasa el desafío de Cloudflare
+const UI_VERSION = 'v328'; // v328: CUEVANA RECONECTADA — motor nuevo tmdb.allcalidad.re (mismo motor de CineCalidad): cosecha masiva, resolver y sonda
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -678,50 +678,12 @@ const CVM_VISTAS = new Set();
 try { for (const l of fs.readFileSync(path.join(__dirname, 'cuevana-vistas.txt'), 'utf8').split('\n')) if (l.trim()) CVM_VISTAS.add(l.trim()); } catch {}
 
 async function verificarCuevana(slug) {
+  /* v328: veredicto por el motor nuevo — está en el catálogo con code = viva */
   try {
-    const r = await fetchSeguro(CUEVANA_API + encodeURIComponent(slug), 12000);
-    if (!r.ok) return { ok: false, reason: 'api_' + r.status };
-    const d = await r.json();
-    const lat = ((d.videos || {}).latino || []).filter(e => e.url);
-    if (!lat.length) return { ok: false, reason: 'no_latino' };
-    cvmCatEnriquecer(slug, d); /* v292: la sonda ya pagó la llamada — guardar meta al catálogo */
-    /* Probar el primer host que funcione */
-    const sorted = [...lat].sort((a, b) => {
-      const ai = CUEVANA_HOSTS_OK.indexOf(new URL(a.url || 'https://x').hostname);
-      const bi = CUEVANA_HOSTS_OK.indexOf(new URL(b.url || 'https://x').hostname);
-      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-    });
-    for (const embed of sorted) {
-      if (!embed.url) continue;
-      const host = new URL(embed.url).hostname;
-      if (!CUEVANA_HOSTS_OK.some(h => host.includes(h))) continue;
-      try {
-        const er = await fetchSeguro(embed.url, 10000);
-        if (!er.ok) continue;
-        const html = await er.text();
-        let m3u8 = null;
-        if (/goodstream/i.test(host)) {
-          const m = /file\s*[:=]\s*["'](https?:\/\/[^"']+master\.m3u8[^"']*?)["']/i.exec(html)
-            || /(https?:\/\/[^\s"'<>]+master\.m3u8[^\s"'<>]*)/i.exec(html);
-          if (m) m3u8 = m[1];
-        } else {
-          const pm = /eval\(function\(p,a,c,k,e,d\)\{.+?\}\('(.+?)',(\d+),(\d+),'([^']*)'\.split/.exec(html);
-          if (pm) {
-            const pStr = pm[1], aVal = +pm[2], cVal = +pm[3], k = pm[4].split('|');
-            const toBase = (n, b) => { if (!n) return '0'; const d = []; while (n) { d.push('0123456789abcdefghijklmnopqrstuvwxyz'[n % b]); n = Math.floor(n / b); } return d.reverse().join(''); };
-            let result = pStr;
-            for (let i = cVal - 1; i >= 0; i--) { const w = toBase(i, aVal); if (i < k.length && k[i]) result = result.replace(new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g'), k[i]); }
-            const m = /(https?:\/\/[^\s"'<>]+master\.m3u8[^\s"'<>]*)/i.exec(result);
-            if (m) m3u8 = m[1];
-          }
-        }
-        if (m3u8) {
-          const vr = await fetchSeguro(m3u8, 8000).catch(() => null);
-          if (vr && vr.ok) { const t = await vr.text().catch(() => ''); if (t.includes('#EXTM3U')) return { ok: true }; }
-        }
-      } catch {}
-    }
-    return { ok: false, reason: 'all_failed' };
+    const item = await cvBuscar(slug);
+    if (!item) return { ok: false, reason: 'no_esta_en_el_motor' };
+    if (!item.code) return { ok: false, reason: 'sin_codigo' };
+    return { ok: true };
   } catch (e) { return { ok: false, reason: 'error:' + String(e).slice(0, 30) }; }
 }
 
@@ -6108,9 +6070,15 @@ async function resolverCuevanaMov(pageUrl) {
     console.log('[boveda] cuevana ' + slug + ' — embeds guardados sin video, camino normal');
     BOVEDA.delete('cv:' + slug); bovedaGuardar();
   }
-  const r = await fetchSeguro(CUEVANA_API + encodeURIComponent(slug), 12000);
-  if (!r.ok) throw new Error('API Cuevana error: ' + r.status);
-  const d = await r.json();
+  /* v328: la API vieja murió con el rediseño (responde el cascarón HTML);
+   * si no da JSON, pedimos la película al motor nuevo (allcalidad) */
+  let d = null;
+  try {
+    const r = await fetchSeguro(CUEVANA_API + encodeURIComponent(slug), 12000);
+    if (r.ok && /json/i.test(String((r.headers && r.headers.get && r.headers.get('content-type')) || ''))) d = await r.json().catch(() => null);
+  } catch {}
+  if (!d || !(d.videos && d.videos.latino && d.videos.latino.length)) { d = await cvShim(slug); if (d) console.log('[cuevana] motor nuevo (allcalidad) → ' + slug); }
+  if (!d) throw new Error('Cuevana: no encontré esa película en el motor nuevo');
   cvmCatEnriquecer(slug, d); /* v292: cada peli reproducida enriquece el catálogo de búsqueda */
   const lat = (d.videos && d.videos.latino) || [];
   if (!lat.length) throw new Error('Cuevana: sin embeds latinos para ' + slug);
@@ -9454,7 +9422,6 @@ async function bovedaAutoRellenar() {
   } catch (e) { console.log('[boveda] auto-pelis falló: ' + String(e.message || e).slice(0, 60)); }
 }
 const bovedaSeriesCola = { lista: [], intentos: new Map() };
-const bovedaCvCola = { lista: [], hechos: new Set() };
 /* v324: la cola se re-arma SOLA con las series incompletas — las que quedaron
  * 'Falta temporada N' (solo cosechamos S1 en v322) vuelven a la cola y se
  * completan por pases; las ausentes entran como antes. 3 fallos = fuera. */
@@ -9524,81 +9491,71 @@ async function bovedaAutoSeries() {
 /* v327: TERCER ESCAPE — el navegador del servidor abre la URL del API,
  * ejecuta el JS del desafío de Cloudflare (como ya hace con PelisXD/AnimeFLV)
  * y cuando pasa, el cuerpo YA es el JSON. */
-async function bovedaCvNavegador(slug) {
-  const nav = await getNavegador();
-  if (!nav) return null;
-  const page = await nav.newPage().catch(() => null);
-  if (!page) return null;
-  try {
-    await page.setUserAgent(MIRROR_UA).catch(() => {});
-    await page.evaluateOnNewDocument(() => { try { Object.defineProperty(navigator, 'webdriver', { get: () => false }); } catch {} });
-    await page.goto(CUEVANA_API + encodeURIComponent(slug), { waitUntil: 'domcontentloaded', timeout: 30000 });
-    for (let i = 0; i < 4; i++) { /* Cloudflare tarda 3-8 s en soltarse */
-      const txt = await page.evaluate(() => (document.body && document.body.innerText) || '').catch(() => '');
-      if (txt && txt.trim().startsWith('{')) { try { return JSON.parse(txt); } catch {} }
-      await new Promise((r2) => setTimeout(r2, 3000));
-    }
-  } catch {} finally { try { await page.close(); } catch {} }
-  return null;
+/* v328: MOTOR NUEVO DE CUEVANA — el sitio estrenó frontend y la API vieja
+ * (wp-json) responde solo el cascarón HTML. El usuario detectó que el sitio
+ * SÍ funciona: los datos ahora viven en tmdb.allcalidad.re — el mismo motor
+ * de CineCalidad (/v1/items, /v1/search, codes vimeos). Nada de desafíos:
+ * esta puerta responde JSON limpio. */
+const CV_API_NUEVA = 'https://tmdb.allcalidad.re';
+async function cvApiNueva(path2, params) {
+  const u = new URL(CV_API_NUEVA + path2);
+  for (const [k, v] of Object.entries(params || {})) if (v !== undefined && v !== null) u.searchParams.set(k, String(v));
+  const r = await fetchSeguro(u.href, 15000);
+  const ct = String((r.headers && r.headers.get && r.headers.get('content-type')) || '');
+  if (!r.ok || !/json/i.test(ct)) throw new Error('cv-motor-' + r.status + (r.ok ? '-html' : ''));
+  return r.json().catch(() => { throw new Error('cv-motor-json'); });
 }
-/* v324: BÓVEDA DE CUEVANA AUTOMÁTICA — el catálogo local ya trae los slugs;
- * 1 GET por título guarda sus embeds (goodstream/vimeos primero) para
- * reproducir sin sitio y alimentar el respaldo cruzado. */
+async function cvBuscar(slug) {
+  const meta = CVM_CAT.get(slug) || {};
+  const q = (meta.t || String(slug).replace(/-/g, ' ')).trim();
+  const d = await cvApiNueva('/v1/search', { q });
+  const its = (d && d.items) || [];
+  return its.find((x) => x.kind === 'movie' && (x.slug === slug || normaBv(x.title) === normaBv(meta.t || slug))) || its.find((x) => x.kind === 'movie') || null;
+}
+/* shim con la FORMA vieja (titles/images/videos) para que el resolver, la
+ * cosecha y el enriquecimiento del catálogo sigan intactos */
+async function cvShim(slug) {
+  try {
+    const it = await cvBuscar(slug);
+    if (!it) return null;
+    return {
+      titles: { name: it.title || '' },
+      images: { poster: it.poster_path ? ('https://image.tmdb.org/t/p/w342' + it.poster_path) : '' },
+      runtime: it.runtime || '', releaseDate: it.year ? String(it.year) : '',
+      videos: { latino: it.code ? [{ url: 'https://vimeos.net/embed-' + it.code + '.html' }] : [] },
+    };
+  } catch { return null; }
+}
+/* v328: COSECHA DE CUEVANA POR EL MOTOR NUEVO — el catálogo entero llega
+ * paginado con code+póster (igual que CineCalidad): cientos por ciclo, sin
+ * tocar la portada desafiada. Refresco semanal para los estrenos. */
 async function bovedaAutoCuevana() {
   try {
-    if (!bovedaCvCola.lista.length) {
-      const sitemap = await cuevanaIndice().catch(() => []);
-      const basesCv = new Set(sitemap); for (const k of CVM_CAT.keys()) basesCv.add(k); /* v324.1: el catálogo local también alimenta (el sitemap a veces da 0) */
-      bovedaCvCola.lista = [...basesCv].filter((s) => !BOVEDA.has('cv:' + s) && !CVM_OCULTAS.has(s) && !bovedaCvCola.hechos.has(s));
-      if (bovedaCvCola.lista.length) console.log('[boveda] auto-cv: ' + bovedaCvCola.lista.length + ' títulos de Cuevana en cola');
-      if (!bovedaCvCola.lista.length) return;
+    const metaCv = BOVEDA.get('_meta:cv');
+    if (metaCv && Date.now() - metaCv.at < 7 * 24 * 3600 * 1000) return;
+    let total = 0, paginas = 0;
+    for (let page = 1; page <= 80; page++) {
+      let d = null;
+      try { d = await cvApiNueva('/v1/items', { kind: 'movie', page, limit: 100 }); } catch (e) {
+        if (page === 1) { console.log('[boveda] auto-cv: motor nuevo responde mal (' + String(e.message || e).slice(0, 40) + ') — reintento en el próximo ciclo'); return; }
+        break;
+      }
+      const arr = (d && d.items) || [];
+      if (!arr.length) break;
+      for (const it of arr) {
+        if (!it.slug || !it.code) continue;
+        const k = 'cv:' + it.slug;
+        if (BOVEDA.has(k)) continue;
+        bovedaPon(k, { t: it.title || '', kind: 'movie', poster: cqPoster(it.poster_path), y: it.year || '', embeds: ['https://vimeos.net/embed-' + it.code + '.html'] });
+        total++;
+      }
+      paginas = page;
+      const pg = (d && d.pagination) || {};
+      if (pg.has_next === false) break;
     }
-    const rebanada = bovedaCvCola.lista.splice(0, 10);
-    let ok = 0, cvNavegadorUsos = 0; /* v327: máx 3 intentos por ciclo (el navegador es de todos) */
-    for (const slug of rebanada) {
-      try {
-        let r = await fetchSeguro(CUEVANA_API + encodeURIComponent(slug), 12000);
-        const ctCv = () => String((r.headers && r.headers.get && r.headers.get('content-type')) || '');
-        /* v325.2: el desafío viene de DOS formas — 503/403/429 directos, o
-         * 200 'suave' con la página HTML en vez del JSON. Ambas pausan la cola
-         * (sin quemar títulos) y prueban escape por el relay de la Mac. */
-        let desafioCv = [503, 403, 429].includes(r.status) || (r.ok && !/json/i.test(ctCv()));
-        if (desafioCv && CDN_RELAY) {
-          try {
-            const rr = await fetchRelay(CUEVANA_API + encodeURIComponent(slug), 15000);
-            if (rr && rr.ok && /json/i.test(String((rr.headers && rr.headers.get && rr.headers.get('content-type')) || ''))) { r = rr; desafioCv = false; }
-          } catch {}
-        }
-        if (desafioCv && cvNavegadorUsos < 3) { /* v327: el navegador pasa el desafío con JS real */
-          cvNavegadorUsos++;
-          const dN = await bovedaCvNavegador(slug).catch(() => null);
-          if (dN && dN.videos) { r = { ok: true, status: 200, json: async () => dN }; desafioCv = false; console.log('[boveda] auto-cv: ' + slug + ' pasó el desafío vía navegador'); }
-        }
-        if (desafioCv) {
-          const idxCv = rebanada.indexOf(slug);
-          if (idxCv >= 0) bovedaCvCola.lista.unshift(...rebanada.slice(idxCv)); /* regresar TODOS los pendientes */
-          console.log('[boveda] auto-cv: cuevana.mov desafía (' + r.status + ' ' + (/json/i.test(ctCv()) ? 'json' : 'html') + (CDN_RELAY ? ' incluso vía relay — revisa la Mac' : '') + ') — pausa, reintentos en el próximo ciclo');
-          break;
-        }
-        if (!r.ok) { console.log('[boveda] auto-cv: ' + slug + ' HTTP ' + r.status + ' — se salta'); bovedaCvCola.hechos.add(slug); continue; }
-        const d = await r.json().catch(() => null);
-        if (!d) { bovedaCvCola.hechos.add(slug); continue; }
-        const lat = ((d && d.videos && d.videos.latino) || []).map((x) => x.url).filter(Boolean);
-        if (!lat.length) { console.log('[boveda] auto-cv: ' + slug + ' sin videos latinos — se salta (NO se oculta desde la cola)'); bovedaCvCola.hechos.add(slug); continue; } /* ocultar es de la sonda, no de la cosecha */
-        if (lat.length) {
-          const sorted = [...lat].sort((a, b) => {
-            const ai = CUEVANA_HOSTS_OK.indexOf(new URL(a || 'https://x').hostname);
-            const bi = CUEVANA_HOSTS_OK.indexOf(new URL(b || 'https://x').hostname);
-            return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-          });
-          const meta = CVM_CAT.get(slug) || {};
-          bovedaPon('cv:' + slug, { t: (d.titles && (d.titles.name || d.titles.title)) || meta.t || '', embeds: sorted.slice(0, 4) });
-          ok++;
-        } else { CVM_OCULTAS.add(slug); } /* sin servidores — mismo criterio de la sonda */
-      } catch {}
-      bovedaCvCola.hechos.add(slug);
-    }
-    if (rebanada.length) console.log('[boveda] auto-cv: +' + ok + ' de Cuevana (quedan ' + bovedaCvCola.lista.length + ' en cola)');
+    BOVEDA.set('_meta:cv', { at: Date.now() });
+    bovedaGuardar();
+    if (total || paginas) console.log('[boveda] auto-cv: +' + total + ' de Cuevana vía motor nuevo (' + paginas + ' páginas)');
   } catch (e) { console.log('[boveda] auto-cv: ' + String(e.message || e).slice(0, 60)); }
 }
 setTimeout(() => { bovedaAutoRellenar(); setInterval(() => { bovedaAutoSeries().catch(() => {}); bovedaAutoCuevana().catch(() => {}); }, 150 * 1000); }, 30 * 1000);
@@ -14210,7 +14167,7 @@ async function estrenosMezclados(){
     /* v322: BÓVEDA — catálogo propio guardado (para la tarjeta del panel) */
     if (url.pathname === '/api/boveda' && req.method === 'GET') {
       const resumen = url.searchParams.get('resumen') === '1';
-      let pelis = 0, series = 0, animes = 0, cv = 0, caps = 0, completadas = 0, enCola = bovedaSeriesCola.lista.length + bovedaCvCola.lista.length; /* v324: suma ambas colas */
+      let pelis = 0, series = 0, animes = 0, cv = 0, caps = 0, completadas = 0, enCola = bovedaSeriesCola.lista.length; /* v328: la cola de cuevana era por-slug; ahora es cosecha masiva */
       const NOMBRES_BV = { cq: 'CineCalidad', cv: 'Cuevana', d23: 'AnimeD23', lct: 'Lacartoons', misc: 'MisCaricaturas', enn: 'Ennovelas', lat: 'Latanime', flv: 'AnimeFLV', dan: 'Danimados' };
       const TIPO_BV = { d23: 'Anime', lct: 'Caricatura', misc: 'Caricatura', enn: 'Novela', lat: 'Anime', flv: 'Anime', dan: 'Anime' }; /* v326 */
       const fuentes = {};
@@ -14241,7 +14198,7 @@ async function estrenosMezclados(){
           items.push({ clave, t: v.t || clave, tipo: esAni ? 'Anime' : 'Serie', poster: v.poster || '', y: v.y || '', caps: nc, estado: completa ? 'Serie completada' : (ts > 0 ? 'Falta temporada ' + faltan.slice(0, 3).join(', ') + (faltan.length > 3 ? ' +' + (faltan.length - 3) : '') : 'Serie'), ts });
           continue;
         }
-        if (clave.startsWith('cv:')) { cv++; caps += (v.embeds || []).length; items.push({ clave, t: v.t || clave.replace('cv:', ''), tipo: 'Película', poster: '', y: '', estado: 'Película · respaldo Cuevana', caps: (v.embeds || []).length }); }
+        if (clave.startsWith('cv:')) { cv++; caps += (v.embeds || []).length; items.push({ clave, t: v.t || clave.replace('cv:', ''), tipo: 'Película', poster: v.poster || '', y: v.y || '', estado: 'Película · Cuevana', caps: 1 }); } /* v328: ya con póster */
       }
       items.sort((a, b) => a.t.localeCompare(b.t, 'es'));
       if (resumen) return json(res, 200, { ok: true, pelis, series, animes, cuevana: cv, caps, completadas, enCola, titulos: pelis + series + animes + cv, fuentes });

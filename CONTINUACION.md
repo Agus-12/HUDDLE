@@ -3088,3 +3088,25 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - Apuesta: en el Oracle su navegador pasa guardas de otros sitios a diario; si
   CF no lo castiga igual ahí, la cola drena sola. Si tampoco, esperar ventana
   (hoy hubo una ~15:05 en el taller: la API respondió 200 JSON intermitente).
+
+## v328 (24 Sep 2026) — CUEVANA RECONECTADA al motor nuevo (hallazgo del usuario)
+- El usuarioreportó que cuevana.mov SÍ funciona en su navegador (solo 2 anuncios
+  pre-roll) → revisión: el HTML recibido tenía CERO marcadores Cloudflare; era
+  el cascarón de un frontend NUEVO (React/Vite, id=root, /assets/app-*.js).
+  Cuevana se rediseñó: la API vieja /wp-json/wpreact/v1/movie/ responde la SPA
+  para todo (200 text/html) — no había desafío: la puerta se mudó.
+- Disecando el bundle: cliente API con /v1/items, /v1/search, /v1/now… y
+  baseUrl='https://tmdb.allcalidad.re' — ¡el MISMO motor de CineCalidad
+  (red allcalidad)! JSON limpio sin escudo, items con tmdb_id/kind/code/slug/
+  poster_path, codes en formato vimeos (ej. gyvldqqy6sw5).
+- v328: cvApiNueva+cvBuscar+cvShim (forma vieja titles/images/videos para no
+  tocar downstream) · bovedaAutoCuevana AHORA ES COSECHA MASIVA: /v1/items
+  kind=movie paginado → cv:{slug} {t,poster,y,embeds:[vimeos embed]} —
+  VERIFICADO: +7499 en ~2 min (77 páginas), refresco semanal (_meta:cv).
+  Fuera cola por slugs, navegador y escapes CF (v324-v327 obsoletos aquí).
+- resolverCuevanaMov: API vieja 1er intento (por si revive) → si no JSON con
+  videos → cvShim (motor nuevo) → log '[cuevana] motor nuevo (allcalidad)'.
+- verificarCuevana (sonda): veredicto por el motor (item con code = viva) —
+  adiós ocultamientos por el cascarón HTML.
+- VERIFICADO EN VIVO: play 'un-tiempo-para-recordar' → OK 'desde bóveda'
+  (vimeos, nodo s14 muerto descartado solo). /api/boveda cv ya trae póster.
