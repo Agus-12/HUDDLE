@@ -2991,3 +2991,19 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - Verificado local: ficha Fundación → 30 caps en bóveda; /api/solo T2E6 dos veces
   ('desde bóveda'); tras REINICIAR el server → play OK 'desde bóveda' sin tocar
   el sitio — reproducción independiente de cinecalidad.am/tmdb API (solo vimeos).
+
+## v322 (24 Sep 2026) — Bóveda auto-rellenable + respaldo cruzado + tarjeta en panel
+- AUTO-RELLENADO (sin picarle): +30 s cosecha TODAS las películas del catálogo
+  (code+póster vienen en la lista: 7 591 en ~40 s, una sola vez, marcadas
+  _meta:pelis); series/animes en cola (1 945) en rebanadas de 20 cada 2.5 min
+  (temporadas + códigos S1, merge con lo ya guardado, heap>320 pausa, 2 intentos).
+  Abrir ficha = serie completa al instante (cosecha v321).
+- RESPALDO CRUZADO: bovedaRespaldo(titulo) — si el video cq falla, busca la MISMA
+  película en la bóveda de Cuevana (título normalizado) y prueba sus embeds
+  (goodstream/vimeos). Dos CDNs distintos para un mismo título.
+- /api/boveda (+?resumen=1): totales e items {t,tipo,poster,y,estado,caps};
+  estado: 'Película' | 'Serie completada' | 'Falta temporada N,…' (vs ts).
+- PANEL: tarjeta Bóveda (ícono SVG archivo, ámbar) con títulos/capítulos/cola +
+  barra % completadas; página con pósters, filtro por nombre y chips de estado.
+- Verificado local: 7 591 pelis auto, Fundación 'Serie completada', cola 1 945,
+  +20/ciclo (~4 h para todo el catálogo de series).

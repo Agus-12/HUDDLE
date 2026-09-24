@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v321'; // v321: BÓVEDA HUDDLE — códigos estables en data/boveda.json: reproducción instantánea aunque el sitio esté caído
+const UI_VERSION = 'v322'; // v322: bóveda AUTO-RELLENABLE (pelis completas + series en cola) + respaldo cruzado vía Cuevana + /api/boveda para el panel
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -3557,7 +3557,7 @@ async function datosSerieCineCalidad(id) {
     eps.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep);
     if (!eps.length) return null;
     const out = { ok: true, slug: String(id), titulo: String(it.title || it.original_title || '').slice(0, 80), poster: cqPoster(it.poster_path), episodios: eps };
-    if (Object.keys(codigos).length) bovedaPon('cq:' + kind + ':' + id, { t: out.titulo, kind, eps: codigos }); /* v321: cosecha de TODA la serie al abrir su ficha */
+    if (Object.keys(codigos).length) bovedaPon('cq:' + kind + ':' + id, { t: out.titulo, kind, eps: codigos, poster: cqPoster(it.poster_path), ts: seasons.length, y: it.year || '' }); /* v321+v322: con póster y total de temporadas */
     serieCache.set(clave, { at: Date.now(), d: out });
     try { precargarIntroDeSerie(eps.map((e) => ({ url: e.url }))); } catch {}
     return out;
@@ -9387,6 +9387,69 @@ function cqCard(it) {
     _cq: { id: it.tmdb_id, kind },
   };
 }
+/* v322: AUTO-RELLENADO — la bóveda crece SOLA, sin que nadie le pique:
+ * 1) TODAS las películas (el catálogo ya trae code+póster por ítem);
+ * 2) series/anime en rebanadas de 20 cada 2.5 min (temporadas + códigos de S1;
+ *    la ficha completa se cosecha cuando alguien la abre). */
+async function bovedaAutoRellenar() {
+  try {
+    if (BOVEDA.get('_meta:pelis')) return;
+    let n = 0;
+    for (const it of (await cqTodas('movie').catch(() => []))) {
+      if (!it.code || cqOcultaId('movie', it.tmdb_id)) continue;
+      const k = 'cq:movie:' + it.tmdb_id;
+      if (BOVEDA.has(k)) continue;
+      bovedaPon(k, { t: it.title || '', kind: 'movie', code: it.code, poster: cqPoster(it.poster_path), y: it.year || '' });
+      n++;
+    }
+    BOVEDA.set('_meta:pelis', { at: Date.now() });
+    bovedaGuardar();
+    console.log('[boveda] auto: ' + n + ' películas cosechadas del catálogo (una sola vez)');
+  } catch (e) { console.log('[boveda] auto-pelis falló: ' + String(e.message || e).slice(0, 60)); }
+}
+const bovedaSeriesCola = { lista: [], intentos: new Map() };
+async function bovedaAutoSeries() {
+  try {
+    const memMB = process.memoryUsage().heapUsed / 1048576;
+    if (memMB > 320) return; /* v309-style: memoria primero */
+    if (!bovedaSeriesCola.lista.length) {
+      const series = [];
+      for (const kind of ['tvshow', 'anime']) {
+        for (const it of (await cqTodas(kind).catch(() => []))) {
+          const k = 'cq:' + kind + ':' + it.tmdb_id;
+          if (BOVEDA.has(k) || cqOcultaId(kind, it.tmdb_id)) continue;
+          series.push({ id: it.tmdb_id, kind, t: it.title || '', poster: cqPoster(it.poster_path), y: it.year || '' });
+        }
+      }
+      bovedaSeriesCola.lista = series;
+      if (series.length) console.log('[boveda] auto: ' + series.length + ' series/animes en cola de cosecha');
+      if (!series.length) return;
+    }
+    const rebanada = bovedaSeriesCola.lista.splice(0, 20);
+    let ok = 0;
+    for (const s of rebanada) {
+      const clave = 'cq:' + s.kind + ':' + s.id;
+      try {
+        const ds = await cqApi('/v1/items/' + s.kind + '/' + s.id + '/seasons', null, 30 * 60 * 1000).catch(() => null);
+        const seasons = (ds && ds.seasons) || [];
+        const s1 = seasons.find((x) => (x.playable_count || 0) > 0);
+        if (!s1) { bovedaSeriesCola.intentos.set(clave, (bovedaSeriesCola.intentos.get(clave) || 0) + 1); if (bovedaSeriesCola.intentos.get(clave) >= 2) continue; bovedaSeriesCola.lista.push(s); continue; }
+        const dd = await cqApi('/v1/items/' + s.kind + '/' + s.id + '/seasons/' + s1.season, null, 30 * 60 * 1000).catch(() => null);
+        const epsArr = (dd && (dd.episodes || (dd.season && dd.season.episodes))) || [];
+        const codigos = {};
+        for (const e of epsArr) if (e.playable && e.code) codigos[s1.season] = (codigos[s1.season] || {}), codigos[s1.season][e.episode] = e.code;
+        if (Object.keys(codigos).length) {
+          const prev = BOVEDA.get(clave) || {};
+          bovedaPon(clave, { t: s.t || prev.t || '', kind: s.kind, poster: s.poster || prev.poster || '', y: s.y || prev.y || '', ts: seasons.length, eps: Object.assign({}, prev.eps || {}, codigos) });
+          ok++;
+        }
+      } catch {}
+    }
+    if (rebanada.length) console.log('[boveda] auto: +' + ok + ' series/animes (quedan ' + bovedaSeriesCola.lista.length + ' en cola)');
+  } catch (e) { console.log('[boveda] auto-series: ' + String(e.message || e).slice(0, 60)); }
+}
+setTimeout(() => { bovedaAutoRellenar(); setInterval(() => { bovedaAutoSeries().catch(() => {}); }, 150 * 1000); }, 30 * 1000);
+
 const cqOcultaId = (kind, id) => CC_OCULTAS.has(kind + ':' + id);
 const cqVivaCard = (c) => c.title && c.url && c.img && !(c._cq && cqOcultaId(c._cq.kind, c._cq.id));
 /* v314: ¿el embed de vimeos entrega video DE VERDAD? — 2 intentos, m3u8
@@ -11756,6 +11819,27 @@ function bovedaPon(clave, datos) {
   BOVEDA.set(clave, Object.assign(prev, datos, { at: Date.now() }));
   bovedaGuardar();
 }
+const normaBv = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+/* v322: OTRA BÓVEDA COMO RESPALDO — si el video de CineCalidad falla (nodos
+ * muertos o código podrido), buscamos la MISMA película en la bóveda de
+ * Cuevana y probamos sus embeds (goodstream primero). Dos CDNs distintos
+ * para el mismo título. */
+async function bovedaRespaldo(titulo) {
+  const nb = normaBv(titulo);
+  if (!nb) return null;
+  for (const [clave, v] of BOVEDA) {
+    if (!clave.startsWith('cv:') || !Array.isArray(v.embeds) || !v.embeds.length) continue;
+    if (normaBv(v.t) !== nb) continue;
+    for (const eu of v.embeds) {
+      try {
+        const h = new URL(eu).hostname;
+        const out = /goodstream\.one/i.test(h) ? await resolverGoodstream(eu, 'https://cuevana.mov/') : await resolverVimeos(eu, 'https://cuevana.mov/');
+        if (out && out.m3u8) { console.log('[boveda] RESPALDO: "' + titulo + '" vía Cuevana (' + h + ')'); return out; }
+      } catch {}
+    }
+  }
+  return null;
+}
 
 /* v311: cinecalidad.am — el hash de la URL trae kind/id/temporada/episodio;
  * la API da el `code` y el player es SIEMPRE vimeos (ya resuelto por arriba) */
@@ -11779,9 +11863,15 @@ async function resolverCineCalidad(pageUrl) {
     if (!code) { console.log('[cq] ep sin code: ' + m[1] + '/' + m[2] + ' T' + m[3] + 'E' + m[4]); throw new Error('Este episodio no está disponible en CineCalidad — prueba otro capítulo'); }
     const bvEp = BOVEDA.get(bkEp) || { t: '', kind: m[1] === 'anime' ? 'anime' : 'tvshow', eps: {} };
     bvEp.eps = bvEp.eps || {}; (bvEp.eps[m[3]] = bvEp.eps[m[3]] || {})[m[4]] = code;
+    if (!bvEp.t && d && d.episode) bvEp.t = String(d.episode.title || bvEp.t || '').slice(0, 80);
     bovedaPon(bkEp, bvEp); /* v321: cosecha */
     try { return await resolverVimeos('https://vimeos.net/embed-' + code + '.html', CQ_WEB + '/'); }
-    catch (eV) { console.log('[cq] embed ' + code + ' falló: ' + String(eV.message || eV).slice(0, 90)); throw eV; }
+    catch (eV) {
+      console.log('[cq] embed ' + code + ' falló: ' + String(eV.message || eV).slice(0, 90));
+      const rb = await bovedaRespaldo((BOVEDA.get(bkEp) || {}).t).catch(() => null); /* v322: segunda bóveda */
+      if (rb) return rb;
+      throw eV;
+    }
   }
   m = /^\/pelicula\/(\d+)|^\/(?:serie|anime)\/(\d+)/i.exec(h);
   if (m) {
@@ -11801,10 +11891,15 @@ async function resolverCineCalidad(pageUrl) {
     if (!code) { console.log('[cq] título sin code: ' + kind + '/' + (m[1] || m[2])); throw new Error('Este título no está disponible en CineCalidad — prueba otro parecido'); }
     try {
       const outCq = await resolverVimeos('https://vimeos.net/embed-' + code + '.html', CQ_WEB + '/');
-      if (kind === 'movie') bovedaPon(bkP, { t: (d.item && d.item.title) || '', kind: 'movie', code }); /* v321: cosecha */
+      if (kind === 'movie') bovedaPon(bkP, { t: (d.item && d.item.title) || '', kind: 'movie', code, poster: cqPoster(d.item && d.item.poster_path), y: (d.item && d.item.year) || '' }); /* v321+v322: con póster */
       return outCq;
     }
-    catch (eV) { console.log('[cq] embed ' + code + ' falló: ' + String(eV.message || eV).slice(0, 90)); throw eV; }
+    catch (eV) {
+      console.log('[cq] embed ' + code + ' falló: ' + String(eV.message || eV).slice(0, 90));
+      const rbP = await bovedaRespaldo((d.item && d.item.title) || '').catch(() => null); /* v322: segunda bóveda */
+      if (rbP) return rbP;
+      throw eV;
+    }
   }
   throw new Error('URL de CineCalidad no reconocida');
 }
@@ -13906,6 +14001,35 @@ async function estrenosMezclados(){
       try { require('fs').writeFileSync(path.join(DATA_DIR, 'relay.txt'), newUrl); } catch {} /* v316: persistente */
       try { require('fs').writeFileSync('/tmp/huddle-relay.txt', newUrl); } catch {} /* compat v236.8 */
       return json(res, 200, { ok: true, relay: CDN_RELAY });
+    }
+
+    /* v322: BÓVEDA — catálogo propio guardado (para la tarjeta del panel) */
+    if (url.pathname === '/api/boveda' && req.method === 'GET') {
+      const resumen = url.searchParams.get('resumen') === '1';
+      let pelis = 0, series = 0, animes = 0, cv = 0, caps = 0, completadas = 0, enCola = bovedaSeriesCola.lista.length;
+      const items = [];
+      for (const [clave, v] of BOVEDA) {
+        if (clave.startsWith('_meta')) continue;
+        if (clave.startsWith('cq:movie:')) { pelis++; items.push({ clave, t: v.t || '', tipo: 'Película', poster: v.poster || '', y: v.y || '', estado: 'Película', caps: 1 }); continue; }
+        if (clave.startsWith('cq:tvshow:') || clave.startsWith('cq:anime:')) {
+          const esAni = clave.startsWith('cq:anime:');
+          if (esAni) animes++; else series++;
+          const epsK = Object.keys(v.eps || {});
+          const nc = epsK.reduce((a, s) => a + Object.keys(v.eps[s]).length, 0);
+          caps += nc;
+          const ts = v.ts || epsK.length;
+          const faltan = [];
+          for (let s2 = 1; s2 <= ts; s2++) if (!epsK.includes(String(s2))) faltan.push(s2);
+          const completa = !faltan.length && ts > 0;
+          if (completa) completadas++;
+          items.push({ clave, t: v.t || clave, tipo: esAni ? 'Anime' : 'Serie', poster: v.poster || '', y: v.y || '', caps: nc, estado: completa ? 'Serie completada' : (ts > 0 ? 'Falta temporada ' + faltan.slice(0, 3).join(', ') + (faltan.length > 3 ? ' +' + (faltan.length - 3) : '') : 'Serie'), ts });
+          continue;
+        }
+        if (clave.startsWith('cv:')) { cv++; caps += (v.embeds || []).length; items.push({ clave, t: v.t || clave.replace('cv:', ''), tipo: 'Película', poster: '', y: '', estado: 'Película · respaldo Cuevana', caps: (v.embeds || []).length }); }
+      }
+      items.sort((a, b) => a.t.localeCompare(b.t, 'es'));
+      if (resumen) return json(res, 200, { ok: true, pelis, series, animes, cuevana: cv, caps, completadas, enCola, titulos: pelis + series + animes + cv });
+      return json(res, 200, { ok: true, pelis, series, animes, cuevana: cv, caps, completadas, enCola, titulos: items.length, items });
     }
 
     /* v238: estadísticas por fuente */
