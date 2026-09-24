@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v318'; // v318: Cartoons/Live sobreviven a caídas de lacartoons — rescate por lista + refresco único + cachés entre versiones
+const UI_VERSION = 'v319'; // v319: sondas de caricaturas con disyuntor (caído no juzga + barrido pos-caída) + re-resolución automática a mitad de película
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -9708,7 +9708,36 @@ async function sondaDanimados() {
   console.log('[sonda] dani (' + el + 's): ' + ((vm || mv) ? ('vivas→muertas=' + vm + ' muertas→vivas=' + mv) : 'sin cambios'));
   try { fs.appendFileSync(path.join(__dirname, 'sonda-danimados.log'), '[' + new Date().toISOString() + '] ' + el + 's vivas→muertas=' + vm + ' muertas→vivas=' + mv + ' muertas=' + DANI_MUERTAS.size + '\n'); } catch {}
 }
+/* v319: ¿el sitio de caricaturas está vivo? (6 s) — caído NO juzga:
+ * un 522 no convierte series vivas en muertas */
+async function sitioCaricaturasVivo(base) {
+  try {
+    const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 6000);
+    const r = await fetch(base, { headers: { 'User-Agent': FETCH_UA }, signal: ctl.signal, redirect: 'follow' }).finally(() => clearTimeout(t));
+    const ok = r.ok;
+    try { if (r.body) await r.body.cancel(); } catch {}
+    return ok;
+  } catch { return false; }
+}
 async function sondaLacartoons() {
+  /* v319: DISYUNTOR — con lacartoons caído no se oculta NADA; al volver,
+   * barrido completo de muertas para deshacer cualquier daño de la caída */
+  if (!(await sitioCaricaturasVivo(LCT_BASE))) {
+    sondaLacartoons._caido = true;
+    console.log('[sonda] lct saltado — lacartoons caído (no se oculta nada)');
+    return;
+  }
+  if (sondaLacartoons._caido) {
+    sondaLacartoons._caido = false;
+    let rev = 0;
+    for (const slug of [...LCT_MUERTAS]) {
+      const lct = [...LCT_SERIES.values()].find((v) => v.slug === slug);
+      if (lct) { try { if (await lctProbe(lct.lctId)) { LCT_MUERTAS.delete(slug); lctPerdonar(slug); rev++; } } catch {} }
+      await new Promise((r2) => setTimeout(r2, 800));
+    }
+    if (rev) { ocultasReescribir(LCT_MUERTAS, 'lct-muertas.txt'); sondaNotify('Lacartoons', 'revivio', 'lote', rev + ' series revivieron tras la caída — barrido completo'); }
+    console.log('[sonda] lct: sitio de vuelta — barrido pos-caída: ' + rev + ' revividas de ' + LCT_MUERTAS.size);
+  }
   const t0 = Date.now(), PAUSA = 2000;
   let vm = 0, mv = 0;
   const pausa = () => new Promise((r) => setTimeout(r, PAUSA));
@@ -9733,6 +9762,12 @@ async function sondaLacartoons() {
   try { fs.appendFileSync(path.join(__dirname, 'sonda-lacartoons.log'), '[' + new Date().toISOString() + '] ' + el + 's vivas→muertas=' + vm + ' muertas→vivas=' + mv + ' muertas=' + LCT_MUERTAS.size + '\n'); } catch {}
 }
 async function sondaMisc() {
+  if (!(await sitioCaricaturasVivo(CARI_BASE))) { /* v319: mismo disyuntor */
+    sondaMisc._caido = true;
+    console.log('[sonda] misc saltado — miscaricaturas caído (no se oculta nada)');
+    return;
+  }
+  if (sondaMisc._caido) { sondaMisc._caido = false; console.log('[sonda] misc: sitio de vuelta — los ciclos normales revisan las ocultas'); }
   const t0 = Date.now(), PAUSA = 2000;
   let vm = 0, mv = 0;
   const pausa = () => new Promise((r) => setTimeout(r, PAUSA));

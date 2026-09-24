@@ -2951,3 +2951,15 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   (semilla local), Live 5 (Chavo/Drake/iCarly/Kenan/Sabrina). En el Oracle el
   rescate traerá las ~77 cartoons + ~10 live reales de su cariDatos histórico.
 - Cuando lacartoons reviva, la ronda normal refresca todo sola (cache 1 h).
+
+## v319 (24 Sep 2026) — disyuntor para sondas de caricaturas + re-resolución a mitad de peli
+- Sonda de lacartoons SIN freno escondía hasta 5 series vivas POR ciclo con el sitio
+  en 522 ('sin capítulos' = el 522 se lo comía) — y cada deploy/reinicio relanzaba
+  otra ronda. sitioCaricaturasVivo(base) (6 s): caído → ciclo saltado sin ocultar;
+  al volver → BARRIDO COMPLETO de LCT_MUERTAS (lctProbe real, solo revive) + notify.
+- sondaMisc: mismo disyuntor con CARI_BASE.
+- app.js modo Solo: red fatal a mitad de playback → 2 flips directo/proxy →
+  RE-RESOLVER /api/solo (nodo+token nuevos) con montarSolo(res, true); el minuto
+  se conserva por tReconexion. Tope 3 re-resoluciones por sesión (reresolves no
+  se resetea); reintentos sí vuelven a 0 en FRAG_LOADED (video sano).
+  Fin de 'Se cortó el video — vuelve a abrirlo' por un solo nodo muerto.

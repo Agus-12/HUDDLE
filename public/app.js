@@ -3704,7 +3704,7 @@ function montarSolo(d, viaProxy) {
         } catch {}
       });
       hls.on(window.Hls.Events.LEVEL_SWITCHED, () => { try { pintarQMenuSolo(); } catch {} });
-      hls.on(window.Hls.Events.FRAG_LOADED, () => { if (SOLO) SOLO.saltosMovie = 0; }); /* v220 */
+      hls.on(window.Hls.Events.FRAG_LOADED, () => { if (SOLO) { SOLO.saltosMovie = 0; SOLO.reintentos = 0; } }); /* v220 + v319: video sano → contadores a cero (el tope de reresolves no se resetea) */
       /* v83: cuando llega el manifest sabemos qué calidades hay */
       hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
         try { $('#soloQ').textContent = 'Auto'; cerrarQMenuSolo(); pintarQMenuSolo(); } catch {}
@@ -3724,12 +3724,27 @@ function montarSolo(d, viaProxy) {
          * racionando AL SERVIDOR y el directo del usuario sí sirve */
         if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR && SOLO.res && !/^\/api\//.test(SOLO.res.m3u8 || '')) {
           SOLO.reintentos = (SOLO.reintentos || 0) + 1;
-          if (SOLO.reintentos <= 3) {
+          /* v319: 2 cambios de ruta (directo↔servidor) y luego RE-RESOLVER:
+           * nodo nuevo + token fresco SIN cerrar tu película — tu minuto se
+           * conserva (tReconexion). Máx 3 re-resoluciones por sesión. */
+          if (SOLO.reintentos <= 2) {
             const otro = !SOLO.viaProxy;
             toast(otro ? 'Conectando por el servidor…' : 'Probando directo…');
             setTimeout(() => {
               if (SOLO && !SOLO.cerrado && SOLO.res) montarSolo(SOLO.res, otro);
             }, 1500);
+            return;
+          }
+          if (SOLO.reintentos <= 5 && (SOLO.reresolves || 0) < 3) {
+            if (!SOLO.resolviendo) {
+              SOLO.resolviendo = true;
+              SOLO.reresolves = (SOLO.reresolves || 0) + 1;
+              toast('El video cambió de servidor — buscando la ruta nueva (tu minuto se conserva)…');
+              fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(SOLO.url)).then((r) => r.json()).then((d2) => {
+                SOLO.resolviendo = false;
+                if (d2 && d2.ok && d2.m3u8 && SOLO && !SOLO.cerrado) { SOLO.res = d2; montarSolo(d2, true); }
+              }).catch(() => { if (SOLO) SOLO.resolviendo = false; });
+            }
             return;
           }
           toast('Se cortó el video — vuelve a abrirlo');
