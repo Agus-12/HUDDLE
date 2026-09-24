@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v324'; // v324: bóveda se AUTO-COMPLETA — temporadas faltantes vuelven a cola solas + cola automática de Cuevana
+const UI_VERSION = 'v325'; // v325: cosecha de Cuevana blindada — detecta el desafío 'suave' (200+HTML), escapa por relay, jamás oculta de más
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -9537,13 +9537,29 @@ async function bovedaAutoCuevana() {
     let ok = 0;
     for (const slug of rebanada) {
       try {
-        const r = await fetchSeguro(CUEVANA_API + encodeURIComponent(slug), 12000);
-        if (!r.ok) {
-          if (r.status === 503 || r.status === 403) { bovedaCvCola.lista.unshift(slug); console.log('[boveda] auto-cv: cuevana.mov desafía ahora (' + r.status + ') — pausa, reintento en el próximo ciclo'); break; } /* v324.2: no quemar la cola con desafíos */
-          bovedaCvCola.hechos.add(slug); continue;
+        let r = await fetchSeguro(CUEVANA_API + encodeURIComponent(slug), 12000);
+        const ctCv = () => String((r.headers && r.headers.get && r.headers.get('content-type')) || '');
+        /* v325.2: el desafío viene de DOS formas — 503/403/429 directos, o
+         * 200 'suave' con la página HTML en vez del JSON. Ambas pausan la cola
+         * (sin quemar títulos) y prueban escape por el relay de la Mac. */
+        let desafioCv = [503, 403, 429].includes(r.status) || (r.ok && !/json/i.test(ctCv()));
+        if (desafioCv && CDN_RELAY) {
+          try {
+            const rr = await fetchRelay(CUEVANA_API + encodeURIComponent(slug), 15000);
+            if (rr && rr.ok && /json/i.test(String((rr.headers && rr.headers.get && rr.headers.get('content-type')) || ''))) { r = rr; desafioCv = false; }
+          } catch {}
         }
+        if (desafioCv) {
+          const idxCv = rebanada.indexOf(slug);
+          if (idxCv >= 0) bovedaCvCola.lista.unshift(...rebanada.slice(idxCv)); /* regresar TODOS los pendientes */
+          console.log('[boveda] auto-cv: cuevana.mov desafía (' + r.status + ' ' + (/json/i.test(ctCv()) ? 'json' : 'html') + (CDN_RELAY ? ' incluso vía relay — revisa la Mac' : '') + ') — pausa, reintentos en el próximo ciclo');
+          break;
+        }
+        if (!r.ok) { console.log('[boveda] auto-cv: ' + slug + ' HTTP ' + r.status + ' — se salta'); bovedaCvCola.hechos.add(slug); continue; }
         const d = await r.json().catch(() => null);
+        if (!d) { bovedaCvCola.hechos.add(slug); continue; }
         const lat = ((d && d.videos && d.videos.latino) || []).map((x) => x.url).filter(Boolean);
+        if (!lat.length) { console.log('[boveda] auto-cv: ' + slug + ' sin videos latinos — se salta (NO se oculta desde la cola)'); bovedaCvCola.hechos.add(slug); continue; } /* ocultar es de la sonda, no de la cosecha */
         if (lat.length) {
           const sorted = [...lat].sort((a, b) => {
             const ai = CUEVANA_HOSTS_OK.indexOf(new URL(a || 'https://x').hostname);

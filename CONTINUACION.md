@@ -3042,3 +3042,22 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   1 ciclo ('cuevana.mov desafía ahora — pausa'). En el taller 503 constante
   (verificada la pausa); en el Oracle responde (su catálogo 683 lo construyó
   la misma API). enCola = series + cuevana (la tarjeta ya lo muestra).
+
+## v325 (24 Sep 2026) — cosecha de Cuevana a prueba de desafío Cloudflare
+- Síntoma (usuario): chip Cuevana no sube. Causa raíz descubierta con pruebas:
+  cuevana.mov ahora desafía en DOS formas — 503/403/429 directos Y un desafío
+  'suave' HTTP 200 con la página HTML de la SPA en vez del JSON (r.json()
+  falla → d=null → lat=[]). La v324 interpretaba eso como 'sin latinos' y
+  metía los títulos a CVM_OCULTAS EN MEMORIA (nunca al disco) — feed de
+  Cuevana encogiendo y cola sin progresos. Con reinicio se limpia (memoria).
+- Fix v325: detección por content-type (ok + no-json = desafío) + 429 unido al
+  set; escape por fetchRelay (Mac, data/relay.txt) aceptando solo respuesta
+  json; en desafío (directo Y relay) → unshift de TODA la rebanada restante +
+  pausa 1 ciclo, log 'cuevana.mov desafía (NNN json|html…)'.
+  200-json-sin-latinos → solo se salta (hechos), JAMÁS CVM_OCULTAS desde la
+  cola (ocultar es decisión de la sonda con su verificación completa).
+- Verificado local (taller HTML-walled): 'desafía (200 html) — pausa' y cola
+  intacta 676; series siguen +12/ciclo (93 completadas). El taller mostró los
+  3 estados en vivo: 503 duro → 429/otros → 200-html.
+- Falta observar en el Oracle: si su Mac-relay está vivo la cosecha entra por
+  ahí; log 'incluso vía relay — revisa la Mac' si falla también.
