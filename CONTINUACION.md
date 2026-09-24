@@ -3026,3 +3026,19 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   el panel muestra chips por fuente en la página Bóveda.
 - Lacartoons: cosecha preparada — en cuanto el sitio reviva (522 hoy), cada
   capítulo visto queda replicable sin él para siempre.
+
+## v324 (24 Sep 2026) — Bóveda AUTO-COMPLETABLE + cola de Cuevana
+- Reporte del usuario (capturas): 'Cuevana 0', '0 en cola' tras drenarse la
+  cola v322, series multi-temporada atoradas en 'Falta temporada N' (la v322
+  solo cosechaba S1) y Fundación ausente.
+- bovedaSeriesPendientes(): la cola se RE-ARMA con (a) series ausentes y
+  (b) series INCOMPLETAS en bóveda (faltan = 1..ts menos eps guardadas);
+  bovedaAutoSeries() cosecha hasta 6 temporadas por pase (el resto vuelve a
+  la cola al final), 3 fallos = fuera. Verificado: +12/ciclo, series 21→57
+  todas 'Serie completada' — las tarjetas 'Falta temporada 2' se curan solas.
+- bovedaAutoCuevana(): cola propia con slugs de cuevanaIndice() + CVM_CAT
+  (el sitemap a veces da 0), 10 GET/ciclo, embeds goodstream/vimeos primero;
+  sin latinos → CVM_OCULTAS; 503/403 (Cloudflare challenge) → unshift+pausa
+  1 ciclo ('cuevana.mov desafía ahora — pausa'). En el taller 503 constante
+  (verificada la pausa); en el Oracle responde (su catálogo 683 lo construyó
+  la misma API). enCola = series + cuevana (la tarjeta ya lo muestra).

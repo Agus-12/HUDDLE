@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v323'; // v323: BÓVEDA UNIVERSAL — cosecha y reproducción sin sitio en TODAS las fuentes (d23, lacartoons, miscaricaturas, ennovelas, latanime, animeflv, danimados)
+const UI_VERSION = 'v324'; // v324: bóveda se AUTO-COMPLETA — temporadas faltantes vuelven a cola solas + cola automática de Cuevana
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -9454,47 +9454,113 @@ async function bovedaAutoRellenar() {
   } catch (e) { console.log('[boveda] auto-pelis falló: ' + String(e.message || e).slice(0, 60)); }
 }
 const bovedaSeriesCola = { lista: [], intentos: new Map() };
+const bovedaCvCola = { lista: [], hechos: new Set() };
+/* v324: la cola se re-arma SOLA con las series incompletas — las que quedaron
+ * 'Falta temporada N' (solo cosechamos S1 en v322) vuelven a la cola y se
+ * completan por pases; las ausentes entran como antes. 3 fallos = fuera. */
+async function bovedaSeriesPendientes() {
+  const series = [];
+  for (const kind of ['tvshow', 'anime']) {
+    for (const it of (await cqTodas(kind).catch(() => []))) {
+      const clave = 'cq:' + kind + ':' + it.tmdb_id;
+      if (cqOcultaId(kind, it.tmdb_id)) continue;
+      if ((bovedaSeriesCola.intentos.get(clave) || 0) >= 3) continue;
+      const enBv = BOVEDA.get(clave);
+      if (enBv) {
+        const epsK = Object.keys(enBv.eps || {});
+        const ts = enBv.ts || epsK.length;
+        const faltan = [];
+        for (let s2 = 1; s2 <= ts; s2++) if (!epsK.includes(String(s2))) faltan.push(s2);
+        if (faltan.length) series.push({ id: it.tmdb_id, kind, t: enBv.t || it.title || '', poster: enBv.poster || cqPoster(it.poster_path), y: enBv.y || it.year || '', faltan });
+        continue;
+      }
+      series.push({ id: it.tmdb_id, kind, t: it.title || '', poster: cqPoster(it.poster_path), y: it.year || '', faltan: null });
+    }
+  }
+  return series;
+}
 async function bovedaAutoSeries() {
   try {
     const memMB = process.memoryUsage().heapUsed / 1048576;
-    if (memMB > 320) return; /* v309-style: memoria primero */
+    if (memMB > 320) return; /* memoria primero */
     if (!bovedaSeriesCola.lista.length) {
-      const series = [];
-      for (const kind of ['tvshow', 'anime']) {
-        for (const it of (await cqTodas(kind).catch(() => []))) {
-          const k = 'cq:' + kind + ':' + it.tmdb_id;
-          if (BOVEDA.has(k) || cqOcultaId(kind, it.tmdb_id)) continue;
-          series.push({ id: it.tmdb_id, kind, t: it.title || '', poster: cqPoster(it.poster_path), y: it.year || '' });
-        }
-      }
-      bovedaSeriesCola.lista = series;
-      if (series.length) console.log('[boveda] auto: ' + series.length + ' series/animes en cola de cosecha');
-      if (!series.length) return;
+      bovedaSeriesCola.lista = await bovedaSeriesPendientes();
+      if (bovedaSeriesCola.lista.length) console.log('[boveda] auto: ' + bovedaSeriesCola.lista.length + ' series/animes en cola de cosecha (incluye incompletas)');
+      if (!bovedaSeriesCola.lista.length) return;
     }
-    const rebanada = bovedaSeriesCola.lista.splice(0, 20);
+    const rebanada = bovedaSeriesCola.lista.splice(0, 12);
     let ok = 0;
     for (const s of rebanada) {
       const clave = 'cq:' + s.kind + ':' + s.id;
       try {
         const ds = await cqApi('/v1/items/' + s.kind + '/' + s.id + '/seasons', null, 30 * 60 * 1000).catch(() => null);
         const seasons = (ds && ds.seasons) || [];
-        const s1 = seasons.find((x) => (x.playable_count || 0) > 0);
-        if (!s1) { bovedaSeriesCola.intentos.set(clave, (bovedaSeriesCola.intentos.get(clave) || 0) + 1); if (bovedaSeriesCola.intentos.get(clave) >= 2) continue; bovedaSeriesCola.lista.push(s); continue; }
-        const dd = await cqApi('/v1/items/' + s.kind + '/' + s.id + '/seasons/' + s1.season, null, 30 * 60 * 1000).catch(() => null);
-        const epsArr = (dd && (dd.episodes || (dd.season && dd.season.episodes))) || [];
+        const objetivo = Array.isArray(s.faltan)
+          ? seasons.filter((x) => s.faltan.some((f2) => String(f2) === String(x.season)))
+          : seasons.filter((x) => (x.playable_count || 0) > 0);
+        const prev = BOVEDA.get(clave) || {};
         const codigos = {};
-        for (const e of epsArr) if (e.playable && e.code) codigos[s1.season] = (codigos[s1.season] || {}), codigos[s1.season][e.episode] = e.code;
+        for (const sTemp of objetivo.slice(0, 6)) { /* máx 6 temporadas por pase — el resto vuelve a cola */
+          const dd = await cqApi('/v1/items/' + s.kind + '/' + s.id + '/seasons/' + sTemp.season, null, 30 * 60 * 1000).catch(() => null);
+          const epsArr = (dd && (dd.episodes || (dd.season && dd.season.episodes))) || [];
+          for (const e of epsArr) if (e.playable && e.code) (codigos[sTemp.season] = codigos[sTemp.season] || {})[e.episode] = e.code;
+        }
         if (Object.keys(codigos).length) {
-          const prev = BOVEDA.get(clave) || {};
           bovedaPon(clave, { t: s.t || prev.t || '', kind: s.kind, poster: s.poster || prev.poster || '', y: s.y || prev.y || '', ts: seasons.length, eps: Object.assign({}, prev.eps || {}, codigos) });
           ok++;
+        } else if (!prev.at) {
+          bovedaSeriesCola.intentos.set(clave, (bovedaSeriesCola.intentos.get(clave) || 0) + 1); /* sin video en ninguna temporada */
         }
+        const junta = Object.assign({}, prev.eps || {}, codigos);
+        const epsK = Object.keys(junta);
+        const quedan = [];
+        for (let s2 = 1; s2 <= seasons.length; s2++) if (!epsK.includes(String(s2))) quedan.push(s2);
+        if (quedan.length && (bovedaSeriesCola.intentos.get(clave) || 0) < 3) bovedaSeriesCola.lista.push({ id: s.id, kind: s.kind, t: s.t, poster: s.poster, y: s.y, faltan: quedan });
       } catch {}
     }
     if (rebanada.length) console.log('[boveda] auto: +' + ok + ' series/animes (quedan ' + bovedaSeriesCola.lista.length + ' en cola)');
   } catch (e) { console.log('[boveda] auto-series: ' + String(e.message || e).slice(0, 60)); }
 }
-setTimeout(() => { bovedaAutoRellenar(); setInterval(() => { bovedaAutoSeries().catch(() => {}); }, 150 * 1000); }, 30 * 1000);
+/* v324: BÓVEDA DE CUEVANA AUTOMÁTICA — el catálogo local ya trae los slugs;
+ * 1 GET por título guarda sus embeds (goodstream/vimeos primero) para
+ * reproducir sin sitio y alimentar el respaldo cruzado. */
+async function bovedaAutoCuevana() {
+  try {
+    if (!bovedaCvCola.lista.length) {
+      const sitemap = await cuevanaIndice().catch(() => []);
+      const basesCv = new Set(sitemap); for (const k of CVM_CAT.keys()) basesCv.add(k); /* v324.1: el catálogo local también alimenta (el sitemap a veces da 0) */
+      bovedaCvCola.lista = [...basesCv].filter((s) => !BOVEDA.has('cv:' + s) && !CVM_OCULTAS.has(s) && !bovedaCvCola.hechos.has(s));
+      if (bovedaCvCola.lista.length) console.log('[boveda] auto-cv: ' + bovedaCvCola.lista.length + ' títulos de Cuevana en cola');
+      if (!bovedaCvCola.lista.length) return;
+    }
+    const rebanada = bovedaCvCola.lista.splice(0, 10);
+    let ok = 0;
+    for (const slug of rebanada) {
+      try {
+        const r = await fetchSeguro(CUEVANA_API + encodeURIComponent(slug), 12000);
+        if (!r.ok) {
+          if (r.status === 503 || r.status === 403) { bovedaCvCola.lista.unshift(slug); console.log('[boveda] auto-cv: cuevana.mov desafía ahora (' + r.status + ') — pausa, reintento en el próximo ciclo'); break; } /* v324.2: no quemar la cola con desafíos */
+          bovedaCvCola.hechos.add(slug); continue;
+        }
+        const d = await r.json().catch(() => null);
+        const lat = ((d && d.videos && d.videos.latino) || []).map((x) => x.url).filter(Boolean);
+        if (lat.length) {
+          const sorted = [...lat].sort((a, b) => {
+            const ai = CUEVANA_HOSTS_OK.indexOf(new URL(a || 'https://x').hostname);
+            const bi = CUEVANA_HOSTS_OK.indexOf(new URL(b || 'https://x').hostname);
+            return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+          });
+          const meta = CVM_CAT.get(slug) || {};
+          bovedaPon('cv:' + slug, { t: (d.titles && (d.titles.name || d.titles.title)) || meta.t || '', embeds: sorted.slice(0, 4) });
+          ok++;
+        } else { CVM_OCULTAS.add(slug); } /* sin servidores — mismo criterio de la sonda */
+      } catch {}
+      bovedaCvCola.hechos.add(slug);
+    }
+    if (rebanada.length) console.log('[boveda] auto-cv: +' + ok + ' de Cuevana (quedan ' + bovedaCvCola.lista.length + ' en cola)');
+  } catch (e) { console.log('[boveda] auto-cv: ' + String(e.message || e).slice(0, 60)); }
+}
+setTimeout(() => { bovedaAutoRellenar(); setInterval(() => { bovedaAutoSeries().catch(() => {}); bovedaAutoCuevana().catch(() => {}); }, 150 * 1000); }, 30 * 1000);
 
 const cqOcultaId = (kind, id) => CC_OCULTAS.has(kind + ':' + id);
 const cqVivaCard = (c) => c.title && c.url && c.img && !(c._cq && cqOcultaId(c._cq.kind, c._cq.id));
@@ -14103,7 +14169,7 @@ async function estrenosMezclados(){
     /* v322: BÓVEDA — catálogo propio guardado (para la tarjeta del panel) */
     if (url.pathname === '/api/boveda' && req.method === 'GET') {
       const resumen = url.searchParams.get('resumen') === '1';
-      let pelis = 0, series = 0, animes = 0, cv = 0, caps = 0, completadas = 0, enCola = bovedaSeriesCola.lista.length;
+      let pelis = 0, series = 0, animes = 0, cv = 0, caps = 0, completadas = 0, enCola = bovedaSeriesCola.lista.length + bovedaCvCola.lista.length; /* v324: suma ambas colas */
       const NOMBRES_BV = { cq: 'CineCalidad', cv: 'Cuevana', d23: 'AnimeD23', lct: 'Lacartoons', misc: 'MisCaricaturas', enn: 'Ennovelas', lat: 'Latanime', flv: 'AnimeFLV', dan: 'Danimados' };
       const fuentes = {};
       const items = [];
