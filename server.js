@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v314'; // v314: sonda CineCalidad con verificación de video REAL + semilla de podredumbre auditada (29 pelis + 12 eps)
+const UI_VERSION = 'v315'; // v315: vimeos con verificación PROFUNDA (master+variante), 2 oleadas y escape por relay — adiós pantallas negras
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -11506,13 +11506,47 @@ async function resolverGoodstream(embed, pageUrl) {
 }
 /* v90: vimeos — el HLS (720p) vive dentro de un eval(p,a,c,k,e,d) */
 async function resolverVimeos(embed, pageUrl) {
-  /* v313: el embed reparte NODO de salida por fetch (Fundación cayó en
-   * s10.vimeos.net muerto para el Oracle mientras s1 servía La Odisea —
-   * la misma lotería que goodstream en v99). Pedimos el embed 3 veces
-   * desfasadas, verificamos cada m3u8 con un pedido real y nos quedamos
-   * con el primero que SIRVA de verdad. Si el embed mismo bloquea la IP
-   * del datacenter, reintenta por relay (v312). */
+  /* v315: los nodos de vimeos van Y VIENEN — hay nodos que sirven el
+   * master.m3u8 y se ahogan en la VARIANTE (pantalla negra) o están ocupados
+   * un rato («no entregó el video»). Ahora la verificación es PROFUNDA:
+   * master + primera variante; si el directo no contesta y hay relay, se
+   * verifica por relay (el player de vimeos ya rueda por relay en /api/hls).
+   * Y si la 1ª oleada falla completa, una 2ª oleada tras 1.5 s (los nodos
+   * «ocupados» suelen despertar en segundos). */
   const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+  const REF = 'https://vimeos.net/';
+  /* GET pequeño con timeout; ok = status 200/206 */
+  const pide = async (u, ms) => {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), ms);
+    try {
+      const r = await fetch(u, { headers: { 'User-Agent': MIRROR_UA, Referer: REF }, signal: ctl.signal, redirect: 'follow' });
+      const ok = r.ok || r.status === 206;
+      let cuerpo = null;
+      if (ok) cuerpo = await r.text().catch(() => null);
+      else { try { if (r.body) await r.body.cancel(); } catch {} }
+      return { ok, cuerpo };
+    } catch { return { ok: false, cuerpo: null }; }
+    finally { clearTimeout(t); }
+  };
+  const pideRelay = async (u, ms) => {
+    if (!CDN_RELAY) return { ok: false, cuerpo: null };
+    try { const r = await fetchRelay(u, ms); const ok = r.ok; const cuerpo = ok ? await r.text().catch(() => null) : null; return { ok, cuerpo }; }
+    catch { return { ok: false, cuerpo: null }; }
+  };
+  /* verificación PROFUNDA: master + primera variante (directo, luego relay) */
+  const m3u8Sirve = async (m3u8) => {
+    let r = await pide(m3u8, 4500);
+    if (!r.ok) r = await pideRelay(m3u8, 12000);
+    if (!r.ok || !r.cuerpo) return false;
+    const lineas = (r.cuerpo || '').split('\n').map((l) => l.trim());
+    const variante = lineas.find((l) => l && !l.startsWith('#') && /\.m3u8/i.test(l));
+    if (!variante) return true; /* playlist media directa — con master OK basta */
+    const vAbs = /^https?:/i.test(variante) ? variante : new URL(variante, m3u8).href;
+    let rv = await pide(vAbs, 3500);
+    if (!rv.ok) rv = await pideRelay(vAbs, 10000);
+    return rv.ok;
+  };
   const pedirEmbed = async (desfase) => {
     if (desfase) await espera(desfase);
     try {
@@ -11526,25 +11560,24 @@ async function resolverVimeos(embed, pageUrl) {
       const out = desempacar(em);
       const m3u8 = out && (out.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
       if (!m3u8) return null; /* cuerpo racionado o sin video */
-      const ctl = new AbortController();
-      const t = setTimeout(() => ctl.abort(), 3500);
-      let sirve = false;
-      try {
-        const r = await fetch(m3u8, { headers: { 'User-Agent': MIRROR_UA, Referer: 'https://vimeos.net/' }, signal: ctl.signal, redirect: 'follow' });
-        sirve = r.ok;
-        try { if (r.body) await r.body.cancel(); } catch {}
-      } catch {}
-      clearTimeout(t);
-      if (!sirve && m3u8) console.log('[vimeos] nodo ' + (new URL(m3u8).hostname) + ' no contestó — probando otro');
-      return sirve ? m3u8 : null;
+      const sirve = await m3u8Sirve(m3u8);
+      if (!sirve) { console.log('[vimeos] nodo ' + (new URL(m3u8).hostname) + ' no contestó (master+variante) — probando otro'); return null; }
+      return m3u8;
     } catch { return null; }
   };
-  const m3u8s = (await Promise.all([pedirEmbed(0), pedirEmbed(700), pedirEmbed(1400)])).filter(Boolean);
-  if (!m3u8s.length) throw new Error('vimeos no entregó el video (nodos ocupados — reintenta)');
-  const m3u8 = [...new Set(m3u8s)][0];
+  let elegido = (await Promise.all([pedirEmbed(0), pedirEmbed(700), pedirEmbed(1400)])).filter(Boolean)[0];
+  if (!elegido) {
+    await espera(1500); /* oleada 2: los nodos ocupados suelen despertar */
+    elegido = (await Promise.all([pedirEmbed(0), pedirEmbed(500)])).filter(Boolean)[0];
+  }
+  if (!elegido) {
+    await espera(3500); /* v315: oleada 3 — las saturaciones duran segundos, no minutos */
+    elegido = (await Promise.all([pedirEmbed(0), pedirEmbed(800)])).filter(Boolean)[0];
+  }
+  if (!elegido) throw new Error('vimeos está saturado en este momento — reintenta en un minuto');
   /* los segmentos piden el Referer del embed: lo recordamos */
-  try { hlsReferers.set(new URL(m3u8).hostname, embed); } catch {}
-  return { m3u8, proxy: true, subs: [] }; /* directo no sirve → siempre proxy */
+  try { hlsReferers.set(new URL(elegido).hostname, embed); } catch {}
+  return { m3u8: elegido, proxy: true, subs: [] }; /* directo no sirve → siempre proxy */
 }
 /* v311: cinecalidad.am — el hash de la URL trae kind/id/temporada/episodio;
  * la API da el `code` y el player es SIEMPRE vimeos (ya resuelto por arriba) */

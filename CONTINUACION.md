@@ -2918,3 +2918,13 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - Semillas auditoría 24 Sep: CC_SEED_SIN_VIDEO (29 movie:id) + CQ_EPS_SIN_VIDEO (12 URLs → EPS_MUERTOS).
 - catCvFull respeta ocultas (7591 pelis). Panel: total 9571 / ocultas 34+ / activas el resto — REALES.
 - Verificado local: Tully oculta del buscador; Fundación visible; stats coherentes.
+
+## v315 (24 Sep 2026) — vimeos: verificación PROFUNDA + 3 oleadas + relay en cada nivel
+- Síntoma real (capturado en vivo): vimeos tiene VENTANAS de saturación — nodos que
+  sirven master pero se ahogan en la VARIANTE (pantalla negra) o dejan de contestar
+  un rato («nodos ocupados»). Afecta a TODAS las IPs (taller incluido).
+- resolverVimeos v315: verificación master+PRIMERA VARIANTE (nodos medio-muertos
+  filtrados antes de llegar al player); si directo falla y hay CDN_RELAY → verifica
+  por relay (el player vimeos ya rueda por relay en /api/hls); 3 oleadas de embeds
+  (3× / 2× tras 1.5 s / 2× tras 3.5 s) — las saturaciones duran segundos.
+- Error final más claro: 'vimeos está saturado en este momento — reintenta en un minuto'.
