@@ -2908,3 +2908,13 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   La Odisea por p4. Ambos ok:true por /api/solo.
 - NOTA: las entradas de «Continuar viendo» con URLs cine-calidad.mx siguen
   cayendo a resolverSolo (522) — no tienen arreglo; re-abrir desde tarjeta nueva.
+
+## v314 (24 Sep 2026) — sonda con video REAL + semilla de podredumbre
+- cqEmbedSirve(code): 3 intentos embed→desempacar→m3u8→sirveElVideo (nodos muertos no condenan).
+- verificarCC devuelve code (pelis) / epCode (1er ep reproducible de series/anime).
+- sondaCineCalidad: viveDeVerdad() en los 3 frentes — revive SOLO con video real; oculta con
+  razón 'video podrido detrás del code'. Ciclo 1: nuevas_ok=7, nuevas_fail=3, vivas→muertas=2
+  (La Guarida, CODE GEASS Rozé, Daria, 30歳の保健体育, El Legado de Hope) — ocultas 29→34.
+- Semillas auditoría 24 Sep: CC_SEED_SIN_VIDEO (29 movie:id) + CQ_EPS_SIN_VIDEO (12 URLs → EPS_MUERTOS).
+- catCvFull respeta ocultas (7591 pelis). Panel: total 9571 / ocultas 34+ / activas el resto — REALES.
+- Verificado local: Tully oculta del buscador; Fundación visible; stats coherentes.

@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v313'; // v313: vimeos con triple intento + m3u8 verificado (lotería de nodos, como goodstream v99)
+const UI_VERSION = 'v314'; // v314: sonda CineCalidad con verificación de video REAL + semilla de podredumbre auditada (29 pelis + 12 eps)
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -825,6 +825,16 @@ try {
     console.log('[cq] migración v311: ocultas/vistas del sitio viejo archivadas — arranque limpio en cinecalidad.am');
   }
 } catch {}
+/* v314: SEMILLA DE PODREDUMBRE REAL — auditoría completa del 24 Sep 2026
+ * (tools/auditoria-cq.js): títulos que la API anuncia vivos pero cuyo video
+ * está PODRIDO (embed sin m3u8 en 3 intentos). La sonda los re-prueba cada
+ * ciclo con cqEmbedSirve — si el sitio les repara el video, reviven solos. */
+const CC_SEED_SIN_VIDEO = ['movie:115290' /* La laguna azul: El despertar */, 'movie:400579' /* Tully */, 'movie:49519' /* Los Croods */, 'movie:1146577' /* CTRL */, 'movie:188927' /* Star Trek Sin Límites */, 'movie:479718' /* Ciudad sin Ley */, 'movie:1654715' /* The Summoning of Chloe Kane */, 'movie:343668' /* Kingsman: El círculo dorado */, 'movie:764853' /* Young, Stalked and Pregnant */, 'movie:11202' /* Patton */, 'movie:443987' /* Les Mystères de l'île */, 'movie:9366' /* Brasco */, 'movie:844537' /* Tormenta Mortal */, 'movie:1599090' /* Rascacielos en vivo */, 'movie:492452' /* Regresa a mí */, 'movie:1033462' /* Oficina 749 */, 'movie:9272' /* El ángel malvado */, 'movie:300665' /* Leatherface: La máscara del terror */, 'movie:55341' /* Jeepers Creepers 3 */, 'movie:378111' /* Una cigüeña en apuros */, 'movie:524213' /* El Genio y la Bestia */, 'movie:1005031' /* Un viaje al infinito */, 'movie:1087192' /* Cómo entrenar a tu dragón */, 'movie:843889' /* Amarte hasta Marte */, 'movie:920081' /* Megaboa */, 'movie:788920' /* Dealer */, 'movie:15070' /* Invicto: Contraataque */, 'movie:1092193' /* ¿Encontró lo que buscaba? */, 'movie:874300' /* South Park: Pos-Covid */];
+{
+  let ns = 0;
+  for (const s of CC_SEED_SIN_VIDEO) if (!CC_OCULTAS.has(s)) { CC_OCULTAS.add(s); CC_VISTAS.add(s); ns++; }
+  if (ns) console.log('[cq] semilla v314: ' + ns + ' títulos con video podrido ocultados (auditoría 24 Sep)');
+}
 /* v239.13: Notificaciones de sonda — log de eventos recientes */
 const SONDALOG_FILE = path.join(DATA_DIR, 'sonda-log.json');
 const SONDALOG = []; /* {ts, fuente, tipo, slug, msg} — max 500 */
@@ -1003,6 +1013,27 @@ function epsPerdonar(u) {
   }
 }
 const epsVivos = (eps) => (eps || []).filter((e) => e && e.url && !EPS_MUERTOS.has(e.url)); /* v251 muertas siempre ocultas */
+/* v314: episodios concretos con video podrido (auditoría 24 Sep) — el título
+ * vive, el capítulo no. Van a EPS_MUERTOS y el selector ya no los muestra. */
+const CQ_EPS_SIN_VIDEO = [
+  'https://www.cinecalidad.am/#/serie/207250/peligros-en-mi-corazón/temporada/1/episodio/4',
+  'https://www.cinecalidad.am/#/serie/285739/vladimir/temporada/1/episodio/1',
+  'https://www.cinecalidad.am/#/serie/254544/el-frente-costero/temporada/1/episodio/1',
+  'https://www.cinecalidad.am/#/serie/289763/nos-vemos-en-la-oficina/temporada/1/episodio/1',
+  'https://www.cinecalidad.am/#/serie/227318/quién-es-erin-carter/temporada/1/episodio/1',
+  'https://www.cinecalidad.am/#/serie/247670/グラスハート/temporada/1/episodio/1',
+  'https://www.cinecalidad.am/#/serie/103516/star-trek-nuevos-y-extraños-mundos/temporada/1/episodio/1',
+  'https://www.cinecalidad.am/#/anime/34791/claymore/temporada/1/episodio/1',
+  'https://www.cinecalidad.am/#/anime/229676/spice-and-wolf-merchant-meets-the-wise-wolf/temporada/1/episodio/1',
+  'https://www.cinecalidad.am/#/anime/119495/the-eminence-in-shadow/temporada/1/episodio/1',
+  'https://www.cinecalidad.am/#/anime/97617/the-misfit-of-demon-king-academy/temporada/1/episodio/1',
+  'https://www.cinecalidad.am/#/anime/74183/king-s-game-the-animation/temporada/1/episodio/1',
+];
+{
+  let ne = 0;
+  for (const u of CQ_EPS_SIN_VIDEO) if (!EPS_MUERTOS.has(u)) { EPS_MUERTOS.add(u); ne++; }
+  if (ne) { clearTimeout(epsT1); epsT1 = setTimeout(epsEscribir, 1500); console.log('[cq] semilla v314: ' + ne + ' episodios sin video ocultados del selector'); }
+}
 
 /* v295: CADENA ÚNICA DE RESOLUCIÓN — la misma que usa /api/solo; la reutiliza
  * la verificación dirigida para que el veredicto sea por el MISMO camino del player. */
@@ -9271,6 +9302,22 @@ function cqCard(it) {
 }
 const cqOcultaId = (kind, id) => CC_OCULTAS.has(kind + ':' + id);
 const cqVivaCard = (c) => c.title && c.url && c.img && !(c._cq && cqOcultaId(c._cq.kind, c._cq.id));
+/* v314: ¿el embed de vimeos entrega video DE VERDAD? — 2 intentos, m3u8
+ * verificado con rangito real (los nodos muertos no condenan al título) */
+async function cqEmbedSirve(code) {
+  if (!code) return false;
+  for (let i = 0; i < 3; i++) { /* v314.1: 3 intentos como el player — los nodos muertos no condenan */
+    if (i) await new Promise((r) => setTimeout(r, 600));
+    try {
+      const em = await fetchTexto('https://vimeos.net/embed-' + code + '.html', CQ_WEB + '/');
+      const out = desempacar(em);
+      const m3 = out && (out.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
+      if (!m3) continue;
+      if (await sirveElVideo(m3, 'https://vimeos.net/')) return true;
+    } catch {}
+  }
+  return false;
+}
 
 /* catálogo completo por kind (para catCv, géneros e índice del barrido) */
 const cqFull = { movie: { items: [], at: 0, p: null }, tvshow: { items: [], at: 0, p: null }, anime: { items: [], at: 0, p: null } };
@@ -9359,12 +9406,21 @@ async function verificarCC(idKind, tipoViejo) {
       const d = await cqApi('/v1/items/movie/' + id, null, 30 * 60 * 1000).catch(() => null);
       const it = d && d.item;
       if (!it) return { ok: false, reason: 'no-en-api' };
-      return { ok: !!(it.playable && it.code), reason: it.playable && it.code ? 'playable' : 'sin-code' };
+      return { ok: !!(it.playable && it.code), reason: it.playable && it.code ? 'playable' : 'sin-code', code: it.code || '' };
     }
     const d = await cqApi('/v1/items/' + kind + '/' + id + '/seasons', null, 30 * 60 * 1000).catch(() => null);
     if (!d || !Array.isArray(d.seasons)) return { ok: false, reason: 'no-en-api' };
     const play = d.seasons.reduce((a, s) => a + (s.playable_count || 0), 0);
-    return play > 0 ? { ok: true, reason: 'eps:' + play, eps: play } : { ok: false, reason: 'sin-episodios' };
+    if (play <= 0) return { ok: false, reason: 'sin-episodios' };
+    /* v314: un episodio representativo para probar el embed real */
+    const sP = d.seasons.find((s) => (s.playable_count || 0) > 0);
+    let epCode = '';
+    if (sP) {
+      const dd = await cqApi('/v1/items/' + kind + '/' + id + '/seasons/' + sP.season, null, 30 * 60 * 1000).catch(() => null);
+      const ep = (((dd && (dd.episodes || (dd.season && dd.season.episodes))) || []).find((e) => e.playable && e.code));
+      epCode = (ep && ep.code) || '';
+    }
+    return { ok: true, reason: 'eps:' + play, eps: play, epCode };
   } catch (e) { return { ok: false, reason: String(e.message || e).slice(0, 60) }; }
 }
 
@@ -9379,27 +9435,39 @@ async function sondaCineCalidad() {
     let nuevas_ok = 0, nuevas_fail = 0, vivas_muertas = 0, muertas_vivas = 0;
     const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
     const tituloDe = (entry) => (entry.split('|')[2] || entry.split('|')[0]).slice(0, 60);
+    /* v314: veredicto con VIDEO REAL — la API dice «vivo» pero el embed puede
+     * estar podrido (auditoría 24 Sep: 14% pelis). Si el code no entrega
+     * m3u8 en 2 intentos → muerto de verdad. */
+    const viveDeVerdad = async (r) => {
+      if (!r.ok) return false;
+      const code = r.code || r.epCode;
+      if (!code) return r.ok; /* sin code que probar: confianza de la API */
+      return await cqEmbedSirve(code);
+    };
     /* NUEVAS */
     const desconocidas = shuffle(sitemap.filter((s) => { const id = s.split('|')[0]; return !CC_VISTAS.has(id) && !CC_OCULTAS.has(id); })).slice(0, 10);
     for (const entry of desconocidas) {
       const id = entry.split('|')[0];
       const r = await verificarCC(id);
       CC_VISTAS.add(id);
-      if (r.ok) nuevas_ok++;
-      else { CC_OCULTAS.add(id); nuevas_fail++; sondaNotify('CineCalidad', 'muerto', id, tituloDe(entry) + ' — sin video en la API (nueva verificada)'); }
+      const vive = await viveDeVerdad(r);
+      if (vive) nuevas_ok++;
+      else { CC_OCULTAS.add(id); nuevas_fail++; sondaNotify('CineCalidad', 'muerto', id, tituloDe(entry) + (r.ok ? ' — el sitio lo anuncia vivo pero el video está podrido' : ' — sin video en la API (nueva verificada)')); }
     }
     /* VIVAS */
     const vivas = shuffle(sitemap.filter((s) => !CC_OCULTAS.has(s.split('|')[0]))).slice(0, 10);
     for (const entry of vivas) {
       const id = entry.split('|')[0];
       const r = await verificarCC(id);
-      if (!r.ok) { CC_OCULTAS.add(id); vivas_muertas++; sondaNotify('CineCalidad', 'muerto', id, tituloDe(entry) + ' murió — playable desapareció'); }
+      const vive = await viveDeVerdad(r);
+      if (!vive) { CC_OCULTAS.add(id); vivas_muertas++; sondaNotify('CineCalidad', 'muerto', id, tituloDe(entry) + (r.ok ? ' murió — video podrido detrás del code' : ' murió — playable desapareció')); }
     }
-    /* MUERTAS */
+    /* MUERTAS — para revivir exige video real, no solo metadatos */
     const muertas = shuffle([...CC_OCULTAS].filter((id) => /^(movie|tvshow|anime):\d+$/.test(id))).slice(0, 10);
     for (const id of muertas) {
       const r = await verificarCC(id);
-      if (r.ok) { CC_OCULTAS.delete(id); muertas_vivas++; sondaNotify('CineCalidad', 'revivio', id, id.split(':')[1] + ' revivió — playable de vuelta'); }
+      const vive = await viveDeVerdad(r);
+      if (vive) { CC_OCULTAS.delete(id); muertas_vivas++; sondaNotify('CineCalidad', 'revivio', id, id.split(':')[1] + ' revivió — video real de vuelta'); }
     }
     /* Persistir */
     try { fs.writeFileSync(path.join(__dirname, 'cc-ocultas.txt'), [...CC_OCULTAS].join('\n') + '\n'); } catch {}
