@@ -3127,3 +3127,23 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   '[cq] reparación v317/v329: 1 falsos positivos desocultados (incluye
   Fundación)' → primer ciclo → 'Fundación | Serie completada | 30 caps |
   poster sí' y buscable por 'fundaci'.
+
+## v330 (24 Sep 2026) — ARQUITECTURA BÓVEDA-PRIMERO (diseño del usuario)
+- Propuesta del usuario: bóveda = aval (lo que ya jala no se re-chequea ni se
+  oculta), sondas de fuentes solo para casos NUEVOS, y una SONDA DE LA BÓVEDA
+  que audita los videos guardados (OK / confirmar muerte antes de ocultar).
+- GUARDS (probados en vivo): condena() de la sonda cc rechaza títulos con
+  entrada en bóveda ('Seven Snipers está en bóveda — no se oculta', PAW Patrol,
+  DURANTE la ventana de saturación de la noche); frente VIVAS los salta sin
+  gastar sondas; barridoOcultar('cinecalidad') también respeta el aval.
+- SONDA DE LA BÓVEDA (sondaBoveda, cada 10 min): muestrea 3 películas cq,
+  verificación PROFUNDA (cqEmbedSirve) ×3 + CANARIO (code 06k16tgdfs1t de
+  Fundación): si el canario falla = ventana mala, no se juzga nada
+  (lección Ice Skater: condenada en saturación → falso positivo; el frente
+  MUERTAS de la sonda cc la revivirá solo cuando vimeos respire). Muerte
+  confirmada → fuera de bóveda + cc-ocultas + notificación fuente 'Bóveda'.
+- /api/boveda: auditoria {ok, podridos, vistos}; panel: chips 'Auditados OK N'
+  (+ 'Podridos N' si hubo). Re-cosecha de películas ahora SEMANAL (nuevos
+  títulos del sitio y condenados por error re-entran; antes era una sola vez).
+- Verificado: primera pasada 3 OK / 0 condenados en ventana movediza; condena
+  real demostrada end-to-end (prune+oculta+notify) con code podrido de prueba.

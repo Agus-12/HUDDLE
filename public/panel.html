@@ -835,6 +835,8 @@ function bovedaChips(){
     +'<span class="chip" onclick="bovedaFiltro(\'animes\')" style="cursor:pointer;'+(window._bvCat==='animes'?act:'')+'">Animes <b>'+b.animes+'</b></span>'
     +'<span class="chip ok" onclick="bovedaFiltro(\'completadas\')" style="cursor:pointer;'+(window._bvCat==='completadas'?act:'')+'">Completadas <b>'+b.completadas+'</b></span>'
     +'<span class="chip">Capítulos <b>'+b.caps+'</b></span>';
+  var au=b.auditoria;
+  if(au){h+='<span class="chip ok">Auditados OK <b>'+au.ok+'</b></span>'+(au.podridos?'<span class="chip bad">Podridos <b>'+au.podridos+'</b></span>':'');} /* v330: la sonda de la bóveda al día */
   el.innerHTML=h;
 }
 function bovedaFiltro(c){window._bvCat=(window._bvCat===c)?'':c;bovedaChips();bovedaPintar();}

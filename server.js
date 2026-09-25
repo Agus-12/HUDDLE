@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v329'; // v329: Fundación desocultada (condenada injustamente por la lotería de nodos v312) + prioridad en la cola de la bóveda
+const UI_VERSION = 'v330'; // v330: ARQUITECTURA BÓVEDA-PRIMERO — la bóveda avala a los suyos (sondas no los tocan), sonda propia audita los videos guardados
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -1109,7 +1109,7 @@ async function barridoLista(fuente) {
 function barridoOcultar(fuente, slug) {
   if (fuente === 'pelisxd') { if (!PXD_OCULTAS.has(slug)) { PXD_OCULTAS.add(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt'); pxdOcultar(slug); sondaNotify('PelisXD', 'muerto', slug, slug + ' murió — barrido completo'); } }
   else if (fuente === 'cuevana') { if (!CVM_OCULTAS.has(slug)) { CVM_OCULTAS.add(slug); ocultasReescribir(CVM_OCULTAS, 'cuevana-ocultas.txt'); sondaNotify('Cuevana', 'muerto', slug, slug + ' murió — barrido completo'); } }
-  else if (fuente === 'cinecalidad') { if (!CC_OCULTAS.has(slug)) { CC_OCULTAS.add(slug); ocultasReescribir(CC_OCULTAS, 'cc-ocultas.txt'); sondaNotify('CineCalidad', 'muerto', slug, slug + ' murió — barrido completo'); } }
+  else if (fuente === 'cinecalidad') { if (BOVEDA.has('cq:' + slug)) { console.log('[barrido] cc ' + slug + ' está en bóveda — no se oculta'); } else if (!CC_OCULTAS.has(slug)) { CC_OCULTAS.add(slug); ocultasReescribir(CC_OCULTAS, 'cc-ocultas.txt'); sondaNotify('CineCalidad', 'muerto', slug, slug + ' murió — barrido completo'); } } /* v330 */
   else if (fuente === 'latanime') laFallosRegistrar(slug); /* 3 fallos espaciados la ocultan, igual que con usuarios */
   else if (fuente === 'animeflv') { if (!AF_OCULTAS.has(slug)) { AF_OCULTAS.add(slug); ocultasReescribir(AF_OCULTAS, 'af-ocultas.txt'); sondaNotify('AnimeFLV', 'muerto', slug, slug + ' murió — barrido completo'); } }
   else if (fuente === 'animed23') { if (!D23_OCULTAS.has(slug)) { d23Ocultar(slug); sondaNotify('AnimeD23', 'muerto', slug, slug + ' murió — barrido completo'); } }
@@ -9411,7 +9411,8 @@ function cqCard(it) {
  *    la ficha completa se cosecha cuando alguien la abre). */
 async function bovedaAutoRellenar() {
   try {
-    if (BOVEDA.get('_meta:pelis')) return;
+    const metaP = BOVEDA.get('_meta:pelis');
+    if (metaP && Date.now() - metaP.at < 7 * 24 * 3600 * 1000) return; /* v330.1: re-cosecha SEMANAL — nuevos títulos del sitio y condenados por error re-entran */
     let n = 0;
     for (const it of (await cqTodas('movie').catch(() => []))) {
       if (!it.code || cqOcultaId('movie', it.tmdb_id)) continue;
@@ -9563,6 +9564,45 @@ async function bovedaAutoCuevana() {
     if (total || paginas) console.log('[boveda] auto-cv: +' + total + ' de Cuevana vía motor nuevo (' + paginas + ' páginas)');
   } catch (e) { console.log('[boveda] auto-cv: ' + String(e.message || e).slice(0, 60)); }
 }
+/* v330: SONDA DE LA BÓVEDA — el auditor propio que propuso el usuario:
+ * muestrea títulos guardados y les pasa la verificación PROFUNDA de video.
+ * OK → avalado. Podrido (confirmado 2×) → fuera de la bóveda y oculto del
+ * catálogo con aviso. Nunca juzga en racha: el doble chequeo es obligatorio. */
+const BOVEDA_AUDIT = { revisados: new Set(), ok: 0, podridos: 0 };
+async function sondaBoveda() {
+  try {
+    const memMB = process.memoryUsage().heapUsed / 1048576;
+    if (memMB > 320) return;
+    const muestra = [];
+    for (const [k, v] of BOVEDA) {
+      if (!k.startsWith('cq:movie:') || !v.code || BOVEDA_AUDIT.revisados.has(k)) continue;
+      muestra.push([k, v]);
+      if (muestra.length >= 3) break;
+    }
+    if (!muestra.length) { BOVEDA_AUDIT.revisados.clear(); return; } /* vuelta completa — re-auditar desde el inicio */
+    /* v330.1: CANARIO — un código sabidamente vivo (Fundación). Si el canario
+     * también falla, es una ventana mala de vimeos y NO SE JUZGA NADA
+     * (antídoto anti-saturación, mismo espíritu que el disyuntor v317). */
+    let canario = false;
+    for (let i = 0; i < 3 && !canario; i++) canario = await cqEmbedSirve('06k16tgdfs1t').catch(() => false);
+    if (!canario) { console.log('[boveda-sonda] ventana mala de vimeos (canario caído) — no se juzga nada este ciclo'); return; }
+    for (const [k, v] of muestra) {
+      BOVEDA_AUDIT.revisados.add(k);
+      let sirvio = false;
+      for (let i = 0; i < 3 && !sirvio; i++) sirvio = await cqEmbedSirve(v.code).catch(() => false);
+      if (sirvio) { BOVEDA_AUDIT.ok++; continue; }
+      const idNum = k.split(':')[2];
+      BOVEDA.delete(k);
+      BOVEDA_AUDIT.podridos++;
+      if (!CC_OCULTAS.has('movie:' + idNum)) { CC_OCULTAS.add('movie:' + idNum); ocultasReescribir(CC_OCULTAS, 'cc-ocultas.txt'); }
+      sondaNotify('Bóveda', 'muerto', v.t || idNum, (v.t || idNum) + ' — video borrado del CDN, confirmado 2× — fuera de la bóveda');
+      console.log('[boveda-sonda] ' + (v.t || k) + ' — código podrido confirmado: fuera de bóveda y oculto');
+      bovedaGuardar();
+    }
+  } catch (e) { console.log('[boveda-sonda] ' + String(e.message || e).slice(0, 60)); }
+}
+setTimeout(() => sondaBoveda().catch(() => {}), 60 * 1000);
+setInterval(() => sondaBoveda().catch(() => {}), 10 * 60 * 1000);
 setTimeout(() => { bovedaAutoRellenar(); setInterval(() => { bovedaAutoSeries().catch(() => {}); bovedaAutoCuevana().catch(() => {}); }, 150 * 1000); }, 30 * 1000);
 
 const cqOcultaId = (kind, id) => CC_OCULTAS.has(kind + ':' + id);
@@ -9718,7 +9758,12 @@ async function sondaCineCalidad() {
       apunta(vive);
       return vive;
     };
+    const bovedaTieneCq = (id2) => BOVEDA.has('cq:' + id2); /* v330 */
     const condena = (id, titulo, conVideo) => {
+      /* v330: REGLA DE LA BÓVEDA — si el título está cosechado y su código
+       * reproduce, la sonda NO lo condena (la bóveda es su aval; si el video
+       * se pudre de verdad, la sonda de la bóveda lo detecta y actúa) */
+      if (bovedaTieneCq(id)) { GRACIA.delete(id); console.log('[sonda] cc: ' + titulo + ' está en bóveda — no se oculta'); return false; }
       /* v317: solo la API muerta es inmediata; la muerte por VIDEO exige 2
        * ciclos seguidos fallando Y que no haya saturación declarada */
       if (!conVideo) { CC_OCULTAS.add(id); return true; }
@@ -9745,6 +9790,7 @@ async function sondaCineCalidad() {
     const vivas = shuffle(sitemap.filter((s) => !CC_OCULTAS.has(s.split('|')[0]))).slice(0, 10);
     for (const entry of vivas) {
       const id = entry.split('|')[0];
+      if (BOVEDA.has('cq:' + id)) continue; /* v330: en bóveda y jalando — no re-chequear (solo casos nuevos) */
       const r = await verificarCC(id);
       const vive = await viveDeVerdad(r);
       if (!vive && condena(id, tituloDe(entry), r.ok)) { vivas_muertas++; sondaNotify('CineCalidad', 'muerto', id, tituloDe(entry) + (r.ok ? ' murió — video podrido detrás del code' : ' murió — playable desapareció')); }
@@ -14206,8 +14252,9 @@ async function estrenosMezclados(){
         if (clave.startsWith('cv:')) { cv++; caps += (v.embeds || []).length; items.push({ clave, t: v.t || clave.replace('cv:', ''), tipo: 'Película', poster: v.poster || '', y: v.y || '', estado: 'Película · Cuevana', caps: 1 }); } /* v328: ya con póster */
       }
       items.sort((a, b) => a.t.localeCompare(b.t, 'es'));
-      if (resumen) return json(res, 200, { ok: true, pelis, series, animes, cuevana: cv, caps, completadas, enCola, titulos: pelis + series + animes + cv, fuentes });
-      return json(res, 200, { ok: true, pelis, series, animes, cuevana: cv, caps, completadas, enCola, titulos: items.length, fuentes, items });
+      const auditoriaBv = { ok: BOVEDA_AUDIT.ok, podridos: BOVEDA_AUDIT.podridos, vistos: BOVEDA_AUDIT.revisados.size }; /* v330 */
+      if (resumen) return json(res, 200, { ok: true, pelis, series, animes, cuevana: cv, caps, completadas, enCola, titulos: pelis + series + animes + cv, fuentes, auditoria: auditoriaBv });
+      return json(res, 200, { ok: true, pelis, series, animes, cuevana: cv, caps, completadas, enCola, titulos: items.length, fuentes, auditoria: auditoriaBv, items });
     }
 
     /* v238: estadísticas por fuente */
