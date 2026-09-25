@@ -3401,3 +3401,19 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - v343: en la rama canario-muerto, si CDN_RELAY existe → una oleada(4,relay)
   extra antes del throw; 'SALVADO por el relay de casa' en el log si jala.
   Orden final: directa×2 → canario → RELAY → rendirse.
+
+## v344 (25 Sep 2026) — La variante TAMBIÉN viaja por el relay (fin del «saturado» con relay vivo)
+- Datos del usuario: relay vivo (400 raíz = normal), vimeos POR RELAY
+  200 · 49 749 b (¡VIVE — solo bloquea datacenters!), v342 trabajando
+  ('SEGUNDO ENLACE cosechado: Los creyentes (2 embeds)' + reproducción por
+  él), pero aún 'saturado' 08:08-08:10.
+- HALLAZGO: relayGastado = presupuesto de relay de UN SOLO USO dentro de
+  m3u8Sirve: el máster lo gastaba y la VARIANTE (la que decide si el nodo
+  sirve) se verificaba DIRECTA → fallaba por el bloqueo → nodo bueno
+  rechazado → toda la oleada de relay en rojo → 'saturado' con relay vivo.
+- v344: permitirRelay autoriza relay para MÁSTER y VARIANTE (se elimina el
+  presupuesto único). Sin riesgo de tormenta: solo la oleada dedicada
+  (oleada(4,true), tras fallar la directa ×2 + canario) pasa true.
+- Esperado en Oracle: reproducciones cq salen por relay ('SALVADO por el
+  relay de casa'), verificaciones dirigidas pasan (vivo), notificaciones
+  'NO responde' desaparecen. SEGUNDO ENLACE sigue como segunda pata.

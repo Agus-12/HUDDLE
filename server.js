@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v343'; // v343: el relay de casa se intenta ANTES de declarar 'saturado' — bloqueo de vimeos a datacenters ya no tumba la reproducción si el relay está vivo // v342: SEGUNDO ENLACE — películas cq con embeds de respaldo de OTRA infraestructura (PelisXD byse/dood), cosechados al fallar y usados por auditoría/replay; bovedaRespaldo también rastrea pxd: // v341: reanudar SIEMPRE (catálogo respeta continuar viendo y ya no pisa tu minuto) + posición marcada al INICIAR el salto + el perro guardián cura saltos colgados (>9 s buscando) // v340: ventana mala de vimeos = verificaciones diferidas 10 min (aviso único/hora, cero spam, cero muertes falsas) + el player AVISA cuando la reconexión automática no puede // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
+const UI_VERSION = 'v344'; // v344: la verificación del video (máster Y variante) usa el relay en toda la oleada de relay — el presupuesto de un solo uso rechazaba nodos buenos: 'saturado' con relay vivo // v343: el relay de casa se intenta ANTES de declarar 'saturado' — bloqueo de vimeos a datacenters ya no tumba la reproducción si el relay está vivo // v342: SEGUNDO ENLACE — películas cq con embeds de respaldo de OTRA infraestructura (PelisXD byse/dood), cosechados al fallar y usados por auditoría/replay; bovedaRespaldo también rastrea pxd: // v341: reanudar SIEMPRE (catálogo respeta continuar viendo y ya no pisa tu minuto) + posición marcada al INICIAR el salto + el perro guardián cura saltos colgados (>9 s buscando) // v340: ventana mala de vimeos = verificaciones diferidas 10 min (aviso único/hora, cero spam, cero muertes falsas) + el player AVISA cuando la reconexión automática no puede // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -12158,17 +12158,16 @@ async function resolverVimeos(embed, pageUrl) {
   /* verificación PROFUNDA: master + primera variante. v332: el relay SOLO
    * se gasta una vez por resolución (a petición del llamador) — antes cada
    * nodo muerto pagaba +12 s de relay y una tormenta de nodos eran minutos */
-  let relayGastado = false;
   const m3u8Sirve = async (m3u8, permitirRelay) => {
     let r = await pide(m3u8, 4000);
-    if (!r.ok && permitirRelay && !relayGastado) { relayGastado = true; r = await pideRelay(m3u8, 12000); }
+    if (!r.ok && permitirRelay) r = await pideRelay(m3u8, 12000); /* v344: máster por relay */
     if (!r.ok || !r.cuerpo) return false;
     const lineas = (r.cuerpo || '').split('\n').map((l) => l.trim());
     const variante = lineas.find((l) => l && !l.startsWith('#') && /\.m3u8/i.test(l));
     if (!variante) return true; /* playlist media directa — con master OK basta */
     const vAbs = /^https?:/i.test(variante) ? variante : new URL(variante, m3u8).href;
     let rv = await pide(vAbs, 3000);
-    if (!rv.ok && permitirRelay && !relayGastado) { relayGastado = true; rv = await pideRelay(vAbs, 10000); }
+    if (!rv.ok && permitirRelay) rv = await pideRelay(vAbs, 10000); /* v344: la VARIANTE también — antes el presupuesto se agotaba en el máster y el nodo BUENO era rechazado: 'saturado' con relay vivo (medido en Oracle del usuario 08:08-08:10). Tormenta imposible: solo la oleada de relay pasa permitirRelay=true */
     return rv.ok;
   };
   const pedirEmbed = async (desfase, permitirRelay) => {
