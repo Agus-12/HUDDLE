@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v332'; // v332: resolver vimeos en CARRERA — 8 nodos probados en paralelo por oleada (medido: 46 s → ~5 s en tormenta de nodos)
+const UI_VERSION = 'v333'; // v333: BÓVEDA AUTO-RELLENABLE EN TODAS LAS FUENTES — cola discreta de capítulos (1 por ciclo, rotando lat/enn/d23/misc/lct)
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -9603,6 +9603,66 @@ async function sondaBoveda() {
 }
 setTimeout(() => sondaBoveda().catch(() => {}), 60 * 1000);
 setInterval(() => sondaBoveda().catch(() => {}), 10 * 60 * 1000);
+
+/* v333: AUTO-RELLENADO DE CAPÍTULOS para las fuentes «con uso» — cola
+ * DISCRETA: 1 capítulo por ciclo (40 s) rotando fuentes (~2 100 caps/día sin
+ * martillar). Ficha → lista de episodios → cosecha LIGERA (solo embeds, sin
+ * resolver video: el reproductor universal v323 hace el resto al reproducir). */
+const bovedaCaps = { turno: 0, s: {} }; /* s[f] = {series:[], si:0, eps:[], ei:0} */
+function bovedaCapsEstado(f) { return bovedaCaps.s[f] || (bovedaCaps.s[f] = { series: [], si: 0, eps: [], ei: 0, listaEn: 0 }); }
+async function bovedaAutoCaps() {
+  try {
+    if (process.memoryUsage().heapUsed / 1048576 > 320) return;
+    const FUENTES = ['lat', 'enn', 'd23', 'misc', 'lct'];
+    const f = FUENTES[bovedaCaps.turno++ % FUENTES.length];
+    const e = bovedaCapsEstado(f);
+    /* ── lista de series (lazy, una vez) ── */
+    if (!e.series.length && !e.listaEn) {
+      if (f === 'lat') e.series = [...LA_TODOS].filter((s) => !LA_OCULTAS_SET.has(s) && !LA_MUERTAS_SET.has(s)).sort(() => Math.random() - 0.5).slice(0, 400);
+      else if (f === 'd23') e.series = [...D23_TODOS].filter((s) => !D23_OCULTAS.has(s)).sort(() => Math.random() - 0.5).slice(0, 400);
+      else if (f === 'enn') { const cat = await ennCatalogo(true).catch(() => []); e.series = cat.map((x) => x.url || x.serie).filter(Boolean).sort(() => Math.random() - 0.5).slice(0, 200); }
+      else if (f === 'misc') { const rh = await fetchSeguro(CARI_BASE, 10000).catch(() => null); const hh = rh && rh.ok ? await rh.text().catch(() => '') : ''; e.series = [...new Set([...hh.matchAll(/href="https:\/\/miscaricaturas\.com\/([a-z0-9-]+)\//g)].map((m) => m[1]).filter((s) => s.length > 3))].sort(() => Math.random() - 0.5).slice(0, 300); }
+      else if (f === 'lct') { if (!lctVivoAhora()) return; e.series = [...LCT_SERIES.values()].sort(() => Math.random() - 0.5).slice(0, 200); }
+      e.listaEn = 1;
+      if (e.series.length) console.log('[boveda-caps] ' + f + ': ' + e.series.length + ' series en cola de capítulos');
+    }
+    if (!e.series.length) { e.listaEn = 0; return; } /* agotada → re-scan la próxima vuelta de esta fuente */
+    let titulo = e.titulo || '', poster = e.poster || ''; /* v333.2: persisten entre ticks */
+    /* ── lista de episodios de la serie en turno ── */
+    if (!e.eps.length) {
+      const serie = e.series[e.si % e.series.length];
+      titulo = ''; poster = '';
+      try {
+        if (f === 'lat') { const d = await datosAnimeLatanime(serie).catch(() => null); if (!d || d.dead) { e.si++; return; } titulo = d.titulo || ''; poster = d.poster || ''; e.eps = (d.episodios || []).map((x) => x.url || x).filter(Boolean); }
+        else if (f === 'd23') { const r = await fetchSeguro('https://animed23.com/anime/' + serie + '/', 12000).catch(() => null); if (!r || !r.ok) { e.si++; return; } const hh = await r.text().catch(() => ''); titulo = ((/<title>([^<]+)</i.exec(hh) || [])[1] || serie).replace(/ \| AnimeD23.*/i, '').trim(); e.eps = [...new Set([...hh.matchAll(/href="(https:\/\/animed23\.com\/capitulo\/[a-z0-9-]+)"/g)].map((m) => m[1]))].slice(0, 60); }
+        else if (f === 'enn') { const u = String(serie).startsWith('http') ? serie : ENN_BASE + 'series/' + serie + '/'; const r = await fetchSeguro(u, 12000).catch(() => null); if (!r || !r.ok) { e.si++; return; } const hh = await r.text().catch(() => ''); titulo = ((/<title>([^<]+)</i.exec(hh) || [])[1] || '').replace(/\s*[\|-]\s*Ennovelas.*/i, '').trim(); e.eps = [...new Set([...hh.matchAll(/href="(https:\/\/l\.ennovelas-tv\.com\/[a-z0-9-]+-capitulo-\d+\/)"/g)].map((m) => m[1]))].slice(0, 60); }
+        else if (f === 'misc') { const r = await fetchSeguro(CARI_BASE + serie + '/', 12000).catch(() => null); if (!r || !r.ok) { e.si++; return; } const hh = await r.text().catch(() => ''); titulo = ((/<h1[^>]*>([^<]+)<\/h1>/i.exec(hh) || [])[1] || serie).trim(); poster = ((/og:image" content="([^"]+)"/i.exec(hh) || [])[1] || ''); e.eps = [...new Set([...hh.matchAll(/href="(https:\/\/miscaricaturas\.com\/[a-z0-9-]*capitulo[a-z0-9-]*\/)"/g)].map((m) => m[1]))].slice(0, 60); }
+        else if (f === 'lct') { const d = await datosCaricatura(serie).catch(() => null); if (!d) { e.si++; return; } titulo = d.titulo || ''; poster = d.poster || ''; e.eps = (d.episodios || []).map((x) => x.url).filter(Boolean); }
+      } catch { e.si++; return; }
+      e.titulo = titulo; e.poster = poster; /* v333.2 */
+      e.ei = 0;
+    }
+    /* ── cosechar UN capítulo (el siguiente que no esté en bóveda) ── */
+    while (e.ei < e.eps.length) {
+      const epUrl = e.eps[e.ei++];
+      const clave = f + ':' + epUrl;
+      if (BOVEDA.has(clave)) continue;
+      let embeds = [];
+      try {
+        if (f === 'lat') { const hh = await fetchTexto(epUrl, 'https://latanime.org/'); embeds = [...new Set([...hh.matchAll(/data-player="([^"]+)"/g)].map((m) => { try { return Buffer.from(m[1], 'base64').toString('utf8'); } catch { return ''; } }).filter((u) => /^https?:\/\//i.test(u)))].slice(0, 3); }
+        else if (f === 'd23') { const r = await fetchSeguro(epUrl, 15000).catch(() => null); if (!r || !r.ok) break; const hh = await r.text().catch(() => ''); embeds = await d23TabsDeHtml(hh, epUrl).catch(() => []); }
+        else if (f === 'enn') { const r = await fetchSeguro(epUrl, 15000).catch(() => null); if (!r || !r.ok) break; const hh = await r.text().catch(() => ''); for (const m of hh.matchAll(/emb\/\?vid=(\d+)|ok\.ru\/videoembed\/(\d+)|goodstream\.one[^"'\s]*|vk\.com\/video_ext\.php[^"'\s]*/gi)) { const u = m[0].startsWith('http') ? m[0] : (m[1] ? 'https://l.ennovelas-tv.com/emb/?vid=' + m[1] : (m[2] ? 'https://ok.ru/videoembed/' + m[2] : m[0])); if (!embeds.includes(u)) embeds.push(u); } embeds = embeds.slice(0, 3); }
+        else if (f === 'misc') { const r1 = await fetchSeguro(epUrl, 12000).catch(() => null); if (!r1 || !r1.ok) break; const hh = await r1.text().catch(() => ''); const idm = (/anchor-data-container" data-id="(\d+)"/i.exec(hh) || [])[1]; if (!idm) break; const r2 = await fetch(CARI_BASE + 'wp-admin/admin-ajax.php', { method: 'POST', headers: { 'User-Agent': MIRROR_UA, Referer: epUrl, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'action=get_system_data&target_id=' + idm }).catch(() => null); const j2 = r2 && r2.ok ? await r2.json().catch(() => null) : null; const im = j2 && j2.success && j2.data && j2.data.html ? /<iframe[^>]*src="(https?:\/\/[^"]+)"/i.exec(j2.data.html) : null; if (im) embeds = [im[1]]; }
+        else if (f === 'lct') { const r = await fetchSeguro(epUrl, 12000).catch(() => null); if (!r || !r.ok) break; const hh = await r.text().catch(() => ''); const mOk = /ok\.ru\/videoembed\/(\d+)/i.exec(hh); const idR = /cubeembed\.rpmvid\.com\/#([a-z0-9]+)/i.exec(hh); if (mOk) embeds.push('https://ok.ru/videoembed/' + mOk[1]); if (idR) embeds.push('https://cubeembed.rpmvid.com/#' + idR[1]); }
+      } catch {}
+      if (embeds.length) { bovedaPon(clave, { serie: titulo || '', poster: poster || '', embeds }); console.log('[boveda-caps] ' + f + ': +' + (titulo || epUrl.slice(-40)) + ' (' + embeds.length + ' embeds)'); }
+      return; /* UN capítulo por ciclo — discreto */
+    }
+    e.si++; e.eps = []; /* serie agotada → siguiente */
+  } catch (er) { console.log('[boveda-caps] ' + String(er.message || er).slice(0, 60)); }
+}
+setInterval(() => bovedaAutoCaps().catch(() => {}), 40 * 1000);
+setTimeout(() => bovedaAutoCaps().catch(() => {}), 45 * 1000);
 setTimeout(() => { bovedaAutoRellenar(); setInterval(() => { bovedaAutoSeries().catch(() => {}); bovedaAutoCuevana().catch(() => {}); }, 150 * 1000); }, 30 * 1000);
 
 const cqOcultaId = (kind, id) => CC_OCULTAS.has(kind + ':' + id);
@@ -14234,7 +14294,7 @@ async function estrenosMezclados(){
         if (TIPO_BV[preBv2]) { /* v326: las demás fuentes TAMBIÉN salen en la lista del panel */
           const neBv = (v.embeds || []).length;
           const segBv = clave.replace(/^[a-z0-9]+:/, '').replace(/\/$/, '').split('/').pop() || clave;
-          items.push({ clave, t: v.t || segBv, tipo: TIPO_BV[preBv2], poster: '', y: '', estado: NOMBRES_BV[preBv2] + ' · capítulo listo' + (neBv > 1 ? ' · ' + neBv + ' servidores' : ''), caps: 1 });
+          items.push({ clave, t: v.serie || v.t || segBv, tipo: TIPO_BV[preBv2], poster: v.poster || '', y: '', estado: NOMBRES_BV[preBv2] + ' · capítulo listo' + (neBv > 1 ? ' · ' + neBv + ' servidores' : ''), caps: 1 }); /* v333: con serie y póster */
           caps++;
           continue;
         }

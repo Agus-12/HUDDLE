@@ -3179,3 +3179,22 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   cae al camino normal; autocuración real queda en re-cosecha semanal +
   re-cosecha al reproducir (resolverCineCalidad re-guarda el code actual).
   T1E1 de Fundación: archivo caído en vimeos esa hora (28 nodos, todos mal).
+
+## v333 (24 Sep 2026) — AUTO-RELLENADO DE CAPÍTULOS para las demás fuentes
+- El usuario pidió meter las demás fuentes a la bóveda (hasta ahora solo
+  crecían con uso, v323). bovedaAutoCaps(): cola DISCRETA cada 40 s —
+  1 ficha + 1 cosecha de capítulo por ciclo ROTANDO lat→enn→d23→misc→lct
+  (~2 100 caps/día repartidos, sin martillar sitios). Cosecha LIGERA:
+  solo embeds de la página (el reproductor universal v323 los convierte
+  en video al reproducir).
+- Colas armadas de catálogos existentes: lat=LA_TODOS+datosAnimeLatanime
+  (data-player base64) · enn=ennCatalogo(true)+páginas de serie (vid/ok/
+  goodstream/vk) · d23=D23_TODOS+ficha /anime/<slug>/ → /capitulo/ →
+  d23TabsDeHtml · misc=home CARI_BASE+fichas → admin-ajax (embed del player)
+  · lct=LCT_SERIES+datosCaricatura, GATEADO por lctVivoAhora (ok/rpmvid).
+  Entradas con {serie, poster} — el panel muestra la SERIE con carátula.
+- Fix v333.1/v333.2: titulo/poster al nivel de la función y PERSISTIDOS en
+  el estado por fuente (en ticks sin ficha no se resetean).
+- Verificado en vivo: lat '+Uta no Prince-sama (3 embeds)' ×2 con póster,
+  enn '+Por ella soy Eva' ×2; Latanime 3→5, Ennovelas 10→12 en minutos.
+  AnimeFLV/Danimados siguen con-uso (sin catálogo en memoria); PelisXD fuera.
