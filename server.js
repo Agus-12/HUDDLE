@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v349'; // v349: la LUPA de la sonda mira por el relay (canario, embeds y video) — vimeos bloqueando el datacenter ya no silencia las auditorías + pausas por memoria visibles // v348: FASE 2 — segundo enlace de SERIES cq vía Danimados (TxE idéntica, cached en altEps) + auditoría de códigos de series (punto ciego desde v321; 2 strikes = el código fuera, la serie queda) // v347: auto-curación SIN techo (sillita de 20 s) + la rama de error hls pide FRESCO (antes re-montaba la misma m3u8 desde cache) // v346: DOBLE CHEQUEO del ganador en resolverVimeos — nodos inestables (índice OK, video 502: vimeos.zip hoy) detectados ANTES de entregar el stream; se pasa al siguiente nodo de la misma oleada // v345: cadena corta (relay = último intento) + el player JAMÁS se cierra solo: los 4 caminos de 'Se cortó el video' ahora dejan el player abierto con Recargar video disponible (v319 restituida) // v344: la verificación del video (máster Y variante) usa el relay en toda la oleada de relay — el presupuesto de un solo uso rechazaba nodos buenos: 'saturado' con relay vivo // v343: el relay de casa se intenta ANTES de declarar 'saturado' — bloqueo de vimeos a datacenters ya no tumba la reproducción si el relay está vivo // v342: SEGUNDO ENLACE — películas cq con embeds de respaldo de OTRA infraestructura (PelisXD byse/dood), cosechados al fallar y usados por auditoría/replay; bovedaRespaldo también rastrea pxd: // v341: reanudar SIEMPRE (catálogo respeta continuar viendo y ya no pisa tu minuto) + posición marcada al INICIAR el salto + el perro guardián cura saltos colgados (>9 s buscando) // v340: ventana mala de vimeos = verificaciones diferidas 10 min (aviso único/hora, cero spam, cero muertes falsas) + el player AVISA cuando la reconexión automática no puede // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
+const UI_VERSION = 'v350'; // v350: canario directo⇄relay EN PARALELO (veredicto en segundos — v349 lo hacía lento y ahogaba el relay) + semáforo del relay (máx 3) + saneamiento de relay.txt/set-relay // v349: la LUPA de la sonda mira por el relay (canario, embeds y video) — vimeos bloqueando el datacenter ya no silencia las auditorías + pausas por memoria visibles // v348: FASE 2 — segundo enlace de SERIES cq vía Danimados (TxE idéntica, cached en altEps) + auditoría de códigos de series (punto ciego desde v321; 2 strikes = el código fuera, la serie queda) // v347: auto-curación SIN techo (sillita de 20 s) + la rama de error hls pide FRESCO (antes re-montaba la misma m3u8 desde cache) // v346: DOBLE CHEQUEO del ganador en resolverVimeos — nodos inestables (índice OK, video 502: vimeos.zip hoy) detectados ANTES de entregar el stream; se pasa al siguiente nodo de la misma oleada // v345: cadena corta (relay = último intento) + el player JAMÁS se cierra solo: los 4 caminos de 'Se cortó el video' ahora dejan el player abierto con Recargar video disponible (v319 restituida) // v344: la verificación del video (máster Y variante) usa el relay en toda la oleada de relay — el presupuesto de un solo uso rechazaba nodos buenos: 'saturado' con relay vivo // v343: el relay de casa se intenta ANTES de declarar 'saturado' — bloqueo de vimeos a datacenters ya no tumba la reproducción si el relay está vivo // v342: SEGUNDO ENLACE — películas cq con embeds de respaldo de OTRA infraestructura (PelisXD byse/dood), cosechados al fallar y usados por auditoría/replay; bovedaRespaldo también rastrea pxd: // v341: reanudar SIEMPRE (catálogo respeta continuar viendo y ya no pisa tu minuto) + posición marcada al INICIAR el salto + el perro guardián cura saltos colgados (>9 s buscando) // v340: ventana mala de vimeos = verificaciones diferidas 10 min (aviso único/hora, cero spam, cero muertes falsas) + el player AVISA cuando la reconexión automática no puede // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -5819,10 +5819,17 @@ try {
   if (!_rl) { try { _rl = fsRL.readFileSync('/tmp/huddle-relay.txt', 'utf8').trim(); } catch {} }
   if (_rl) {
     if (_rl.includes('lhr.life') || _rl.includes('localhost')) { console.log('[relay] ignorado (lento) ' + _rl); }
-    else { CDN_RELAY = _rl; console.log('[relay] Cargado de disco:', _rl); }
+    else { const _mR = String(_rl).match(/https?:\/\/[^\s)\]]+/); CDN_RELAY = _mR ? _mR[0] : _rl; console.log('[relay] Cargado de disco:', CDN_RELAY, (_mR && _mR[0] !== _rl) ? '(v350: saneado)' : ''); }
   }
 } catch {}
-async function fetchRelay(url, ms) { /* v236: fetch a través del relay — NUNCA cae al directo (el token se liga a la IP) */
+const RELAY_SEMA = { n: 0, cola: [] }; /* v350: máx 3 en vuelo — el uplink de casa es finito (sonda + reproducción NO lo ahogan; el resto hace fila de ms) */
+async function fetchRelay(url, ms) {
+  if (!CDN_RELAY) return fetchSeguro(url, ms);
+  if (RELAY_SEMA.n >= 3) await new Promise((libre) => RELAY_SEMA.cola.push(libre));
+  RELAY_SEMA.n++;
+  try { return await fetchRelayInterno(url, ms); } finally { RELAY_SEMA.n--; const _s = RELAY_SEMA.cola.shift(); if (_s) _s(); }
+}
+async function fetchRelayInterno(url, ms) { /* v236: fetch a través del relay — NUNCA cae al directo (el token se liga a la IP) */
   if (!CDN_RELAY) return fetchSeguro(url, ms);
   const relayUrl = CDN_RELAY + '/?u=' + encodeURIComponent(url);
   const ctl = new AbortController();
@@ -9664,7 +9671,7 @@ async function sondaBoveda() {
     let canario = false; /* v337: par de canarios con rotación — un archivo muerto ya no ciega la auditoría */
     for (let n = 0; n < CANARIOS_VIMEOS.length && !canario; n++) {
       const i = (canarioVimeosIdx + n) % CANARIOS_VIMEOS.length;
-      canario = await cqEmbedSirve(CANARIOS_VIMEOS[i]).catch(() => false);
+      canario = await canarioPruebaRapida(CANARIOS_VIMEOS[i]).catch(() => false); /* v350 */
       if (canario) { if (n > 0) console.log('[boveda-sonda] canario rotado a ' + CANARIOS_VIMEOS[i] + ' (v337)'); canarioVimeosIdx = i; }
       else console.log('[boveda-sonda] canario ' + CANARIOS_VIMEOS[i] + ' no responde');
     }
@@ -12138,6 +12145,31 @@ async function resolverGoodstream(embed, pageUrl) {
 /* v336: CANARIO DE REPRODUCCIÓN — el mismo código sabidamente vivo (Fundación)
  * que usa la sonda de la bóveda. Si el canario TAMBIÉN falla, vimeos entero
  * está caído/saturado: no tiene sentido oleada tras oleada. Cacheado 60 s. */
+/* v350: prueba de canario RÁPIDA — directo y relay EN PARALELO (antes: 3
+ * directos pesados + relay EN SECUENCIA por código ⇒ la verificación tardaba
+ * un minuto y ahogaba el uplink de casa; hoy: veredicto en ~3-6 s) */
+async function canarioPruebaRapida(code) {
+  const reM = /https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i;
+  const intentoDirecto = (async () => {
+    try {
+      const em = await fetchTexto('https://vimeos.net/embed-' + code + '.html', 'https://www.cinecalidad.am/');
+      const m3 = (String(desempacar(em) || '').match(reM) || [])[0];
+      if (m3 && await sirveElVideo(m3, 'https://vimeos.net/')) return true;
+    } catch {}
+    return false;
+  })();
+  const intentoRelay = (async () => {
+    if (!CDN_RELAY) return false;
+    try {
+      const em = await (await fetchRelay('https://vimeos.net/embed-' + code + '.html', 15000)).text();
+      const m3 = (String(desempacar(em) || '').match(reM) || [])[0];
+      if (!m3) return false;
+      try { const rv = await fetchRelay(m3, 10000); if (rv.ok || rv.status === 206) return true; } catch {}
+    } catch {}
+    return false;
+  })();
+  return (await Promise.all([intentoDirecto, intentoRelay])).some(Boolean);
+}
 const CANARIOS_VIMEOS = ['06k16tgdfs1t', '9a0haovfdhih']; /* v337: Fundación + Drácula — UN solo código era punto único de fallo: si el archivo canario muere, el canario ROTA al otro (Fundación empezó a dar pantalla negra 24 Sep; Drácula confirmado vivo por el usuario) */
 let canarioVimeosIdx = 0;
 let vimeosCanarioAt = 0, vimeosCanarioOk = false;
@@ -12149,7 +12181,7 @@ async function vimeosCanario() {
     /* v339: verificación COMPLETA (master + variante, como la sonda) — el
      * índice solo ya no basta: los nodos ahogados SIRVEN el índice y ahogan
      * el video → canario ciego → oleadas inútiles de 40-60 s (Fundación T2E6) */
-    try { vimeosCanarioOk = await cqEmbedSirve(CANARIOS_VIMEOS[i]).catch(() => false); } catch { vimeosCanarioOk = false; }
+    try { vimeosCanarioOk = await canarioPruebaRapida(CANARIOS_VIMEOS[i]).catch(() => false); } catch { vimeosCanarioOk = false; } /* v350: en segundos, sin ahogar el relay */
     if (vimeosCanarioOk) { if (n > 0) console.log('[vimeos] canario rotado a ' + CANARIOS_VIMEOS[i] + ' (v337)'); canarioVimeosIdx = i; }
   }
   if (!vimeosCanarioOk && CDN_RELAY) { /* v336.1: ¿vimeos le bloquea la IP al servidor? canario por el relay de casa */
@@ -14566,9 +14598,10 @@ async function estrenosMezclados(){
     if (url.pathname === '/api/set-relay') { /* v236: actualizar CDN relay URL del Mac Mini */
       const newUrl = (url.searchParams.get('url') || '').trim().replace(/\/+$/, '');
       if (!newUrl) return json(res, 400, { ok: false, error: 'Falta ?url=' });
+      { const _mRN = String(newUrl).match(/https?:\/\/[^\s)\]]+/); if (_mRN) newUrl = _mRN[0]; } /* v350: sano el formato (si alguien pega con corchetes/markdown, no rompe el relay) */
       CDN_RELAY = newUrl;
       console.log('[relay] CDN relay actualizado:', CDN_RELAY);
-      try { require('fs').writeFileSync(path.join(DATA_DIR, 'relay.txt'), newUrl); } catch {} /* v316: persistente */
+      try { require('fs').writeFileSync(path.join(DATA_DIR, 'relay.txt'), newUrl) /* v350: el set-relay también sanea abajo */; } catch {} /* v316: persistente */
       try { require('fs').writeFileSync('/tmp/huddle-relay.txt', newUrl); } catch {} /* compat v236.8 */
       return json(res, 200, { ok: true, relay: CDN_RELAY });
     }

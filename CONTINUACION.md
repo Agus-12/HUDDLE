@@ -3493,3 +3493,21 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   pelis, auditoría de series (v348) y auditoría ligera VUELVEN a juzgar
   aunque vimeos corte al servidor. Pausa por memoria (>320 MB heap) ahora
   loguea 1×/h en vez de silencio.
+
+## v350 (25 Sep 2026) — Canario paralelo + semáforo del relay: fin de la regresión de v349
+- Usuario: canarios 'no responde' ×2 en la sonda + «Drácula ya no resolvió»
+  (regresión tras v349).
+- CAUSA (mía): v349 puso el relay DESPUÉS de 3 directos pesados y EN
+  SECUENCIA por canario/verificación → la fase de canario/auditoría tardaba
+  mucho, ahogaba el uplink de casa y arrastraba la reproducción.
+- v350: (1) canarioPruebaRapida(code): directo Y relay EN PARALELO
+  (Promise.all, primero que confirme gana) → veredicto ~3-6 s; la usan
+  vimeosCanario y el canario de sondaBoveda (las auditorías de fondo
+  siguen con cqEmbedSirve completo). (2) fetchRelay con SEMÁFORO máx 3 en
+  vuelo (cola FIFO) — sonda + reproducción no compiten a muerte por el
+  uplink de casa. (3) saneamiento de relay.txt al cargar y en /api/set-relay
+  (extrae la URL plana si el archivo trae corchetes/markdown).
+- Nota: el nodo de Fundación (T2E6 = vimeos.zip) está INESTABLE confirmado
+  (502 por relay en el diagnóstico del usuario); los canarios pueden caer
+  legítimamente cuando AMBOS archivos canario caen en nodos flojos — con
+  v350 el veredicto llega rápido y la reproducción usa la oleada de relay.
