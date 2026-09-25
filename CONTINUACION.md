@@ -3312,3 +3312,20 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   → carrera nueva (total 2). node --check OK.
 - Techo práctico restante: ancho de banda del Oracle (~4-6 Mbps por stream
   proxy → 20 ≈ 80-120 Mbps); el diseño no es el límite.
+
+## v339 (24 Sep 2026) — Canario honesto de verdad + la posición sobrevive al cambio de transporte
+- Reporte del usuario (Fundación T2E6, 2ª prueba): negro en «continuar
+  viendo» 13:50 → 'Probando directo…' jaló pero LO REGRESÓ AL INICIO →
+  adelantó → se congeló. Y: «sobre todo tarda demasiado en resolver».
+- CAUSA 1 (lentitud): vimeosCanario solo verificaba el ÍNDICE (!!m3 del
+  embed). Los nodos ahogados SIRVEN el índice y ahogan el video → canario
+  decía 'vivo' → oleadas completas 2-3 + relay = 40-60 s de nada. FIX:
+  vimeosCanario ahora usa cqEmbedSirve (master+VARIANTE, igual que la
+  sonda) → 'saturado' honesto en ~6 s (medido: 5.8 s total con oleada 1).
+- CAUSA 2 (regreso al inicio): timeupdate guarda lastT=0 ANTES del seek
+  inicial; si el video nunca entrega datos, no hay más timeupdates → al
+  re-montar (cambio proxy→directo), reT=max(lastT=0, tReconexion=0)=0.
+  FIX (app.js montarSolo): if (!reT && SOLO.seekHecho) reT = SOLO.startAt||0.
+- watchdog 12 s → 9 s (wdTicks 4→3).
+- Verificado :3956: veredicto 5.8 s, log '(índice o video)', fix de
+  posición servido en app.js. node --check OK ambos.

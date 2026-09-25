@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v338'; // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
+const UI_VERSION = 'v339'; // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -12061,11 +12061,10 @@ async function vimeosCanario() {
   vimeosCanarioOk = false;
   for (let n = 0; n < CANARIOS_VIMEOS.length && !vimeosCanarioOk; n++) {
     const i = (canarioVimeosIdx + n) % CANARIOS_VIMEOS.length;
-    try {
-      const em = await fetchTexto('https://vimeos.net/embed-' + CANARIOS_VIMEOS[i] + '.html', 'https://www.cinecalidad.am/');
-      const m3 = (String(desempacar(em) || '').match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
-      vimeosCanarioOk = !!m3;
-    } catch { vimeosCanarioOk = false; }
+    /* v339: verificación COMPLETA (master + variante, como la sonda) — el
+     * índice solo ya no basta: los nodos ahogados SIRVEN el índice y ahogan
+     * el video → canario ciego → oleadas inútiles de 40-60 s (Fundación T2E6) */
+    try { vimeosCanarioOk = await cqEmbedSirve(CANARIOS_VIMEOS[i]).catch(() => false); } catch { vimeosCanarioOk = false; }
     if (vimeosCanarioOk) { if (n > 0) console.log('[vimeos] canario rotado a ' + CANARIOS_VIMEOS[i] + ' (v337)'); canarioVimeosIdx = i; }
   }
   if (!vimeosCanarioOk && CDN_RELAY) { /* v336.1: ¿vimeos le bloquea la IP al servidor? canario por el relay de casa */
@@ -12076,7 +12075,7 @@ async function vimeosCanario() {
     } catch {}
   }
   vimeosCanarioAt = Date.now();
-  console.log('[vimeos] canario de reproducción: ' + (vimeosCanarioOk ? 'vivo (' + CANARIOS_VIMEOS[canarioVimeosIdx] + ')' : 'CAÍDO — ventana mala de vimeos'));
+  console.log('[vimeos] canario de reproducción: ' + (vimeosCanarioOk ? 'vivo (' + CANARIOS_VIMEOS[canarioVimeosIdx] + ')' : 'CAÍDO — ventana mala de vimeos (índice o video)'));
   return vimeosCanarioOk;
 }
 async function resolverVimeos(embed, pageUrl) {

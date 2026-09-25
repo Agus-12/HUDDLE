@@ -3646,7 +3646,8 @@ function montarSolo(d, viaProxy) {
    * pisa SOLO.lastT antes de que llegue el loadedmetadata. v83: si el
    * remount ANTERIOR falló, lastT ya quedó en 0 → recordamos el último
    * minuto sano en tReconexion y lo reutilizamos. */
-  const reT = SOLO.seekHecho ? Math.max(SOLO.lastT || 0, SOLO.tReconexion || 0) : 0;
+  let reT = SOLO.seekHecho ? Math.max(SOLO.lastT || 0, SOLO.tReconexion || 0) : 0;
+  if (!reT && SOLO.seekHecho) reT = SOLO.startAt || 0; /* v339: pantalla negra antes del primer timeupdate → «continuar viendo» sobrevive al remount (Fundación T2E6 se regresaba al inicio) */
   SOLO.tReconexion = reT;
   const reSeek = () => {
     if (!SOLO || SOLO.cerrado) return;
@@ -3683,7 +3684,7 @@ function montarSolo(d, viaProxy) {
     if (v.paused || v.seeking || !isFinite(v.duration) || v.duration <= 0) { SOLO.wdT = v.currentTime; SOLO.wdTicks = 0; return; }
     if (v.currentTime === SOLO.wdT) {
       SOLO.wdTicks++;
-      if (SOLO.wdTicks >= 4) {
+      if (SOLO.wdTicks >= 3) { /* v339: 9 s — antes era 12 */
         SOLO.wdTicks = 0; SOLO.wdT = v.currentTime;
         if ((SOLO.autoReN || 0) < 2) { SOLO.autoReN++; toast('Video congelado — cambiando de nodo…'); reResolverSolo(true); }
       }
