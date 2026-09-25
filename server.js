@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v341'; // v341: reanudar SIEMPRE (catálogo respeta continuar viendo y ya no pisa tu minuto) + posición marcada al INICIAR el salto + el perro guardián cura saltos colgados (>9 s buscando) // v340: ventana mala de vimeos = verificaciones diferidas 10 min (aviso único/hora, cero spam, cero muertes falsas) + el player AVISA cuando la reconexión automática no puede // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
+const UI_VERSION = 'v342'; // v342: SEGUNDO ENLACE — películas cq con embeds de respaldo de OTRA infraestructura (PelisXD byse/dood), cosechados al fallar y usados por auditoría/replay; bovedaRespaldo también rastrea pxd: // v341: reanudar SIEMPRE (catálogo respeta continuar viendo y ya no pisa tu minuto) + posición marcada al INICIAR el salto + el perro guardián cura saltos colgados (>9 s buscando) // v340: ventana mala de vimeos = verificaciones diferidas 10 min (aviso único/hora, cero spam, cero muertes falsas) + el player AVISA cuando la reconexión automática no puede // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -7341,6 +7341,34 @@ async function buscarPelisxd(q) {
  *    - DoodStream (myvidplay/playmogo): intentar extraer directo
  *    - Otros: intentar como streamwish genérico
  * 3. El primero que devuelva video gana */
+/* v342: SEGUNDO ENLACE — blindaje multi-fuente para películas de cq. Busca
+ * la MISMA película en el índice de PelisXD (título normalizado, coincidencia
+ * EXACTA) y cosecha sus embeds (byse/dood: infraestructura DISTINTA a vimeos)
+ * para guardarlos en la entrada cq como v.alt. Ventana mala de vimeos ≠ título
+ * sin video. Coincidencia exacta solamente — jamás una peli equivocada. */
+async function cqAltBuscar(titulo) {
+  const nb = normaBv(titulo);
+  if (!nb || nb.length < 4) return null;
+  try {
+    let slugs = pelisxdIdx.slugs;
+    if (!slugs.length) {
+      const rS = await fetchSeguro('https://www.pelisxd.com/sitemap.xml', 20000);
+      slugs = rS.ok ? [...(await rS.text()).matchAll(/<loc>https:\/\/pelisxd\.com\/pelicula\/([a-z0-9-]+)<\/loc>/gi)].map((m) => m[1]) : [];
+    }
+    const slug = slugs.find((s) => normaBv(s.replace(/-/g, ' ')) === nb);
+    if (!slug) return null;
+    const r = await fetchSeguro('https://www.pelisxd.com/pelicula/' + slug, 12000);
+    if (!r.ok) return null;
+    const html = await r.text();
+    const alt = [];
+    const re = /v_source[^A-Za-z0-9]{0,12}([A-Za-z0-9+/=]{24,})/g;
+    let m2;
+    while ((m2 = re.exec(html)) && alt.length < 3) {
+      try { const u = Buffer.from(m2[1], 'base64').toString('utf8'); if (/^https?:\/\//i.test(u) && !/vimeos/i.test(u)) alt.push(u); } catch {}
+    }
+    return alt.length ? { slug, alt } : null;
+  } catch { return null; }
+}
 async function extraerStreamwishPeli(pageUrl, preEmbeds) {
   const t0 = Date.now();
   const FETCH_UA_PXD = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
@@ -9647,6 +9675,21 @@ async function sondaBoveda() {
       for (let i = 0; i < 3 && !sirvio; i++) sirvio = await cqEmbedSirve(v.code).catch(() => false);
       if (sirvio) { BOVEDA_AUDIT.ok++; continue; }
       const idNum = k.split(':')[2];
+      /* v342: antes de condenar — ¿hay SEGUNDO ENLACE vivo en otra infraestructura? */
+      let altSalvo = null;
+      if (v.alt && v.alt.length) {
+        try { const rA = await fetchSeguro(v.alt[0], 10000); altSalvo = (rA && rA.ok) ? v.alt : null; if (rA && rA.body) { try { await rA.body.cancel(); } catch {} } } catch {}
+      } else {
+        const altN = await cqAltBuscar(v.t || ''); if (altN) altSalvo = altN.alt;
+      }
+      if (altSalvo) {
+        bovedaPon(k, { t: v.t || '', kind: 'movie', code: (v.alt && v.alt.length) ? '' : v.code, alt: altSalvo, poster: v.poster || '', y: v.y || '' });
+        BOVEDA_AUDIT.ok++;
+        sondaNotify('Bóveda', 'revision', v.t || idNum, (v.t || idNum) + ' — código vimeos podrido, pero CONSERVADA por segundo enlace (' + altSalvo.length + ' embeds de otra infraestructura)');
+        console.log('[boveda-sonda] ' + (v.t || k) + ' — vimeos podrido pero CON segundo enlace: se conserva');
+        bovedaGuardar();
+        continue;
+      }
       BOVEDA.delete(k);
       BOVEDA_AUDIT.podridos++;
       if (!CC_OCULTAS.has('movie:' + idNum)) { CC_OCULTAS.add('movie:' + idNum); ocultasReescribir(CC_OCULTAS, 'cc-ocultas.txt'); }
@@ -12254,6 +12297,12 @@ async function bovedaRespaldo(titulo) {
       } catch {}
     }
   }
+  /* v342: y también en la bóveda de PelisXD (embeds byse/dood — replay sin abrir el sitio) */
+  for (const [clave, v] of BOVEDA) {
+    if (!clave.startsWith('pxd:') || !Array.isArray(v.embeds) || !v.embeds.length) continue;
+    if (normaBv(v.t) !== nb) continue;
+    try { const outX = await extraerStreamwishPeli('', v.embeds); if (outX && (outX.m3u8 || outX.mp4)) { console.log('[boveda] RESPALDO: "' + titulo + '" vía PelisXD'); return outX; } } catch {}
+  }
   return null;
 }
 
@@ -12300,7 +12349,13 @@ async function resolverCineCalidad(pageUrl) {
         const outPB = await resolverVimeos('https://vimeos.net/embed-' + bP.code + '.html', CQ_WEB + '/');
         console.log('[boveda] cq peli ' + (m[1] || m[2]) + ' desde bóveda');
         return outPB;
-      } catch (ePB) { console.log('[boveda] código de peli vencido — camino normal'); }
+      } catch (ePB) {
+        console.log('[boveda] código de peli vencido — camino normal');
+        if (bP.alt && bP.alt.length) { /* v342: segundo enlace (otra infraestructura) antes de rendirse */
+          try { const outA = await extraerStreamwishPeli(pageUrl, bP.alt); console.log('[boveda] cq peli ' + (m[1] || m[2]) + ' por SEGUNDO ENLACE (' + bP.alt.length + ' embeds)'); return outA; }
+          catch (eA) { console.log('[boveda] segundo enlace tampoco sirvió (' + String(eA.message || eA).slice(0, 50) + ')'); }
+        }
+      }
     }
     const d = await cqApi('/v1/items/' + kind + '/' + (m[1] || m[2]), null, 15 * 60 * 1000).catch(() => null);
     const code = d && d.item && d.item.code;
@@ -12312,6 +12367,11 @@ async function resolverCineCalidad(pageUrl) {
     }
     catch (eV) {
       console.log('[cq] embed ' + code + ' falló: ' + String(eV.message || eV).slice(0, 90));
+      try { /* v342: cosechar/usar segundo enlace */
+        let altP = bP && bP.alt && bP.alt.length ? bP.alt : null;
+        if (!altP) { const altN = await cqAltBuscar((d.item && d.item.title) || ''); if (altN) { altP = altN.alt; bovedaPon(bkP, { alt: altN.alt }); console.log('[boveda] SEGUNDO ENLACE cosechado: ' + ((d.item && d.item.title) || bkP) + ' (' + altN.alt.length + ' embeds de ' + altN.slug + ')'); } }
+        if (altP) { try { const outA = await extraerStreamwishPeli(pageUrl, altP); console.log('[boveda] cq peli por SEGUNDO ENLACE'); return outA; } catch (eA2) { console.log('[boveda] segundo enlace sin video esta vez'); } }
+      } catch {}
       const rbP = await bovedaRespaldo((d.item && d.item.title) || '').catch(() => null); /* v322: segunda bóveda */
       if (rbP) return rbP;
       throw eV;

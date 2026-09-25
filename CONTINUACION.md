@@ -3366,3 +3366,28 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   ticks (9 s) = 'Salto atorado — cambiando de nodo' (misma cura común
   wdDisparar; máx 2 autos + aviso final v340).
 - Verificado :3954: bundle con 4 marcadores v341, server 200, /api/continue OK.
+
+## v342 (24 Sep 2026) — SEGUNDO ENLACE: blindaje multi-infraestructura para películas cq
+- Pregunta del usuario: «aparte de vimeos, ¿hay otras fuentes para blindar
+  todos los títulos de la bóveda? ¿como un segundo enlace que se guarde?»
+- IMPORTANTE (estado de red): el sandbox perdió DNS para vimeos.net Y
+  lisxd.com (bloqueo acumulado por pruebas) mientras otros sitios siguen
+  respondiendo → el sandbox YA NO ES TESTIGO del estado de vimeos; solo el
+  Oracle del usuario puede confirmar (comando de diagnóstico entregado).
+- v342 (server):
+  · cqAltBuscar(titulo): normaliza (normaBv) y busca coincidencia EXACTA en
+    el índice de PelisXD (pelisxdIdx.slugs / sitemap) → cosecha ≤3 embeds
+    que NO sean vimeos (byse/dood — otra infraestructura).
+  · replay película cq: code-bóveda falla → API fresca falla → v.alt
+    (extraerStreamwishPeli preEmbeds) → bovedaRespaldo → throw.
+  · al fallar el embed fresco: cosecha v.alt al vuelo y la guarda
+    (bovedaPon MERGEA — alt sobrevive re-cosechas de code/poster).
+  · auditoría profunda: antes de condenar una cq:movie, prueba v.alt[0] o
+    busca cqAltBuscar; con enlace vivo → se CONSERVA (code:'' si vencido),
+    notifica 'CONSERVADA por segundo enlace'; sin respaldo → fuera como hoy.
+  · bovedaRespaldo: ahora también rastrea pxd: (normaBv match).
+- Cobertura honesta: solo pelis cq que existan tb en PelisXD con título
+  exacto (4 700+ índice; solape grande en películas). Series cq: fase 2
+  pendiente (ofrecida). Lo que se guarda es el enlace ESTABLE (embed),
+  no el http directo (las URLs firmadas expiran en horas).
+- Verificado: boot OK :3953, 6/6 parches, node --check OK.
