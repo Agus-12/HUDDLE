@@ -3348,3 +3348,21 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   auto; el watchdog agotado avisa 'toca Recargar video en un minuto'.
 - Verificado :3955 (2.5 min de prueba): encolado → canario doble caído →
   '[verif] ventana mala — diferido 10 min' + aviso único → 0 'NO responde'.
+
+## v341 (24 Sep 2026) — Reanudar SIEMPRE + el perro guardián cura SALTOS colgados
+- Reporte del usuario: «resolvió rápido pero no respetó continuar viendo —
+  me regresó al inicio; le adelanto manual y se congela».
+- HUECO 1: abrirSolo solo recibía startAt desde la FILA de continuar viendo;
+  abrir desde el catálogo → startAt 0 → y el reporte de 10 s PISABA el minuto
+  guardado (13:50 perdido). FIX: si opts.startAt === undefined, abrirSolo
+  consulta /api/continue y retoma (+ts>30, no 'juntos', no casi-terminado).
+  La fila sigue mandando startAt explícito → sin cambios ahí.
+- HUECO 2: el minutero interno (lastT) solo se actualiza en timeupdate — un
+  salto manual COLGADO no lo mueve → el remount tras la cura reanudaba en 0
+  otra vez (el ciclo 'adelanto→congela→vuelve al inicio'). FIX: listener
+  'seeking' marca SOLO.lastT AL INICIAR el salto.
+- HUECO 3: el perro guardián ignoraba seeking (v.paused||v.seeking||…) — un
+  salto colgado eterno nunca disparaba la cura. FIX: seeking sostenido ≥3
+  ticks (9 s) = 'Salto atorado — cambiando de nodo' (misma cura común
+  wdDisparar; máx 2 autos + aviso final v340).
+- Verificado :3954: bundle con 4 marcadores v341, server 200, /api/continue OK.

@@ -3489,6 +3489,18 @@ function cargarHlsJs(cb) {
 async function abrirSolo(pageUrl, info, opts) {
   info = info || {}; opts = opts || {};
   if (!S.profile) { toast('Entra con tu perfil primero'); return; }
+  /* v341: REANUDAR SIEMPRE — abrir desde el catálogo también respeta «continuar
+   * viendo» (antes solo la fila pasaba startAt; abrir de donde fuera veía desde
+   * 0 y PISABA tu minuto guardado con el reporte de los 10 s). La fila de
+   * «Continuar viendo» pasa startAt explícito (0 o t) → no se toca. */
+  if (opts.startAt === undefined) {
+    try {
+      const rc = await fetch('/api/continue?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token), { cache: 'no-store' });
+      const dc = await rc.json();
+      const itC = (dc && Array.isArray(dc.items) ? dc.items : []).find((x) => x.url === pageUrl && (x.modo || '') !== 'juntos' && +x.ts > 30 && !(x.d && +x.ts >= +x.d - 20));
+      if (itC) opts.startAt = Math.floor(+itC.ts);
+    } catch {}
+  }
   if (SOLO) cerrarSolo();
   $('#soloTitle').textContent = info.title || info.serie || 'Reproduciendo';
   $('#soloEp').textContent = info.ep ? 'Episodio ' + info.ep : '';
@@ -3681,14 +3693,17 @@ function montarSolo(d, viaProxy) {
   SOLO.wdTimer = setInterval(() => {
     if (!SOLO || SOLO.cerrado || SOLO.mountN !== token) { if (SOLO && SOLO.wdTimer) { clearInterval(SOLO.wdTimer); SOLO.wdTimer = null; } return; }
     const v = $('#soloVideo');
-    if (v.paused || v.seeking || !isFinite(v.duration) || v.duration <= 0) { SOLO.wdT = v.currentTime; SOLO.wdTicks = 0; return; }
+    const wdDisparar = (msg) => { /* v341: cura común — re-resolver con la posición ya marcada (seeking la deja en lastT) */
+      SOLO.wdTicks = 0; SOLO.wdSeek = 0; SOLO.wdT = v.currentTime;
+      if ((SOLO.autoReN || 0) < 2) { SOLO.autoReN++; toast(msg + ' — cambiando de nodo…'); reResolverSolo(true); }
+      else if (!SOLO.wdAvisado) { SOLO.wdAvisado = true; toast('Sigue sin dar video — toca Recargar video en un minuto o vuelve a entrar'); }
+    };
+    if (v.paused || !isFinite(v.duration) || v.duration <= 0) { SOLO.wdT = v.currentTime; SOLO.wdTicks = 0; SOLO.wdSeek = 0; return; }
+    if (v.seeking) { SOLO.wdSeek = (SOLO.wdSeek || 0) + 1; if (SOLO.wdSeek >= 3) wdDisparar('Salto atorado'); return; } /* v341: salto colgado >9 s = nodo muerto — antes el perro NO lo veía */
+    SOLO.wdSeek = 0;
     if (v.currentTime === SOLO.wdT) {
       SOLO.wdTicks++;
-      if (SOLO.wdTicks >= 3) { /* v339: 9 s — antes era 12 */
-        SOLO.wdTicks = 0; SOLO.wdT = v.currentTime;
-        if ((SOLO.autoReN || 0) < 2) { SOLO.autoReN++; toast('Video congelado — cambiando de nodo…'); reResolverSolo(true); }
-        else if (!SOLO.wdAvisado) { SOLO.wdAvisado = true; toast('Sigue sin dar video — toca Recargar video en un minuto o vuelve a entrar'); } /* v340 */
-      }
+      if (SOLO.wdTicks >= 3) wdDisparar('Video congelado'); /* v339: 9 s — antes era 12 */
     } else { SOLO.wdTicks = 0; SOLO.wdT = v.currentTime; }
   }, 3000);
   cargarHlsJs((okHls) => {
@@ -4128,6 +4143,7 @@ $('#soloEndCancelar').addEventListener('click', pararCuentaSiguiente);
 
 (() => {
   const video = $('#soloVideo');
+  video.addEventListener('seeking', () => { if (SOLO && !SOLO.cerrado) SOLO.lastT = video.currentTime; }); /* v341: el salto se marca AL INICIAR — un salto colgado ya no borra tu posición del remount */
   video.addEventListener('timeupdate', () => {
     if (!SOLO) return;
     SOLO.lastT = video.currentTime; /* v82: por si hay que reconectar en medio */
