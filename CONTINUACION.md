@@ -3266,3 +3266,27 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
     (nodos ocupados despiertan).
 - Verificado en vivo (:3959): '/api/solo' Drácula → **3 s** {ok:false,
   'vimeos está saturado…'} con log canario CAÍDO + camino normal completo.
+
+## v337 (24 Sep 2026) — Canarios dobles + pantalla negra auto-curada + botón Recargar
+- Reporte del usuario: Drácula ya jala (ventana mala de vimeos pasó), pero
+  Fundación «resuelve el video y pantalla negra», y no reanuda «continuar
+  viendo» (Drácula sí reanuda).
+- CLAVE: Fundación (06k16tgdfs1t) ES el código canario de la sonda v330.1 y
+  del canario de reproducción v336. Un archivo canario muriendo = canario
+  ciego = la sonda se congela ('ventana mala' cada ciclo) y TODO replay
+  fast-falla como 'saturado' aunque vimeos esté sano.
+- SERVER v337: CANARIOS_VIMEOS = [Fundación, Drácula(9a0haovfdhih, confirmado
+  vivo por el usuario)] con ROTACIÓN (canarioVimeosIdx): el primero que
+  responda se vuelve el preferido y se loguea la rotación. Aplica a
+  vimeosCanario() (reproducción) y al canario de sondaBoveda (cqEmbedSirve).
+  Ventana mala SOLO si AMBOS caen.
+- PANTALLA NEGRA (frontend app.js): la m3u8 es exclusiva del nodo que la
+  firmó (v332); re-montar la misma es negro eterno. Dos curas nuevas:
+  1) watchdog de PROGRESO (montarSolo): 12 s sin avanzar (sin pausa/seeking)
+     → reResolverSolo(true) automática, máx 2 por sesión, toast 'cambiando
+     de nodo', la posición se restaura con el reSeek existente.
+  2) botón «Recargar video» (#soloReload, SVG, junto a Sig.): reResolverSolo
+     manual ilimitada — nueva carrera de nodos sin cerrar el player (v319).
+  reResolverSolo: /api/solo con heal-de-token 403; jamás cerrarSolo.
+- Verificado :3958: botón servido en /, reResolverSolo en app.js, Drácula
+  fast-fail 4 s con canario doble en log. Sintaxis node --check OK (server+app).

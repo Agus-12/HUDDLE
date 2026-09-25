@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v336'; // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
+const UI_VERSION = 'v337'; // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -9614,9 +9614,14 @@ async function sondaBoveda() {
     /* v330.1: CANARIO — un código sabidamente vivo (Fundación). Si el canario
      * también falla, es una ventana mala de vimeos y NO SE JUZGA NADA
      * (antídoto anti-saturación, mismo espíritu que el disyuntor v317). */
-    let canario = false;
-    for (let i = 0; i < 3 && !canario; i++) canario = await cqEmbedSirve('06k16tgdfs1t').catch(() => false);
-    if (!canario) { console.log('[boveda-sonda] ventana mala de vimeos (canario caído) — no se juzga nada este ciclo'); return; }
+    let canario = false; /* v337: par de canarios con rotación — un archivo muerto ya no ciega la auditoría */
+    for (let n = 0; n < CANARIOS_VIMEOS.length && !canario; n++) {
+      const i = (canarioVimeosIdx + n) % CANARIOS_VIMEOS.length;
+      canario = await cqEmbedSirve(CANARIOS_VIMEOS[i]).catch(() => false);
+      if (canario) { if (n > 0) console.log('[boveda-sonda] canario rotado a ' + CANARIOS_VIMEOS[i] + ' (v337)'); canarioVimeosIdx = i; }
+      else console.log('[boveda-sonda] canario ' + CANARIOS_VIMEOS[i] + ' no responde');
+    }
+    if (!canario) { console.log('[boveda-sonda] ventana mala de vimeos (canarios caídos) — no se juzga nada este ciclo'); return; }
     for (const [k, v] of muestra) {
       BOVEDA_AUDIT.revisados.add(k);
       let sirvio = false;
@@ -12034,23 +12039,30 @@ async function resolverGoodstream(embed, pageUrl) {
 /* v336: CANARIO DE REPRODUCCIÓN — el mismo código sabidamente vivo (Fundación)
  * que usa la sonda de la bóveda. Si el canario TAMBIÉN falla, vimeos entero
  * está caído/saturado: no tiene sentido oleada tras oleada. Cacheado 60 s. */
+const CANARIOS_VIMEOS = ['06k16tgdfs1t', '9a0haovfdhih']; /* v337: Fundación + Drácula — UN solo código era punto único de fallo: si el archivo canario muere, el canario ROTA al otro (Fundación empezó a dar pantalla negra 24 Sep; Drácula confirmado vivo por el usuario) */
+let canarioVimeosIdx = 0;
 let vimeosCanarioAt = 0, vimeosCanarioOk = false;
 async function vimeosCanario() {
   if (Date.now() - vimeosCanarioAt < 60000) return vimeosCanarioOk;
-  try {
-    const em = await fetchTexto('https://vimeos.net/embed-06k16tgdfs1t.html', 'https://www.cinecalidad.am/');
-    const m3 = (String(desempacar(em) || '').match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
-    vimeosCanarioOk = !!m3;
-  } catch { vimeosCanarioOk = false; }
+  vimeosCanarioOk = false;
+  for (let n = 0; n < CANARIOS_VIMEOS.length && !vimeosCanarioOk; n++) {
+    const i = (canarioVimeosIdx + n) % CANARIOS_VIMEOS.length;
+    try {
+      const em = await fetchTexto('https://vimeos.net/embed-' + CANARIOS_VIMEOS[i] + '.html', 'https://www.cinecalidad.am/');
+      const m3 = (String(desempacar(em) || '').match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
+      vimeosCanarioOk = !!m3;
+    } catch { vimeosCanarioOk = false; }
+    if (vimeosCanarioOk) { if (n > 0) console.log('[vimeos] canario rotado a ' + CANARIOS_VIMEOS[i] + ' (v337)'); canarioVimeosIdx = i; }
+  }
   if (!vimeosCanarioOk && CDN_RELAY) { /* v336.1: ¿vimeos le bloquea la IP al servidor? canario por el relay de casa */
     try {
-      const emR = await (await fetchRelay('https://vimeos.net/embed-06k16tgdfs1t.html', 15000)).text();
+      const emR = await (await fetchRelay('https://vimeos.net/embed-' + CANARIOS_VIMEOS[canarioVimeosIdx] + '.html', 15000)).text();
       const m3R = (String(desempacar(emR) || '').match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
       vimeosCanarioOk = !!m3R;
     } catch {}
   }
   vimeosCanarioAt = Date.now();
-  console.log('[vimeos] canario de reproducción: ' + (vimeosCanarioOk ? 'vivo — el fallo es de este título' : 'CAÍDO — ventana mala de vimeos'));
+  console.log('[vimeos] canario de reproducción: ' + (vimeosCanarioOk ? 'vivo (' + CANARIOS_VIMEOS[canarioVimeosIdx] + ')' : 'CAÍDO — ventana mala de vimeos'));
   return vimeosCanarioOk;
 }
 async function resolverVimeos(embed, pageUrl) {

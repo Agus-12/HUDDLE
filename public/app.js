@@ -3524,7 +3524,7 @@ async function abrirSolo(pageUrl, info, opts) {
     url: pageUrl, info,
     startAt: Math.max(0, Math.floor(+opts.startAt || 0)),
     seekHecho: false, subsOn: false, viaProxy: false, cerrado: false,
-    res: null, hls: null, timer: null, lastT: 0, reintentos: 0, tReconexion: 0, mountN: 0,
+    res: null, hls: null, timer: null, lastT: 0, reintentos: 0, tReconexion: 0, mountN: 0, wdTimer: null, wdT: 0, wdTicks: 0, autoReN: 0, reResolviendo: false,
     rate: rateInicial,
     prevUrl: (opts && opts.prevUrl) || (info && info.prevUrl) || '', /* v86: de dónde venimos (avance de episodio) */
   };
@@ -3670,6 +3670,25 @@ function montarSolo(d, viaProxy) {
       } else { toast('Se cortó el video — vuelve a abrirlo'); cerrarSolo(); }
     }
   }, 25000);
+  /* v337: perro guardián de PROGRESO — la «pantalla negra» (nodo que sirve
+   * el master pero ahoga las variantes) deja readyState>0 y el perro viejo
+   * no la ve. 12 s seguidos sin avanzar (sin pausa ni seeking) =
+   * re-RESOLVER: nueva carrera de nodos, misma posición (el reSeek de
+   * montarSolo reanuda donde iba). Máx 2 automáticas; NUNCA cierra (v319). */
+  if (SOLO.wdTimer) { clearInterval(SOLO.wdTimer); SOLO.wdTimer = null; }
+  SOLO.wdTicks = 0; SOLO.wdT = -1;
+  SOLO.wdTimer = setInterval(() => {
+    if (!SOLO || SOLO.cerrado || SOLO.mountN !== token) { if (SOLO && SOLO.wdTimer) { clearInterval(SOLO.wdTimer); SOLO.wdTimer = null; } return; }
+    const v = $('#soloVideo');
+    if (v.paused || v.seeking || !isFinite(v.duration) || v.duration <= 0) { SOLO.wdT = v.currentTime; SOLO.wdTicks = 0; return; }
+    if (v.currentTime === SOLO.wdT) {
+      SOLO.wdTicks++;
+      if (SOLO.wdTicks >= 4) {
+        SOLO.wdTicks = 0; SOLO.wdT = v.currentTime;
+        if ((SOLO.autoReN || 0) < 2) { SOLO.autoReN++; toast('Video congelado — cambiando de nodo…'); reResolverSolo(true); }
+      }
+    } else { SOLO.wdTicks = 0; SOLO.wdT = v.currentTime; }
+  }, 3000);
   cargarHlsJs((okHls) => {
     if (!SOLO || SOLO.cerrado) return;
     ponerSubsSolo(d.subs || []);
@@ -3861,6 +3880,7 @@ function cerrarSolo() {
     SOLO.cerrado = true;
     try { soloReportar(); } catch {}
     if (SOLO.timer) { clearInterval(SOLO.timer); SOLO.timer = null; }
+    if (SOLO.wdTimer) { clearInterval(SOLO.wdTimer); SOLO.wdTimer = null; } /* v337 */
     if (SOLO.hls) { try { SOLO.hls.destroy(); } catch {} }
   }
   const video = $('#soloVideo');
@@ -3876,6 +3896,36 @@ function cerrarSolo() {
   cargarContinuar(); /* refresca la fila de "Continuar viendo" */
 }
 $('#soloBack').addEventListener('click', cerrarSolo);
+/* v337: RE-RESOLVER SIN SALIR — la dirección m3u8 es exclusiva del nodo que
+ * la firmó (v332): si ese nodo se ahoga, re-montar el MISMO m3u8 es negro
+ * para siempre. Aquí pedimos una resolución NUEVA (= nueva lotería de
+ * nodos) y montarSolo reanuda en el minuto donde iba. El reproductor jamás
+ * se cierra por aquí (v319); el usuario puede insistir con el botón. */
+async function reResolverSolo(auto) {
+  if (!SOLO || SOLO.cerrado || SOLO.reResolviendo) return;
+  SOLO.reResolviendo = true;
+  try {
+    if (!auto) toast('Cambiando de nodo…');
+    let r = await fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(SOLO.url), { cache: 'no-store' });
+    let d = await r.json();
+    if (r.status === 403 && d && (d.healable || /Perfil no v/.test(d.error || ''))) { /* token curado tras restart */
+      try {
+        const hr = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: S.profile.name, token: S.profile.token, force: true }) });
+        const hd = await hr.json();
+        if (hd && hd.ok && hd.token) {
+          S.profile.token = hd.token;
+          try { localStorage.setItem('rr-profile', JSON.stringify(S.profile)); } catch {}
+          r = await fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(SOLO.url), { cache: 'no-store' });
+          d = await r.json();
+        }
+      } catch {}
+    }
+    if (d && d.ok && d.m3u8) { SOLO.res = d; montarSolo(d, await elegirModoSolo(d)); toast('Video reconectado — otro nodo'); }
+    else if (!auto) toast(String((d && d.error) || 'sin respuesta').slice(0, 90) + ' — intenta en un minuto');
+  } catch { if (!auto) toast('No pude reconectar — el video sigue abierto, intenta de nuevo'); }
+  finally { SOLO.reResolviendo = false; }
+}
+$('#soloReload').addEventListener('click', () => reResolverSolo(false));
 /* v83: toque simple = controles o play/pausa; DOBLE toque a los lados
  * adelanta/atrasa 10s (como YouTube) y al centro pausa; en escritorio
  * el doble clic amplía a pantalla completa */
