@@ -3329,3 +3329,22 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - watchdog 12 s → 9 s (wdTicks 4→3).
 - Verificado :3956: veredicto 5.8 s, log '(índice o video)', fix de
   posición servido en app.js. node --check OK ambos.
+
+## v340 (24 Sep 2026) — Fin del spam de «la fuente NO responde» + cero muertes falsas en ventana mala
+- Reporte del usuario: la sonda repetía 'revisión dirigida tras fallo: la
+  fuente NO responde — vimeos está saturado' cada 1-2 min durante 17+ min.
+- CAUSA: el veredicto rápido (v336+) aceleró el ciclo fallo→revisión→aviso;
+  la revisión dirigida NO consultaba el canario: notificaba muerte por
+  título, epsFallo contaba muertes FALSAS y re-encolaba cada minuto.
+- v340 (server):
+  · revisión dirigida: si el error es de ventana ('saturado') y el canario
+    (doble, v337) confirma → DIFIERE 10 min (VERIF_COLA re-set), cero
+    epsFallo, cero notify por título, y UN aviso global por hora
+    ('VENTANA MALA — diferidas, no se condena ni se oculta nada').
+  · fallo directo en reproducción (línea 329): epsFallo se salta si el
+    error es de ventana (verificado: 0 notificaciones de muerte en la prueba).
+- v340 (app.js): la reconexión automática JAMÁS falla en silencio — el toast
+  muestra el veredicto del server ('vimeos está saturado…') también en modo
+  auto; el watchdog agotado avisa 'toca Recargar video en un minuto'.
+- Verificado :3955 (2.5 min de prueba): encolado → canario doble caído →
+  '[verif] ventana mala — diferido 10 min' + aviso único → 0 'NO responde'.

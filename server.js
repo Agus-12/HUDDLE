@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v339'; // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
+const UI_VERSION = 'v340'; // v340: ventana mala de vimeos = verificaciones diferidas 10 min (aviso único/hora, cero spam, cero muertes falsas) + el player AVISA cuando la reconexión automática no puede // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -326,7 +326,7 @@ function resolverNativo(url) {
   const k = String(url || '');
   const enVuelo = RESOLVIENDO.get(k);
   if (enVuelo) return enVuelo;
-  const p = resolverNativoInterno(url).catch((e) => { if (esEpUrl(k)) epsFallo(k); verifEncolar(k); throw e; }).finally(() => RESOLVIENDO.delete(k)); /* v287: los fallos en Juntos también cuentan; v295: y se encolan para verificación dirigida */
+  const p = resolverNativoInterno(url).catch((e) => { if (esEpUrl(k) && !/saturado|ventana mala/i.test(String(e && e.message || e))) epsFallo(k); /* v340: ventana mala de vimeos NO es muerte de episodio */ verifEncolar(k); throw e; }).finally(() => RESOLVIENDO.delete(k)); /* v287: los fallos en Juntos también cuentan; v295: y se encolan para verificación dirigida */
   RESOLVIENDO.set(k, p);
   return p;
 }
@@ -1055,6 +1055,7 @@ function verifFuenteDe(url) {
   if (/ennovelas-tv\.com\//i.test(url)) return { f: 'Ennovelas', s: '' };
   return { f: 'Huddle', s: '' };
 }
+let VERIF_VENTANA_AT = 0; /* v340: última vez que avisamos VENTANA MALA de vimeos (aviso único por hora) */
 function verifEncolar(url) {
   try {
     if (!url || !/^https?:/i.test(url) || VERIF_COLA.size > 300) return;
@@ -1080,6 +1081,10 @@ setInterval(() => {
         sp.n++; VERIF_SOSPECHAS.set(it.fuente, sp);
         sondaNotify(it.fuente, 'revision', it.slug || url.slice(0, 60),
           'falló al reproducir pero la fuente SÍ responde — fallo puntual o bug de Huddle' + (sp.n >= 3 ? ' (ojo: ' + sp.n + ' en 1 h en ' + it.fuente + ')' : ''));
+      } else if (/saturado|ventana mala/i.test(err) && !(await vimeosCanario())) { /* v340: ventana mala de vimeos — NO es muerte por título: diferir 10 min, cero castigo, aviso único por hora */
+        if (!VERIF_VENTANA_AT || ahora - VERIF_VENTANA_AT > 3600000) { VERIF_VENTANA_AT = ahora; sondaNotify(it.fuente, 'revision', 'vimeos', 'vimeos está en VENTANA MALA — verificaciones diferidas 10 min; no se condena ni se oculta nada hasta que despierte'); }
+        console.log('[verif] ventana mala de vimeos — diferido 10 min: ' + it.fuente + ' ' + String(url).slice(0, 60));
+        VERIF_COLA.set(url, { fuente: it.fuente, slug: it.slug, al: ahora + 600000, ok: 0, mal: 0 });
       } else {
         try { epsFallo(url); } catch {}
         sondaNotify(it.fuente, 'muerto', it.slug || url.slice(0, 60), 'revisión dirigida tras fallo: la fuente NO responde — ' + err);

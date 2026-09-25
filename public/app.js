@@ -3687,6 +3687,7 @@ function montarSolo(d, viaProxy) {
       if (SOLO.wdTicks >= 3) { /* v339: 9 s — antes era 12 */
         SOLO.wdTicks = 0; SOLO.wdT = v.currentTime;
         if ((SOLO.autoReN || 0) < 2) { SOLO.autoReN++; toast('Video congelado — cambiando de nodo…'); reResolverSolo(true); }
+        else if (!SOLO.wdAvisado) { SOLO.wdAvisado = true; toast('Sigue sin dar video — toca Recargar video en un minuto o vuelve a entrar'); } /* v340 */
       }
     } else { SOLO.wdTicks = 0; SOLO.wdT = v.currentTime; }
   }, 3000);
@@ -3922,8 +3923,8 @@ async function reResolverSolo(auto) {
       } catch {}
     }
     if (d && d.ok && d.m3u8) { SOLO.res = d; montarSolo(d, await elegirModoSolo(d)); toast('Video reconectado — otro nodo'); }
-    else if (!auto) toast(String((d && d.error) || 'sin respuesta').slice(0, 90) + ' — intenta en un minuto');
-  } catch { if (!auto) toast('No pude reconectar — el video sigue abierto, intenta de nuevo'); }
+    else toast(String((d && d.error) || 'sin respuesta').slice(0, 90)); /* v340: la reconexión automática JAMÁS falla en silencio */
+  } catch { toast('No pude reconectar — el video sigue abierto' + (auto ? ', espera un momento' : ', intenta de nuevo')); }
   finally { SOLO.reResolviendo = false; }
 }
 $('#soloReload').addEventListener('click', () => reResolverSolo(false));
