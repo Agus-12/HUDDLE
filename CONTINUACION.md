@@ -3563,3 +3563,28 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   · revividor: solo true revive.
   Si algo fue purgado en la ventana pre-v353: revive solo (revivir verifica
   vivo + sonda cq nueva) y abrirlo jala code fresco de la API.
+
+## v354 (25 Sep 2026) — Saludómetro de vimeos en el panel + dan/flv/pxd arreglados
+- Usuario (con captura): ¿podemos ver el estado de vimeo y las bodegas s2/s3
+  en el panel, y al picarle los títulos que fallan? + PelisXD lleva rato en 5
+  + no veo Danimados ni AnimeFLV.
+- BUG dan (v335, mío): e.daniT/e.daniN SIN INICIALIZAR tras la refactor →
+  URL undefinedxundefined → 404 eterno → dan JAMÁS cosechó (por eso el chip
+  no existía). Fix: init en el flujo.
+- BUG flv (v335): la ficha /anime/ NO trae /ver/ (los monta JS) → la maquina-
+  ría común nunca tuvo eps. REDISEÑO: flujo propio SECUENCIAL /ver/<slug>-N
+  (2 misses = serie siguiente) + la página trae data-dwn: LISTA COMPLETA de
+  servidores (byse/dood/mp4upload/voe/mixdrop/dhcplay/movearn — hosters
+  independientes) sin AJAX. Hosters independientes primero (≤3).
+- PELISXD en 5: solo cosechaba al REPRODUCIR. Ahora 'pxd' está en la rotación
+  de bovedaAutoCaps (flujo propio: 1 GET por peli → título + embeds ≤3).
+- SALUDÓMETRO (panel): tarjeta 'Salud de vimeos' — chips por BODEGA
+  (s8/s10/s14…: ok/ko/silencio con contadores) alimentada por las
+  resoluciones Y la auditoría (regSaludV en m3u8Sirve y cqEmbedSirve);
+  canario VIVO/CAÍDO con antigüedad; botón Ver → lista de TÍTULOS CON
+  FALLOS RECIENTES (título resuelto por fuente, error, hace cuánto).
+  Endpoint /api/vimeos-salud. Sin emojis, SVG, estilo del panel.
+- VERIFICADO :3939: dan '+Transformers G1 1x1' (PRIMER cosecho dan histórico),
+  flv '+Jinrui… E1 (1 servidores)', pxd '+Treinta días de noche (2 embeds)';
+  salud en vivo: s14 42 ko, s10 ko (las caídas del censo), s1/s8/s11/s12 ok;
+  Drácula resolvió ok desde bóveda (s8 viva).

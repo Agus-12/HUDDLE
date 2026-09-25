@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v353'; // v353: bodega caída NO es muerte — la auditoría distingue 'podrido' (página completa sin video, 2 strikes) de opaco (timeout/403/racionado: no se juzga); el revividor solo acepta vida real // v352: FASE 3 — películas cq con fallo total se resuelven vía CUEVANA (otro hoster, goodstream) desde el catálogo en memoria; negative cache 30 min; la cosecha cv deja el título blindado para siempre // v351: DIVERSIDAD DE HOSTERS — respaldos ordenan goodstream/no-vimeos primero y la auditoría ligera da la entrada por viva si CUALQUIER hoster responde (una entrada multi-hoster solo muere si todos mueren) // v350: canario directo⇄relay EN PARALELO (veredicto en segundos — v349 lo hacía lento y ahogaba el relay) + semáforo del relay (máx 3) + saneamiento de relay.txt/set-relay // v349: la LUPA de la sonda mira por el relay (canario, embeds y video) — vimeos bloqueando el datacenter ya no silencia las auditorías + pausas por memoria visibles // v348: FASE 2 — segundo enlace de SERIES cq vía Danimados (TxE idéntica, cached en altEps) + auditoría de códigos de series (punto ciego desde v321; 2 strikes = el código fuera, la serie queda) // v347: auto-curación SIN techo (sillita de 20 s) + la rama de error hls pide FRESCO (antes re-montaba la misma m3u8 desde cache) // v346: DOBLE CHEQUEO del ganador en resolverVimeos — nodos inestables (índice OK, video 502: vimeos.zip hoy) detectados ANTES de entregar el stream; se pasa al siguiente nodo de la misma oleada // v345: cadena corta (relay = último intento) + el player JAMÁS se cierra solo: los 4 caminos de 'Se cortó el video' ahora dejan el player abierto con Recargar video disponible (v319 restituida) // v344: la verificación del video (máster Y variante) usa el relay en toda la oleada de relay — el presupuesto de un solo uso rechazaba nodos buenos: 'saturado' con relay vivo // v343: el relay de casa se intenta ANTES de declarar 'saturado' — bloqueo de vimeos a datacenters ya no tumba la reproducción si el relay está vivo // v342: SEGUNDO ENLACE — películas cq con embeds de respaldo de OTRA infraestructura (PelisXD byse/dood), cosechados al fallar y usados por auditoría/replay; bovedaRespaldo también rastrea pxd: // v341: reanudar SIEMPRE (catálogo respeta continuar viendo y ya no pisa tu minuto) + posición marcada al INICIAR el salto + el perro guardián cura saltos colgados (>9 s buscando) // v340: ventana mala de vimeos = verificaciones diferidas 10 min (aviso único/hora, cero spam, cero muertes falsas) + el player AVISA cuando la reconexión automática no puede // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
+const UI_VERSION = 'v354'; // v354: SALUDÓMETRO de vimeos en el panel (bodegas en vivo + fallos recientes) + BUG dan v335 (undefinedxundefined — jamás cosechó) + flv secuencial con data-dwn (hosters independientes) + pxd en la rotación automática // v353: bodega caída NO es muerte — la auditoría distingue 'podrido' (página completa sin video, 2 strikes) de opaco (timeout/403/racionado: no se juzga); el revividor solo acepta vida real // v352: FASE 3 — películas cq con fallo total se resuelven vía CUEVANA (otro hoster, goodstream) desde el catálogo en memoria; negative cache 30 min; la cosecha cv deja el título blindado para siempre // v351: DIVERSIDAD DE HOSTERS — respaldos ordenan goodstream/no-vimeos primero y la auditoría ligera da la entrada por viva si CUALQUIER hoster responde (una entrada multi-hoster solo muere si todos mueren) // v350: canario directo⇄relay EN PARALELO (veredicto en segundos — v349 lo hacía lento y ahogaba el relay) + semáforo del relay (máx 3) + saneamiento de relay.txt/set-relay // v349: la LUPA de la sonda mira por el relay (canario, embeds y video) — vimeos bloqueando el datacenter ya no silencia las auditorías + pausas por memoria visibles // v348: FASE 2 — segundo enlace de SERIES cq vía Danimados (TxE idéntica, cached en altEps) + auditoría de códigos de series (punto ciego desde v321; 2 strikes = el código fuera, la serie queda) // v347: auto-curación SIN techo (sillita de 20 s) + la rama de error hls pide FRESCO (antes re-montaba la misma m3u8 desde cache) // v346: DOBLE CHEQUEO del ganador en resolverVimeos — nodos inestables (índice OK, video 502: vimeos.zip hoy) detectados ANTES de entregar el stream; se pasa al siguiente nodo de la misma oleada // v345: cadena corta (relay = último intento) + el player JAMÁS se cierra solo: los 4 caminos de 'Se cortó el video' ahora dejan el player abierto con Recargar video disponible (v319 restituida) // v344: la verificación del video (máster Y variante) usa el relay en toda la oleada de relay — el presupuesto de un solo uso rechazaba nodos buenos: 'saturado' con relay vivo // v343: el relay de casa se intenta ANTES de declarar 'saturado' — bloqueo de vimeos a datacenters ya no tumba la reproducción si el relay está vivo // v342: SEGUNDO ENLACE — películas cq con embeds de respaldo de OTRA infraestructura (PelisXD byse/dood), cosechados al fallar y usados por auditoría/replay; bovedaRespaldo también rastrea pxd: // v341: reanudar SIEMPRE (catálogo respeta continuar viendo y ya no pisa tu minuto) + posición marcada al INICIAR el salto + el perro guardián cura saltos colgados (>9 s buscando) // v340: ventana mala de vimeos = verificaciones diferidas 10 min (aviso único/hora, cero spam, cero muertes falsas) + el player AVISA cuando la reconexión automática no puede // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -9781,12 +9781,54 @@ function bovedaCapsEstado(f) { return bovedaCaps.s[f] || (bovedaCaps.s[f] = { se
 async function bovedaAutoCaps() {
   try {
     if (process.memoryUsage().heapUsed / 1048576 > 320) return;
-    const FUENTES = ['lat', 'enn', 'd23', 'misc', 'lct', 'flv', 'dan']; /* v335: + animeflv y danimados */
+    const FUENTES = ['lat', 'enn', 'd23', 'misc', 'lct', 'flv', 'dan', 'pxd']; /* v354: + pelisxd (auto-cosecha); flv y dan llevan flujo propio */
     const f = FUENTES[bovedaCaps.turno++ % FUENTES.length];
     const e = bovedaCapsEstado(f);
+    if (f === 'flv') { /* v354: ANIMEFLV — sondeo secuencial /ver/<slug>-N; la página trae data-dwn: la LISTA COMPLETA de servidores (byse/dood/mp4upload… hosters independientes de vimeos) sin AJAX. La ficha no trae /ver/ (los monta JS) — por eso las fases comunes nunca cosecharon */
+      if (!e.series.length) { const rs = await fetchSeguro('https://vww.animeflv.one/sitemap.xml', 15000).catch(() => null); const xs = rs && rs.ok ? await rs.text().catch(() => '') : ''; e.series = [...new Set([...xs.matchAll(/<loc>https:\/\/vww\.animeflv\.one\/anime\/([a-z0-9-]+)<\/loc>/g)].map((m) => m[1]))].sort(() => Math.random() - 0.5).slice(0, 600); }
+      if (!e.series.length) return;
+      if (!e.flvN) { e.flvN = 1; e.flvMiss = 0; }
+      const serieF = e.series[e.si % e.series.length];
+      const urlEp = 'https://vww.animeflv.one/ver/' + serieF + '-' + e.flvN;
+      const r1F = await fetchSeguro(urlEp, 12000).catch(() => null);
+      if (!r1F || !r1F.ok) { e.flvMiss = (e.flvMiss || 0) + 1; if (e.flvMiss >= 2) { e.si++; e.flvN = 1; e.flvMiss = 0; } return; } /* fin de la serie → siguiente */
+      e.flvMiss = 0;
+      const hhF = await r1F.text().catch(() => '');
+      const tituloF = (((/<title>([^<]+)</i.exec(hhF) || [])[1] || '').replace(/^Ver\s+/i, '').replace(/\s*Sub\s+Espa[ñn]ol.*$/i, '').replace(/\s*Episodio\s+\d+.*$/i, '').replace(/\s*[\|–-]\s*AnimeFLV.*/i, '').trim()) || serieF; /* v354: título de serie limpio */
+      const dwnF = /data-dwn="([^"]+)"/.exec(hhF);
+      let embedsF = [];
+      if (dwnF) {
+        try {
+          const arrF = JSON.parse(dwnF[1].replace(/&quot;/g, '"').replace(/\\\//g, '/'));
+          embedsF = arrF.filter((u) => /^https?:\/\//i.test(u)).sort((a, b) => (/byse|dood|mp4upload/i.test(b) ? 1 : 0) - (/byse|dood|mp4upload/i.test(a) ? 1 : 0)).slice(0, 3); /* hosters independientes primero */
+        } catch {}
+      }
+      e.flvN = e.flvN + 1;
+      if (embedsF.length) { const claveF = 'flv:' + urlEp; if (!BOVEDA.has(claveF)) { bovedaPon(claveF, { serie: tituloF, poster: '', serieSlug: serieF, embeds: embedsF }); console.log('[boveda-caps] flv: +' + tituloF + ' E' + (e.flvN - 1) + ' (' + embedsF.length + ' servidores)'); } }
+      return;
+    }
+    if (f === 'pxd') { /* v354: PELISXD en la rotación — auto-cosecha sin depender de que alguien reproduzca (1 GET por peli da título + embeds) */
+      if (!e.series.length) { try { e.series = (await pelisxdIndice()).slice(); } catch {} if (!e.series.length) return; }
+      const slugP = e.series[e.si % e.series.length];
+      const urlP = 'https://www.pelisxd.com/pelicula/' + slugP;
+      try {
+        const r1P = await fetchSeguro(urlP, 12000);
+        if (r1P.ok) {
+          const hhP = await r1P.text();
+          const tP = (((/<title>([^<]+)</i.exec(hhP) || [])[1] || '').replace(/^Ver\s+/i, '').replace(/\s*\(?\d{4}\)?\s*Online.*/i, '').replace(/\s*[\|–-]\s*PelisXD.*/i, '').trim()).slice(0, 90);
+          const vSources = [];
+          const reP = /v_source[^A-Za-z0-9]{0,12}([A-Za-z0-9+/=]{24,})/g;
+          let m2P;
+          while ((m2P = reP.exec(hhP))) { try { const u2 = Buffer.from(m2P[1], 'base64').toString('utf8'); if (/^https?:\/\//i.test(u2)) vSources.push(u2); } catch {} }
+          if (vSources.length) { if (!BOVEDA.has('pxd:' + slugP)) { bovedaPon('pxd:' + slugP, { t: tP, embeds: vSources.slice(0, 3) }); console.log('[boveda-caps] pxd: +' + tP + ' (' + Math.min(vSources.length, 3) + ' embeds)'); } e.si++; return; }
+        }
+      } catch {}
+      e.si++; return; /* página sin reproductores o falló — siguiente */
+    }
     if (f === 'dan') { /* v335: DANIMADOS — flujo propio: catálogo en memoria (DANI_CAT) + sondeo secuencial /episodios/<slug>-TxN/ */
       if (!e.series.length) e.series = [...DANI_CAT.keys()].sort(() => Math.random() - 0.5);
       if (!e.series.length) return;
+      if (!e.daniT) { e.daniT = 1; e.daniN = 1; e.daniMiss = 0; } /* v354: BUG v335 — sin esto la URL era undefinedxundefined y dan JAMÁS cosechó (chip ausente en el panel) */
       const serie = e.series[e.si % e.series.length];
       const titulo = (DANI_CAT.get(serie) || {}).t || serie;
       const urlEp = DANI_BASE + '/episodios/' + serie + '-' + e.daniT + 'x' + e.daniN + '/';
@@ -9818,7 +9860,7 @@ async function bovedaAutoCaps() {
       else if (f === 'd23') e.series = [...D23_TODOS].filter((s) => !D23_OCULTAS.has(s)).sort(() => Math.random() - 0.5).slice(0, 400);
       else if (f === 'enn') { const cat = await ennCatalogo(true).catch(() => []); e.series = cat.map((x) => x.url || x.serie).filter(Boolean).sort(() => Math.random() - 0.5).slice(0, 200); }
       else if (f === 'misc') { const rh = await fetchSeguro(CARI_BASE, 10000).catch(() => null); const hh = rh && rh.ok ? await rh.text().catch(() => '') : ''; e.series = [...new Set([...hh.matchAll(/href="https:\/\/miscaricaturas\.com\/([a-z0-9-]+)\//g)].map((m) => m[1]).filter((s) => s.length > 3))].sort(() => Math.random() - 0.5).slice(0, 300); }
-      else if (f === 'flv') { const rs = await fetchSeguro('https://vww.animeflv.one/sitemap.xml', 15000).catch(() => null); const xs = rs && rs.ok ? await rs.text().catch(() => '') : ''; e.series = [...new Set([...xs.matchAll(/<loc>https:\/\/vww\.animeflv\.one\/anime\/([a-z0-9-]+)<\/loc>/g)].map((m) => m[1]))].sort(() => Math.random() - 0.5).slice(0, 600); }
+
       else if (f === 'lct') { if (!lctVivoAhora()) return; e.series = [...LCT_SERIES.values()].sort(() => Math.random() - 0.5).slice(0, 200); }
       e.listaEn = 1;
       if (e.series.length) console.log('[boveda-caps] ' + f + ': ' + e.series.length + ' series en cola de capítulos');
@@ -9834,7 +9876,7 @@ async function bovedaAutoCaps() {
         else if (f === 'd23') { const r = await fetchSeguro('https://animed23.com/anime/' + serie + '/', 12000).catch(() => null); if (!r || !r.ok) { console.log('[boveda-caps] d23: ficha no abrió (' + (r ? r.status : 'red') + ') ' + serie); e.si++; return; } const hh = await r.text().catch(() => ''); titulo = ((/<title>([^<]+)</i.exec(hh) || [])[1] || serie).replace(/ \| AnimeD23.*/i, '').trim(); e.eps = [...new Set([...hh.matchAll(/href="(https:\/\/animed23\.com\/capitulo\/[a-z0-9-]+)"/g)].map((m) => m[1]))].slice(0, 60); if (!e.eps.length) console.log('[boveda-caps] d23: ficha sin enlaces (challenge?) ' + serie); }
         else if (f === 'enn') { const u = String(serie).startsWith('http') ? serie : ENN_BASE + 'series/' + serie + '/'; const r = await fetchSeguro(u, 12000).catch(() => null); if (!r || !r.ok) { e.si++; return; } const hh = await r.text().catch(() => ''); titulo = ((/<title>([^<]+)</i.exec(hh) || [])[1] || '').replace(/\s*[\|-]\s*Ennovelas.*/i, '').trim(); e.eps = [...new Set([...hh.matchAll(/href="(https:\/\/l\.ennovelas-tv\.com\/[a-z0-9-]+-capitulo-\d+\/)"/g)].map((m) => m[1]))].slice(0, 60); }
         else if (f === 'misc') { const d = await datosCaricatura(serie).catch(() => null); if (!d) { e.si++; return; } titulo = d.titulo || ''; poster = d.poster || ''; e.eps = (d.episodios || []).map((x) => x.url).filter(Boolean); } /* v335: el mismo extractor de la app (los links no son anchors) */
-        else if (f === 'flv') { const r = await fetchSeguro('https://vww.animeflv.one/anime/' + serie, 12000).catch(() => null); if (!r || !r.ok) { e.si++; return; } const hh = await r.text().catch(() => ''); titulo = ((/<title>([^<]+)</i.exec(hh) || [])[1] || serie).replace(/\s*[\|-]\s*AnimeFLV.*/i, '').trim(); e.eps = [...new Set([...hh.matchAll(/href="(?:https:\/\/vww\.animeflv\.one)?\/ver\/([a-z0-9-]+-\d+)"/g)].map((m) => 'https://vww.animeflv.one/ver/' + m[1]))].slice(0, 80); }
+
         else if (f === 'lct') { const d = await datosCaricatura(serie).catch(() => null); if (!d) { e.si++; return; } titulo = d.titulo || ''; poster = d.poster || ''; e.eps = (d.episodios || []).map((x) => x.url).filter(Boolean); }
       } catch { e.si++; return; }
       e.titulo = titulo; e.poster = poster; e.serieSlug = serie; /* v334: para el aval de las sondas */
@@ -9851,7 +9893,6 @@ async function bovedaAutoCaps() {
         else if (f === 'd23') { const r = await fetchSeguro(epUrl, 15000).catch(() => null); if (!r || !r.ok) break; const hh = await r.text().catch(() => ''); embeds = await d23TabsDeHtml(hh, epUrl).catch(() => []); }
         else if (f === 'enn') { const r = await fetchSeguro(epUrl, 15000).catch(() => null); if (!r || !r.ok) break; const hh = await r.text().catch(() => ''); for (const m of hh.matchAll(/emb\/\?vid=(\d+)|ok\.ru\/videoembed\/(\d+)|goodstream\.one[^"'\s]*|vk\.com\/video_ext\.php[^"'\s]*/gi)) { const u = m[0].startsWith('http') ? m[0] : (m[1] ? 'https://l.ennovelas-tv.com/emb/?vid=' + m[1] : (m[2] ? 'https://ok.ru/videoembed/' + m[2] : m[0])); if (!embeds.includes(u)) embeds.push(u); } embeds = embeds.slice(0, 3); }
         else if (f === 'misc') { const r1 = await fetchSeguro(epUrl, 12000).catch(() => null); if (!r1 || !r1.ok) break; const hh = await r1.text().catch(() => ''); const idm = (/anchor-data-container" data-id="(\d+)"/i.exec(hh) || [])[1]; if (!idm) break; const r2 = await fetch(CARI_BASE + 'wp-admin/admin-ajax.php', { method: 'POST', headers: { 'User-Agent': MIRROR_UA, Referer: epUrl, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'action=get_system_data&target_id=' + idm }).catch(() => null); const j2 = r2 && r2.ok ? await r2.json().catch(() => null) : null; const im = j2 && j2.success && j2.data && j2.data.html ? /<iframe[^>]*src="(https?:\/\/[^"]+)"/i.exec(j2.data.html) : null; if (im) embeds = [im[1]]; }
-        else if (f === 'flv') { const r1 = await fetchSeguro(epUrl, 12000).catch(() => null); if (!r1 || !r1.ok) break; const hh1 = await r1.text().catch(() => ''); const enc = (/class="opt"[^>]*data-encrypt="([0-9a-f]+)"/i.exec(hh1) || [])[1]; if (!enc) break; const ctlF = new AbortController(); const tF = setTimeout(() => ctlF.abort(), 12000); try { const r2 = await fetch('https://vww.animeflv.one/flv', { method: 'POST', headers: { 'User-Agent': MIRROR_UA, Referer: epUrl, 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8', 'X-Requested-With': 'XMLHttpRequest' }, body: 'acc=opt&i=' + enc, signal: ctlF.signal }); const cu = r2.ok ? await r2.text() : ''; embeds = [...new Set([...cu.matchAll(/<li[^>]*encrypt="([0-9a-f]+)"/gi)].map((mm) => { try { return Buffer.from(mm[1], 'hex').toString('utf8'); } catch { return ''; } }).filter((u) => /^https?:\/\//i.test(u)))]; embeds.sort((a, b) => (/mp4upload/i.test(b) ? 1 : 0) - (/mp4upload/i.test(a) ? 1 : 0)); embeds = embeds.slice(0, 3); } catch {} finally { clearTimeout(tF); } }
 
         else if (f === 'lct') { const r = await fetchSeguro(epUrl, 12000).catch(() => null); if (!r || !r.ok) break; const hh = await r.text().catch(() => ''); const mOk = /ok\.ru\/videoembed\/(\d+)/i.exec(hh); const idR = /cubeembed\.rpmvid\.com\/#([a-z0-9]+)/i.exec(hh); if (mOk) embeds.push('https://ok.ru/videoembed/' + mOk[1]); if (idR) embeds.push('https://cubeembed.rpmvid.com/#' + idR[1]); }
       } catch {}
@@ -9884,7 +9925,8 @@ async function cqEmbedSirve(code) {
       const m3 = out && (out.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
       if (!m3) { cuerpoMax = Math.max(cuerpoMax, String(em || '').length); continue; }
       huboM3u8 = true;
-      if (await sirveElVideo(m3, 'https://vimeos.net/')) return true;
+      if (await sirveElVideo(m3, 'https://vimeos.net/')) { regSaludV(m3, true); return true; }
+      regSaludV(m3, false);
     } catch {}
   }
   if (CDN_RELAY) { /* v349: embed por el relay de casa — sin esto la sonda no puede juzgar NADA cuando vimeos bloquea el datacenter */
@@ -9892,7 +9934,7 @@ async function cqEmbedSirve(code) {
       const em = await (await fetchRelay('https://vimeos.net/embed-' + code + '.html', 15000)).text();
       const out = desempacar(em);
       const m3 = out && (out.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
-      if (m3) { if (await sirveElVideo(m3, 'https://vimeos.net/')) return true; huboM3u8 = true; }
+      if (m3) { if (await sirveElVideo(m3, 'https://vimeos.net/')) { regSaludV(m3, true); return true; } regSaludV(m3, false); huboM3u8 = true; }
       else cuerpoMax = Math.max(cuerpoMax, String(em || '').length);
     } catch {}
   }
@@ -12188,6 +12230,16 @@ async function canarioPruebaRapida(code) {
   })();
   return (await Promise.all([intentoDirecto, intentoRelay])).some(Boolean);
 }
+/* v354: SALUD DE VIMEOS — censo de bodegas (s8, s10…) visto desde las
+ * resoluciones reales + registro de fallos recientes para el panel. Así el
+ * usuario ve EN VIVO qué bodegas están caídas y qué títulos fallan, sin
+ * preguntar. */
+const VIMEOS_SALUD = new Map(); /* bodega → {ok, ko, lastOk, lastKo} */
+let VIMEOS_EST = { at: 0, vivo: false };
+const bodegaDe = (m3) => { try { const u = new URL(m3); const mS = /(?:^|\.)s(\d+)\./i.exec(u.hostname); if (mS) return 's' + mS[1]; const mP = /[?&]srv=s(\d+)/.exec(u.search); if (mP) return 's' + mP[1]; return u.hostname; } catch { return '?'; } };
+const FALLOS_RECIENTES = [];
+const regSaludV = (m3x, okx) => { try { const b = bodegaDe(m3x); const r = VIMEOS_SALUD.get(b) || { ok: 0, ko: 0, lastOk: 0, lastKo: 0 }; if (okx) { r.ok++; r.lastOk = Date.now(); } else { r.ko++; r.lastKo = Date.now(); } VIMEOS_SALUD.set(b, r); } catch {} }; /* v354: la AUDITORÍA también alimenta el medidor */
+const tituloFalloDe = (target) => { try { const h = String(target); let m = /#\/pelicula\/(\d+)/.exec(h) || /#\/(?:serie|anime)\/(\d+)/.exec(h); if (m) { for (const pre of ['cq:movie:', 'cq:tvshow:', 'cq:anime:']) { const v = BOVEDA.get(pre + m[1]); if (v && v.t) return v.t; } return 'cq ' + m[1]; } m = /cuevana\.mov\/pelicula\/\d+\/([^/?#]+)/i.exec(h) || /cuevana\.mov\/pelicula\/([^/?#]+)/i.exec(h); if (m) { const v = BOVEDA.get('cv:' + m[1]); return (v && v.t) || m[1]; } m = /pelisxd\.com\/pelicula\/([^/?#]+)/i.exec(h); if (m) { const v = BOVEDA.get('pxd:' + m[1]); return (v && v.t) || m[1]; } m = /danimados\.cc\/episodios\/([a-z0-9-]+)-\d+x\d+/i.exec(h); if (m) { const v = DANI_CAT.get(m[1]); return (v && v.t) || m[1]; } m = /ennovelas-tv\.com\/([a-z0-9-]+)-capitulo/i.exec(h); if (m) return m[1].replace(/-/g, ' '); m = /animed23\.com\/capitulo\/([a-z0-9-]+)/i.exec(h); if (m) return m[1].replace(/-/g, ' '); m = /miscaricaturas\.com\/([a-z0-9-]+)\//i.exec(h); if (m) return m[1].replace(/-/g, ' '); m = /latanime\.org\/ver\/([a-z0-9-]+)/i.exec(h); if (m) return m[1].replace(/-/g, ' '); } catch {} return ''; };
 const CANARIOS_VIMEOS = ['06k16tgdfs1t', '9a0haovfdhih']; /* v337: Fundación + Drácula — UN solo código era punto único de fallo: si el archivo canario muere, el canario ROTA al otro (Fundación empezó a dar pantalla negra 24 Sep; Drácula confirmado vivo por el usuario) */
 let canarioVimeosIdx = 0;
 let vimeosCanarioAt = 0, vimeosCanarioOk = false;
@@ -12210,6 +12262,7 @@ async function vimeosCanario() {
     } catch {}
   }
   vimeosCanarioAt = Date.now();
+  VIMEOS_EST = { at: vimeosCanarioAt, vivo: vimeosCanarioOk }; /* v354 */
   console.log('[vimeos] canario de reproducción: ' + (vimeosCanarioOk ? 'vivo (' + CANARIOS_VIMEOS[canarioVimeosIdx] + ')' : 'CAÍDO — ventana mala de vimeos (índice o video)'));
   return vimeosCanarioOk;
 }
@@ -12271,7 +12324,8 @@ async function resolverVimeos(embed, pageUrl) {
       const m3u8 = out && (out.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
       if (!m3u8) return { sin: 'video' }; /* cuerpo racionado o sin video */
       const sirve = await m3u8Sirve(m3u8, permitirRelay);
-      if (!sirve) { console.log('[vimeos] nodo ' + (new URL(m3u8).hostname) + ' no contestó (master+variante) — probando otro'); return { sin: 'red' }; }
+      if (!sirve) { regSaludV(m3u8, false); console.log('[vimeos] nodo ' + (new URL(m3u8).hostname) + ' no contestó (master+variante) — probando otro'); return { sin: 'red' }; }
+      regSaludV(m3u8, true); /* v354: bodega viva vista en producción */
       return m3u8;
     } catch { return { sin: 'red' }; }
   };
@@ -14395,6 +14449,7 @@ async function estrenosMezclados(){
         return json(res, 200, out2);
       } catch (e) {
         console.warn('[solo] no pude resolver', target.slice(0, 70), '→', String(e.message || e).slice(0, 90));
+        try { const urlF = String(target).slice(0, 130); if (!FALLOS_RECIENTES.length || FALLOS_RECIENTES[0].url !== urlF || Date.now() - FALLOS_RECIENTES[0].at > 600000) { FALLOS_RECIENTES.unshift({ url: urlF, fuente: (verifFuenteDe(target) || {}).f || '', titulo: tituloFalloDe(target), err: String(e.message || e).slice(0, 80), at: Date.now() }); if (FALLOS_RECIENTES.length > 30) FALLOS_RECIENTES.length = 30; } } catch {} /* v354: el panel muestra los fallos recientes */
         verifEncolar(target); /* v295: revisar en concreto ~90 s después y dar veredicto */
         return json(res, 404, { ok: false, error: String(e.message || e).slice(0, 200), ocultado: EPS_MUERTOS.has(target) || /ya no está disponible en el sitio/.test(String(e.message || e)) }); /* v205.5: el cliente quita la tarjeta al momento */
       }
@@ -14652,6 +14707,10 @@ async function estrenosMezclados(){
     }
 
     /* v322: BÓVEDA — catálogo propio guardado (para la tarjeta del panel) */
+    if (url.pathname === '/api/vimeos-salud' && req.method === 'GET') { /* v354: el saludómetro del panel */
+      const bodegas = [...VIMEOS_SALUD.entries()].map(([b, r]) => ({ b, ok: r.ok, ko: r.ko, lastOk: r.lastOk, lastKo: r.lastKo, estado: (Date.now() - Math.max(r.lastOk || 0, r.lastKo || 0) < 3600000) ? (r.lastOk >= r.lastKo ? 'ok' : 'ko') : 'silencio' })).sort((a, b2) => (b2.ok + b2.ko) - (a.ok + a.ko));
+      return json(res, 200, { ok: true, canario: VIMEOS_EST, bodegas, fallos: FALLOS_RECIENTES.slice(0, 15) });
+    }
     if (url.pathname === '/api/boveda' && req.method === 'GET') {
       const resumen = url.searchParams.get('resumen') === '1';
       let pelis = 0, series = 0, animes = 0, cv = 0, caps = 0, completadas = 0, enCola = bovedaSeriesCola.lista.length; /* v328: la cola de cuevana era por-slug; ahora es cosecha masiva */
