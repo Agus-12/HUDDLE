@@ -3460,3 +3460,23 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   (SOLO.ultRe); (3) esa raha ahora pide &fresco=1 (lotería nueva garantizada).
   server.js: solo versión. El player se auto-mantiene mientras haya NODOS
   vivos en el azar de vimeos.
+
+## v348 (25 Sep 2026) — FASE 2: segundo enlace de SERIES + auditoría del punto ciego
+- Usuario: «haz la cura definitiva y checa si pasa lo mismo con otras».
+- HALLAZGO (punto ciego): la auditoría profunda solo revisaba cq:movie — los
+  códigos de SERIES cq (200 entradas en la bóveda) NUNCA se auditaban.
+- v348 server:
+  · cqSerieAltBuscar(titulo,T,E): Danimados (DANI_CAT en memoria, 821
+    series, numeración TxE IDÉNTICA) → URL /episodios/<slug>-TxE/;
+    coincidencia exacta por normaBv. Fundación NO está (live-action Apple;
+    D23 tampoco — es anime-only).
+  · replay ep cq: code-bóveda falla → API fresca falla → [NUEVO: altEps
+    cached o cqSerieAltBuscar → resolverDani] → bovedaRespaldo → throw.
+    El alt se guarda en v.altEps['TxE'] (bovedaPon mergea).
+  · auditoría de SERIES cq: 2 entradas/ciclo, 1 episodio AL AZAR de cada
+    una, cqEmbedSirve ×2; 2 strikes = ESE CÓDIGO fuera (la serie y sus
+    demás episodios quedan); vaciada toda → entrada fuera. Canario doble
+    la protege de ventanas malas igual que las pelis.
+- Cobertura honesta: series cuyo título exista en Danimados (caricaturas,
+  kids y varias live-action; crece con su catálogo). Foundation/T2E6 sigue
+  con la auto-curación v347 + códigos frescos de la API.
