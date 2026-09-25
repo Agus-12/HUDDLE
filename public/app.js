@@ -3693,8 +3693,8 @@ function montarSolo(d, viaProxy) {
     const v = $('#soloVideo');
     const wdDisparar = (msg) => { /* v341: cura común — re-resolver con la posición ya marcada (seeking la deja en lastT) */
       SOLO.wdTicks = 0; SOLO.wdSeek = 0; SOLO.wdT = v.currentTime;
-      if ((SOLO.autoReN || 0) < 2) { SOLO.autoReN++; toast(msg + ' — cambiando de nodo…'); reResolverSolo(true); }
-      else if (!SOLO.wdAvisado) { SOLO.wdAvisado = true; toast('Sigue sin dar video — toca Recargar video en un minuto o vuelve a entrar'); }
+      const tAhora = Date.now();
+      if (tAhora - (SOLO.ultRe || 0) >= 20000) { SOLO.ultRe = tAhora; SOLO.autoReN++; toast(msg + ' — cambiando de nodo (' + SOLO.autoReN + ')…'); reResolverSolo(true); } /* v347: SIN techo — nodos que mueren cada minuto (T2E6) se curan para siempre, cada ≥20 s */
     };
     if (v.paused || !isFinite(v.duration) || v.duration <= 0) { SOLO.wdT = v.currentTime; SOLO.wdTicks = 0; SOLO.wdSeek = 0; return; }
     if (v.seeking) { SOLO.wdSeek = (SOLO.wdSeek || 0) + 1; if (SOLO.wdSeek >= 3) wdDisparar('Salto atorado'); return; } /* v341: salto colgado >9 s = nodo muerto — antes el perro NO lo veía */
@@ -3769,12 +3769,13 @@ function montarSolo(d, viaProxy) {
             }, 1500);
             return;
           }
-          if (SOLO.reintentos <= 5 && (SOLO.reresolves || 0) < 3) {
+          if (Date.now() - (SOLO.ultRe || 0) >= 20000) { /* v347: sin techo, sillita de 20 s */
             if (!SOLO.resolviendo) {
               SOLO.resolviendo = true;
               SOLO.reresolves = (SOLO.reresolves || 0) + 1;
               toast('El video cambió de servidor — buscando la ruta nueva (tu minuto se conserva)…');
-              fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(SOLO.url)).then((r) => r.json()).then((d2) => {
+              SOLO.ultRe = Date.now();
+              fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(SOLO.url) + '&fresco=1').then((r) => r.json()).then((d2) => { /* v347: FRESCO — antes re-montaba la MISMA m3u8 desde cache */
                 SOLO.resolviendo = false;
                 if (d2 && d2.ok && d2.m3u8 && SOLO && !SOLO.cerrado) { SOLO.res = d2; montarSolo(d2, true); }
               }).catch(() => { if (SOLO) SOLO.resolviendo = false; });

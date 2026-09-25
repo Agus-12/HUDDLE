@@ -3446,3 +3446,17 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   relay permitido); si muere en el 2º chequeo → siguiente ganador de la
   MISMA oleada ([…new Set(rs strings)]), cero viajes nuevos. Todos muertos →
   veredicto honesto rápido. Los 'contestan-y-mueren' quedan fuera del stream.
+
+## v347 (25 Sep 2026) — Auto-curación SIN techo + la rama hls ya no re-monta la m3u8 muerta
+- Usuario: T2E6 'batallo pero lo puso… unos minutos y se congeló, pantalla
+  negra de nuevo'. Log: 3× 'T2E6 desde bóveda' en 40 s = el perro guardián
+  curaba (nodos mueren a los ~12 s de sesión en este archivo) PERO se agotó
+  el techo de 2 curas auto → negro final.
+- BUG adicional encontrado: la rama de error de hls.js pedía /api/solo SIN
+  fresco=1 → recibía la resolución CACHED (2 min) → re-montaba LA MISMA
+  m3u8 muerta (inútil), y su techo era 3.
+- v347 (app.js): (1) wdDisparar sin techo — cura cada ≥20 s indefinidamente
+  (toast 'cambiando de nodo (n)'); (2) rama hls sin techo + mismo rate
+  (SOLO.ultRe); (3) esa raha ahora pide &fresco=1 (lotería nueva garantizada).
+  server.js: solo versión. El player se auto-mantiene mientras haya NODOS
+  vivos en el azar de vimeos.
