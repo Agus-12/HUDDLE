@@ -3391,3 +3391,13 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   pendiente (ofrecida). Lo que se guarda es el enlace ESTABLE (embed),
   no el http directo (las URLs firmadas expiran en horas).
 - Verificado: boot OK :3953, 6/6 parches, node --check OK.
+
+## v343 (25 Sep 2026) — El relay de casa ANTES de declarar «saturado»
+- Usuario: diagnóstico 0 bytes desde Oracle (vimeos no abre ni la puerta) +
+  'Vimeo está saturado' en el panel + relay.txt = http://100.72.3.0:3128
+  (Tailscale a máquina de casa, carga OK de disco).
+- FALLO v336: cuando el canario moría, se lanzaba 'saturado' ANTES de la
+  oleada de relay (olas: directa×2 → [canario muerto = throw] → relay NUNCA).
+- v343: en la rama canario-muerto, si CDN_RELAY existe → una oleada(4,relay)
+  extra antes del throw; 'SALVADO por el relay de casa' en el log si jala.
+  Orden final: directa×2 → canario → RELAY → rendirse.
