@@ -3480,3 +3480,16 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - Cobertura honesta: series cuyo título exista en Danimados (caricaturas,
   kids y varias live-action; crece con su catálogo). Foundation/T2E6 sigue
   con la auto-curación v347 + códigos frescos de la API.
+
+## v349 (25 Sep 2026) — La LUPA de la sonda mira por el relay: auditorías des-silenciadas
+- Usuario: grep de auditoría VACÍO. Causa raíz: cqEmbedSirve y sirveElVideo
+  (el canario de la sonda Y la verificación de embeds/video) iban SOLO
+  directos → con vimeos bloqueando el datacenter, el canario SIEMPRE caía →
+  'ventana mala' cada ciclo → CERO auditorías (pelis, series y ligeras) y
+  ni una línea nueva en el log.
+- v349: sirveElVideo → si directo falla y CDN_RELAY → fetchRelay (Range OK);
+  cqEmbedSirve → tras 3 intentos directos, embed por fetchRelay + m3u8 +
+  sirveElVideo (que ya tiene relay). Con eso canario, auditoría profunda de
+  pelis, auditoría de series (v348) y auditoría ligera VUELVEN a juzgar
+  aunque vimeos corte al servidor. Pausa por memoria (>320 MB heap) ahora
+  loguea 1×/h en vez de silencio.
