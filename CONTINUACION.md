@@ -3511,3 +3511,20 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   (502 por relay en el diagnóstico del usuario); los canarios pueden caer
   legítimamente cuando AMBOS archivos canario caen en nodos flojos — con
   v350 el veredicto llega rápido y la reproducción usa la oleada de relay.
+
+## v351 (25 Sep 2026) — DIVERSIDAD DE HOSTERS (la visión del usuario, explícita)
+- Pregunta: «¿hay más como vimeo que también tengan las series o películas?»
+- MAPA DE HOSTERS (inventario real de la bóveda + sondas): familia vimeos
+  (vimeos.net/zip, hlswish, videoapp — cq y buena parte de Cuevana),
+  goodstream.one (Cuevana), byse (byseqekaho/bysekoze — PelisXD), dood
+  (doodstream), mp4upload (latanime/animeflv), uqload, vidhide, hoster
+  propio de Ennovelas. Estado desde el sandbox: vimeos/goodstream/dood/
+  mp4upload VIVOS; vidhide 522; hlswish sin respuesta.
+- v351: (1) bovedaRespaldo ordena los embeds: goodstream → otros hosters →
+  vimeos al final (el punto débil de hoy); (2) la auditoría LIGERA prueba
+  hasta 2 embeds distintos y da la entrada por viva si CUALQUIERA responde
+  (una entrada multi-hoster solo muere si TODOS mueren).
+- Estado vimeos verificado en vivo desde el sandbox (25 Sep): embeds 200
+  completos (Fundación 49754b con m3u8 viva vía vimeos.zip; Drácula
+  49591b) — vimeos MUNDIALMENTE vivo; el problema del usuario sigue siendo
+  bloqueo-a-su-datacenter + nodos inestables para su relay.
