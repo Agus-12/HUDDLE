@@ -834,7 +834,8 @@ function bovedaChips(){
     +'<span class="chip" onclick="bovedaFiltro(\'series\')" style="cursor:pointer;'+(window._bvCat==='series'?act:'')+'">Series <b>'+b.series+'</b></span>'
     +'<span class="chip" onclick="bovedaFiltro(\'animes\')" style="cursor:pointer;'+(window._bvCat==='animes'?act:'')+'">Animes <b>'+b.animes+'</b></span>'
     +'<span class="chip ok" onclick="bovedaFiltro(\'completadas\')" style="cursor:pointer;'+(window._bvCat==='completadas'?act:'')+'">Completadas <b>'+b.completadas+'</b></span>'
-    +'<span class="chip">Capítulos <b>'+b.caps+'</b></span>';
+    +'<span class="chip">Capítulos <b>'+b.caps+'</b></span>'
+    +'<span class="chip" onclick="bovedaFiltro(\'encola\')" style="cursor:pointer;'+(window._bvCat==='encola'?act:'')+'">En cola <b>'+b.enCola+'</b></span>'; /* v331 */
   var au=b.auditoria;
   if(au){h+='<span class="chip ok">Auditados OK <b>'+au.ok+'</b></span>'+(au.podridos?'<span class="chip bad">Podridos <b>'+au.podridos+'</b></span>':'');} /* v330: la sonda de la bóveda al día */
   el.innerHTML=h;
@@ -845,6 +846,21 @@ function bovedaPintar(){
   var q=(document.getElementById('bvFiltro')||{}).value||'';
   var nq=q.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
   var cat=window._bvCat||'';
+  if(cat==='encola'){ /* v331: la fila de espera */
+    var col=(b.cola||[]).filter(function(x){return !nq||x.t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().indexOf(nq)>=0;});
+    var el=document.getElementById('bvLista');
+    if(!col.length){el.innerHTML='<div style="color:#9d93b5;font-size:12px">Cola vacía — la cosecha va al día 🎉</div>';return;}
+    var h='<div style="grid-column:1/-1;font-size:12px;color:#9d93b5">Esperando cosecha — entran ~12 por ciclo (2.5 min). Los reparados y priorizados van primero.</div>';
+    col.slice(0,400).forEach(function(x){
+      h+='<div style="background:#191522;border:1px solid #2c2739;border-radius:10px;padding:10px">'
+        +'<div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+x.t.replace(/"/g,'')+'">'+(x.prioridad?'<span style="color:#38e08a">★ </span>':'')+x.t+'</div>'
+        +'<div style="font-size:10px;color:#fbbf24;margin-top:2px">'+x.tipo+(x.faltan?' · le faltan '+x.faltan+' temporadas':' · nueva')+'</div>'
+        +'</div>';
+    });
+    if(col.length>400)h+='<div style="color:#9d93b5;font-size:11px;grid-column:1/-1">… y '+(col.length-400)+' más — usa el filtro</div>';
+    el.innerHTML=h;
+    return;
+  }
   var items=(b.items||[]).filter(function(x){
     if(cat==='peliculas'&&x.tipo!=='Película')return false;
     if(cat==='series'&&x.tipo!=='Serie')return false;

@@ -3147,3 +3147,15 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   títulos del sitio y condenados por error re-entran; antes era una sola vez).
 - Verificado: primera pasada 3 OK / 0 condenados en ventana movediza; condena
   real demostrada end-to-end (prune+oculta+notify) con code podrido de prueba.
+
+## v331 (24 Sep 2026) — chip EN COLA visible en la Bóveda
+- /api/boveda: 'cola' (primeros 500 de bovedaSeriesCola) [{t, tipo, faltan,
+  prioridad}]; el chip 'En cola N' del panel ahora es CLICKEABLE: muestra la
+  fila de espera con nombres, tipo (Serie/Anime), si es 'nueva' o cuántas
+  temporadas le faltan, y ★ verde para los priorizados (reparados primero).
+  Filtro por nombre incluido; 'Cola vacía' cuando la cosecha va al día.
+- Verificado: 1794 en cola, 500 con nombre servidos; el guard bóveda-primero
+  sigue activo ('Beso de tres'/'Oz: El Poderoso está en bóveda — no se oculta'
+  en plena ventana de saturación).
+- NOTA despliegue: la reparación de Fundación es v329 — el usuario venía de
+  v328; con v331 entra todo: desocultación + prioridad + fila visible.

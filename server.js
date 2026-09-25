@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v330'; // v330: ARQUITECTURA BÓVEDA-PRIMERO — la bóveda avala a los suyos (sondas no los tocan), sonda propia audita los videos guardados
+const UI_VERSION = 'v331'; // v331: chip EN COLA en la Bóveda — mira la fila de espera con nombres (Fundación va primero por reparación)
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -14253,8 +14253,9 @@ async function estrenosMezclados(){
       }
       items.sort((a, b) => a.t.localeCompare(b.t, 'es'));
       const auditoriaBv = { ok: BOVEDA_AUDIT.ok, podridos: BOVEDA_AUDIT.podridos, vistos: BOVEDA_AUDIT.revisados.size }; /* v330 */
-      if (resumen) return json(res, 200, { ok: true, pelis, series, animes, cuevana: cv, caps, completadas, enCola, titulos: pelis + series + animes + cv, fuentes, auditoria: auditoriaBv });
-      return json(res, 200, { ok: true, pelis, series, animes, cuevana: cv, caps, completadas, enCola, titulos: items.length, fuentes, auditoria: auditoriaBv, items });
+const colaBv = bovedaSeriesCola.lista.slice(0, 500).map((s) => ({ t: s.t || ('cq:' + s.kind + ':' + s.id), tipo: s.kind === 'anime' ? 'Anime' : 'Serie', faltan: Array.isArray(s.faltan) ? s.faltan.length : 0, prioridad: BOVEDA_PRIORIDAD.has('cq:' + s.kind + ':' + s.id) })); /* v331: la fila de espera con nombres */
+      if (resumen) return json(res, 200, { ok: true, pelis, series, animes, cuevana: cv, caps, completadas, enCola, titulos: pelis + series + animes + cv, fuentes, auditoria: auditoriaBv, cola: colaBv });
+      return json(res, 200, { ok: true, pelis, series, animes, cuevana: cv, caps, completadas, enCola, titulos: items.length, fuentes, auditoria: auditoriaBv, cola: colaBv, items });
     }
 
     /* v238: estadísticas por fuente */
