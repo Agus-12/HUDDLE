@@ -3435,3 +3435,14 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   (lotería NUEVA) ×2 → toast keep-open; mp4 → toast; hls rutas → toast
   keep-open (wdAvisado). Recargar video siempre disponible.
 - Verificado: 0 'Se cortó el video — vuelve a abrirlo' en app.js, boot OK.
+
+## v346 (25 Sep 2026) — Doble chequeo del ganador: fin del «resolviendo video» eterno
+- Datos del usuario: m3u8 de Fundación T2E6 VIVA (nodo vimeos.zip), server
+  resolvió por relay ('SALVADO… T2E6 desde bóveda' 08:25:58), PERO el video
+  por relay dio 502 en 0.7 s → nodo INESTABLE (índice OK, video rehúsa) →
+  player eterno en 'resolviendo video' (el transporte /api/hls ya va por
+  relay directo desde v236.6 para vimeos hosts).
+- v346: tras elegir ganador en resolverVimeos, RE-VERIFICAR (m3u8Sirve con
+  relay permitido); si muere en el 2º chequeo → siguiente ganador de la
+  MISMA oleada ([…new Set(rs strings)]), cero viajes nuevos. Todos muertos →
+  veredicto honesto rápido. Los 'contestan-y-mueren' quedan fuera del stream.
