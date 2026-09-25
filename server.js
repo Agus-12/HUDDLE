@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v331'; // v331: chip EN COLA en la Bóveda — mira la fila de espera con nombres (Fundación va primero por reparación)
+const UI_VERSION = 'v332'; // v332: resolver vimeos en CARRERA — 8 nodos probados en paralelo por oleada (medido: 46 s → ~5 s en tormenta de nodos)
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -11910,20 +11910,23 @@ async function resolverVimeos(embed, pageUrl) {
     try { const r = await fetchRelay(u, ms); const ok = r.ok; const cuerpo = ok ? await r.text().catch(() => null) : null; return { ok, cuerpo }; }
     catch { return { ok: false, cuerpo: null }; }
   };
-  /* verificación PROFUNDA: master + primera variante (directo, luego relay) */
-  const m3u8Sirve = async (m3u8) => {
-    let r = await pide(m3u8, 4500);
-    if (!r.ok) r = await pideRelay(m3u8, 12000);
+  /* verificación PROFUNDA: master + primera variante. v332: el relay SOLO
+   * se gasta una vez por resolución (a petición del llamador) — antes cada
+   * nodo muerto pagaba +12 s de relay y una tormenta de nodos eran minutos */
+  let relayGastado = false;
+  const m3u8Sirve = async (m3u8, permitirRelay) => {
+    let r = await pide(m3u8, 4000);
+    if (!r.ok && permitirRelay && !relayGastado) { relayGastado = true; r = await pideRelay(m3u8, 12000); }
     if (!r.ok || !r.cuerpo) return false;
     const lineas = (r.cuerpo || '').split('\n').map((l) => l.trim());
     const variante = lineas.find((l) => l && !l.startsWith('#') && /\.m3u8/i.test(l));
     if (!variante) return true; /* playlist media directa — con master OK basta */
     const vAbs = /^https?:/i.test(variante) ? variante : new URL(variante, m3u8).href;
-    let rv = await pide(vAbs, 3500);
-    if (!rv.ok) rv = await pideRelay(vAbs, 10000);
+    let rv = await pide(vAbs, 3000);
+    if (!rv.ok && permitirRelay && !relayGastado) { relayGastado = true; rv = await pideRelay(vAbs, 10000); }
     return rv.ok;
   };
-  const pedirEmbed = async (desfase) => {
+  const pedirEmbed = async (desfase, permitirRelay) => {
     if (desfase) await espera(desfase);
     try {
       let em;
@@ -11936,20 +11939,21 @@ async function resolverVimeos(embed, pageUrl) {
       const out = desempacar(em);
       const m3u8 = out && (out.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
       if (!m3u8) return null; /* cuerpo racionado o sin video */
-      const sirve = await m3u8Sirve(m3u8);
+      const sirve = await m3u8Sirve(m3u8, permitirRelay);
       if (!sirve) { console.log('[vimeos] nodo ' + (new URL(m3u8).hostname) + ' no contestó (master+variante) — probando otro'); return null; }
       return m3u8;
     } catch { return null; }
   };
-  let elegido = (await Promise.all([pedirEmbed(0), pedirEmbed(700), pedirEmbed(1400)])).filter(Boolean)[0];
-  if (!elegido) {
-    await espera(1500); /* oleada 2: los nodos ocupados suelen despertar */
-    elegido = (await Promise.all([pedirEmbed(0), pedirEmbed(500)])).filter(Boolean)[0];
-  }
-  if (!elegido) {
-    await espera(3500); /* v315: oleada 3 — las saturaciones duran segundos, no minutos */
-    elegido = (await Promise.all([pedirEmbed(0), pedirEmbed(800)])).filter(Boolean)[0];
-  }
+  /* v332: CARRERA DE EMBEDS — el embed es barato (~0.5 s) y reparte nodo
+   * AL AZAR en cada petición (medido: 4 peticiones → 4 nodos distintos; la
+   * ruta del video es exclusiva del nodo que la firmó). Nada de filas:
+   * N embeds EN PARALELO = N nodos probados a la vez; el primero vivo gana.
+   * Relay solo en su oleada propia (cuando la directa completa falla). */
+  const oleada = async (n, permitirRelay) => (await Promise.all(Array.from({ length: n }, (_, i) => pedirEmbed(i * 120, permitirRelay)))).filter(Boolean)[0];
+  let elegido = await oleada(8, false);
+  if (!elegido) { await espera(1200); elegido = await oleada(8, false); } /* los ocupados despiertan en segundos */
+  if (!elegido && CDN_RELAY) { await espera(800); elegido = await oleada(4, true); } /* ¿vimeos le bloquea la IP al servidor? el relay de casa */
+  if (!elegido) { await espera(2500); elegido = await oleada(8, false); }
   if (!elegido) throw new Error('vimeos está saturado en este momento — reintenta en un minuto');
   /* los segmentos piden el Referer del embed: lo recordamos */
   try { hlsReferers.set(new URL(elegido).hostname, embed); } catch {}

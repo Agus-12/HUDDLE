@@ -3159,3 +3159,23 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   en plena ventana de saturación).
 - NOTA despliegue: la reparación de Fundación es v329 — el usuario venía de
   v328; con v331 entra todo: desocultación + prioridad + fila visible.
+
+## v332 (24 Sep 2026) — resolver vimeos en CARRERA (diagnóstico de lentitud)
+- Usuario: 'Fundación tarda demasiado en resolver'. MEDICIONES (noche de
+  tormenta vimeos): play T1E1 = 46.5 s y falló con 14 nodos muertos;
+  embed vimeos responde en ~0.5 s y REPARTE NODO AL AZAR por petición
+  (4 peticiones → 4 nodos distintos); la ruta del video es EXCLUSIVA del
+  nodo que la firmó (404/TLS en otros nodos → no hay carreras entre nodos,
+  el failover ES re-pedir embed); ~2 nodos vivos de 9 esa hora.
+- CAUSA de la lentitud: 3 oleadas chicas (2-3 embeds) con esperas + cada
+  nodo muerto costaba 4.5 s directo + 12 s de RELAY (usuarios con relay
+  configurado pagaban ~16.5 s por nodo muerto).
+- v332: oleadas de 8 embeds EN PARALELO (8 nodos por oleada), verificación
+  directa durante la carrera (master 4 s, variante 3 s), relay SOLO en su
+  oleada propia y una vez por resolución (relayGastado). Peor caso ~40 s
+  (solo si el archivo mismo está caído); típico medido: 5.2-5.3 s en plena
+  tormenta (T2E6/T3E10 'desde bóveda' OK).
+- Nota: fast-path de bóveda NO borra códigos en fallo (verificado) — solo
+  cae al camino normal; autocuración real queda en re-cosecha semanal +
+  re-cosecha al reproducir (resolverCineCalidad re-guarda el code actual).
+  T1E1 de Fundación: archivo caído en vimeos esa hora (28 nodos, todos mal).
