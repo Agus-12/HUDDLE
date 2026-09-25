@@ -3544,3 +3544,22 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   alt/respaldo en ambas ramas de película. Series: cuevana resolver es
   movies-only (documentado); Fundacion no está en ninguna de las 10
   fuentes (Apple live-action) — su destino depende de s10 + perro guardián.
+
+## v353 (25 Sep 2026) — BODEGA CAÍDA ≠ MUERTE: la auditoría ya no condena opacos
+- Preguntas del usuario: ¿las bodegas caídas se autoreparan? ¿el respaldo
+  goodstream de Cuevana sirve también para series?
+- URGENTE encontrado en el código: la auditoría profunda condenaba (borraba +
+  ocultaba) tras 3 fallos CUALQUIERA — un timeout/403 por bodega caída
+  (s10/s14 AHORA) contaba como muerte → podía purgar títulos SANOS cuyo
+  único pecado era vivir en una bodega dormida (el canario en bodega sana
+  no lo frenaba). Lo mismo en la auditoría de series (v348) y el revividor
+  aceptaba 'podrido' como vida (truthy).
+- v353: cqEmbedSirve TRI-ESTADO: true = vivo; 'podrido' = página COMPLETA
+  (>30 KB; las sanas ~49 KB) SIN m3u8 = archivo borrado de verdad; false =
+  OPACO (red/403/timeout/racionado/m3u8 que no sirve video) = bodega caída.
+  · auditoría profunda: opaco → 'NO se juzga esta vuelta'; 'podrido' →
+    2 strikes (sospechosos) → alt-check → condena (como decía el aviso).
+  · auditoría de series: solo 'podrido' hace strike.
+  · revividor: solo true revive.
+  Si algo fue purgado en la ventana pre-v353: revive solo (revivir verifica
+  vivo + sonda cq nueva) y abrirlo jala code fresco de la API.
