@@ -3528,3 +3528,19 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   completos (Fundación 49754b con m3u8 viva vía vimeos.zip; Drácula
   49591b) — vimeos MUNDIALMENTE vivo; el problema del usuario sigue siendo
   bloqueo-a-su-datacenter + nodos inestables para su relay.
+
+## v352 (25 Sep 2026) — FASE 3: película cq sin remedio → CUEVANA automáticamente
+- Usuario ofreció key del Oracle (declinada: el server no debe dar credenciales
+  a nadie). Fundación «sigue sin jalar»: CENSO hecho desde el sandbox
+  (vimeos me desbloqueó) — 5 embeds de T2E6 → SIEMPRE srv=s10: directo
+  s10.vimeos.net = timeout, proxy p6.vimeos.zip = 403 con URL fresca.
+  Control Drácula (srv=s8): master 200 en 0.6 s. VEREDICTO: el ALMACÉN s10
+  de vimeos está caído/rechazando; todas las loterías caen en el mismo
+  origen. No es Huddle/relay/Oracle — se cura cuando vimeos lo repare.
+- v352: cqCuevanaFallback(titulo) — última fase de PELÍCULAS cq: busca el
+  título en CVM_CAT (catálogo de cuevana en memoria) y llama
+  resolverCuevanaMov (goodstream — hoster ajeno a vimeos; cosecha cv: en
+  bóveda → blindaje permanente). Negative cache 30 min. Enganchado tras
+  alt/respaldo en ambas ramas de película. Series: cuevana resolver es
+  movies-only (documentado); Fundacion no está en ninguna de las 10
+  fuentes (Apple live-action) — su destino depende de s10 + perro guardián.
