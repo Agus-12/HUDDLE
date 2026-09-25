@@ -3240,3 +3240,29 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - Sonda: la auditoría LIGERA de la bóveda (v334) cubre flv/dan/pxd
   automáticamente (cualquier embed no-cq). Canario anti-saturación activo
   ('ventana mala de vimeos — no se juzga nada' en el log de la prueba).
+
+## v336 (24 Sep 2026) — Canario de reproducción: fin del despinter eterno de vimeos
+- Reporte del usuario: Drácula 2025 (cq) y Fundación no reproducen — «solo
+  sale resolviendo el video y de repente me saca».
+- DIAGNÓSTICO (no es bug de la bóveda): la entrada cq:movie:1531928 está
+  SANA — la API de cq devolvió EL MISMO code (9a0haovfdhih) que la bóveda
+  ya guardaba. Lo que falla es vimeos.net (el host de los ARCHIVOS): el
+  canario de la sonda (Fundación, 06k16tgdfs1t) también caído + 'saturado'
+  ×2 en el log + sandbox sin conexión. Ventana mala de vimeos = todo lo cq
+  falla a la vez (código viejo, código fresco, respaldo cv-vimeos).
+- ANTES: al reproducir con vimeos caído → bóveda 3 oleadas+relay (~40 s) →
+  API cq → otras 3 oleadas (~40 s) → respaldo Cuevana (más oleadas)… 80-160 s
+  peleando; la app abandona a los ~20-30 s y saca al usuario de todas formas.
+- v336: resolverVimeos clasifica cada embed fallido ({sin:'red'|'video'}) y
+  consulta vimeosCanario() (mismo código Fundación, cacheado 60 s, con
+  variante por relay para el caso bloqueo-de-IP):
+  · canario caído → throw 'vimeos está saturado — reintenta en un minuto'
+    en SEGUNDOS (cadena cq completa ≈ 3-10 s) → la app recibe error rápido
+    y honesto; si hay copia goodstream en la bóveda de Cuevana,
+    bovedaRespaldo ahora sí llega a tiempo.
+  · canario vivo + todos cuerpo-sin-video → 'este código ya no existe en
+    vimeos' (archivo vencido, sin oleadas inútiles).
+  · canario vivo + fallos de red → oleadas 2-3 y relay como siempre
+    (nodos ocupados despiertan).
+- Verificado en vivo (:3959): '/api/solo' Drácula → **3 s** {ok:false,
+  'vimeos está saturado…'} con log canario CAÍDO + camino normal completo.

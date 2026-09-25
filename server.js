@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v335'; // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
+const UI_VERSION = 'v336'; // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -12031,6 +12031,28 @@ async function resolverGoodstream(embed, pageUrl) {
   return { m3u8, subs, proxy: true };
 }
 /* v90: vimeos — el HLS (720p) vive dentro de un eval(p,a,c,k,e,d) */
+/* v336: CANARIO DE REPRODUCCIÓN — el mismo código sabidamente vivo (Fundación)
+ * que usa la sonda de la bóveda. Si el canario TAMBIÉN falla, vimeos entero
+ * está caído/saturado: no tiene sentido oleada tras oleada. Cacheado 60 s. */
+let vimeosCanarioAt = 0, vimeosCanarioOk = false;
+async function vimeosCanario() {
+  if (Date.now() - vimeosCanarioAt < 60000) return vimeosCanarioOk;
+  try {
+    const em = await fetchTexto('https://vimeos.net/embed-06k16tgdfs1t.html', 'https://www.cinecalidad.am/');
+    const m3 = (String(desempacar(em) || '').match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
+    vimeosCanarioOk = !!m3;
+  } catch { vimeosCanarioOk = false; }
+  if (!vimeosCanarioOk && CDN_RELAY) { /* v336.1: ¿vimeos le bloquea la IP al servidor? canario por el relay de casa */
+    try {
+      const emR = await (await fetchRelay('https://vimeos.net/embed-06k16tgdfs1t.html', 15000)).text();
+      const m3R = (String(desempacar(emR) || '').match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
+      vimeosCanarioOk = !!m3R;
+    } catch {}
+  }
+  vimeosCanarioAt = Date.now();
+  console.log('[vimeos] canario de reproducción: ' + (vimeosCanarioOk ? 'vivo — el fallo es de este título' : 'CAÍDO — ventana mala de vimeos'));
+  return vimeosCanarioOk;
+}
 async function resolverVimeos(embed, pageUrl) {
   /* v315: los nodos de vimeos van Y VIENEN — hay nodos que sirven el
    * master.m3u8 y se ahogan en la VARIANTE (pantalla negra) o están ocupados
@@ -12082,28 +12104,38 @@ async function resolverVimeos(embed, pageUrl) {
       let em;
       try { em = await fetchTexto(embed, pageUrl); }
       catch (eDir) {
-        if (!CDN_RELAY) throw eDir;
+        if (!CDN_RELAY) return { sin: 'red' };
         console.log('[vimeos] embed directo falló (' + String(eDir.message || eDir).slice(0, 50) + ') — por relay');
-        em = await (await fetchRelay(embed, 15000)).text();
+        try { em = await (await fetchRelay(embed, 15000)).text(); } catch { return { sin: 'red' }; }
       }
       const out = desempacar(em);
       const m3u8 = out && (out.match(/https?:\/\/[^"'\s\\]+\.m3u8[^"'\s\\]*/i) || [])[0];
-      if (!m3u8) return null; /* cuerpo racionado o sin video */
+      if (!m3u8) return { sin: 'video' }; /* cuerpo racionado o sin video */
       const sirve = await m3u8Sirve(m3u8, permitirRelay);
-      if (!sirve) { console.log('[vimeos] nodo ' + (new URL(m3u8).hostname) + ' no contestó (master+variante) — probando otro'); return null; }
+      if (!sirve) { console.log('[vimeos] nodo ' + (new URL(m3u8).hostname) + ' no contestó (master+variante) — probando otro'); return { sin: 'red' }; }
       return m3u8;
-    } catch { return null; }
+    } catch { return { sin: 'red' }; }
   };
   /* v332: CARRERA DE EMBEDS — el embed es barato (~0.5 s) y reparte nodo
    * AL AZAR en cada petición (medido: 4 peticiones → 4 nodos distintos; la
    * ruta del video es exclusiva del nodo que la firmó). Nada de filas:
    * N embeds EN PARALELO = N nodos probados a la vez; el primero vivo gana.
    * Relay solo en su oleada propia (cuando la directa completa falla). */
-  const oleada = async (n, permitirRelay) => (await Promise.all(Array.from({ length: n }, (_, i) => pedirEmbed(i * 120, permitirRelay)))).filter(Boolean)[0];
-  let elegido = await oleada(8, false);
-  if (!elegido) { await espera(1200); elegido = await oleada(8, false); } /* los ocupados despiertan en segundos */
-  if (!elegido && CDN_RELAY) { await espera(800); elegido = await oleada(4, true); } /* ¿vimeos le bloquea la IP al servidor? el relay de casa */
-  if (!elegido) { await espera(2500); elegido = await oleada(8, false); }
+  /* v336: oleada con veredicto — si el canario también cae, fallar en segundos
+   * con mensaje honesto (antes: 3 oleadas + relay ≈ 40 s por intento, y la app
+   * ya le sacó al usuario; encadenado en cq eran 80+ s de nada). */
+  const oleada = async (n, permitirRelay) => await Promise.all(Array.from({ length: n }, (_, i) => pedirEmbed(i * 120, permitirRelay)));
+  let rs = await oleada(8, false);
+  let elegido = rs.find((r) => typeof r === 'string' && r) || null;
+  if (!elegido) {
+    const canarioVivo = await vimeosCanario();
+    const huboRed = rs.some((r) => r && r.sin === 'red');
+    if (!canarioVivo) throw new Error('vimeos está saturado en este momento — reintenta en un minuto'); /* ventana mala completa */
+    if (!huboRed) throw new Error('este código ya no existe en vimeos'); /* todos dieron cuerpo sin video y el canario vivo = archivo vencido */
+  }
+  if (!elegido) { await espera(1200); rs = await oleada(8, false); elegido = rs.find((r) => typeof r === 'string' && r) || null; } /* los ocupados despiertan en segundos */
+  if (!elegido && CDN_RELAY) { await espera(800); rs = await oleada(4, true); elegido = rs.find((r) => typeof r === 'string' && r) || null; } /* ¿vimeos le bloquea la IP al servidor? el relay de casa */
+  if (!elegido) { await espera(2500); rs = await oleada(8, false); elegido = rs.find((r) => typeof r === 'string' && r) || null; }
   if (!elegido) throw new Error('vimeos está saturado en este momento — reintenta en un minuto');
   /* los segmentos piden el Referer del embed: lo recordamos */
   try { hlsReferers.set(new URL(elegido).hostname, embed); } catch {}
