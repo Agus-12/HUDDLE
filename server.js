@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v333'; // v333: BÓVEDA AUTO-RELLENABLE EN TODAS LAS FUENTES — cola discreta de capítulos (1 por ciclo, rotando lat/enn/d23/misc/lct)
+const UI_VERSION = 'v334'; // v334: AVAL DE LA BÓVEDA EN TODAS LAS SONDAS — las fuentes solo cazan lo nuevo; la sonda de la bóveda audita y delibera todo lo guardado
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -483,6 +483,7 @@ function laFallosRegistrar(slug) {
   if (Date.now() - (e.last || 0) < 10 * 60 * 1000) return; /* la misma ráfaga no cuenta como fallos nuevos */
   e.f = (e.f || 0) + 1;
   e.last = Date.now();
+  if (e.f >= 3 && !LA_MUERTAS_SET.has(slug) && bovedaTiene('lat', slug)) { console.log('[podredumbre] la: ' + slug + ' tiene capítulos en bóveda — no se oculta'); LA_FALLOS.set(slug, e); return; } /* v334 */
   if (e.f >= 3 && !LA_MUERTAS_SET.has(slug)) {
     e.h = Date.now();
     LA_MUERTAS_SET.add(slug);
@@ -699,6 +700,7 @@ async function sondaCuevana() {
     /* Frente NUEVAS: sitemap no vistas */
     const desconocidas = shuffle(sitemap.filter(s => !CVM_VISTAS.has(s) && !CVM_OCULTAS.has(s))).slice(0, 15);
     for (const slug of desconocidas) {
+      if (BOVEDA.has('cv:' + slug)) { CVM_VISTAS.add(slug); nuevas_ok++; continue; } /* v334: avalada por la bóveda */
       const r = await verificarCuevana(slug);
       CVM_VISTAS.add(slug);
       if (r.ok) nuevas_ok++;
@@ -707,6 +709,7 @@ async function sondaCuevana() {
     /* Frente VIVAS: muestra de activas */
     const vivas = shuffle(sitemap.filter(s => !CVM_OCULTAS.has(s))).slice(0, 15);
     for (const slug of vivas) {
+      if (BOVEDA.has('cv:' + slug)) continue; /* v334: avalada — no se re-chequea */
       const r = await verificarCuevana(slug);
       if (!r.ok) { CVM_OCULTAS.add(slug); vivas_muertas++; sondaNotify("Cuevana", "muerto", slug, slug + " murio — sin servidores"); }
     }
@@ -1108,7 +1111,7 @@ async function barridoLista(fuente) {
 }
 function barridoOcultar(fuente, slug) {
   if (fuente === 'pelisxd') { if (!PXD_OCULTAS.has(slug)) { PXD_OCULTAS.add(slug); ocultasReescribir(PXD_OCULTAS, 'pxd-ocultas.txt'); pxdOcultar(slug); sondaNotify('PelisXD', 'muerto', slug, slug + ' murió — barrido completo'); } }
-  else if (fuente === 'cuevana') { if (!CVM_OCULTAS.has(slug)) { CVM_OCULTAS.add(slug); ocultasReescribir(CVM_OCULTAS, 'cuevana-ocultas.txt'); sondaNotify('Cuevana', 'muerto', slug, slug + ' murió — barrido completo'); } }
+  else if (fuente === 'cuevana') { if (BOVEDA.has('cv:' + slug)) { console.log('[barrido] cuevana ' + slug + ' está en bóveda — no se oculta'); } else if (!CVM_OCULTAS.has(slug)) { CVM_OCULTAS.add(slug); ocultasReescribir(CVM_OCULTAS, 'cuevana-ocultas.txt'); sondaNotify('Cuevana', 'muerto', slug, slug + ' murió — barrido completo'); } } /* v334 */
   else if (fuente === 'cinecalidad') { if (BOVEDA.has('cq:' + slug)) { console.log('[barrido] cc ' + slug + ' está en bóveda — no se oculta'); } else if (!CC_OCULTAS.has(slug)) { CC_OCULTAS.add(slug); ocultasReescribir(CC_OCULTAS, 'cc-ocultas.txt'); sondaNotify('CineCalidad', 'muerto', slug, slug + ' murió — barrido completo'); } } /* v330 */
   else if (fuente === 'latanime') laFallosRegistrar(slug); /* 3 fallos espaciados la ocultan, igual que con usuarios */
   else if (fuente === 'animeflv') { if (!AF_OCULTAS.has(slug)) { AF_OCULTAS.add(slug); ocultasReescribir(AF_OCULTAS, 'af-ocultas.txt'); sondaNotify('AnimeFLV', 'muerto', slug, slug + ' murió — barrido completo'); } }
@@ -1539,6 +1542,7 @@ function lctPerdonar(slug) { falloPerdonar(FALLOS_LCT, 'fallos-lct.json', slug);
 function cariPerdonar(slug) { falloPerdonar(FALLOS_CARI, 'fallos-cari.json', slug); }
 function d23Ocultar(slug){
   falloRegistrar(FALLOS_D23,'fallos-d23.json',slug,(k2)=>{
+    if(bovedaTiene('d23',k2)){ console.log('[podredumbre] d23: '+k2+' tiene capítulos en bóveda — no se oculta'); return; } /* v334 */
     if(D23_OCULTAS.has(k2)) return;
     D23_OCULTAS.add(k2); ocultasReescribir(D23_OCULTAS,'d23-ocultas.txt');
     console.log('[podredumbre] d23: '+k2+' ocultada tras 3 fallos');
@@ -3118,7 +3122,7 @@ async function sondaEnnovelas(){
   try{
     const todos=await ennCatalogo(true), visibles=await ennCatalogo();ENN_SONDA.total=todos.length;ENN_SONDA.visibles=visibles.length;ENN_SONDA.ocultas=ENN_OCULTAS.size;ENN_SONDA.auditadas=ENN_VISTAS.size;
     const ocultas=todos.filter(x=>ENN_OCULTAS.has(x.slug)), nuevas=todos.filter(x=>!ENN_VISTAS.has(x.slug)&&!ENN_OCULTAS.has(x.slug));const picks=[];const add=(a,n)=>{for(let i=0;i<Math.min(n,a.length);i++){const x=a[(ENN_SONDA.revisadas+i)%a.length];if(x&&!picks.some(y=>y.slug===x.slug))picks.push(x);}};add(visibles,3);add(ocultas,2);add(nuevas,2);
-    for(const x of picks){ENN_SONDA.revisadas++;const p=await ennProbePlayable(x.slug);if(p.ok){const wasHidden=ENN_OCULTAS.has(x.slug),wasNew=!ENN_VISTAS.has(x.slug);ennPerdonar(x.slug);if(wasHidden)ENN_SONDA.revividas++;if(wasNew&&!wasHidden)sondaNotify('Ennovelas','ok',x.slug,x.slug+' confirmado y agregado al catálogo');}else if(ENN_VISTAS.has(x.slug)){const antes=ENN_OCULTAS.has(x.slug);ennFallo(x.slug,p.error);if(!antes&&ENN_OCULTAS.has(x.slug))ENN_SONDA.caidas++;}await new Promise(r=>setTimeout(r,500));}
+    for(const x of picks){ENN_SONDA.revisadas++;const p=await ennProbePlayable(x.slug);if(p.ok){const wasHidden=ENN_OCULTAS.has(x.slug),wasNew=!ENN_VISTAS.has(x.slug);ennPerdonar(x.slug);if(wasHidden)ENN_SONDA.revividas++;if(wasNew&&!wasHidden)sondaNotify('Ennovelas','ok',x.slug,x.slug+' confirmado y agregado al catálogo');}else if(ENN_VISTAS.has(x.slug)&&!bovedaTiene('enn',x.slug)){const antes=ENN_OCULTAS.has(x.slug);ennFallo(x.slug,p.error);if(!antes&&ENN_OCULTAS.has(x.slug))ENN_SONDA.caidas++;}else if(ENN_VISTAS.has(x.slug)){console.log('[sonda] enn: '+x.slug+' tiene capítulos en bóveda — no se juzga');} /* v334 */await new Promise(r=>setTimeout(r,500));}
     ENN_SONDA.episodiosOcultos=ENN_EPS_OCULTOS.size;const epMuerto=[...ENN_EPS_OCULTOS][ENN_SONDA.revisadas%Math.max(1,ENN_EPS_OCULTOS.size)];if(epMuerto&&await ennProbeEpisodeUrl(epMuerto)&&ennPerdonarEp(epMuerto))ENN_SONDA.episodiosRevividos++;
     ENN_SONDA.visibles=ENN_VISTAS.size;ENN_SONDA.auditadas=ENN_VISTAS.size;ENN_SONDA.ocultas=ENN_OCULTAS.size;ENN_SONDA.episodiosOcultos=ENN_EPS_OCULTOS.size;ENN_SONDA.ultima=new Date().toISOString();ENN_SONDA.estado='vivo';ENN_STATS.total=ENN_SONDA.total;ENN_STATS.vistas=ENN_SONDA.auditadas;ENN_STATS.ocultas=ENN_SONDA.ocultas;console.log('[sonda] ennovelas: '+ENN_SONDA.visibles+' visibles / '+ENN_SONDA.ocultas+' ocultas; revisadas='+ENN_SONDA.revisadas);
   }catch(e){ENN_SONDA.estado='error';ENN_SONDA.error=String(e?.message||e).slice(0,160);console.warn('[sonda] ennovelas error',ENN_SONDA.error);}
@@ -9568,7 +9572,21 @@ async function bovedaAutoCuevana() {
  * muestrea títulos guardados y les pasa la verificación PROFUNDA de video.
  * OK → avalado. Podrido (confirmado 2×) → fuera de la bóveda y oculto del
  * catálogo con aviso. Nunca juzga en racha: el doble chequeo es obligatorio. */
-const BOVEDA_AUDIT = { revisados: new Set(), ok: 0, podridos: 0 };
+const BOVEDA_AUDIT = { revisados: new Set(), ok: 0, podridos: 0, sospechosos: new Map() };
+/* v334: AVAL DE LA BÓVEDA para TODAS las sondas — la clave contiene al slug
+ * (lat:…/ver/<serie>-episodio-N, d23:…/capitulo/<serie>-ep-N, enn:…/<serie>-capitulo-N,
+ * lct:<capId>) o el guardado trae serieSlug (misc). Si hay aval, la sonda de
+ * la fuente NO oculta ni re-chequea: deliberar lo guardado es de la bóveda. */
+function bovedaTiene(f, slug) {
+  if (!slug) return false;
+  const pre = f + ':';
+  for (const [k, v] of BOVEDA) {
+    if (!k.startsWith(pre)) continue;
+    if (k.includes(slug)) return true;
+    if (v && v.serieSlug === slug) return true;
+  }
+  return false;
+}
 async function sondaBoveda() {
   try {
     const memMB = process.memoryUsage().heapUsed / 1048576;
@@ -9598,6 +9616,31 @@ async function sondaBoveda() {
       sondaNotify('Bóveda', 'muerto', v.t || idNum, (v.t || idNum) + ' — video borrado del CDN, confirmado 2× — fuera de la bóveda');
       console.log('[boveda-sonda] ' + (v.t || k) + ' — código podrido confirmado: fuera de bóveda y oculto');
       bovedaGuardar();
+    }
+    /* v334: AUDITORÍA LIGERA de las demás fuentes — el embed responde = vivo;
+     * sospechoso 2 auditorías = fuera de la bóveda (solo se limpia la bóveda:
+     * ocultar del catálogo sigue siendo decisión de la sonda de cada fuente) */
+    for (let muestraL = 0; muestraL < 3; muestraL++) {
+      let par = null;
+      for (const [k, v] of BOVEDA) {
+        if (/^(cq:|_meta)/.test(k) || BOVEDA_AUDIT.revisados.has(k) || !Array.isArray(v.embeds) || !v.embeds.length) continue;
+        par = [k, v]; break;
+      }
+      if (!par) break;
+      const [k, v] = par;
+      let vivo = false;
+      for (let i = 0; i < 2 && !vivo; i++) {
+        try { const rL = await fetchSeguro(v.embeds[0], 10000); vivo = !!(rL && (rL.ok || rL.status === 206)); if (!vivo && rL && rL.body) { try { await rL.body.cancel(); } catch {} } } catch {}
+        if (!vivo && i === 0) await new Promise((r3) => setTimeout(r3, 1500));
+      }
+      if (vivo) { BOVEDA_AUDIT.revisados.add(k); BOVEDA_AUDIT.ok++; BOVEDA_AUDIT.sospechosos.delete(k); continue; }
+      const sOs = (BOVEDA_AUDIT.sospechosos.get(k) || 0) + 1;
+      BOVEDA_AUDIT.sospechosos.set(k, sOs);
+      if (sOs >= 2) {
+        BOVEDA.delete(k); BOVEDA_AUDIT.revisados.add(k); BOVEDA_AUDIT.podridos++; BOVEDA_AUDIT.sospechosos.delete(k); bovedaGuardar();
+        sondaNotify('Bóveda', 'muerto', v.serie || v.t || k, (v.serie || v.t || k) + ' — embed muerto confirmado 2× — limpiado de la bóveda');
+        console.log('[boveda-sonda] limpiado (embed muerto 2×): ' + k.slice(0, 70));
+      } else console.log('[boveda-sonda] embed no respondió (1ª vez): ' + k.slice(0, 70));
     }
   } catch (e) { console.log('[boveda-sonda] ' + String(e.message || e).slice(0, 60)); }
 }
@@ -9639,7 +9682,7 @@ async function bovedaAutoCaps() {
         else if (f === 'misc') { const r = await fetchSeguro(CARI_BASE + serie + '/', 12000).catch(() => null); if (!r || !r.ok) { e.si++; return; } const hh = await r.text().catch(() => ''); titulo = ((/<h1[^>]*>([^<]+)<\/h1>/i.exec(hh) || [])[1] || serie).trim(); poster = ((/og:image" content="([^"]+)"/i.exec(hh) || [])[1] || ''); e.eps = [...new Set([...hh.matchAll(/href="(https:\/\/miscaricaturas\.com\/[a-z0-9-]*capitulo[a-z0-9-]*\/)"/g)].map((m) => m[1]))].slice(0, 60); }
         else if (f === 'lct') { const d = await datosCaricatura(serie).catch(() => null); if (!d) { e.si++; return; } titulo = d.titulo || ''; poster = d.poster || ''; e.eps = (d.episodios || []).map((x) => x.url).filter(Boolean); }
       } catch { e.si++; return; }
-      e.titulo = titulo; e.poster = poster; /* v333.2 */
+      e.titulo = titulo; e.poster = poster; e.serieSlug = serie; /* v334: para el aval de las sondas */
       e.ei = 0;
     }
     /* ── cosechar UN capítulo (el siguiente que no esté en bóveda) ── */
@@ -9655,7 +9698,7 @@ async function bovedaAutoCaps() {
         else if (f === 'misc') { const r1 = await fetchSeguro(epUrl, 12000).catch(() => null); if (!r1 || !r1.ok) break; const hh = await r1.text().catch(() => ''); const idm = (/anchor-data-container" data-id="(\d+)"/i.exec(hh) || [])[1]; if (!idm) break; const r2 = await fetch(CARI_BASE + 'wp-admin/admin-ajax.php', { method: 'POST', headers: { 'User-Agent': MIRROR_UA, Referer: epUrl, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'action=get_system_data&target_id=' + idm }).catch(() => null); const j2 = r2 && r2.ok ? await r2.json().catch(() => null) : null; const im = j2 && j2.success && j2.data && j2.data.html ? /<iframe[^>]*src="(https?:\/\/[^"]+)"/i.exec(j2.data.html) : null; if (im) embeds = [im[1]]; }
         else if (f === 'lct') { const r = await fetchSeguro(epUrl, 12000).catch(() => null); if (!r || !r.ok) break; const hh = await r.text().catch(() => ''); const mOk = /ok\.ru\/videoembed\/(\d+)/i.exec(hh); const idR = /cubeembed\.rpmvid\.com\/#([a-z0-9]+)/i.exec(hh); if (mOk) embeds.push('https://ok.ru/videoembed/' + mOk[1]); if (idR) embeds.push('https://cubeembed.rpmvid.com/#' + idR[1]); }
       } catch {}
-      if (embeds.length) { bovedaPon(clave, { serie: titulo || '', poster: poster || '', embeds }); console.log('[boveda-caps] ' + f + ': +' + (titulo || epUrl.slice(-40)) + ' (' + embeds.length + ' embeds)'); }
+      if (embeds.length) { bovedaPon(clave, { serie: titulo || '', poster: poster || '', serieSlug: e.serieSlug || '', embeds }); console.log('[boveda-caps] ' + f + ': +' + (titulo || epUrl.slice(-40)) + ' (' + embeds.length + ' embeds)'); }
       return; /* UN capítulo por ciclo — discreto */
     }
     e.si++; e.eps = []; /* serie agotada → siguiente */
@@ -9839,6 +9882,7 @@ async function sondaCineCalidad() {
     const desconocidas = shuffle(sitemap.filter((s) => { const id = s.split('|')[0]; return !CC_VISTAS.has(id) && !CC_OCULTAS.has(id); })).slice(0, 10);
     for (const entry of desconocidas) {
       const id = entry.split('|')[0];
+      if (BOVEDA.has('cq:' + id)) { CC_VISTAS.add(id); nuevas_ok++; continue; } /* v334: ya está en bóveda — avalada, sin sondeo */
       const r = await verificarCC(id);
       CC_VISTAS.add(id);
       const vive = await viveDeVerdad(r);
@@ -10077,7 +10121,8 @@ async function sondaMisc() {
     try {
       CARI_VISTAS.add('cari:' + slug);
       if (await cariProbe(slug)) cariPerdonar(slug);
-      else { const era = CARI_MUERTAS.has(slug); cariOcultar(slug); if (!era && CARI_MUERTAS.has(slug)) { vm++; sondaNotify('MisCaricaturas', 'muerto', slug, slug + ' murio — sin capitulos'); } }
+      else if (bovedaTiene('misc', slug)) { console.log('[sonda] misc: ' + slug + ' tiene capítulos en bóveda — no se oculta'); }
+      else { const era = CARI_MUERTAS.has(slug); cariOcultar(slug); if (!era && CARI_MUERTAS.has(slug)) { vm++; sondaNotify('MisCaricaturas', 'muerto', slug, slug + ' murio — sin capitulos'); } } /* v334 */
     } catch {}
     await pausa();
   }

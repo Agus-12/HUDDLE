@@ -3198,3 +3198,21 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - Verificado en vivo: lat '+Uta no Prince-sama (3 embeds)' ×2 con póster,
   enn '+Por ella soy Eva' ×2; Latanime 3→5, Ennovelas 10→12 en minutos.
   AnimeFLV/Danimados siguen con-uso (sin catálogo en memoria); PelisXD fuera.
+
+## v334 (24 Sep 2026) — AVAL DE LA BÓVEDA EN TODAS LAS SONDAS (pregunta del usuario)
+- El usuario auditó: '¿las sondas de fuente solo revisan nuevas y omiten las
+  de bóveda? ¿y solo la sonda bóveda revisa todas y delibera?'. Respuesta
+  honesta: v330 solo cubría CineCalidad — v334 generaliza el principio:
+- bovedaTiene(fuente, slug): la clave de bóveda contiene al slug de la serie
+  (lat:…/ver/<serie>-episodio-N · d23:…/capitulo/<serie>-ep-N · enn:…/<serie>-capitulo-N
+  · lct:<capId>) o el guardado trae serieSlug (misc — añadido en auto-caps).
+- GUARDS añadidos: cc NUEVAS marca vistas sin sondear avaladas (7591 pelis en
+  bóveda dejaron de gastar sondeos) · Cuevana NUEVAS/VIVAS saltan avaladas +
+  barrido respeta · sondaEnnovelas no condena (ennFallo) series con capítulos
+  avalados · d23Ocultar bloqueado con aval · laFallosRegistrar no oculta
+  series avaladas (3 fallos) · sondaMisc no oculta series avaladas.
+- SONDA DE LA BÓVEDA ahora audita TODO: cq movies (profunda ×3 + canario) y
+  3 embeds por ciclo del resto (LIGERA: el embed responde = vivo; 2
+  auditorías fallidas = limpiado SOLO de la bóveda — ocultar del catálogo
+  sigue siendo de la sonda de cada fuente). Verificado: auditoría 3→6 vistos,
+  0 condenados, auto-caps con serieSlug activo.
