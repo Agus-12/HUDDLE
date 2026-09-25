@@ -3216,3 +3216,27 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   auditorías fallidas = limpiado SOLO de la bóveda — ocultar del catálogo
   sigue siendo de la sonda de cada fuente). Verificado: auditoría 3→6 vistos,
   0 condenados, auto-caps con serieSlug activo.
+
+## v335 (24 Sep 2026) — PelisXD con bóveda + AnimeFLV y Danimados auto + misc arreglado
+- Reporte del usuario: lat ok; d23/misc no descargaban; pxd sin bóveda; faltan
+  dan y flv.
+- MISC arreglado: sus episodios NO son anchors (JS) — ahora usa
+  datosCaricatura(slug) (el extractor de la app). Verificado: +Sabrina T3.
+- D23: funcionaba pero el sitio lo desafía ('ficha sin enlaces (challenge?)'
+  ahora visible; avanza de serie cada tick y entra cuando ceda el challenge).
+- PELISXD con BÓVEDA: los v_source (embeds base64) salen con 1 GET de la
+  página — extraerStreamwishPeli los cosecha en cada resolución
+  (pxd:{slug} {t limpio, embeds≤3}) y ACEPTA preEmbeds: replay = extrae
+  del embed directo SIN abrir pelisxd (byse/dood son fetch planos).
+  Fast-path en resolverPelisxd con caída al camino normal. Verificado
+  harvest ('-me-heriste' 1 embed) + título limpio.
+- ANIMEFLV auto: catálogo del sitemap (7 205; muestra 600) → ficha /anime/ →
+  /ver/<slug>-N → data-encrypt → POST /flv → embeds (mp4upload primero).
+  600 series en cola verificadas.
+- DANIMADOS auto: catálogo DANI_CAT en memoria; sondeo secuencial
+  /episodios/<slug>-TxN/ (2 misses = siguiente temporada; T>12 = siguiente
+  serie) → data-post → doo_player_ajax nume 1..3 → embeds (no-vimeus).
+  Verificado probe: 200 + data-post.
+- Sonda: la auditoría LIGERA de la bóveda (v334) cubre flv/dan/pxd
+  automáticamente (cualquier embed no-cq). Canario anti-saturación activo
+  ('ventana mala de vimeos — no se juzga nada' en el log de la prueba).
