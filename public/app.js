@@ -3677,10 +3677,8 @@ function montarSolo(d, viaProxy) {
     const v = $('#soloVideo');
     if (v.readyState === 0 && !v.paused && SOLO.res) {
       SOLO.reintentos = (SOLO.reintentos || 0) + 1;
-      if (SOLO.reintentos <= 2) {
-        toast('Reconectando… (' + SOLO.reintentos + ' de 2)');
-        montarSolo(SOLO.res, true);
-      } else { toast('Se cortó el video — vuelve a abrirlo'); cerrarSolo(); }
+      if (SOLO.reintentos <= 2) { toast('Sin video — pidiendo OTRO nodo (' + SOLO.reintentos + ' de 2)…'); reResolverSolo(true); } /* v345: lotería nueva (el mismo m3u8 en nodo muerto es negro para siempre, v332) */
+      else if (!SOLO.wdAvisado) { SOLO.wdAvisado = true; toast('Sigue sin video — toca Recargar video o vuelve a entrar'); } /* v345: el player JAMÁS se cierra solo (v319) */
     }
   }, 25000);
   /* v337: perro guardián de PROGRESO — la «pantalla negra» (nodo que sirve
@@ -3715,7 +3713,7 @@ function montarSolo(d, viaProxy) {
        * sin hls.js; el proxy ya manda el Referer por nosotros */
       video.src = src;
       video.addEventListener('error', () => {
-        if (SOLO && !SOLO.cerrado) { toast('Se cortó el video — vuelve a abrirlo'); cerrarSolo(); }
+        if (SOLO && !SOLO.cerrado) toast('Se cortó el mp4 — toca Recargar video o vuelve a entrar'); /* v345: sin cierre */
       }, { once: true });
     } else if (hlsOk) {
       const hls = new window.Hls(cfgHls(src));
@@ -3783,8 +3781,7 @@ function montarSolo(d, viaProxy) {
             }
             return;
           }
-          toast('Se cortó el video — vuelve a abrirlo');
-          cerrarSolo();
+          if (!SOLO.wdAvisado) { SOLO.wdAvisado = true; toast('Ruta agotada — toca Recargar video o vuelve a entrar'); } /* v345: sin cierre (v319) */
           return;
         }
         {
@@ -3798,7 +3795,7 @@ function montarSolo(d, viaProxy) {
               setTimeout(() => {
                 if (SOLO && !SOLO.cerrado && SOLO.res) montarSolo(SOLO.res, true);
               }, 2500);
-            } else { toast('Se cortó el video — vuelve a abrirlo'); cerrarSolo(); }
+            } else if (!SOLO.wdAvisado) { SOLO.wdAvisado = true; toast('Sigue sin video — toca Recargar video o vuelve a entrar'); } /* v345: sin cierre */
           }
         }
       });

@@ -3417,3 +3417,21 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - Esperado en Oracle: reproducciones cq salen por relay ('SALVADO por el
   relay de casa'), verificaciones dirigidas pasan (vivo), notificaciones
   'NO responde' desaparecen. SEGUNDO ENLACE sigue como segunda pata.
+
+## v345 (25 Sep 2026) — Drácula vuela (relay OK); el player JAMÁS se cierra + cadena corta
+- Usuario: Drácula 'entra casi al instante' (relay de casa + v344 CONFIRMADOS
+  en producción). Fundación: 'tarda mucho' y 'Se cortó el video — vuelve a
+  intentar' (el player CERRÁNDOSE).
+- HALLAZGOS: (1) el perro viejo de readyState (v83) tras 2 re-montajes del
+  MISMO m3u8 (inútil en nodo muerto, v332) hacía cerrarSolo() — violación
+  v319; había 4 caminos que cerraban (perro, error mp4, hls rutas agotadas,
+  hls genérico). (2) la cadena seguía teniendo una 3ª oleada directa ×8
+  DESPUÉS del relay → 60+ s extra cuando vimeos bloquea datacenters.
+- v345 server: fuera la 3ª oleada — orden final: directa → directa →
+  [canario → relay si muerto] → oleada 2 → RELAY (último, log SALVADO) →
+  veredicto. Fundacion T2E6 'tarda mucho' = cadena larga + probable code
+  podrido (las SERIES cq no tienen segundo enlace aún, v342 es solo pelis).
+- v345 app.js: los 4 caminos sin cerrarSolo: perro viejo → reResolverSolo
+  (lotería NUEVA) ×2 → toast keep-open; mp4 → toast; hls rutas → toast
+  keep-open (wdAvisado). Recargar video siempre disponible.
+- Verificado: 0 'Se cortó el video — vuelve a abrirlo' en app.js, boot OK.
