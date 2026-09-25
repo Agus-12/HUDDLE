@@ -3906,7 +3906,7 @@ async function reResolverSolo(auto) {
   SOLO.reResolviendo = true;
   try {
     if (!auto) toast('Cambiando de nodo…');
-    let r = await fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(SOLO.url), { cache: 'no-store' });
+    let r = await fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(SOLO.url) + '&fresco=1', { cache: 'no-store' });
     let d = await r.json();
     if (r.status === 403 && d && (d.healable || /Perfil no v/.test(d.error || ''))) { /* token curado tras restart */
       try {
@@ -3915,7 +3915,7 @@ async function reResolverSolo(auto) {
         if (hd && hd.ok && hd.token) {
           S.profile.token = hd.token;
           try { localStorage.setItem('rr-profile', JSON.stringify(S.profile)); } catch {}
-          r = await fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(SOLO.url), { cache: 'no-store' });
+          r = await fetch('/api/solo?name=' + encodeURIComponent(S.profile.name) + '&tok=' + encodeURIComponent(S.profile.token) + '&url=' + encodeURIComponent(SOLO.url) + '&fresco=1', { cache: 'no-store' });
           d = await r.json();
         }
       } catch {}

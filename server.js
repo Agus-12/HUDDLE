@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v337'; // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
+const UI_VERSION = 'v338'; // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -3344,6 +3344,20 @@ async function ponerDaniNativo(room, urlEp, userId) {
   return true;
 }
 
+/* v338: TRÁNSITO DE RESOLUCIONES — cache de resultado (mismo título = misma
+ * m3u8 fresca por 2 min, la promise EN VUELO se comparte entre espectadores
+ * simultáneos) + semáforo (máx 4 carreras completas en paralelo contra
+ * vimeos: 20 espectadores jamás = 20 oleadas — el 'saturado' no puede ser
+ * autoinfligido). 'fresco=1' (perro guardián/botón Recargar) se salta la
+ * cache: nueva lotería de nodos para ese espectador. */
+const SOLO_RES_CACHE = new Map();
+const RES_SEMAFORO = { n: 0, cola: [] };
+async function conRazaRes(fn) {
+  if (RES_SEMAFORO.n >= 4) await new Promise((libre) => RES_SEMAFORO.cola.push(libre));
+  RES_SEMAFORO.n++;
+  try { return await fn(); }
+  finally { RES_SEMAFORO.n--; const sig = RES_SEMAFORO.cola.shift(); if (sig) sig(); }
+}
 async function resolverNativoInterno(url) {
   /* v219: el catálogo vivo de Movie entrega su playlist YA por nuestro proxy
      (/api/movie/v-vid?url=…): se reproduce nativo, tal cual, sin resolver nada */
@@ -14150,9 +14164,24 @@ async function estrenosMezclados(){
       try {
         /* v295: la cadena de resolución vive en resolverPagina() (la misma que
            usa la verificación dirigida tras un fallo) */
+        /* v338: cache compartida + semáforo — ver TRÁNSITO DE RESOLUCIONES.
+           epsPerdonar/epsFallo corren UNA vez por carrera, no por espectador. */
+        const cS = url.searchParams.get('fresco') === '1' ? null : SOLO_RES_CACHE.get(target);
+        if (cS && Date.now() - cS.at < (cS.err ? 15000 : 120000)) {
+          if (cS.err) throw new Error(cS.err); /* cache negativa: mismo veredicto, cero tormenta de reintentos */
+          if (cS.promesa) { const rP = await cS.promesa; const oP = { ok: true, m3u8: rP.m3u8, subs: rP.subs, mp4: !!rP.mp4, proxy: !!rP.proxy }; if (healedToken) oP.newToken = healedToken; return json(res, 200, oP); }
+          const oC = { ok: true, m3u8: cS.r.m3u8, subs: cS.r.subs, mp4: !!cS.r.mp4, proxy: !!cS.r.proxy }; if (healedToken) oC.newToken = healedToken; return json(res, 200, oC);
+        }
         let r;
-        try { r = await resolverPagina(target); epsPerdonar(target); } /* v205.5 + v206 + v206.2 + v207 + v235 + v286 d23 */
-        catch (e2r) { epsFallo(target); throw e2r; } /* v205.5: episodios muertos al contador */
+        const promesaRes = conRazaRes(async () => {
+          try { const rr = await resolverPagina(target); epsPerdonar(target); return rr; } /* v205.5 + v206 + v206.2 + v207 + v235 + v286 d23 */
+          catch (e2r) { epsFallo(target); throw e2r; } /* v205.5: episodios muertos al contador */
+        });
+        SOLO_RES_CACHE.set(target, { promesa: promesaRes, at: Date.now() });
+        try { r = await promesaRes; }
+        catch (e2r) { SOLO_RES_CACHE.set(target, { err: String(e2r.message || e2r).slice(0, 140), at: Date.now() }); throw e2r; }
+        SOLO_RES_CACHE.set(target, { r, at: Date.now() });
+        if (SOLO_RES_CACHE.size > 300) for (const [k2, v2] of [...SOLO_RES_CACHE.entries()].sort((a, b) => a[1].at - b[1].at).slice(0, 100)) SOLO_RES_CACHE.delete(k2);
         const out2 = { ok: true, m3u8: r.m3u8, subs: r.subs, mp4: !!r.mp4, proxy: !!r.proxy };
         if (healedToken) out2.newToken = healedToken;
         return json(res, 200, out2);

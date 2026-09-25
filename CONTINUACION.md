@@ -3290,3 +3290,25 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   reResolverSolo: /api/solo con heal-de-token 403; jamás cerrarSolo.
 - Verificado :3958: botón servido en /, reResolverSolo en app.js, Drácula
   fast-fail 4 s con canario doble en log. Sintaxis node --check OK (server+app).
+
+## v338 (24 Sep 2026) — Tránsito de resoluciones: 3, 5 o 20 espectadores NO son una estampida
+- Pregunta del usuario: «¿esto no pasará con ninguna otra? ¿si veo 3, 5 o 20
+  de CineCalidad qué pasaría?» → análisis de concurrencia.
+- RIESGO real pre-v338: cada /api/solo = carrera completa (oleada de 8 embeds
+  + master+variante c/u ≈ ~24 peticiones a vimeos). 20 espectadores
+  simultáneos ≈ 480 peticiones → vimeos puede rate-limitar la IP del Oracle →
+  'saturado' AUTOINFLIGIDO para todos.
+- v338 (server): SOLO_RES_CACHE (Map target→{promesa|r|err, at}) + conRazaRes
+  (semáforo máx 4 carreras paralelas, cola FIFO):
+  · mismos título simultáneos → comparten la promise EN VUELO (1 carrera).
+  · joiners hasta 2 min → misma m3u8 fresca (result cache 120 s).
+  · fallo → cache negativa 15 s (mismo veredicto instantáneo, cero re-tormenta).
+  · epsPerdonar/epsFallo UNA vez por carrera (no 20 castigos por 1 fallo).
+  · 'fresco=1' → se salta caches (nueva lotería de nodos); lo usan el perro
+    guardián y el botón Recargar (app.js, ambos fetches).
+- MEDIDO (:3957, vimeos bloqueado al sandbox — perfecto para la prueba):
+  4 espectadores simultáneos → 1 sola carrera ([cq] embed falló ×1), 4
+  respuestas idénticas ~3.2 s; 5º a 1 s → 12 ms (cache negativa); fresco=1
+  → carrera nueva (total 2). node --check OK.
+- Techo práctico restante: ancho de banda del Oracle (~4-6 Mbps por stream
+  proxy → 20 ≈ 80-120 Mbps); el diseño no es el límite.
