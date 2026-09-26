@@ -3676,3 +3676,23 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - En el Oracle: drop-in systemd LimitNOFILE=24576 (sube el techo por si
   acaso) + diagnosticar: ls /proc/$(MainPID)/fd | wc -l antes/después.
 - VERIFICAR con el usuario: count de fds durante congelada = confirmación.
+
+## v356.2 (26 Sep 2026) — escrituras async: la cura del cuelgue masivo
+- Evidencia de las 3 congeladas (01:40/01:46/01:52, resucitadas por el
+  watchdog): TODAS murieron en el mismo punto del arranque — justo tras
+  '[catCv] movies: 7591 títulos cacheados' (arranque+60-80 s). El
+  writeFileSync multi-MB de cuevana-cat.json (throttle 5 s, línea ~762)
+  sincrónico sobre un volumen atascado = loop congelado indefinido,
+  con 10 GiB libres (free -h descartó memoria; fds descartados: techo
+  ya era 524288).
+- v356.2: (1) escribirAsync() — fs.promises.writeFile encolado por
+  archivo (sin riesgo de interleave); 29 call sites convertidos (los
+  frecuentes/pesados: catálogo cq, users/continuar/vistos, censo,
+  sonda, auditoría, fallos, vistas/ocultas de todas las fuentes,
+  cajanegra, movie-disp, barrido-pos…). Los tmp+rename atómicos NO se
+  tocaron (otro patrón). (2) LATIDO: detector de loop congelado >10 s
+  → 'loop congelado ~Ns' en el journal (cuelgues futuros=medidos).
+- Verificado :3931: la coreografía asesina completa corrió y a los 85 s
+  el server respondía 200 en 0.007 s; 0 latidos falsos; /api/salud OK.
+- Pendiente (si vuelve a colgarse): capturar top CPU del PID + wchan +
+  dmesg (blocked/hung_task/nvme) para diferenciar CPU-loop vs disco.

@@ -63,7 +63,7 @@ function auditoriaGuardarProgreso(){
       logs: HUDDLE_AUDITORIA.logs.slice(0,20),
       nota: HUDDLE_AUDITORIA.activo ? 'Auditoría Huddle en curso — sonda Huddle 24/7 verificando todo lo vivo' : 'Auditoría detenida — sondas Huddle 24/7 siguen vigilando en segundo plano cada 6h'
     };
-    fs.writeFileSync(AUDITORIA_PROGRESO_FILE, JSON.stringify(out,null,2));
+    escribirAsync(AUDITORIA_PROGRESO_FILE, JSON.stringify(out,null,2));
   }catch{}
 }
 function auditoriaActualizarPct(){
@@ -178,7 +178,7 @@ try {
 function saveUsers() {
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(USERS_FILE, JSON.stringify(Object.fromEntries(users)));
+    escribirAsync(USERS_FILE, JSON.stringify(Object.fromEntries(users)));
   } catch (e) { console.warn('⚠️ no pude guardar usuarios:', e.message); }
 }
 const NAME_RE = /^[\p{L}\p{N}_ ]{3,20}$/u;
@@ -198,7 +198,7 @@ const CONT_MAX = 10; // entradas guardadas por usuario
 function saveContinuar() {
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(CONT_FILE, JSON.stringify(Object.fromEntries(continuar)));
+    escribirAsync(CONT_FILE, JSON.stringify(Object.fromEntries(continuar)));
   } catch (e) { console.warn('⚠️ no pude guardar continuar-viendo:', e.message); }
 }
 
@@ -225,7 +225,7 @@ function anotarVisto(nameKey, entry) {
 function saveVistos() {
   try {
     fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(VISTOS_FILE, JSON.stringify(Object.fromEntries(vistos)));
+    escribirAsync(VISTOS_FILE, JSON.stringify(Object.fromEntries(vistos)));
   } catch (e) { console.warn('⚠️ no pude guardar vistos:', e.message); }
 }
 function registrarProgreso(room, m, r) {
@@ -475,7 +475,7 @@ try { for (const [k3, v3] of Object.entries(JSON.parse(fs.readFileSync(path.join
 let laFallosTimer = null;
 function laFallosGuardar() {
   clearTimeout(laFallosTimer);
-  laFallosTimer = setTimeout(() => { try { fs.writeFileSync(path.join(DATA_DIR, 'la-fallos.json'), JSON.stringify(Object.fromEntries(LA_FALLOS))); } catch {} }, 4000);
+  laFallosTimer = setTimeout(() => { try { escribirAsync(path.join(DATA_DIR, 'la-fallos.json'), JSON.stringify(Object.fromEntries(LA_FALLOS))); } catch {} }, 4000);
 }
 function laFallosRegistrar(slug) {
   if (!slug) return;
@@ -487,7 +487,7 @@ function laFallosRegistrar(slug) {
   if (e.f >= 3 && !LA_MUERTAS_SET.has(slug)) {
     e.h = Date.now();
     LA_MUERTAS_SET.add(slug);
-    try { fs.writeFileSync(path.join(__dirname, 'public', 'latanime-muertas.txt'), [...LA_MUERTAS_SET].sort().join('\n') + '\n'); } catch {}
+    try { escribirAsync(path.join(__dirname, 'public', 'latanime-muertas.txt'), [...LA_MUERTAS_SET].sort().join('\n') + '\n'); } catch {}
     console.log('[podredumbre] la: ' + slug + ' ocultada tras ' + e.f + ' fallos');
   }
   LA_FALLOS.set(slug, e);
@@ -614,7 +614,7 @@ async function sondaPelisxd() {
         }
       }
       /* Guardar vistas (cada ciclo crece un poco) */
-      try { fs.writeFileSync(path.join(__dirname, 'public', 'pxd-vistas.txt'), [...pxdVistas].join('\n') + '\n'); } catch {}
+      try { escribirAsync(path.join(__dirname, 'public', 'pxd-vistas.txt'), [...pxdVistas].join('\n') + '\n'); } catch {}
     } catch (e) { console.warn('[sonda] pxd nuevas error: ' + String(e).slice(0, 60)); }
 
     /* ─── 2. VIVAS: ¿siguen funcionando? ─── */
@@ -720,8 +720,8 @@ async function sondaCuevana() {
       if (r.ok) { CVM_OCULTAS.delete(slug); muertas_vivas++; sondaNotify("Cuevana", "revivio", slug, slug + " revivio — servidores encontrados"); }
     }
     /* Persistir */
-    try { fs.writeFileSync(path.join(__dirname, 'cuevana-ocultas.txt'), [...CVM_OCULTAS].join('\n') + '\n'); } catch {}
-    try { fs.writeFileSync(path.join(__dirname, 'cuevana-vistas.txt'), [...CVM_VISTAS].join('\n') + '\n'); } catch {}
+    try { escribirAsync(path.join(__dirname, 'cuevana-ocultas.txt'), [...CVM_OCULTAS].join('\n') + '\n'); } catch {}
+    try { escribirAsync(path.join(__dirname, 'cuevana-vistas.txt'), [...CVM_VISTAS].join('\n') + '\n'); } catch {}
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
     const parts = [];
     if (nuevas_ok) parts.push('nuevas_ok=' + nuevas_ok);
@@ -759,7 +759,7 @@ function cvmCatGuardar() {
   if (cvmCatTimer) return;
   cvmCatTimer = setTimeout(() => {
     cvmCatTimer = null;
-    try { fs.writeFileSync(path.join(__dirname, 'public', 'cuevana-cat.json'), JSON.stringify({ items: Object.fromEntries(CVM_CAT) })); } catch {}
+    try { escribirAsync(path.join(__dirname, 'public', 'cuevana-cat.json'), JSON.stringify({ items: Object.fromEntries(CVM_CAT) })); } catch {}
   }, 5000);
 }
 function cvmCatEnriquecer(slug, d) {
@@ -835,7 +835,7 @@ function sondaNotify(fuente, tipo, slug, msg) {
   SONDALOG.unshift({ ts: Date.now(), fuente, tipo, slug, msg: String(msg || '').slice(0, 200) });
   if (SONDALOG.length > SONDALOG_MAX) SONDALOG.length = SONDALOG_MAX;
   clearTimeout(sondaLogTimer);
-  sondaLogTimer = setTimeout(() => { try { fs.mkdirSync(DATA_DIR, { recursive: true }); fs.writeFileSync(SONDALOG_FILE, JSON.stringify(SONDALOG)); } catch {} }, 3000);
+  sondaLogTimer = setTimeout(() => { try { fs.mkdirSync(DATA_DIR, { recursive: true }); escribirAsync(SONDALOG_FILE, JSON.stringify(SONDALOG)); } catch {} }, 3000);
   const sym = tipo === 'muerto' ? 'x' : tipo === 'revivio' ? '+' : '?';
   console.log(`[sonda-notif] ${sym} ${fuente}: ${msg}`);
 }
@@ -867,7 +867,7 @@ function fallosCargar(mapa, arch) {
 }
 function fallosGuardar(mapa, arch) {
   if (fallosGuardarT.has(arch)) return;
-  const t = setTimeout(() => { fallosGuardarT.delete(arch); try { fs.writeFileSync(path.join(DATA_DIR, arch), JSON.stringify(Object.fromEntries(mapa))); } catch {} }, 4000);
+  const t = setTimeout(() => { fallosGuardarT.delete(arch); try { escribirAsync(path.join(DATA_DIR, arch), JSON.stringify(Object.fromEntries(mapa))); } catch {} }, 4000);
   t.unref(); fallosGuardarT.set(arch, t);
 }
 function falloRegistrar(mapa, arch, clave, alOcultar) {
@@ -883,7 +883,7 @@ function falloPerdonar(mapa, arch, clave) { if (clave && mapa.delete(clave)) fal
 const ocT = new Map(); /* v241: timer por archivo (el unico global perdia escrituras) */
 function ocultasReescribir(set, archivo) {
   clearTimeout(ocT.get(archivo));
-  ocT.set(archivo, setTimeout(() => { ocT.delete(archivo); try { fs.writeFileSync(path.join(__dirname, 'public', archivo), [...set].sort().join('\n') + '\n'); } catch {} }, 3000));
+  ocT.set(archivo, setTimeout(() => { ocT.delete(archivo); try { escribirAsync(path.join(__dirname, 'public', archivo), [...set].sort().join('\n') + '\n'); } catch {} }, 3000));
 }
 /* PelisXD / AnimeFLV — ocultar por slug */
 function pxdOcultar(slug) {
@@ -916,7 +916,7 @@ function cvFallo(slug) { /* v205.5: servidores existían pero TODOS fallaron —
     console.log('[podredumbre] cv: ' + k2 + ' ocultada tras 3 fallos');
   });
 }
-function cvPerdonarFile() { try { fs.writeFileSync(path.join(DATA_DIR, 'cv-ocultas-rt.json'), JSON.stringify([...CV_OCULTAS_RT])); } catch {} }
+function cvPerdonarFile() { try { escribirAsync(path.join(DATA_DIR, 'cv-ocultas-rt.json'), JSON.stringify([...CV_OCULTAS_RT])); } catch {} }
 
 /* re-chequeo general cada 6 h — poquitos por vuelta y con calma */
 let revGiro = { pxd: 0, af: 0, cv: 0 };
@@ -964,7 +964,7 @@ const EPS_FALLOS = new Map(), EPS_MUERTOS = new Set();
 try { for (const x of JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'eps-muertos.json'), 'utf8')) || []) EPS_MUERTOS.add(x); } catch {}
 fallosCargar(EPS_FALLOS, 'fallos-eps.json'); /* v287: contadores de episodio sobreviven al deploy */
 let epsT1 = null;
-const epsEscribir = () => { try { fs.writeFileSync(path.join(DATA_DIR, 'eps-muertos.json'), JSON.stringify([...EPS_MUERTOS])); } catch {} };
+const epsEscribir = () => { try { escribirAsync(path.join(DATA_DIR, 'eps-muertos.json'), JSON.stringify([...EPS_MUERTOS])); } catch {} };
 function esEpUrl(u) {
   return /latanime\.org\/ver\/[a-z0-9-]+-episodio-\d+/i.test(u) || /animeflv\.one\/ver\/[a-z0-9-]+-\d+/.test(u)
     || /lacartoons\.com\/serie\/capitulo\//i.test(u) || /danimados\.cc\/episodios\//i.test(u)
@@ -1162,7 +1162,7 @@ setInterval(() => {
         }
       }
       BARRIDO.hechos += 2;
-      if (BARRIDO.hechos % 40 === 0) try { fs.writeFileSync(path.join(__dirname, 'barrido-pos.json'), JSON.stringify(BARRIDO.pos)); } catch {}
+      if (BARRIDO.hechos % 40 === 0) try { escribirAsync(path.join(__dirname, 'barrido-pos.json'), JSON.stringify(BARRIDO.pos)); } catch {}
     } catch (e) { console.warn('[barrido] error: ' + String(e).slice(0, 80)); }
     finally { barridoOcupado = false; }
   })();
@@ -1197,7 +1197,7 @@ process.on('SIGINT', () => { try { console.log('[vida] recibí SIGINT — salien
 setInterval(() => {
   try {
     const m = process.memoryUsage();
-    fs.writeFileSync(path.join(DATA_DIR, 'cajanegra.log'),
+    escribirAsync(path.join(DATA_DIR, 'cajanegra.log'),
       new Date().toISOString() + ' uptime=' + Math.floor(process.uptime()) +
       's heap=' + Math.round(m.heapUsed / 1048576) + 'MB rss=' + Math.round(m.rss / 1048576) +
       'MB detectores=' + INTRO_DETECTANDO + ' barridoHechos=' + BARRIDO.hechos +
@@ -1667,7 +1667,7 @@ async function sondaNovelas() {
       } catch {}
       await pausa();
     }
-    try { fs.writeFileSync(path.join(__dirname, 'public', 'nv-vistas.txt'), [...NV_VISTAS].join('\n') + '\n'); } catch {}
+    try { escribirAsync(path.join(__dirname, 'public', 'nv-vistas.txt'), [...NV_VISTAS].join('\n') + '\n'); } catch {}
     const el = ((Date.now() - t0) / 1000).toFixed(1);
     console.log('[sonda] nv (' + el + 's): ' + ((vm || mv) ? ('vivas→muertas=' + vm + ' muertas→vivas=' + mv) : 'sin cambios'));
     try { fs.appendFileSync(path.join(__dirname, 'sonda-novelas.log'), '[' + new Date().toISOString() + '] ' + el + 's vivas→muertas=' + vm + ' muertas→vivas=' + mv + ' muertas=' + NV_OCULTAS.size + ' vistas=' + NV_VISTAS.size + '\n'); } catch {}
@@ -2427,7 +2427,7 @@ let movieDispArchivo = '';
 let movieDispCola = [], movieDispCorriendo = false, movieDispAt = 0;
 function movieDispRuta() { return path.join(carpetaArchivos(), 'movie-disponibles.json'); }
 function movieDispGuardar() {
-  try { fs.writeFileSync(movieDispRuta(), JSON.stringify({ at: Date.now(), items: [...MOVIE_DISP] })); } catch {}
+  try { escribirAsync(movieDispRuta(), JSON.stringify({ at: Date.now(), items: [...MOVIE_DISP] })); } catch {}
 }
 function movieDispCargar() {
   try {
@@ -2780,7 +2780,7 @@ function laMuertaQuitar(slug) { /* v202: autocuración — una «muerta» que vu
   if (!slug || !LA_MUERTAS_SET.has(slug)) return;
   LA_MUERTAS_SET.delete(slug);
   clearTimeout(laRtTimer);
-  laRtTimer = setTimeout(() => { try { fs.writeFileSync(path.join(__dirname, 'public', 'latanime-muertas.txt'), [...LA_MUERTAS_SET].sort().join('\n') + '\n'); } catch {} }, 3000);
+  laRtTimer = setTimeout(() => { try { escribirAsync(path.join(__dirname, 'public', 'latanime-muertas.txt'), [...LA_MUERTAS_SET].sort().join('\n') + '\n'); } catch {} }, 3000);
   console.log('[lázaro] la: ' + slug + ' volvió a la vida — fuera de la lista de muertas');
   LA_FALLOS.delete(slug);
 }
@@ -4271,7 +4271,7 @@ let INTRO_DETECTANDO = 0; /* v298: a lo más 1 detección a la vez */
  * detector vuelve a aprender openings (de uno en uno y con medidor, v298/v299). */
 let INTRO_AUTO_ON = false;
 try { INTRO_AUTO_ON = !!((JSON.parse(fs.readFileSync(path.join(DATA_DIR, 'intro-auto.json'), 'utf8')) || {}).on); } catch {}
-function introAutoGuardar() { try { fs.writeFileSync(path.join(DATA_DIR, 'intro-auto.json'), JSON.stringify({ on: INTRO_AUTO_ON })); } catch {} }
+function introAutoGuardar() { try { escribirAsync(path.join(DATA_DIR, 'intro-auto.json'), JSON.stringify({ on: INTRO_AUTO_ON })); } catch {} }
 /* v310: BARREDORA de intro-*.ts huérfanos — si el proceso muere a media
  * detección (SIGKILL/ABRT) la limpieza del finally no alcanza a correr y los
  * pedazos de video se quedan en /tmp: en Oracle juntaron 26 GB (685 archivos).
@@ -6650,7 +6650,7 @@ async function sondaAnimeflv() {
       } catch {}
       await new Promise((r) => setTimeout(r, 1500));
     }
-    try { fs.writeFileSync(path.join(__dirname, 'public', 'af-vistas.txt'), [...AF_VISTAS].join('\n') + '\n'); } catch {}
+    try { escribirAsync(path.join(__dirname, 'public', 'af-vistas.txt'), [...AF_VISTAS].join('\n') + '\n'); } catch {}
     const el = ((Date.now() - t0) / 1000).toFixed(1);
     console.log('[sonda] af (' + el + 's): ' + ((vm || mv) ? ('vivas→muertas=' + vm + ' muertas→vivas=' + mv) : 'sin cambios'));
     try { fs.appendFileSync(path.join(__dirname, 'sonda-animeflv.log'), '[' + new Date().toISOString() + '] ' + el + 's vivas→muertas=' + vm + ' muertas→vivas=' + mv + ' muertas=' + AF_OCULTAS.size + ' vistas=' + AF_VISTAS.size + '\n'); } catch {}
@@ -6768,11 +6768,11 @@ async function sondaD23(){
       }catch{}
       await new Promise(r=>setTimeout(r,1800));
     }
-    try{ fs.writeFileSync(path.join(__dirname,'public','d23-vistas.txt'), [...D23_VISTAS].join('\n')+'\n'); }catch{}
-    try{ fs.writeFileSync(path.join(__dirname,'public','d23-ocultas.txt'), [...D23_OCULTAS].sort().join('\n')+'\n'); }catch{}
+    try{ escribirAsync(path.join(__dirname,'public','d23-vistas.txt'), [...D23_VISTAS].join('\n')+'\n'); }catch{}
+    try{ escribirAsync(path.join(__dirname,'public','d23-ocultas.txt'), [...D23_OCULTAS].sort().join('\n')+'\n'); }catch{}
     // alias animed23
-    try{ fs.writeFileSync(path.join(__dirname,'public','animed23-ocultas.txt'), [...D23_OCULTAS].sort().join('\n')+'\n'); }catch{}
-    try{ fs.writeFileSync(path.join(__dirname,'public','animed23-vistas.txt'), [...D23_VISTAS].join('\n')+'\n'); }catch{}
+    try{ escribirAsync(path.join(__dirname,'public','animed23-ocultas.txt'), [...D23_OCULTAS].sort().join('\n')+'\n'); }catch{}
+    try{ escribirAsync(path.join(__dirname,'public','animed23-vistas.txt'), [...D23_VISTAS].join('\n')+'\n'); }catch{}
     const el=((Date.now()-t0)/1000).toFixed(1);
     console.log('[sonda] d23 ('+el+'s): '+((vm||mv)?('vivas→muertas='+vm+' muertas→vivas='+mv):'sin cambios'));
     try{ fs.appendFileSync(path.join(__dirname,'sonda-animed23.log'),'['+new Date().toISOString()+'] '+el+'s vivas→muertas='+vm+' muertas→vivas='+mv+' muertas='+D23_OCULTAS.size+' vistas='+D23_VISTAS.size+'\n'); }catch{}
@@ -10605,7 +10605,7 @@ function cvOcultaRegistrar(slug) {
   CV_OCULTAS_RT.add(slug);
   console.log('[cuevana] título muerto ocultado en vivo: ' + slug);
   try { clearTimeout(cvRtTimer); } catch {}
-  cvRtTimer = setTimeout(() => { try { fs.writeFileSync(path.join(DATA_DIR, 'cv-ocultas-rt.json'), JSON.stringify([...CV_OCULTAS_RT])); } catch {} }, 3000);
+  cvRtTimer = setTimeout(() => { try { escribirAsync(path.join(DATA_DIR, 'cv-ocultas-rt.json'), JSON.stringify([...CV_OCULTAS_RT])); } catch {} }, 3000);
 }
 /* v195: +1,440 PELÍCULAS muertas de las 10,062 auditadas (páginas sin ningún
  * servidor — como «Proyecto Lázarus» del feed). cvOcultaUrl aplica el set a
@@ -12244,7 +12244,7 @@ const CENSO_PATH = path.join(DATA_DIR, 'bodegas-censo.json');
 const CENSO = { titulos: {} };
 try { const _cj = JSON.parse(fs.readFileSync(CENSO_PATH, 'utf8')); if (_cj && _cj.titulos) CENSO.titulos = _cj.titulos; } catch {}
 let censoDirty = false;
-setInterval(() => { if (censoDirty) { try { fs.writeFileSync(CENSO_PATH, JSON.stringify(CENSO)); censoDirty = false; } catch {} } }, 120000);
+setInterval(() => { if (censoDirty) { try { escribirAsync(CENSO_PATH, JSON.stringify(CENSO)); censoDirty = false; } catch {} } }, 120000);
 const bodegaTag = (clave, m3u8Url) => { if (!clave || !m3u8Url) return; const b = bodegaDe(m3u8Url); if (b && b !== '?' && CENSO.titulos[clave] !== b) { CENSO.titulos[clave] = b; censoDirty = true; } };
 const regSaludV = (m3x, okx) => { try { const b = bodegaDe(m3x); const r = VIMEOS_SALUD.get(b) || { ok: 0, ko: 0, lastOk: 0, lastKo: 0 }; if (okx) { r.ok++; r.lastOk = Date.now(); } else { r.ko++; r.lastKo = Date.now(); } VIMEOS_SALUD.set(b, r); } catch {} }; /* v354: la AUDITORÍA también alimenta el medidor */
 const tituloFalloDe = (target) => { try { const h = String(target); let m = /#\/pelicula\/(\d+)/.exec(h) || /#\/(?:serie|anime)\/(\d+)/.exec(h); if (m) { for (const pre of ['cq:movie:', 'cq:tvshow:', 'cq:anime:']) { const v = BOVEDA.get(pre + m[1]); if (v && v.t) return v.t; } return 'cq ' + m[1]; } m = /cuevana\.mov\/pelicula\/\d+\/([^/?#]+)/i.exec(h) || /cuevana\.mov\/pelicula\/([^/?#]+)/i.exec(h); if (m) { const v = BOVEDA.get('cv:' + m[1]); return (v && v.t) || m[1]; } m = /pelisxd\.com\/pelicula\/([^/?#]+)/i.exec(h); if (m) { const v = BOVEDA.get('pxd:' + m[1]); return (v && v.t) || m[1]; } m = /danimados\.cc\/episodios\/([a-z0-9-]+)-\d+x\d+/i.exec(h); if (m) { const v = DANI_CAT.get(m[1]); return (v && v.t) || m[1]; } m = /ennovelas-tv\.com\/([a-z0-9-]+)-capitulo/i.exec(h); if (m) return m[1].replace(/-/g, ' '); m = /animed23\.com\/capitulo\/([a-z0-9-]+)/i.exec(h); if (m) return m[1].replace(/-/g, ' '); m = /miscaricaturas\.com\/([a-z0-9-]+)\//i.exec(h); if (m) return m[1].replace(/-/g, ' '); m = /latanime\.org\/ver\/([a-z0-9-]+)/i.exec(h); if (m) return m[1].replace(/-/g, ' '); } catch {} return ''; };
@@ -13124,6 +13124,26 @@ function capturaEstado() {
     return { ok: true, existe: true, bytes: s.size, mb: +(s.size / 1048576).toFixed(1), cabecera: cab, tipo, modificado: s.mtime.toISOString() };
   } catch { return { ok: true, existe: false, bytes: 0, mb: 0, tipo: 'no hay archivo todavía' }; }
 }
+/* v356.2: escrituras ASYNC — en el Oracle el volumen a veces se atasca y una
+ * llamada sincrónica (ej. el JSON multi-MB de cuevana-cat.json, exactamente
+ * tras 'movies cacheados' donde murieron las 3 congeladas) pausa el loop
+ * entero hasta que el disco responde. Ahora los guardados frecuentes van
+ * encolados por archivo: nunca más bloquean el servidor. */
+const fsp = fs.promises;
+const _escCola = new Map();
+function escribirAsync(ruta, datos) {
+  try {
+    const previa = _escCola.get(ruta) || Promise.resolve();
+    const siguiente = previa.then(() => fsp.writeFile(ruta, datos)).catch(() => {});
+    _escCola.set(ruta, siguiente);
+    siguiente.then(() => { if (_escCola.get(ruta) === siguiente) _escCola.delete(ruta); });
+    return siguiente;
+  } catch { return Promise.resolve(); }
+}
+/* v356.2: detector de congelamiento — si el loop se pausa >10 s, el journal
+ * dirá CUÁNTO duró (adiós a adivinar la causa del cuelgue). */
+let _latidoT = Date.now();
+setInterval(() => { const a = Date.now(); const d = a - _latidoT - 5000; _latidoT = a; if (d > 10000) console.warn('[latido] loop congelado ~' + Math.round((d + 5000) / 1000) + ' s — algo bloqueó el proceso (disco/CPU)'); }, 5000).unref();
 const imgProxyCache = new Map(); /* v67: imágenes de animes proxyadas, url → {buf, ct, at} */
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
@@ -14060,7 +14080,7 @@ async function estrenosMezclados(){
         if (dL && dL.dead) { /* v288: el sitio la borró o vació sus episodios → fuera del buscador (laRevizar la re-prueba) */
           if (!LA_MUERTAS_SET.has(slug)) {
             LA_MUERTAS_SET.add(slug);
-            try { fs.writeFileSync(path.join(__dirname, 'public', 'latanime-muertas.txt'), [...LA_MUERTAS_SET].sort().join('\n') + '\n'); } catch {}
+            try { escribirAsync(path.join(__dirname, 'public', 'latanime-muertas.txt'), [...LA_MUERTAS_SET].sort().join('\n') + '\n'); } catch {}
             const eL = LA_FALLOS.get(slug) || { f: 0, last: 0, h: 0 };
             eL.f = 3; eL.last = Date.now(); eL.h = Date.now();
             LA_FALLOS.set(slug, eL); laFallosGuardar();
