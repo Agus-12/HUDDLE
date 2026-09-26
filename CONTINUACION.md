@@ -3588,3 +3588,21 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   flv '+Jinrui… E1 (1 servidores)', pxd '+Treinta días de noche (2 embeds)';
   salud en vivo: s14 42 ko, s10 ko (las caídas del censo), s1/s8/s11/s12 ok;
   Drácula resolvió ok desde bóveda (s8 viva).
+
+## Investigación fase 4 (25 Sep 2026) — DESCARTADA con evidencia; estado de s10
+- «Sigue con lo que estabas» → evalué el tercer enlace para series vía
+  Cuevana. HALLAZGO CLAVE: el motor de Cuevana (tmdb.allcalidad.re) comparte
+  el ESPACIO DE IDS y los CÓDIGOS de archivo con cq: /v1/items/tvshow/93740
+  → Fundación, y /seasons/2/episodes/6 → code mfacvgdjt22d = EXACTAMENTE el
+  mismo code de la bóveda cq. Cuevana series = mismos archivos de vimeos →
+  un 'tercer enlace' sería copia del mismo archivo: CERO diversidad. NO se
+  construye. La única fuente independiente de archivos para series cq sigue
+  siendo Danimados (altEps, ya conectado). Danimados NO tiene Fundación
+  (verificado en catálogo y búsqueda del sitio — live-action Apple).
+- s10 (bodega de T2E6) está en FLAPPING: master 200 en 0.6 s a las X:XX y
+  timeout minutos después. Convaleciente — T2E6 funcionará cuando
+  estabilice; el sistema ya da veredictos honestos mientras tanto.
+  s14 sigue caída. El resto de bodegas (s1/s8/s11/s12/s13) sanas.
+- El veredicto de Huddle al intentar T2E6 durante el flapping fue correcto
+  ('saturado' en 14 s) — canario rotando entre códigos vivos/caídos según
+  la ventana.
