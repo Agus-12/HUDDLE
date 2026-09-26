@@ -3936,6 +3936,7 @@ for (const k of Object.keys(INTROS)) {
   if (n) { try { guardarIntros(); } catch {} console.log('[intro] migración: ' + n + ' aprendizaje' + (n === 1 ? '' : 's') + ' de la ventana vieja eliminado' + (n === 1 ? '' : 's') + ' (salían de más)'); }
 })();
 function introKeyDe(url) {
+  url = String(url || '').slice(0, 600); /* v357: cota de entrada — ninguna URL legítima pasa de aquí */
   try { const u = new URL(url); return u.hostname.replace(/^www\./, '') + u.pathname.replace(/\/$/, ''); } catch { return String(url || '').slice(0, 140); }
 }
 /* v132: clave a NIVEL DE SERIE — la intro es la misma en todos los
@@ -4254,7 +4255,7 @@ function penalizarIntro(serieKey, ms) {
 }
 /* v190: dispara la detección de una serie (la usa el GET de /api/intro y el rastreador) */
 function dispararDeteccionIntro(urlStr, serieKeyFija) {
-  serieCtxFromUrl(urlStr).then((sc) => {
+  _serieCtxFromUrl_orig(urlStr).then((sc) => { /* v357: la ORIGINAL (nunca la envoltura: se dispararía a sí misma) */
     if (sc && sc.eps && sc.eps.length > 1) {
       /* comparar episodios de LA MISMA TEMPORADA que el pedido */
       const ped = sc.eps.find((e) => { try { return new URL(e.url).pathname === new URL(urlStr).pathname.replace(/\/$/, ''); } catch { return false; } });
@@ -4454,13 +4455,13 @@ function precargarIntroDeSerie(eps) {
 function dispararDeteccionIntroSiToca(urlEp) {
   try {
     const ks = introKeysDe(urlEp);
-    if (!ks.serie) return;
+    if (!ks.serie) return; /* v357: el ciclo envoltura→disparar→envoltura murió aquí arriba */
     if (INTROS[ks.serie] && INTROS[ks.serie].by === 'auto' && Date.now() - (INTROS[ks.serie].at || 0) < 12 * 3600 * 1000) return;
     if (introJobAtascado(ks.serie)) INTRO_JOBS.delete(ks.serie);
     if (!fpcalcOk() || INTRO_JOBS.has(ks.serie)) return;
     if (Date.now() - (INTRO_INTENTOS.get(ks.serie) || 0) < 1 * 3600 * 1000) return;
     // toma hasta 3 episodios de la serie si los tenemos en serieCtxFromUrl
-    serieCtxFromUrl(urlEp).then((sc) => {
+    _serieCtxFromUrl_orig(urlEp).then((sc) => { /* v357: la ORIGINAL — vía la envoltura este disparo se reciclaba a sí mismo (envoltura→disparar→envoltura…): bucle infinito = el congelamiento 100% CPU de Oracle */
       const urls = sc && sc.eps && sc.eps.length ? sc.eps.map((e) => e.url).slice(0, 3) : [urlEp];
       detectarIntroSerie(ks.serie, urls);
     }).catch(() => { try { detectarIntroSerie(ks.serie, [urlEp]); } catch {} });

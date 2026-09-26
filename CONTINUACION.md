@@ -3718,3 +3718,21 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   restart si vimeos sigue mudo + usuarios reconectando), leer
   /home/ubuntu/huddle-diag-pila.log → la pila NOMBRA al culpable → parche
   quirúrgico v357. El log también queda tras watchdog/reinicio manual.
+
+## v357 (26 Sep 2026) — CAUSA RAÍZ del cuelgue: ciclo envoltura→disparar→envoltura
+- diag-hijo capturó la pila (2x): introKeyDe/introKeysDe ← dispararDeteccionIntroSiToca
+  ← serieCtxFromUrl(wrapper) — 100% CPU estado R. Mecanismo: la envoltura v223 de
+  serieCtxFromUrl dispara dispararDeteccionIntroSiToca tras cada resolución, y
+  disparar volvía a llamar a serieCtxFromUrl (¡la ENVOLTURA!) → bucle async
+  infinito (cada ciclo re-dispara antes de que detectar fije INTRO_JOBS/INTRO_INTENTOS).
+  Coincide todo: solo Oracle (fpcalc presente; en sandbox fpcalcOk()=false corta
+  ANTES del ciclo — por eso jamás reproducí), muere al ENTRAR a una serie
+  (latanime repro del usuario), pelisxd (película) no toca serieCtxFromUrl,
+  muere ~60-90 s post-boot (primer usuario entra a una serie al reconectar).
+- v357: dispararDeteccionIntroSiToca y dispararDeteccionIntro usan
+  _serieCtxFromUrl_orig (la envoltura solo es para el camino de salas/prefetch);
+  +cota 600 chars en introKeyDe. Las demás llamadas (salas 4651, prefetch 4425,
+  scFix, 3344) quedan con la envoltura: su arista disparar→orig es terminal.
+- REPRO en sandbox: fpcalc FALSO (sleep 300 en PATH) + /api/intro de serie
+  latanime → server 200 en 0.002-0.005 s a los 20 y 65 s, CPU 0%, diag vacío.
+- diag-hijo queda PERMANENTE como tripwire (pila nombrada + resurrección ~20 s).
