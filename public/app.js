@@ -3638,6 +3638,10 @@ async function elegirModoSolo(d) {
 }
 
 function montarSolo(d, viaProxy) {
+  if (!d || !d.m3u8) { /* v357.1: respuesta mal formada — mensaje claro, nunca el críptico de hls.js */
+    toast('El video no se dejó servir — toca de nuevo o en un momento');
+    return;
+  }
   const video = $('#soloVideo');
   /* v98: las pelis de PelisXD traen un playlist NUESTRO (/api/xd/…) — tal cual */
   const src = /^\/api\//.test(d.m3u8) ? d.m3u8

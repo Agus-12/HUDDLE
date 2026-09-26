@@ -7801,7 +7801,19 @@ async function resolverPelisxd(pageUrl) {
   if (bvPxd && Array.isArray(bvPxd.embeds) && bvPxd.embeds.length) {
     try {
       const capB = await extraerStreamwishPeli(pageUrl, bvPxd.embeds);
-      if (capB && (capB.m3u8 || capB.body)) { console.log('[boveda] pelisxd ' + slug + ' desde bóveda'); return capB.mp4 ? capB : capB; }
+      if (capB && (capB.m3u8 || capB.body)) {
+        console.log('[boveda] pelisxd ' + slug + ' desde bóveda');
+        /* v357.1: convertir a FORMA DE API — antes se devolvía crudo {body,url,ref}
+         * y el cliente recibía m3u8 indefinido (hls.js: «reading 'trim'» al re-entrar) */
+        if (capB.mp4) {
+          try { hlsReferers.set(new URL(capB.url).hostname, capB.ref || pageUrl); } catch {}
+          return { m3u8: capB.url, mp4: true, proxy: true, subs: [] };
+        }
+        const tokB = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+        pelisxdStreams.set(tokB, { body: capB.body, base: capB.url, ref: capB.ref || 'https://f7hyg4q.org/', slug, at: Date.now() });
+        try { hlsReferers.set(new URL(capB.url).hostname, capB.ref || 'https://f7hyg4q.org/'); } catch {}
+        return { m3u8: '/api/xd/' + tokB + '/index.m3u8', proxy: true, subs: [] };
+      }
     } catch {}
     console.log('[boveda] pelisxd ' + slug + ' — embeds guardados sin video, camino normal');
   }

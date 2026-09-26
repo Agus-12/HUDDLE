@@ -3736,3 +3736,21 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - REPRO en sandbox: fpcalc FALSO (sleep 300 en PATH) + /api/intro de serie
   latanime → server 200 en 0.002-0.005 s a los 20 y 65 s, CPU 0%, diag vacío.
 - diag-hijo queda PERMANENTE como tripwire (pila nombrada + resurrección ~20 s).
+
+## v357.1 (26 Sep 2026) — «Cannot read properties of undefined (reading 'trim')» al re-entrar a una peli de PelisXD
+- Causa: el replay de bóveda pxd (bvPxd) devolvía CRUDO el objeto del
+  extractor {body,url,ref,mp4} (capB.mp4 ? capB : capB) en vez de la forma
+  de API {m3u8,...}. Al cliente llegaba m3u8:undefined → montarSolo hacía
+  src=undefined → hls.loadSource(undefined) → hls.js hace url.trim()
+  interno → TypeError EXACTO del toast del usuario. Encaja todo: «casi
+  nunca falla», falló SOLO al re-entrar (1ª visita: sin entrada pxd en
+  bóveda → camino normal OK; tras la cosecha de boveda-caps/rotación la
+  entrada YA existe → bvPxd → crash).
+- Fix server: la rama bvPxd ahora convierte a forma de API (mp4 →
+  {m3u8:url,mp4:true,proxy:true}; HLS → pelisxdStreams + /api/xd/…).
+- Fix client (app.js montarSolo): guardía !d.m3u8 → toast claro
+  «El video no se dejó servir», nunca el críptico de hls.js.
+- VERIFICADO :3928: re-entrada pxd con embeds de bóveda (treinta-dias-de-
+  noche, byse+playmogo) → {ok,m3u8:/api/xd/…/index.m3u8,proxy:true} en
+  1.8 s; playlist sirve #EXTM3U 1080p; server vivo. hls.min.js contiene
+  exactamente 1 'trim' (el manejo de URL) — mecanismo confirmado.
