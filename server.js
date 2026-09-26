@@ -12857,6 +12857,18 @@ function esProxeable(u) {
       || hlsReferers.has(h); /* v93: hosts que ya resolvimos (con su Referer) */
   } catch { return false; }
 }
+/* v356: FUSIBLE de vimeos. Síntoma Oracle 26 Sep 01:29: viendo Fundación,
+ * las puertas p5/p6 se pusieron mudas (vimeos bloquea al datacenter / s10
+ * convaleciente) y CADA segmento quedaba colgado hasta ~3 min (3 reintentos
+ * × 30 s + relay de 20 s); el player pedía más segmentos y el servidor
+ * acabó ahogado (loop congelado, ni SIGTERM lo despertó). Remedios:
+ * 1) tras 6 fallos seguidos a vimeos, FUSIBLE ABIERTO 90 s: respuestas
+ *    inmediatas (master→410 re-resolver, segmento→502), cero sockets zombis;
+ * 2) plazo total de 45 s por petición (antes ~3 min);
+ * 3) el AbortController ahora TAMBIÉN corta el camino https-module;
+ * 4) si el player se va a media descarga, se cancela el upstream. */
+const VIMEOS_FUSIBLE = { hasta: 0, fallos: 0, UMBRAL: 6, MS_ABIERTO: 90000 };
+function esVimeosH(u) { try { return /(^|\.)vimeos\.(net|zip)$/i.test(new URL(u).hostname); } catch { return false; } }
 /* v83: reescribe un m3u8 para que todo pase por el proxy */
 function servirPlaylist(res, codigo, txt, target) {
   const esLocal = /^\/test-media\//.test(target);
@@ -12905,6 +12917,11 @@ async function proxearHls(req, res, target) {
     }
   }
   if (!esProxeable(target)) return json(res, 403, { ok: false, error: 'No permitido' }); /* v90: allowlist ampliada */
+  /* v356: fusible vimeos abierto ⇒ contestar al toque, sin colgar sockets */
+  if (esVimeosH(target) && Date.now() < VIMEOS_FUSIBLE.hasta) {
+    if (/master\.m3u8/i.test(target)) return json(res, 410, { ok: false, error: 'master expirado — re-resolver', reResolve: true });
+    return json(res, 502, { ok: false, error: 'El servidor de video no respondió' });
+  }
   /* v236.6: goodstream/vimeos/videoapp → ir directo por relay si está disponible */
   let useRelayDirect = false;
   try {
@@ -12952,7 +12969,8 @@ async function proxearHls(req, res, target) {
       upstream = null;
     }
   }
-  for (let intento = 0; !upstream && intento < 3; intento++) {
+  const t0v356 = Date.now(); /* v356: plazo total de esta petición */
+  for (let intento = 0; !upstream && intento < 3 && Date.now() - t0v356 < 45000; intento++) {
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), 30000);
     try {
@@ -12966,7 +12984,7 @@ async function proxearHls(req, res, target) {
         upstream = await new Promise((resolve, reject) => {
           const r = https.get({
             hostname: u.hostname, port: 443, path: u.pathname + u.search,
-            headers: cabUp, timeout: 25000,
+            headers: cabUp, timeout: 25000, signal: ctl.signal, /* v356: el abort de 30 s también corta aquí (antes este camino quedaba zombi) */
             /* Cipher suites que imitan Chrome */
             ciphers: 'TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256',
           }, (res) => {
@@ -12981,7 +12999,7 @@ async function proxearHls(req, res, target) {
         });
       }
       clearTimeout(t);
-      if (upstream.ok) break;
+      if (upstream.ok) { if (esVimeosH(target)) VIMEOS_FUSIBLE.fallos = 0; break; }
       if (upstream.status === 403 || upstream.status >= 500) {
         try { upstream.body && upstream.body.cancel(); } catch {}
         upstream = null;
@@ -12993,6 +13011,10 @@ async function proxearHls(req, res, target) {
       clearTimeout(t);
       console.warn('[hls-proxy] intento ' + intento + ' error:', String(e.message || e).slice(0, 100), '| host:', decodeURIComponent(target).slice(0, 60));
       upstream = null;
+      if (esVimeosH(target) && ++VIMEOS_FUSIBLE.fallos >= VIMEOS_FUSIBLE.UMBRAL && Date.now() >= VIMEOS_FUSIBLE.hasta) {
+        VIMEOS_FUSIBLE.hasta = Date.now() + VIMEOS_FUSIBLE.MS_ABIERTO;
+        console.warn('[hls-proxy] FUSIBLE vimeos: ' + VIMEOS_FUSIBLE.fallos + ' fallos seguidos — respuestas inmediatas 90 s (puertas mudas)');
+      }
       if (intento === 2) return json(res, 502, { ok: false, error: 'El servidor de video no respondió' });
       await new Promise((r2) => setTimeout(r2, 1500 * (intento + 1)));
     }
@@ -13005,7 +13027,7 @@ async function proxearHls(req, res, target) {
       const t2 = setTimeout(() => ctl2.abort(), 20000);
       upstream = await fetch(relayUrl, { signal: ctl2.signal, redirect: 'follow' });
       clearTimeout(t2);
-      if (upstream.ok) console.log('[hls-proxy] relay OK:', decodeURIComponent(target).slice(0, 60));
+      if (upstream.ok) { VIMEOS_FUSIBLE.fallos = 0; console.log('[hls-proxy] relay OK:', decodeURIComponent(target).slice(0, 60)); }
       else { try { upstream.body && upstream.body.cancel(); } catch {} upstream = null; }
     } catch (relayErr) {
       console.warn('[hls-proxy] relay falló:', String(relayErr.message || relayErr).slice(0, 80));
@@ -13030,7 +13052,7 @@ async function proxearHls(req, res, target) {
       const t2 = setTimeout(() => ctl2.abort(), 20000);
       const relayResp = await fetch(relayUrl, { signal: ctl2.signal, redirect: 'follow' });
       clearTimeout(t2);
-      if (relayResp.ok) { upstream = relayResp; console.log('[hls-proxy] relay OK:', decodeURIComponent(target).slice(0, 60)); }
+      if (relayResp.ok) { upstream = relayResp; VIMEOS_FUSIBLE.fallos = 0; console.log('[hls-proxy] relay OK:', decodeURIComponent(target).slice(0, 60)); }
       else { try { relayResp.body && relayResp.body.cancel(); } catch {} }
     } catch (relayErr) {
       console.warn('[hls-proxy] relay falló:', String(relayErr.message || relayErr).slice(0, 80));
@@ -13069,6 +13091,7 @@ async function proxearHls(req, res, target) {
     const cab = { 'Content-Type': ct || 'video/MP2T', 'Cache-Control': 'no-store', 'Accept-Ranges': 'bytes' };
     for (const h of ['content-range', 'content-length']) { const v = upstream.headers.get(h); if (v) cab[h] = v; }
     res.writeHead(upstream.status, cab);
+    res.on('close', () => { try { upstream.body && upstream.body.cancel(); } catch {} }); /* v356: el player se fue ⇒ cancelar el upstream */
     Readable.fromWeb(upstream.body).on('error', () => {}).pipe(res);
     return;
   }

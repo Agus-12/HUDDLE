@@ -3643,3 +3643,21 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - Nota: en el Oracle (vimeos bloquea datacenter) la clasificación igual
   avanza: las resoluciones exitosas pasan por el relay de casa y el
   winner m3u8 revela la bodega igual.
+
+## v356 (26 Sep 2026) — FUSIBLE vimeos: adiós congelamientos del proxy HLS
+- Causa raíz del cuelgue Oracle 26 Sep 01:29 (journal): viendo Fundación
+  (mfacvgdjt22d), las puertas p5/p6.vimeos.zip se pusieron mudas y CADA
+  segmento quedaba colgado hasta ~3 min (3 reintentos × 30 s + relay 20 s,
+  y el AbortController NO cortaba el camino https-module). El player pedía
+  más y más → servidor ahogado (loop congelado, ni SIGTERM: systemd lo
+  mató a SIGKILL tras 90 s). El vigilante (watchdog timer, instalado en el
+  Oracle) ahora reanimaría solo en ≤3 min; v356 elimina la causa.
+- Remedios en proxearHls: (1) VIMEOS_FUSIBLE {UMBRAL 6 fallos seguidos a
+  vimeos → 90 s respuestas inmediatas: master→410 reResolve, seg→502;
+  éxito directo o por relay resetea}; (2) plazo total 45 s por petición;
+  (3) signal: ctl.signal en el https.get de respaldo; (4) res.on('close')
+  cancela el upstream (adiós sockets zombis si el player se va).
+- Verificado :3933: playlist reescrita por /api/hls ✓, segmento HTTP 200
+  152 KB en 0.2 s ✓, servidor vivo al instante después (200 en 0.002 s) ✓.
+- Recordar: fuse global para vimeos.* (si se abre, brownout de 90 s para
+  todas las bodegas — mejor 90 s a marearse que morir ahogado).
