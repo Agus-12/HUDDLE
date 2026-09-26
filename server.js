@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v354'; // v355: CENSO de bodegas — cada título cq queda clasificado por bodega (persistente, se llena al reproducir/auditar); los chips del panel muestran CUÁNTOS TÍTULOS tiene cada bodega de vimeos en el panel (bodegas en vivo + fallos recientes) + BUG dan v335 (undefinedxundefined — jamás cosechó) + flv secuencial con data-dwn (hosters independientes) + pxd en la rotación automática // v353: bodega caída NO es muerte — la auditoría distingue 'podrido' (página completa sin video, 2 strikes) de opaco (timeout/403/racionado: no se juzga); el revividor solo acepta vida real // v352: FASE 3 — películas cq con fallo total se resuelven vía CUEVANA (otro hoster, goodstream) desde el catálogo en memoria; negative cache 30 min; la cosecha cv deja el título blindado para siempre // v351: DIVERSIDAD DE HOSTERS — respaldos ordenan goodstream/no-vimeos primero y la auditoría ligera da la entrada por viva si CUALQUIER hoster responde (una entrada multi-hoster solo muere si todos mueren) // v350: canario directo⇄relay EN PARALELO (veredicto en segundos — v349 lo hacía lento y ahogaba el relay) + semáforo del relay (máx 3) + saneamiento de relay.txt/set-relay // v349: la LUPA de la sonda mira por el relay (canario, embeds y video) — vimeos bloqueando el datacenter ya no silencia las auditorías + pausas por memoria visibles // v348: FASE 2 — segundo enlace de SERIES cq vía Danimados (TxE idéntica, cached en altEps) + auditoría de códigos de series (punto ciego desde v321; 2 strikes = el código fuera, la serie queda) // v347: auto-curación SIN techo (sillita de 20 s) + la rama de error hls pide FRESCO (antes re-montaba la misma m3u8 desde cache) // v346: DOBLE CHEQUEO del ganador en resolverVimeos — nodos inestables (índice OK, video 502: vimeos.zip hoy) detectados ANTES de entregar el stream; se pasa al siguiente nodo de la misma oleada // v345: cadena corta (relay = último intento) + el player JAMÁS se cierra solo: los 4 caminos de 'Se cortó el video' ahora dejan el player abierto con Recargar video disponible (v319 restituida) // v344: la verificación del video (máster Y variante) usa el relay en toda la oleada de relay — el presupuesto de un solo uso rechazaba nodos buenos: 'saturado' con relay vivo // v343: el relay de casa se intenta ANTES de declarar 'saturado' — bloqueo de vimeos a datacenters ya no tumba la reproducción si el relay está vivo // v342: SEGUNDO ENLACE — películas cq con embeds de respaldo de OTRA infraestructura (PelisXD byse/dood), cosechados al fallar y usados por auditoría/replay; bovedaRespaldo también rastrea pxd: // v341: reanudar SIEMPRE (catálogo respeta continuar viendo y ya no pisa tu minuto) + posición marcada al INICIAR el salto + el perro guardián cura saltos colgados (>9 s buscando) // v340: ventana mala de vimeos = verificaciones diferidas 10 min (aviso único/hora, cero spam, cero muertes falsas) + el player AVISA cuando la reconexión automática no puede // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
+const UI_VERSION = 'v357'; // v358 auditoría: archive.org (clásicos de Danimados) + v357 ciclo intros + v357.1 replay pxd + v356.x fusible/async + v355 censo // v355: CENSO de bodegas — cada título cq queda clasificado por bodega (persistente, se llena al reproducir/auditar); los chips del panel muestran CUÁNTOS TÍTULOS tiene cada bodega de vimeos en el panel (bodegas en vivo + fallos recientes) + BUG dan v335 (undefinedxundefined — jamás cosechó) + flv secuencial con data-dwn (hosters independientes) + pxd en la rotación automática // v353: bodega caída NO es muerte — la auditoría distingue 'podrido' (página completa sin video, 2 strikes) de opaco (timeout/403/racionado: no se juzga); el revividor solo acepta vida real // v352: FASE 3 — películas cq con fallo total se resuelven vía CUEVANA (otro hoster, goodstream) desde el catálogo en memoria; negative cache 30 min; la cosecha cv deja el título blindado para siempre // v351: DIVERSIDAD DE HOSTERS — respaldos ordenan goodstream/no-vimeos primero y la auditoría ligera da la entrada por viva si CUALQUIER hoster responde (una entrada multi-hoster solo muere si todos mueren) // v350: canario directo⇄relay EN PARALELO (veredicto en segundos — v349 lo hacía lento y ahogaba el relay) + semáforo del relay (máx 3) + saneamiento de relay.txt/set-relay // v349: la LUPA de la sonda mira por el relay (canario, embeds y video) — vimeos bloqueando el datacenter ya no silencia las auditorías + pausas por memoria visibles // v348: FASE 2 — segundo enlace de SERIES cq vía Danimados (TxE idéntica, cached en altEps) + auditoría de códigos de series (punto ciego desde v321; 2 strikes = el código fuera, la serie queda) // v347: auto-curación SIN techo (sillita de 20 s) + la rama de error hls pide FRESCO (antes re-montaba la misma m3u8 desde cache) // v346: DOBLE CHEQUEO del ganador en resolverVimeos — nodos inestables (índice OK, video 502: vimeos.zip hoy) detectados ANTES de entregar el stream; se pasa al siguiente nodo de la misma oleada // v345: cadena corta (relay = último intento) + el player JAMÁS se cierra solo: los 4 caminos de 'Se cortó el video' ahora dejan el player abierto con Recargar video disponible (v319 restituida) // v344: la verificación del video (máster Y variante) usa el relay en toda la oleada de relay — el presupuesto de un solo uso rechazaba nodos buenos: 'saturado' con relay vivo // v343: el relay de casa se intenta ANTES de declarar 'saturado' — bloqueo de vimeos a datacenters ya no tumba la reproducción si el relay está vivo // v342: SEGUNDO ENLACE — películas cq con embeds de respaldo de OTRA infraestructura (PelisXD byse/dood), cosechados al fallar y usados por auditoría/replay; bovedaRespaldo también rastrea pxd: // v341: reanudar SIEMPRE (catálogo respeta continuar viendo y ya no pisa tu minuto) + posición marcada al INICIAR el salto + el perro guardián cura saltos colgados (>9 s buscando) // v340: ventana mala de vimeos = verificaciones diferidas 10 min (aviso único/hora, cero spam, cero muertes falsas) + el player AVISA cuando la reconexión automática no puede // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -3246,6 +3246,15 @@ async function daniEpToStream(urlEp) {
       const src = (/src=["']([^"']+)/.exec(embedUrl) || [])[1] || '';
       if (!src) continue;
       embedUrl = src;
+    }
+    if (/archive\.org/i.test(embedUrl)) { /* v358: clásicos en archive.org — mp4 directo */
+      const ra = await extraerArchive(embedUrl).catch(() => null);
+      if (ra && ra.m3u8) {
+        try { if (embedsVistosDan.length) bovedaPon('dan:' + urlEp, { embeds: embedsVistosDan.slice(0, 3) }); } catch {}
+        DANI_STREAMS.set(urlEp, { nat: ra, at: ahora });
+        return ra;
+      }
+      continue;
     }
     /* el front hglink (con guard JS) solo ROTA el dominio: hanerix sirve el
      * player de verdad sin guard — si aún no viene desempacable, cambiamos host */
@@ -12419,6 +12428,26 @@ const normaBv = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]
  * fuente se convierte en video con los extractores que ya tenemos. Los ids
  * de los players (ok.ru, rpmvid, vimeos, mp4upload, goodstream, vk, byse)
  * son estables; lo único efímero es el stream, y ese se re-deriva al play. */
+/* v358: ARCHIVE.ORG — Danimados (clásicos: Transformers G1, y toda la vieja
+ * escuela) embedea archive.org: /embed/{id}/{archivo}.mp4. El archivo DIRECTO
+ * vive en /download/ y sirve mp4 con soporte de Range — sin referer, sin
+ * cookies, sin packer. Antes estos títulos jamás reproducían. */
+async function extraerArchive(embedUrl) {
+  const mA = /archive\.org\/(?:embed|download)\/([^\/?#]+)\/([^?#]*\.mp4)/i.exec(String(embedUrl || ''));
+  if (!mA) return null;
+  /* v358.1: archive.org redirige a su nodo y el nodo exige ESPACIOS reales
+   * (%20) — con '+' del embed da 404 al final de la cadena */
+  const nombre = mA[2].replace(/\+/g, '%20');
+  const archivos = ['https://archive.org/download/' + mA[1] + '/' + nombre];
+  for (const uA of archivos) {
+    try {
+      const rA = await fetchSeguro(uA, 15000, { Range: 'bytes=0-1024' });
+      if (rA && (rA.ok || rA.status === 206)) { console.log('[archive] OK ' + mA[1] + '/' + decodeURIComponent(mA[2]).slice(0, 60)); return { m3u8: uA, mp4: true, proxy: true, subs: [] }; }
+    } catch {}
+  }
+  console.warn('[archive] el archivo no respondió: ' + mA[1]);
+  return null;
+}
 async function bovedaEmbedASink(embed, ctx) {
   const e = String(embed || '');
   if (!/^https?:\/\//i.test(e)) return null;
@@ -12426,6 +12455,7 @@ async function bovedaEmbedASink(embed, ctx) {
   if ((m = /ok\.ru\/videoembed\/(\d+)/i.exec(e))) return resolverOkRu(m[1]);
   if ((m = /rpmvid\.com\/#([a-z0-9]+)/i.exec(e))) return resolverRpmvidD23(e, m[1]);
   if (/goodstream\.one/i.test(e)) return resolverGoodstream(e, ctx);
+  if (/archive\.org/i.test(e)) return extraerArchive(e); /* v358 */
   if (/vimeos?\.net|hlswish\.com/i.test(e)) return resolverVimeos(e, ctx);
   if (/mp4upload\.com/i.test(e)) return extraerMp4([e], ctx);
   if (/vk\.com\/video_ext\.php/i.test(e)) return resolverVk(e, ctx);
@@ -15577,6 +15607,8 @@ server.timeout = 0; // streaming SSE sin timeout
  * (qué función en qué línea), la deja en huddle-diag-pila.log y lo mata para
  * que systemd lo releve al instante (~20 s en vez de 3 min). */
 try { require('child_process').spawn(process.execPath, [path.join(__dirname, 'diag-hijo.js'), String(process.pid)], { detached: true, stdio: 'ignore' }).unref(); } catch {}
+  /* v358: calentar tendencias al arrancar — el primer usuario no paga el frío */
+  setTimeout(() => { try { tendenciasCuevana('dia', tendenciasCache).catch(() => {}); tendenciasCuevana('semana', seriesCache).catch(() => {}); } catch {} }, 12000).unref();
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🎬 Huddle ${UI_VERSION} corriendo en http://0.0.0.0:${PORT} — 100 usuarios, sonda HTTP/HLS, auditoría 100% disponible`);
 });

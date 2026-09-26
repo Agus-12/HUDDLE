@@ -3754,3 +3754,28 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   noche, byse+playmogo) → {ok,m3u8:/api/xd/…/index.m3u8,proxy:true} en
   1.8 s; playlist sirve #EXTM3U 1080p; server vivo. hls.min.js contiene
   exactamente 1 'trim' (el manejo de URL) — mecanismo confirmado.
+
+## v358.1 (26 Sep 2026) — AUDITORÍA INTEGRAL solicitada por el usuario
+- Reproducciones reales por fuente (sandbox): cq peli ✓ (bóveda), cq serie ✓
+  (vimeos.zip, flapping según ventana), PelisXD ✓ (bóveda byse), Caricaturas ✓
+  (Sabrina 3x01 1080p), Ennovelas ✓ (bóveda vkuser), Danimados ✗→✓ (v358),
+  Latanime ✗ honesto (servidores muertos del título probado; cosecha lat sigue
+  viva: +Parasyte, +Yu-Gi-Oh Zexal, +Bleach S2), AnimeFLV ✗ honesto (catálogo
+  viejo = mega/zippy/streamtape: hosters no abribles; veredicto correcto),
+  d23: Cloudflare bloquea la IP del sandbox (verificable solo desde Oracle;
+  la cosecha d23 del Oracle sigue viva). Lacartoons: sitio CAÍDO (oculto
+  automático, correcto). Enn placeholders YouTube: ruido conocido, la bóveda
+  de enn sirve igual (Betty ✓).
+- BUG v358: archive.org NO era hoster soportado → los CLÁSICOS de Danimados
+  (Transformers G1 etc. vía /embed/{id}/{file}.mp4) jamás reproducían ni de
+  bóveda ni del sitio. Fix: extraerArchive() (embed→download, Range check,
+  mp4 nativo proxy) en bovedaEmbedASink + daniEpToStream.
+- BUG v358.1: archive.org /download con '+' del embed → 302 → nodo final 404;
+  el nodo exige %20. Fix: nombre.replace(/\+/g,'%20'). VERIFICADO: Transformers
+  G1 1x1 → ok:true mp4 206 ✓ (toda la vieja escuela desbloqueada).
+- Endpoints ✓: search/boveda(3MB)/vimeos-salud/sondas/stats/intros-panel/sites/
+  health/panel(cookie)/index. trending en frío >20s → warm-up al arranque (+12s).
+- UI_VERSION 'v354'→'v357'; badge panel 'v357 · 24/7' (visibilidad de deploys).
+- EN VIVO (Oracle) durante auditoría: v356.2 corriendo, canario VIVO, s9/s11/s12
+  despiertas, s14/s1 ko, intro-crawl 1965/6676 PROGRESANDO (fpcalc OK + v357
+  = ya sin riesgo de bucle). Falta desplegar v357+ en el Oracle.
