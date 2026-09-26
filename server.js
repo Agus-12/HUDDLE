@@ -5334,7 +5334,11 @@ async function handleAction(req, res, body) {
            * claro a la sala. Antes se abría la página web en el navegador
            * remoto: mala experiencia y un Chrome extra comiendo RAM que
            * después tumbaba las demás resoluciones. */
-          if (/lacartoons\.com\/serie\/capitulo\/|miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}|pelisxd\.com\/pelicula\//i.test(urlNat)) {
+          /* v358.2: TODAS nuestras fuentes se resuelven por HTTP — si el
+           * nativo falla, error limpio a la sala. Antes solo 3 fuentes
+           * estaban protegidas y latanime/enn/d23/dani/cq caían al espejo
+           * (Chrome remoto para una página muerta: RAM y mala experiencia). */
+          if (/lacartoons\.com\/serie\/capitulo\/|miscaricaturas\.com\/[a-z0-9-]+-\d{2}x\d{2}|pelisxd\.com\/pelicula\/|latanime\.org\/ver\/|animeflv\.[a-z.]+\/ver\/|danimados\.cc\/episodios\/|animed23\.com\/capitulo\/|ennovelas-tv\.com\/[a-z0-9-]+-capitulo-|novelas360\.com\/video\/|enpantallatv\.com\/|cinecalidad\.am\/|cine-calidad\.mx\/|cuevana\.mov\/(?:pelicula|serie)\//i.test(urlNat)) {
             return json(res, 200, { ok: false, error: errNat || 'No pude resolver ese capítulo — prueba otro' });
           }
         }

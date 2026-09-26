@@ -3779,3 +3779,23 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - EN VIVO (Oracle) durante auditoría: v356.2 corriendo, canario VIVO, s9/s11/s12
   despiertas, s14/s1 ko, intro-crawl 1965/6676 PROGRESANDO (fpcalc OK + v357
   = ya sin riesgo de bucle). Falta desplegar v357+ en el Oracle.
+
+## v358.2 (26 Sep 2026) — AUDITORÍA del modo JUNTOS (salas compartidas)
+- Cliente auditor Node (/tmp/audit-juntos.js): 2 usuarios SSE por sala × 7
+  salas; protocolo real: events?room&uid&name&tok → hello {userId (el server
+  REGENERA el uid — cliente debe usar el del hello)} + acciones POST /api/action
+  {room,userId,action} → mirror op:'start' = abrir contenido (nativo primero).
+- RESULTADOS (todo ✓): pelisxd/danimados(archive!)/caricaturas/cq-peli/cq-serie
+  → nativo + bRecibio + sysMsg + sync play/seek/pause/CHAT ✓; serieCtx ✓
+  (dan {total:98,next}, misc {total:163,3x1}); SALTO AUTOMÁTICO v128 VERIFICADO:
+  Sabrina 3x01 'ended' → 3x02 pausado + sysMsg ✓; negativos badName/noRoom ✓;
+  /api/rooms y /api/room/CODE ✓; fallos limpios latanime/enn sin espejo ✓
+  (enn Betty: site en placeholder — veredicto honesto).
+- BUG v358.2: la lista de fuentes SIN espejo (v117) solo tenía 3 — latanime/
+  animeflv/danimados/d23/enn/novelas/enpantalla/cq/cuevana caían al CHROME
+  remoto al fallar el nativo (RAM + mala experiencia). Fix: regex completa de
+  fuentes propias → error limpio en la sala; espejo solo para sitios externos.
+- Notas: el chat del server usa action.text (mi auditor mandaba msg — falso
+  positivo resuelto); cq-serie 287620 serieCtx total:1 (solo 1 ep en su
+  fuente/bóveda — dato, no bug); vimeos flapping fuerte durante la prueba
+  (s14/p5/s1 mudos por ventanas) y AUN así cq resolvió por oleadas.
