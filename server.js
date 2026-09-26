@@ -15559,6 +15559,11 @@ server.maxConnections = 200;
 server.keepAliveTimeout = 65000;
 server.headersTimeout = 66000;
 server.timeout = 0; // streaming SSE sin timeout
+/* v356.3: diag-hijo — guardaespaldas que vigila el CPU del server; si el loop
+ * se congela (100% sostenido 15 s), le extrae la PILA JS exacta vía inspector
+ * (qué función en qué línea), la deja en huddle-diag-pila.log y lo mata para
+ * que systemd lo releve al instante (~20 s en vez de 3 min). */
+try { require('child_process').spawn(process.execPath, [path.join(__dirname, 'diag-hijo.js'), String(process.pid)], { detached: true, stdio: 'ignore' }).unref(); } catch {}
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`🎬 Huddle ${UI_VERSION} corriendo en http://0.0.0.0:${PORT} — 100 usuarios, sonda HTTP/HLS, auditoría 100% disponible`);
 });

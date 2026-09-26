@@ -3696,3 +3696,25 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   el server respondía 200 en 0.007 s; 0 latidos falsos; /api/salud OK.
 - Pendiente (si vuelve a colgarse): capturar top CPU del PID + wchan +
   dmesg (blocked/hung_task/nvme) para diferenciar CPU-loop vs disco.
+
+## v356.3 (26 Sep 2026) — diag-hijo: capturador de la pila congelada
+- Evidencia definitiva del usuario (top): node a 100.0% CPU, estado R,
+  wchan 0 ⇒ bucle JS infinito (NO disco, NO sockets, NO memoria: 10 GiB
+  libres, techo fd 524288). v356 (fusible) y v356.2 (async writes) no
+  bastaron ⇒ el spinner corre tras los últimos logs del boot (~60-90 s),
+  solo en Oracle (sandbox idéntico en datos NO se congela). Diferenciales
+  sandbox-vs-Oracle: intro-auto/fpcalc OFF aquí, relay no alcanzable aquí,
+  usuarios reales conectados allá.
+- diag-hijo.js: hijo spawned al listen; vigila /proc/<pid>/stat (utime+stime);
+  >=80% núcleo sostenido 15 s ⇒ SIGUSR1 (activa inspector del padre) ⇒ CDP
+  por WebSocket pelado (sin deps) ⇒ Debugger.pause ⇒ volca callFrames a
+  huddle-diag-pila.log ('#0 función @ archivo:línea') ⇒ SIGKILL (systemd
+  releva en ~20 s vs 3 min del watchdog). Probado con spinner sintético:
+  capturó 'giro @ :3:29' y mató. Lección: setInterval .unref() en un proceso
+  sin más handles = exit inmediato (bug hallado por mi propio test).
+- server.js: spawn al listen (detached, unref); huérfanos se auto-exitan al
+  ver /proc del padre muerto (verificado).
+- SIGUIENTE PASO: desplegar, esperar la próxima congelada (~90 s tras algún
+  restart si vimeos sigue mudo + usuarios reconectando), leer
+  /home/ubuntu/huddle-diag-pila.log → la pila NOMBRA al culpable → parche
+  quirúrgico v357. El log también queda tras watchdog/reinicio manual.
