@@ -3661,3 +3661,18 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   152 KB en 0.2 s ✓, servidor vivo al instante después (200 en 0.002 s) ✓.
 - Recordar: fuse global para vimeos.* (si se abre, brownout de 90 s para
   todas las bodegas — mejor 90 s a marearse que morir ahogado).
+
+## v356.1 (26 Sep 2026) — fuga de sockets en el proxy HLS (teoría fd-exhaustion)
+- v356 no bastó: Oracle re-congelado a los ~70 s del restart (10 GiB libres —
+  NO es memoria). Journal: las 2 congeladas mueren tras 'catCv movies
+  cacheados' / 'boveda-caps cola' (~60 s del boot) = cuando los players
+  re-conectados martillan /api/hls contra vimeos mudo.
+- Teoría principal: agotamiento de FILE DESCRIPTORS (default 1024/proceso):
+  cada error 401/403/5xx de vimeos dejaba el body upstream SIN cancelar
+  (socket abierto hasta GC) × marea de reconexiones → EMFILE → node deja
+  de aceptar → parece congelado con memoria de sobra.
+- v356.1: (1) cancel() del body en la ruta 'estado X' del proxy;
+  (2) el fusible ahora también cuenta 403/5xx (antes solo timeouts).
+- En el Oracle: drop-in systemd LimitNOFILE=24576 (sube el techo por si
+  acaso) + diagnosticar: ls /proc/$(MainPID)/fd | wc -l antes/después.
+- VERIFICAR con el usuario: count de fds durante congelada = confirmación.

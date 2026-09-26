@@ -13002,6 +13002,10 @@ async function proxearHls(req, res, target) {
       if (upstream.ok) { if (esVimeosH(target)) VIMEOS_FUSIBLE.fallos = 0; break; }
       if (upstream.status === 403 || upstream.status >= 500) {
         try { upstream.body && upstream.body.cancel(); } catch {}
+        if (esVimeosH(target) && ++VIMEOS_FUSIBLE.fallos >= VIMEOS_FUSIBLE.UMBRAL && Date.now() >= VIMEOS_FUSIBLE.hasta) {
+          VIMEOS_FUSIBLE.hasta = Date.now() + VIMEOS_FUSIBLE.MS_ABIERTO;
+          console.warn('[hls-proxy] FUSIBLE vimeos: ' + VIMEOS_FUSIBLE.fallos + ' fallos seguidos — respuestas inmediatas 90 s');
+        }
         upstream = null;
         await new Promise((r2) => setTimeout(r2, 1500 * (intento + 1)));
         continue;
@@ -13059,6 +13063,7 @@ async function proxearHls(req, res, target) {
     }
   }
   if (!upstream.ok && upstream.status !== 404) {
+    try { upstream.body && upstream.body.cancel(); } catch {} /* v356.1: cerrar el socket, no filtrarlo */
     console.warn('[hls-proxy] estado ' + upstream.status + ':', decodeURIComponent(target).slice(0, 90));
     if (upstream.status === 403 && /master\.m3u8/i.test(target)) {
       return json(res, 410, { ok: false, error: 'master expirado — re-resolver', reResolve: true });
