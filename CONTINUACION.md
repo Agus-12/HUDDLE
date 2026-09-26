@@ -3799,3 +3799,19 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   positivo resuelto); cq-serie 287620 serieCtx total:1 (solo 1 ep en su
   fuente/bóveda — dato, no bug); vimeos flapping fuerte durante la prueba
   (s14/p5/s1 mudos por ventanas) y AUN así cq resolvió por oleadas.
+
+## v358.2+ (26 Sep 2026) — VALIDACIÓN DEL USUARIO en Juntos
+- El usuario confirmó con captura: Latanime REPRODUCE en sala Juntos
+  ('De viejo pueblerino a gran maestro espadachín S2 Latino' T.1 EP.7,
+  serieCtx resuelto, título formateado, video en pantalla). Sus fallos de
+  auditoría eran contenido muerto puntual (009-1, Detective Conan) —
+  veredictos honestos correctos, la fuente sana.
+- Ennovelas VERIFICADA por mí: amor-real-capitulo-1 → ok:true (bóveda enn,
+  m3u8 de okcdn.ru/vk). El fallo de Betty C1 = placeholder del PROPIO sitio.
+- Nota: la ficha latanime de esa serie carga episodios por JS (sin /ver/ en
+  HTML crudo) — el catálogo de Huddle tiene las URLs correctas de todos modos.
+- El Oracle del usuario corre YA la cadena v357 (chat 'Conexión verificada
+  (v357)' en su captura) = bucle-intros, pxd trim, archive.org y Juntos fixes
+  desplegados. Badge 'v116' del cliente = APP_VERSION de app.js (contador
+  aparte, no es el server).
+- AUDITORÍA COMPLETA CERRADA: Solo ✓ + Juntos ✓ + usuario validando en vivo.
