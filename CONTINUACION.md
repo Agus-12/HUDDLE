@@ -3626,3 +3626,20 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - Nota técnica: 'SALUD DE VIMEOS' aparece 2× (comentario HTML + comentario JS
   en tic()) — los chequeos de unicidad deben usar el comentario HTML.
 - Verificado en el HTML servido (cookie admin): orden correcto ✓.
+
+## v355 (25 Sep 2026) — CENSO: cuántos títulos vive en cada bodega
+- Pregunta del usuario: ¿esos chips son todas las bóvedas? ¿cuántos títulos
+  tiene cada una? → ACLARACIÓN: los chips NO son bóvedas (la Bóveda Huddle
+  es UNA, la nuestra); son las BODEGAS de vimeos (servidores de origen).
+  Solo aparecen las que Huddle ha tocado. ok/ko = peticiones, no títulos.
+- v355: CENSO persistente (data/bodegas-censo.json, guardado cada 2 min si
+  hay cambios): bodegaTag(clave, m3u8) clasifica el título al resolverse
+  (3 rutas cq: peli-bóveda, peli-API, serie). Endpoint suma títulos por
+  bodega + clasificadas/totalPelis. Panel: chips '+ N títulos' y línea
+  'X de Y películas ya saben en qué bodega viven'.
+- Verificado :3935: Drácula resolvió (p6.vimeos.zip/srv s8 — la puerta
+  proxy p6 NO es otra bodega, es la puerta de la s8) → clasificadas 1 de
+  7590 · s8 · 1 título.
+- Nota: en el Oracle (vimeos bloquea datacenter) la clasificación igual
+  avanza: las resoluciones exitosas pasan por el relay de casa y el
+  winner m3u8 revela la bodega igual.
