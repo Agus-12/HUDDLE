@@ -3606,3 +3606,13 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - El veredicto de Huddle al intentar T2E6 durante el flapping fue correcto
   ('saturado' en 14 s) — canario rotando entre códigos vivos/caídos según
   la ventana.
+
+## v354.1 (25 Sep 2026) — Reacomodo del panel a petición del usuario
+- El saludómetro funcionó en producción (capturas: s14 0 ok/144 fallos,
+  s9 49/57, s10 1/15 flapping, s13 0/20 — vista del Oracle, distinta a la
+  del sandbox por punto de observación).
+- Reorden: en pageDash, Sonda Huddle y Bóveda Huddle quedaron PRIMERO
+  (antes de 'Fuentes de video'); 'Salud de vimeos' se MUDÓ a pageHuddle
+  (encima de la tarjeta del Servidor). Verificado en el HTML servido.
+- Nota: 'nada falló recientemente' = no hubo fallos de reproducción en los
+  últimos minutos (la lista solo registra /api/solo fallidos, dedup 10 min).

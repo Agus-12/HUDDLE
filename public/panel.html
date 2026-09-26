@@ -223,9 +223,6 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
     <div style="font-size:10px;color:#7c6fa0;margin-top:8px">Se enciende con la tarjeta «Detector openings» de arriba</div>
   </div>
 
-  <div class="sec-title">Fuentes de video <span class="line"></span></div>
-  <div id="fuentesCards"></div>
-
   <!-- v308: Sonda Huddle = una fuente más — tarjeta como las demás; al entrar abre SU detalle (no el Panel Huddle) -->
   <div class="fcard" onclick="showFuente('huddle')" style="margin-top:12px">
     <div class="fhead">
@@ -265,7 +262,29 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
     <div class="bar"><i id="bvBar" style="width:0%;background:#f59e0b"></i></div>
   </div>
 
-  <!-- v354: SALUD DE VIMEOS — bodegas en vivo + fallos recientes -->
+  <div class="sec-title">Fuentes de video <span class="line"></span></div>
+  <div id="fuentesCards"></div>
+
+  <!-- v305: el rastreador ahora vive en su propia tarjeta/página -->
+  <div id="introsWrap" style="display:none"></div>
+  <p class="pie" id="pie">conectando…</p>
+</div>
+
+<!-- HUDDLE PANEL -->
+<div class="page" id="pageHuddle">
+  <!-- hero -->
+  <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+    <div style="width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#4c1d95,#7c3aed 60%,#a78bfa);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(124,58,237,.30);flex-shrink:0">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 12 L12 3"/><path d="M12 12 L19.5 12"/><path d="M12 12 L17 7"/><circle cx="12" cy="12" r="1.8" fill="#fff" stroke="none"/></svg>
+    </div>
+    <div style="flex:1;min-width:0">
+      <div style="font-size:19px;font-weight:900;letter-spacing:-.2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">Panel Huddle <span style="font-size:11px;font-weight:700;color:#a78bfa;background:#1e1438;border:1px solid #3b2a6b;border-radius:99px;padding:3px 8px">v285 · 24/7</span></div>
+      <div style="font-size:12px;color:#9d93b5;margin-top:2px">Dos sondas maestras · solo vivos · muertas siempre ocultas · auto-repara Huddle</div>
+    </div>
+    <span id="huddleStatusBadge" class="badge-idle">IDLE</span>
+  </div>
+  <!-- v268: salud + storage + 100 users -->
+    <!-- v354: SALUD DE VIMEOS — bodegas en vivo + fallos recientes -->
   <div class="fcard" style="margin-top:12px;cursor:default">
     <div class="fhead">
       <div style="display:flex;align-items:center;gap:10px">
@@ -289,26 +308,7 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
     <div id="vmFallos" style="display:none;margin-top:8px"></div>
   </div>
 
-  <!-- v305: el rastreador ahora vive en su propia tarjeta/página -->
-  <div id="introsWrap" style="display:none"></div>
-  <p class="pie" id="pie">conectando…</p>
-</div>
-
-<!-- HUDDLE PANEL -->
-<div class="page" id="pageHuddle">
-  <!-- hero -->
-  <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
-    <div style="width:46px;height:46px;border-radius:14px;background:linear-gradient(135deg,#4c1d95,#7c3aed 60%,#a78bfa);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 20px rgba(124,58,237,.30);flex-shrink:0">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 12 L12 3"/><path d="M12 12 L19.5 12"/><path d="M12 12 L17 7"/><circle cx="12" cy="12" r="1.8" fill="#fff" stroke="none"/></svg>
-    </div>
-    <div style="flex:1;min-width:0">
-      <div style="font-size:19px;font-weight:900;letter-spacing:-.2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">Panel Huddle <span style="font-size:11px;font-weight:700;color:#a78bfa;background:#1e1438;border:1px solid #3b2a6b;border-radius:99px;padding:3px 8px">v285 · 24/7</span></div>
-      <div style="font-size:12px;color:#9d93b5;margin-top:2px">Dos sondas maestras · solo vivos · muertas siempre ocultas · auto-repara Huddle</div>
-    </div>
-    <span id="huddleStatusBadge" class="badge-idle">IDLE</span>
-  </div>
-  <!-- v268: salud + storage + 100 users -->
-  <div class="detail-section" id="healthCard" style="border-color:#1e2a3a">
+<div class="detail-section" id="healthCard" style="border-color:#1e2a3a">
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
       <div style="display:flex;align-items:center;gap:10px">
         <div style="width:32px;height:32px;border-radius:9px;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.22);display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></div>
