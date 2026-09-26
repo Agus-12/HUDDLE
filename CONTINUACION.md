@@ -3616,3 +3616,13 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   (encima de la tarjeta del Servidor). Verificado en el HTML servido.
 - Nota: 'nada falló recientemente' = no hubo fallos de reproducción en los
   últimos minutos (la lista solo registra /api/solo fallidos, dedup 10 min).
+
+## v354.2 (25 Sep 2026) — Orden del panel: exacto a lo que pidió el usuario
+- Usuario: «PANEL HUDDLE → Salud Vimeo - Panel Huddle - Rastreo Intros →
+  FUENTES DE VIDEO → Boveda Huddle - Sonda Huddle - Cuevana - PelisXD - y más».
+- pageDash ahora: [Salud de vimeos] → [Panel Huddle] → [Rastreo de intros] →
+  título 'Fuentes de video' → [Bóveda Huddle] → [Sonda Huddle] →
+  [#fuentesCards dinámicas]. Salud FUERA de pageHuddle (vuelta al dash).
+- Nota técnica: 'SALUD DE VIMEOS' aparece 2× (comentario HTML + comentario JS
+  en tic()) — los chequeos de unicidad deben usar el comentario HTML.
+- Verificado en el HTML servido (cookie admin): orden correcto ✓.

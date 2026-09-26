@@ -153,6 +153,30 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
   <div id="catDetail" style="font-size:12px;color:#9d93b5;line-height:1.8;margin-bottom:16px"></div>
 
   <div class="sec-title" style="color:#c4b5fd">Panel Huddle <span class="line" style="background:#2e2550"></span></div>
+  <!-- v354: SALUD DE VIMEOS — bodegas en vivo + fallos recientes -->
+  <div class="fcard" style="margin-top:12px;cursor:default">
+    <div class="fhead">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#1e3a8a,#3b82f6);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        </div>
+        <div>
+          <div class="fname" style="color:#60a5fa">Salud de vimeos</div>
+          <div class="fsub" id="vmEstado">—</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="fcount" style="color:#60a5fa" id="vmCanario">—</div>
+      </div>
+    </div>
+    <div id="vmChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
+    <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:11px;color:#9d93b5">Títulos con fallos recientes (todos los orígenes)</div>
+      <button onclick="toggleFallos()" style="font-size:11px;font-weight:700;color:#60a5fa;background:rgba(96,165,250,.10);border:1px solid rgba(96,165,250,.22);border-radius:99px;padding:4px 12px;cursor:pointer">Ver</button>
+    </div>
+    <div id="vmFallos" style="display:none;margin-top:8px"></div>
+  </div>
+
   <div class="fcard audit-preview" onclick="showPage('Huddle')">
     <div class="fhead" style="position:relative;z-index:1">
       <div style="display:flex;align-items:center;gap:12px">
@@ -223,6 +247,26 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
     <div style="font-size:10px;color:#7c6fa0;margin-top:8px">Se enciende con la tarjeta «Detector openings» de arriba</div>
   </div>
 
+  <div class="sec-title">Fuentes de video <span class="line"></span></div>
+    <!-- v322: BÓVEDA — catálogo propio con reproducción sin sitio -->
+  <div class="fcard" onclick="showFuenteBoveda()" style="margin-top:12px">
+    <div class="fhead">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#92400e,#f59e0b);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+        </div>
+        <div>
+          <div class="fname" style="color:#fbbf24">Bóveda Huddle</div>
+          <div class="fsub"><span id="bvT">—</span> títulos · <span id="bvCaps">—</span> capítulos · <span id="bvCola">—</span> en cola</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="fcount" style="color:#fbbf24" id="bvP">—</div>
+      </div>
+    </div>
+    <div class="bar"><i id="bvBar" style="width:0%;background:#f59e0b"></i></div>
+  </div>
+
   <!-- v308: Sonda Huddle = una fuente más — tarjeta como las demás; al entrar abre SU detalle (no el Panel Huddle) -->
   <div class="fcard" onclick="showFuente('huddle')" style="margin-top:12px">
     <div class="fhead">
@@ -243,27 +287,7 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
     <div class="bar"><i id="hudBar" style="width:0%;background:#8a5cf6"></i></div>
   </div>
 
-  <!-- v322: BÓVEDA — catálogo propio con reproducción sin sitio -->
-  <div class="fcard" onclick="showFuenteBoveda()" style="margin-top:12px">
-    <div class="fhead">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#92400e,#f59e0b);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
-        </div>
-        <div>
-          <div class="fname" style="color:#fbbf24">Bóveda Huddle</div>
-          <div class="fsub"><span id="bvT">—</span> títulos · <span id="bvCaps">—</span> capítulos · <span id="bvCola">—</span> en cola</div>
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <div class="fcount" style="color:#fbbf24" id="bvP">—</div>
-      </div>
-    </div>
-    <div class="bar"><i id="bvBar" style="width:0%;background:#f59e0b"></i></div>
-  </div>
-
-  <div class="sec-title">Fuentes de video <span class="line"></span></div>
-  <div id="fuentesCards"></div>
+<div id="fuentesCards"></div>
 
   <!-- v305: el rastreador ahora vive en su propia tarjeta/página -->
   <div id="introsWrap" style="display:none"></div>
@@ -284,31 +308,7 @@ td{padding:5px 4px;border-bottom:1px solid #1a1625}
     <span id="huddleStatusBadge" class="badge-idle">IDLE</span>
   </div>
   <!-- v268: salud + storage + 100 users -->
-    <!-- v354: SALUD DE VIMEOS — bodegas en vivo + fallos recientes -->
-  <div class="fcard" style="margin-top:12px;cursor:default">
-    <div class="fhead">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#1e3a8a,#3b82f6);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-        </div>
-        <div>
-          <div class="fname" style="color:#60a5fa">Salud de vimeos</div>
-          <div class="fsub" id="vmEstado">—</div>
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <div class="fcount" style="color:#60a5fa" id="vmCanario">—</div>
-      </div>
-    </div>
-    <div id="vmChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
-    <div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between">
-      <div style="font-size:11px;color:#9d93b5">Títulos con fallos recientes (todos los orígenes)</div>
-      <button onclick="toggleFallos()" style="font-size:11px;font-weight:700;color:#60a5fa;background:rgba(96,165,250,.10);border:1px solid rgba(96,165,250,.22);border-radius:99px;padding:4px 12px;cursor:pointer">Ver</button>
-    </div>
-    <div id="vmFallos" style="display:none;margin-top:8px"></div>
-  </div>
-
-<div class="detail-section" id="healthCard" style="border-color:#1e2a3a">
+  <div class="detail-section" id="healthCard" style="border-color:#1e2a3a">
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between">
       <div style="display:flex;align-items:center;gap:10px">
         <div style="width:32px;height:32px;border-radius:9px;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.22);display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg></div>
