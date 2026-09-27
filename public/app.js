@@ -1525,7 +1525,7 @@ let spDatos = null; /* lo que devolvió /api/serie */
  * wsrv.nl ya no puede con ellas (las bloquean con 403) */
 function proxyAnimeImg(src, w) {
   if (src && src.startsWith('/api/img')) return src; /* v91: ya proxieada */
-  if (src && /animeflv\.|latanime\.|miscaricaturas\.|lacartoons\./i.test(src)) { /* v102 pósters de caricaturas; v112 lacartoons */
+  if (src && /animeflv\.|latanime\.|miscaricaturas\.|lacartoons\.|image\.tmdb\.org|(^|\/\/)(www\.)?pelisxd\.com\//i.test(src)) { /* v102 caricaturas; v112 lacartoons; v359.1 pelis por el proxy (TMDB limita ráfagas y deja carátulas negras) */
     return '/api/img?u=' + encodeURIComponent(src);
   }
   return src || '';
@@ -1538,7 +1538,7 @@ function proxyAnimeImg(src, w) {
 function imgPorProxy(src) {
   if (!src) return '';
   if (src.startsWith('/api/img')) return src;
-  if (/animeflv\.|latanime\.|miscaricaturas\./i.test(src)) return '/api/img?u=' + encodeURIComponent(src); /* v102 */
+  if (/animeflv\.|latanime\.|miscaricaturas\.|lacartoons\.|image\.tmdb\.org|(^|\/\/)(www\.)?pelisxd\.com\//i.test(src)) return '/api/img?u=' + encodeURIComponent(src); /* v102 + v359.1: pósters de pelis (TMDB/pelisxd) también por el proxy — TMDB limita ráfagas por IP y deja la mitad de carátulas negras */
   return src;
 }
 function abrirSeriePicker(res, enSala, esAnime) {

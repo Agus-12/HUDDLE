@@ -3845,3 +3845,16 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   tiene ventanas malas (530/1016 vistas en sandbox, pasó sola); los embeds
   cosechados son el seguro y la auditoría ligera vigila su salud.
 - UI_VERSION 'v359'; badge 'v359 · 24/7'.
+
+## v359.1 (26 Sep 2026) — carátulas negras: TMDB limita ráfagas → proxy con caché
+- Usuario reporta pósters sin cargar (El mirón, Taxi Express, Interstellar…).
+  Diagnóstico: las imágenes están VIVAS (TMDB 200 desde sandbox) — el feed
+  dispara docenas de GET a image.tmdb.org SIMULTÁNEOS desde el navegador y
+  TMDB limita la ráfaga por IP → la mitad de carátulas negras (aleatorio).
+  No era el internet del usuario ni pósters muertos.
+- Fix: /api/img (el proxy de pósters de animes) ahora también permite
+  image.tmdb.org + pelisxd.com; caché 1 h→12 h, cap 300→1200 (~70 MB).
+  Cliente: imgPorProxy y proxyAnimeImg enrutan TMDB/pelisxd por el proxy.
+  El navegador ya no le dispara a TMDB: al server (una conexión, 12 h de
+  caché). Verificado: 200 → 1.5 ms caché; ráfaga 12×200; no-permitidos 403.
+- UI_VERSION v359.1; badge 'v359.1 · 24/7'.
