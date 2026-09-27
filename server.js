@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v359.1'; // v359.1: carátulas de pelis (TMDB/pelisxd) por el proxy con caché 12 h — TMDB limita ráfagas por IP y dejaba la mitad de pósters negros // v359: COSECHA TOTAL de lacartoons a la bóveda (241 series, HTTP puro) + replay rpmvid/ok.ru sin sitio + sonda avisa caídas // v358 auditoría: archive.org (clásicos de Danimados) + v357 ciclo intros + v357.1 replay pxd + v356.x fusible/async + v355 censo // v355: CENSO de bodegas — cada título cq queda clasificado por bodega (persistente, se llena al reproducir/auditar); los chips del panel muestran CUÁNTOS TÍTULOS tiene cada bodega de vimeos en el panel (bodegas en vivo + fallos recientes) + BUG dan v335 (undefinedxundefined — jamás cosechó) + flv secuencial con data-dwn (hosters independientes) + pxd en la rotación automática // v353: bodega caída NO es muerte — la auditoría distingue 'podrido' (página completa sin video, 2 strikes) de opaco (timeout/403/racionado: no se juzga); el revividor solo acepta vida real // v352: FASE 3 — películas cq con fallo total se resuelven vía CUEVANA (otro hoster, goodstream) desde el catálogo en memoria; negative cache 30 min; la cosecha cv deja el título blindado para siempre // v351: DIVERSIDAD DE HOSTERS — respaldos ordenan goodstream/no-vimeos primero y la auditoría ligera da la entrada por viva si CUALQUIER hoster responde (una entrada multi-hoster solo muere si todos mueren) // v350: canario directo⇄relay EN PARALELO (veredicto en segundos — v349 lo hacía lento y ahogaba el relay) + semáforo del relay (máx 3) + saneamiento de relay.txt/set-relay // v349: la LUPA de la sonda mira por el relay (canario, embeds y video) — vimeos bloqueando el datacenter ya no silencia las auditorías + pausas por memoria visibles // v348: FASE 2 — segundo enlace de SERIES cq vía Danimados (TxE idéntica, cached en altEps) + auditoría de códigos de series (punto ciego desde v321; 2 strikes = el código fuera, la serie queda) // v347: auto-curación SIN techo (sillita de 20 s) + la rama de error hls pide FRESCO (antes re-montaba la misma m3u8 desde cache) // v346: DOBLE CHEQUEO del ganador en resolverVimeos — nodos inestables (índice OK, video 502: vimeos.zip hoy) detectados ANTES de entregar el stream; se pasa al siguiente nodo de la misma oleada // v345: cadena corta (relay = último intento) + el player JAMÁS se cierra solo: los 4 caminos de 'Se cortó el video' ahora dejan el player abierto con Recargar video disponible (v319 restituida) // v344: la verificación del video (máster Y variante) usa el relay en toda la oleada de relay — el presupuesto de un solo uso rechazaba nodos buenos: 'saturado' con relay vivo // v343: el relay de casa se intenta ANTES de declarar 'saturado' — bloqueo de vimeos a datacenters ya no tumba la reproducción si el relay está vivo // v342: SEGUNDO ENLACE — películas cq con embeds de respaldo de OTRA infraestructura (PelisXD byse/dood), cosechados al fallar y usados por auditoría/replay; bovedaRespaldo también rastrea pxd: // v341: reanudar SIEMPRE (catálogo respeta continuar viendo y ya no pisa tu minuto) + posición marcada al INICIAR el salto + el perro guardián cura saltos colgados (>9 s buscando) // v340: ventana mala de vimeos = verificaciones diferidas 10 min (aviso único/hora, cero spam, cero muertes falsas) + el player AVISA cuando la reconexión automática no puede // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
+const UI_VERSION = 'v359.2'; // v359.2: lacartoons — ventana mala del player rpmvid = mensaje claro y reintento (NUNCA navegador); bóveda de lct llena por cosecha total // v359.1: carátulas de pelis (TMDB/pelisxd) por el proxy con caché 12 h — TMDB limita ráfagas por IP y dejaba la mitad de pósters negros // v359: COSECHA TOTAL de lacartoons a la bóveda (241 series, HTTP puro) + replay rpmvid/ok.ru sin sitio + sonda avisa caídas // v358 auditoría: archive.org (clásicos de Danimados) + v357 ciclo intros + v357.1 replay pxd + v356.x fusible/async + v355 censo // v355: CENSO de bodegas — cada título cq queda clasificado por bodega (persistente, se llena al reproducir/auditar); los chips del panel muestran CUÁNTOS TÍTULOS tiene cada bodega de vimeos en el panel (bodegas en vivo + fallos recientes) + BUG dan v335 (undefinedxundefined — jamás cosechó) + flv secuencial con data-dwn (hosters independientes) + pxd en la rotación automática // v353: bodega caída NO es muerte — la auditoría distingue 'podrido' (página completa sin video, 2 strikes) de opaco (timeout/403/racionado: no se juzga); el revividor solo acepta vida real // v352: FASE 3 — películas cq con fallo total se resuelven vía CUEVANA (otro hoster, goodstream) desde el catálogo en memoria; negative cache 30 min; la cosecha cv deja el título blindado para siempre // v351: DIVERSIDAD DE HOSTERS — respaldos ordenan goodstream/no-vimeos primero y la auditoría ligera da la entrada por viva si CUALQUIER hoster responde (una entrada multi-hoster solo muere si todos mueren) // v350: canario directo⇄relay EN PARALELO (veredicto en segundos — v349 lo hacía lento y ahogaba el relay) + semáforo del relay (máx 3) + saneamiento de relay.txt/set-relay // v349: la LUPA de la sonda mira por el relay (canario, embeds y video) — vimeos bloqueando el datacenter ya no silencia las auditorías + pausas por memoria visibles // v348: FASE 2 — segundo enlace de SERIES cq vía Danimados (TxE idéntica, cached en altEps) + auditoría de códigos de series (punto ciego desde v321; 2 strikes = el código fuera, la serie queda) // v347: auto-curación SIN techo (sillita de 20 s) + la rama de error hls pide FRESCO (antes re-montaba la misma m3u8 desde cache) // v346: DOBLE CHEQUEO del ganador en resolverVimeos — nodos inestables (índice OK, video 502: vimeos.zip hoy) detectados ANTES de entregar el stream; se pasa al siguiente nodo de la misma oleada // v345: cadena corta (relay = último intento) + el player JAMÁS se cierra solo: los 4 caminos de 'Se cortó el video' ahora dejan el player abierto con Recargar video disponible (v319 restituida) // v344: la verificación del video (máster Y variante) usa el relay en toda la oleada de relay — el presupuesto de un solo uso rechazaba nodos buenos: 'saturado' con relay vivo // v343: el relay de casa se intenta ANTES de declarar 'saturado' — bloqueo de vimeos a datacenters ya no tumba la reproducción si el relay está vivo // v342: SEGUNDO ENLACE — películas cq con embeds de respaldo de OTRA infraestructura (PelisXD byse/dood), cosechados al fallar y usados por auditoría/replay; bovedaRespaldo también rastrea pxd: // v341: reanudar SIEMPRE (catálogo respeta continuar viendo y ya no pisa tu minuto) + posición marcada al INICIAR el salto + el perro guardián cura saltos colgados (>9 s buscando) // v340: ventana mala de vimeos = verificaciones diferidas 10 min (aviso único/hora, cero spam, cero muertes falsas) + el player AVISA cuando la reconexión automática no puede // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -8959,7 +8959,7 @@ async function resolverRpmvidHttp(capNum, id) {
     if (intento) await new Promise((r) => setTimeout(r, 900));
     try {
       const r2 = await fetchSeguro('https://cubeembed.rpmvid.com/api/v1/video?id=' + encodeURIComponent(id) + '&w=1280&h=720&r=lacartoons.com', 10000);
-      if (!r2.ok) { ultimoErr = 'el player rechazó el video (' + r2.status + ')'; if (r2.status === 404 || r2.status === 410) ultimoErr = 'borrado'; /* v209: el player lo eliminó — ni el navegador lo revive */ continue; }
+      if (!r2.ok) { ultimoErr = 'el player rechazó el video (' + r2.status + ')'; if (r2.status === 404 || r2.status === 410) ultimoErr = 'borrado'; else if (r2.status >= 500 || r2.status === 403) ultimoErr = 'ventana'; /* v359.2: 5xx/403 = ventana mala TRANSITORIA (lo vimos vivo minutos después) — no merece navegador */ continue; }
       const hex = String(await r2.text() || '').trim();
       if (!/^[0-9a-f]+$/i.test(hex) || hex.length % 2) { ultimoErr = 'el player cambió su cifrado'; continue; }
       const d = crypto.createDecipheriv('aes-128-cbc', Buffer.from('kiemtienmua911ca', 'utf8'), Buffer.from('1234567890oiuytr', 'utf8'));
@@ -8972,6 +8972,7 @@ async function resolverRpmvidHttp(capNum, id) {
      * que el salto automático de la sala lo brinque) en vez de abrir el
      * navegador y morir con un «aborted» incomprensible. */
     if (ultimoErr === 'borrado') throw new Error('Ese capítulo ya no está disponible en Lacartoons — el player lo borró; prueba otro');
+    if (ultimoErr === 'ventana') throw new Error('El player de Lacartoons anda en ventana mala — toca de nuevo en un momento'); /* v359.2: transitorio — se cura solo */
     throw new Error(ultimoErr || 'el player no respondió');
   }
   let cfg = {};
@@ -9002,13 +9003,16 @@ async function resolverRpmvidHttp(capNum, id) {
     }
     try {
       const r3 = await fetchSeguro(masterUrl, 10000);
-      if (!r3.ok) { ultimoErr = 'el master no se dejó ver (' + r3.status + ')'; continue; }
+      if (!r3.ok) { ultimoErr = (r3.status === 403 || r3.status >= 500) ? 'ventana' : 'el master no se dejó ver (' + r3.status + ')'; continue; } /* v359.2: 403/5xx del master = la misma mala ventana del player */
       const b = await r3.text();
       if (/^#EXTM3U/m.test(b)) body = b;
       else ultimoErr = 'master inválido';
     } catch (e) { ultimoErr = String(e.message || e).slice(0, 60); }
   }
-  if (!body) throw new Error(ultimoErr || 'el master no respondió');
+  if (!body) {
+    if (ultimoErr === 'ventana') throw new Error('El player de Lacartoons anda en ventana mala — toca de nuevo en un momento'); /* v359.2 */
+    throw new Error(ultimoErr || 'el master no respondió');
+  }
   /* los hosts quedan registrados: master/variante por cubeembed (hlsmod)
    * y segmentos por su CDN — todo vía /api/hls con la IP de este server */
   hlsReferers.set('cubeembed.rpmvid.com', 'https://lacartoons.com/');
@@ -9150,66 +9154,14 @@ async function resolverLacartoons(epUrl) {
     if (idRpm) bvLct.push('https://cubeembed.rpmvid.com/#' + idRpm);
     if (bvLct.length) bovedaPon('lct:' + m[1], { embeds: bvLct.slice(0, 3) });
   }
-  /* v159: HTTP PRIMERO — la página ya nos dio el id del player; si algo
-   * falla, el navegador de respaldo toma el turno como siempre */
-  if (idRpm) {
-    try { return await resolverRpmvidHttp(m[1], idRpm); }
-    catch (eH) {
-      /* v209: capítulo borrado de la fuente = no hay nada que rascar con el
-       * navegador; el error limpio viaja directo al usuario */
-      if (/ya no está disponible/i.test(String(eH && eH.message || eH))) throw eH;
-      console.log('[lacartoons] sin HTTP (' + String(eH && eH.message || eH).slice(0, 60) + ') — uso el navegador');
-    }
-  }
-  /* el navegador clica el player y suelta el master. Hay DOS formatos:
-   * - viejo (billy, iCarly): master con una sola variante muxada a+v —
-   *   se baja su cuerpo y se cachea como los demás playlists.
-   * - nuevo v113 (Ben 10, Ed Edd): audio DEMULTICANALIZADO en renditions
-   *   #EXT-X-MEDIA con IDIOMA DECLARADO y video aparte — se arma un
-   *   master propio que deja SOLO la pista «Español» como default, para
-   *   que hls.js no pueda equivocarse de idioma. Sin pista es → error
-   *   claro (capítulo que solo existe en inglés/portugués/francés). */
-  const master = await extraerRpmvid(epUrl);
-  const rM = await fetchSeguro(master, 15000);
-  if (!rM.ok) throw new Error('El player de Lacartoons no respondió');
-  const txtM = await rM.text();
-  let body = null, base = master, nSeg = 0;
-  const medios = txtM.split('\n').filter((l) => /^#EXT-X-MEDIA:TYPE=AUDIO/i.test(l.trim()));
-  if (medios.length) {
-    /* v115: la pista «Español» de Los Supersónicos viene etiquetada
-     * «Latine» (LANGUAGE="la") — también cuenta como español */
-    const lineaEs = medios.find((l) => /LANGUAGE="es"/i.test(l) || /NAME="[^"]*(Espa|Latin)/i.test(l));
-    if (!lineaEs) throw new Error('Ese capítulo no está en español en Lacartoons — prueba otro');
-    const uriEs = (/URI="([^"]+)"/.exec(lineaEs) || [])[1];
-    const rA = uriEs ? await fetchSeguro(new URL(uriEs, master).href, 15000) : null;
-    const bodyA = rA ? await rA.text() : '';
-    if (!rA || !rA.ok || !/#EXTINF/.test(bodyA)) throw new Error('No pude leer la pista de audio de Lacartoons');
-    nSeg = (bodyA.match(/#EXTINF/g) || []).length;
-    body = txtM
-      .split('\n')
-      .filter((l) => !/^#EXT-X-MEDIA:TYPE=AUDIO/i.test(l.trim()) || l.trim() === lineaEs.trim())
-      .map((l) => l.trim() === lineaEs.trim() ? l.replace(/AUTOSELECT=\w+/i, 'AUTOSELECT=YES').replace(/DEFAULT=\w+/i, 'DEFAULT=YES') : l)
-      .join('\n');
-    try { for (const u of bodyA.match(/https?:\/\/[^\s"']+/g) || []) { try { hlsReferers.set(new URL(u).hostname, 'https://cubeembed.rpmvid.com/'); } catch {} } } catch {}
-  } else {
-    const linea = txtM.split('\n').map((s) => s.trim()).find((s) => s && !s.startsWith('#'));
-    const vari = linea ? new URL(linea, master).href : master;
-    const rV = await fetchSeguro(vari, 15000);
-    body = await rV.text();
-    if (!rV.ok || !/#EXTINF/.test(body)) throw new Error('No pude leer el playlist de Lacartoons');
-    base = vari;
-    nSeg = (body.match(/#EXTINF/g) || []).length;
-  }
-  const tok = Math.random().toString(36).slice(2, 10) + ahora.toString(36);
-  pelisxdStreams.set(tok, { body, base, ref: 'https://cubeembed.rpmvid.com/', slug: slugLct, at: ahora });
-  try {
-    hlsReferers.set(new URL(base).hostname, 'https://cubeembed.rpmvid.com/');
-    for (const u of body.match(/https?:\/\/[^\s"']+/g) || []) {
-      try { hlsReferers.set(new URL(u).hostname, 'https://cubeembed.rpmvid.com/'); } catch {}
-    }
-  } catch {}
-  console.log('[lacartoons] cap ' + m[1] + ' → ' + (medios.length ? 'master con audio es (' + medios.length + ' pistas)' : 'playlist') + ' ' + nSeg + ' segmentos');
-  return { m3u8: '/api/xd/' + tok + '/index.m3u8', proxy: true, subs: [] };
+  /* v159+v359.2: HTTP PRIMERO y SIN navegador — el player rpmvid es el mismo
+   * upstream para ambos caminos: si anda en ventana mala el navegador muere
+   * igual (y su arranque roto daba el toast feo «No pude abrir el navegador»).
+   * Los fallos salen claros, la ventana pasa sola (verificado: resolvió tras
+   * unos minutos) y la BÓVEDA es el seguro permanente. */
+  if (idRpm) return resolverRpmvidHttp(m[1], idRpm);
+  /* llegar aquí = la página no abrió ni trajo player (sitio caído/cambiado) */
+  throw new Error('Lacartoons no responde ahora — toca de nuevo en un momento');
 }
 
 

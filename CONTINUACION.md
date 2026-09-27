@@ -3858,3 +3858,20 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   El navegador ya no le dispara a TMDB: al server (una conexión, 12 h de
   caché). Verificado: 200 → 1.5 ms caché; ráfaga 12×200; no-permitidos 403.
 - UI_VERSION v359.1; badge 'v359.1 · 24/7'.
+
+## v359.2 final (26 Sep 2026) — Lacartoons SIN navegador + ventana mala clara
+- Síntoma del usuario (Oracle): iCarly en Solo → toast 'No pude abrir el
+  navegador del servidor' → minutos después resolvió solo. Autopsia: (1)
+  player rpmvid en ventana mala (530/403 al master — pasa sola, lo comprobamos
+  dos veces); (2) el fallo caía al respaldo extraerRpmvid = CHROME completo
+  (v159), y su lanzamiento falló → toast feo; (3) reintentar después = éxito
+  cuando la ventana del player pasó.
+- Fix final: Lacartoons NUNCA abre navegador (mismo upstream — el navegador
+  muere igual; y su fallo de arranque era el toast). resolverRpmvidHttp
+  clasifica: 404/410='borrado' (error digno), 5xx/403 API o master='ventana'
+  → 'El player de Lacartoons anda en ventana mala — toca de nuevo en un
+  momento'; sitio sin player/caído → 'Lacartoons no responde ahora — toca de
+  nuevo'. Verificado en vivo con el player EN ventana mala: 14 s y mensaje
+  claro (antes 32 s + Chrome). La bóveda (cosecha total v359) es el seguro.
+- Nota: durante las pruebas lacartoons pareció rate-limitar la IP del sandbox
+  (200 con cuerpo vacío) — el cosechador aborta limpio ante eso y retoma.
