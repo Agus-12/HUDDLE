@@ -3889,3 +3889,20 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - Nota aclaratoria: las carátulas NO vienen de IMDb — las de anime (d23) sí
   se cosecharon de IMDb y viven en /covers (por eso esas nunca fallan); las
   de pelis vienen de TMDB/pelisxd y ahora pasan por el proxy del server.
+
+## v359.4 (26 Sep 2026) — CAUSA RAÍZ de las carátulas pxd: optimizador _next/image
+- Usuario en v359.3 seguía con carátulas negras (Resident Evil 2021, Misión
+  a Marte…). Extraje el feed EN VIVO del Oracle y los hosts: TMDB ✓ (ya
+  arreglado por v359.1), PERO PelisXD entrega pósters por su optimizador
+  Next.js: www.pelisxd.com/_next/image?url=%2Fuploads%2FN.webp&w=3840&q=75
+  — y ESE endpoint responde 400 SIEMPRE a fetch de server (probado directo
+  y con &amp;) → carátulas pxd negras SIEMPRE (no aleatorias). El archivo
+  directo /uploads/N.webp responde 200 ✓.
+- v359.4: (1) /api/img limpia &amp;/&#38; y reescribe _next/image → archivo
+  directo (prefix https://www.pelisxd.com si relativo) ANTES del allowlist;
+  (2) raíz: pelisxdMeta og() limpia entidades y reescribe al directo (los
+  pósters en bóveda/búsquedas futuras salen limpios).
+- VERIFICADO con las URLs EXACTAS del feed roto: 4875/4879/4876 → 200 con
+  bytes reales (incluida la variante &amp;) ✓✓✓.
+- Nota: /api/trending del Oracle servía 26 imgs www.pelisxd.com — todas
+  _next/image: eran TODAS las pxd rotas del usuario.
