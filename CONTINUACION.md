@@ -3875,3 +3875,17 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   claro (antes 32 s + Chrome). La bóveda (cosecha total v359) es el seguro.
 - Nota: durante las pruebas lacartoons pareció rate-limitar la IP del sandbox
   (200 con cuerpo vacío) — el cosechador aborta limpio ante eso y retoma.
+
+## v359.3 (26 Sep 2026) — carátulas (continuación) + pre-caché de pósters
+- Usuario seguía viendo carátulas rotas (pxd: Soy leyenda/Cloverfield/
+  Alien³/Vengadores/Interestelar…): mapeado EXACTO — rotas = TMDB (cq) y
+  pelisxd.com/uploads (pxd); funcionando = /covers locales + otras fuentes.
+  Los 3 pósters exactos de sus tarjetas → 200 vía /api/img ✓ (fix v359.1
+  funciona; el Oracle aún no lo tenía desplegado / app.js cacheado).
+- v359.3: PRE-CACHÉ al arranque — 20 s tras el boot, el server pide por su
+  propio /api/img los primeros 40 pósters del feed (trending+series) con
+  pausa 250 ms: primera pantalla con carátulas instantáneas + TMDB recibe
+  una petición amable por póster.
+- Nota aclaratoria: las carátulas NO vienen de IMDb — las de anime (d23) sí
+  se cosecharon de IMDb y viven en /covers (por eso esas nunca fallan); las
+  de pelis vienen de TMDB/pelisxd y ahora pasan por el proxy del server.
