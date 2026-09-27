@@ -3815,3 +3815,33 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   desplegados. Badge 'v116' del cliente = APP_VERSION de app.js (contador
   aparte, no es el server).
 - AUDITORÍA COMPLETA CERRADA: Solo ✓ + Juntos ✓ + usuario validando en vivo.
+
+## v359 (26 Sep 2026) — RESCATE de Lacartoons: cosecha total + replay sin sitio
+- El sitio VOLVIÓ. Misión del usuario: auditar TODOS los títulos a la bóveda
+  ANTES de que vuelva a caer (lo de antes no se repite) + sonda avisando.
+- Descubrimientos: (1) la ficha /serie/{lctId} trae TODOS los capítulos en
+  HTML y cada capítulo trae el iframe embed (cubeembed.rpmvid.com/#id u
+  ok.ru) EN CRUDO → cosecha 100% HTTP sin navegador; (2) los embeds viven
+  FUERA de lacartoons.com → con el sitio muerto el replay sigue al aire.
+- v359: cosechaLctTotal() — recorre las 241 series de LCT_SERIES (cap 150
+  caps/serie), guarda {serie, poster(og:image), serieSlug, embeds} por
+  capítulo (BOVEDA.has = puntero: rondas siguientes saltan lo cosechado),
+  ritmo 1.1 s (sitio convaleciente), arranque a los 40 s + cada 3 h, aborta
+  si el sitio muere a mitad y retoma el próximo ciclo. Verificado: +100
+  capítulos en minutos (iCarly primero), entradas completas.
+- bovedaEmbedASink: handlers NUEVOS ok.ru/videoembed (→resolverOkRu) y
+  cubeembed.rpmvid.com (→resolverRpmvidHttp, HTTP puro con su log de fallo).
+  VERIFICADO END-TO-END: cap 8848 → '[boveda] lacartoons cap 8848 desde
+  bóveda' → ok:true playlist /api/xd SIN tocar el sitio ✓✓.
+- BUG PREEXISTENTE CRÍTICO (cazado por accidente): en resolverLacartoons,
+  'const mOk' vivía dentro del if(html) y la cosecha v323 la usaba FUERA →
+  ReferenceError 'mOk is not defined' en CADA capítulo sin caché/bóveda
+  (lct nativo roto en silencio desde v323; por eso 'lo mismo de antes').
+  Fix: let mOk a nivel del bloque exterior. + regex ?t= opcional.
+- Sonda lct: ya tenía disyuntor (no oculta nada con el sitio caído) +
+  barrido pos-caída + notify de revivida; AHORA TAMBIÉN notifica la CAÍDA
+  ('Lacartoons se cayó — los capítulos siguen servibles desde la bóveda').
+- Nota honesta: el replay depende del PLAYER rpmvid (tercero) — a veces
+  tiene ventanas malas (530/1016 vistas en sandbox, pasó sola); los embeds
+  cosechados son el seguro y la auditoría ligera vigila su salud.
+- UI_VERSION 'v359'; badge 'v359 · 24/7'.
