@@ -22,7 +22,7 @@ const { spawn, execFile, execFileSync } = require('child_process');
 const os = require('os'); /* v133: tmpfiles de detección de intros */
 
 const PORT = process.env.PORT || 3000;
-const UI_VERSION = 'v359.4'; // v359.4: pósters de PelisXD — el optimizador _next/image del sitio responde 400 → reescribimos al archivo directo (y limpiamos &amp;); causa exacta de las carátulas negras pxd // v359.3: pre-caché de pósters del feed al arranque (carátulas instantáneas desde el primer minuto) // v359.2: lacartoons — ventana mala del player rpmvid = mensaje claro y reintento (NUNCA navegador); bóveda de lct llena por cosecha total // v359.1: carátulas de pelis (TMDB/pelisxd) por el proxy con caché 12 h — TMDB limita ráfagas por IP y dejaba la mitad de pósters negros // v359: COSECHA TOTAL de lacartoons a la bóveda (241 series, HTTP puro) + replay rpmvid/ok.ru sin sitio + sonda avisa caídas // v358 auditoría: archive.org (clásicos de Danimados) + v357 ciclo intros + v357.1 replay pxd + v356.x fusible/async + v355 censo // v355: CENSO de bodegas — cada título cq queda clasificado por bodega (persistente, se llena al reproducir/auditar); los chips del panel muestran CUÁNTOS TÍTULOS tiene cada bodega de vimeos en el panel (bodegas en vivo + fallos recientes) + BUG dan v335 (undefinedxundefined — jamás cosechó) + flv secuencial con data-dwn (hosters independientes) + pxd en la rotación automática // v353: bodega caída NO es muerte — la auditoría distingue 'podrido' (página completa sin video, 2 strikes) de opaco (timeout/403/racionado: no se juzga); el revividor solo acepta vida real // v352: FASE 3 — películas cq con fallo total se resuelven vía CUEVANA (otro hoster, goodstream) desde el catálogo en memoria; negative cache 30 min; la cosecha cv deja el título blindado para siempre // v351: DIVERSIDAD DE HOSTERS — respaldos ordenan goodstream/no-vimeos primero y la auditoría ligera da la entrada por viva si CUALQUIER hoster responde (una entrada multi-hoster solo muere si todos mueren) // v350: canario directo⇄relay EN PARALELO (veredicto en segundos — v349 lo hacía lento y ahogaba el relay) + semáforo del relay (máx 3) + saneamiento de relay.txt/set-relay // v349: la LUPA de la sonda mira por el relay (canario, embeds y video) — vimeos bloqueando el datacenter ya no silencia las auditorías + pausas por memoria visibles // v348: FASE 2 — segundo enlace de SERIES cq vía Danimados (TxE idéntica, cached en altEps) + auditoría de códigos de series (punto ciego desde v321; 2 strikes = el código fuera, la serie queda) // v347: auto-curación SIN techo (sillita de 20 s) + la rama de error hls pide FRESCO (antes re-montaba la misma m3u8 desde cache) // v346: DOBLE CHEQUEO del ganador en resolverVimeos — nodos inestables (índice OK, video 502: vimeos.zip hoy) detectados ANTES de entregar el stream; se pasa al siguiente nodo de la misma oleada // v345: cadena corta (relay = último intento) + el player JAMÁS se cierra solo: los 4 caminos de 'Se cortó el video' ahora dejan el player abierto con Recargar video disponible (v319 restituida) // v344: la verificación del video (máster Y variante) usa el relay en toda la oleada de relay — el presupuesto de un solo uso rechazaba nodos buenos: 'saturado' con relay vivo // v343: el relay de casa se intenta ANTES de declarar 'saturado' — bloqueo de vimeos a datacenters ya no tumba la reproducción si el relay está vivo // v342: SEGUNDO ENLACE — películas cq con embeds de respaldo de OTRA infraestructura (PelisXD byse/dood), cosechados al fallar y usados por auditoría/replay; bovedaRespaldo también rastrea pxd: // v341: reanudar SIEMPRE (catálogo respeta continuar viendo y ya no pisa tu minuto) + posición marcada al INICIAR el salto + el perro guardián cura saltos colgados (>9 s buscando) // v340: ventana mala de vimeos = verificaciones diferidas 10 min (aviso único/hora, cero spam, cero muertes falsas) + el player AVISA cuando la reconexión automática no puede // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
+const UI_VERSION = 'v360.1'; // v360.1: vimeos en ventana mala → mensaje 'toca de nuevo' también en cq (nada de 'no disponible' que engaña) // v360: series cq SIN capítulos → la API nueva ya no da code (schema v3): capítulos cuentan por playable + ficha desde bóveda; peli cq sin code → fallback Cuevana; fila Cuevana desde bóveda cv (7.5k) // v359.4: pósters de PelisXD — el optimizador _next/image del sitio responde 400 → reescribimos al archivo directo (y limpiamos &amp;); causa exacta de las carátulas negras pxd // v359.3: pre-caché de pósters del feed al arranque (carátulas instantáneas desde el primer minuto) // v359.2: lacartoons — ventana mala del player rpmvid = mensaje claro y reintento (NUNCA navegador); bóveda de lct llena por cosecha total // v359.1: carátulas de pelis (TMDB/pelisxd) por el proxy con caché 12 h — TMDB limita ráfagas por IP y dejaba la mitad de pósters negros // v359: COSECHA TOTAL de lacartoons a la bóveda (241 series, HTTP puro) + replay rpmvid/ok.ru sin sitio + sonda avisa caídas // v358 auditoría: archive.org (clásicos de Danimados) + v357 ciclo intros + v357.1 replay pxd + v356.x fusible/async + v355 censo // v355: CENSO de bodegas — cada título cq queda clasificado por bodega (persistente, se llena al reproducir/auditar); los chips del panel muestran CUÁNTOS TÍTULOS tiene cada bodega de vimeos en el panel (bodegas en vivo + fallos recientes) + BUG dan v335 (undefinedxundefined — jamás cosechó) + flv secuencial con data-dwn (hosters independientes) + pxd en la rotación automática // v353: bodega caída NO es muerte — la auditoría distingue 'podrido' (página completa sin video, 2 strikes) de opaco (timeout/403/racionado: no se juzga); el revividor solo acepta vida real // v352: FASE 3 — películas cq con fallo total se resuelven vía CUEVANA (otro hoster, goodstream) desde el catálogo en memoria; negative cache 30 min; la cosecha cv deja el título blindado para siempre // v351: DIVERSIDAD DE HOSTERS — respaldos ordenan goodstream/no-vimeos primero y la auditoría ligera da la entrada por viva si CUALQUIER hoster responde (una entrada multi-hoster solo muere si todos mueren) // v350: canario directo⇄relay EN PARALELO (veredicto en segundos — v349 lo hacía lento y ahogaba el relay) + semáforo del relay (máx 3) + saneamiento de relay.txt/set-relay // v349: la LUPA de la sonda mira por el relay (canario, embeds y video) — vimeos bloqueando el datacenter ya no silencia las auditorías + pausas por memoria visibles // v348: FASE 2 — segundo enlace de SERIES cq vía Danimados (TxE idéntica, cached en altEps) + auditoría de códigos de series (punto ciego desde v321; 2 strikes = el código fuera, la serie queda) // v347: auto-curación SIN techo (sillita de 20 s) + la rama de error hls pide FRESCO (antes re-montaba la misma m3u8 desde cache) // v346: DOBLE CHEQUEO del ganador en resolverVimeos — nodos inestables (índice OK, video 502: vimeos.zip hoy) detectados ANTES de entregar el stream; se pasa al siguiente nodo de la misma oleada // v345: cadena corta (relay = último intento) + el player JAMÁS se cierra solo: los 4 caminos de 'Se cortó el video' ahora dejan el player abierto con Recargar video disponible (v319 restituida) // v344: la verificación del video (máster Y variante) usa el relay en toda la oleada de relay — el presupuesto de un solo uso rechazaba nodos buenos: 'saturado' con relay vivo // v343: el relay de casa se intenta ANTES de declarar 'saturado' — bloqueo de vimeos a datacenters ya no tumba la reproducción si el relay está vivo // v342: SEGUNDO ENLACE — películas cq con embeds de respaldo de OTRA infraestructura (PelisXD byse/dood), cosechados al fallar y usados por auditoría/replay; bovedaRespaldo también rastrea pxd: // v341: reanudar SIEMPRE (catálogo respeta continuar viendo y ya no pisa tu minuto) + posición marcada al INICIAR el salto + el perro guardián cura saltos colgados (>9 s buscando) // v340: ventana mala de vimeos = verificaciones diferidas 10 min (aviso único/hora, cero spam, cero muertes falsas) + el player AVISA cuando la reconexión automática no puede // v339: canario con verificación completa (master+variante — los ahogados ya no lo ciegan: veredicto honesto en segundos) + la posición de «continuar viendo» sobrevive al cambio de transporte + watchdog 9 s // v338: tránsito de resoluciones — cache compartida por título (2 min, promise en vuelo compartida) + semáforo de 4 carreras máx contra vimeos (20 espectadores jamás = 20 oleadas) + fresco=1 para el watchdog/botón // v337: canarios dobles con rotación (Fundación+Drácula) + watchdog de pantalla negra en el player (re-resuelve y cambia de nodo sin cerrar) + botón Recargar video // v336: canario de reproducción en resolverVimeos — si Fundación (código vivo) también falla, vimeos entero está caído: fallo en segundos con mensaje honesto en vez de 80+ s de oleadas (la app ya le sacó al usuario) // v335: PelisXD con bóveda (embeds re-usables sin abrir el sitio) + auto-rellenado de AnimeFLV (sitemap) y Danimados (sondeo secuencial) + misc arreglado
 const HUDDLE_MOSTRAR_TODO = true; // v251 — buscar ignora solo curaduría (LA_OCULTAS/DANI_OCULTAS/LCT_OCULTAS/dedup), muertas (PXD/AF/CVM/CC/D23/LA_MUERTAS/EPS_MUERTOS/CARI_MUERTAS/LCT_MUERTAS/DANI_MUERTAS/CV_*) siempre ocultas
 
 /* v252: AUDITORÍA HUDDLE — sonda maestro que revisa TODO lo vivo de Huddle
@@ -3540,6 +3540,25 @@ async function datosSerieCuevana(slug) {
 }
 /* v311: ficha completa de una serie de cinecalidad.am por tmdb_id —
  * todas las temporadas con episodios reproducibles (playable+code) */
+/* v360: ficha de serie cq desde la BÓVEDA — la API nueva (schema v3) ya no
+ * entrega codes y puede caer entera; los eps cosechados siguen jugando
+ * (vimeos vivo, verificado) y sin slug el resolutor igual casa. */
+function cqFichaDeBoveda(id) {
+  for (const kind of ['tvshow', 'anime']) {
+    const bv = BOVEDA.get('cq:' + kind + ':' + id);
+    if (!bv || !bv.eps || !Object.keys(bv.eps).length) continue;
+    const slugT = String(bv.t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'x';
+    const eps2 = [];
+    for (const s of Object.keys(bv.eps).map(Number).sort((a, b) => a - b))
+      for (const e of Object.keys(bv.eps[s] || {}).map(Number).sort((a, b) => a - b))
+        eps2.push({ temporada: s, ep: e, url: CQ_WEB + '/#/' + (kind === 'anime' ? 'anime' : 'serie') + '/' + id + '/' + slugT + '/temporada/' + s + '/episodio/' + e, titulo: 'Episodio ' + e, img: '' });
+    if (!eps2.length) continue;
+    console.log('[boveda] ficha cq ' + kind + ' ' + id + ' desde bóveda (' + eps2.length + ' eps cosechados)');
+    return { ok: true, slug: String(id), titulo: String(bv.t || '').slice(0, 80), poster: bv.poster || '', episodios: eps2, boveda: true };
+  }
+  return null;
+}
+
 async function datosSerieCineCalidad(id) {
   const clave = 'cqid:' + id;
   const c = serieCache.get(clave);
@@ -3552,7 +3571,7 @@ async function datosSerieCineCalidad(id) {
       const dA = await cqApi('/v1/items/anime/' + id, null, 20 * 60 * 1000).catch(() => null);
       if (dA && dA.item) { it = dA.item; kind = 'anime'; }
     }
-    if (!it) return null;
+    if (!it) { const rBv = cqFichaDeBoveda(id); if (rBv) return rBv; return null; } /* v360 */
     const ds = await cqApi('/v1/items/' + kind + '/' + id + '/seasons', null, 20 * 60 * 1000).catch(() => null);
     const seasons = (ds && ds.seasons) || [];
     const eps = [];
@@ -3562,13 +3581,13 @@ async function datosSerieCineCalidad(id) {
       const dd = await cqApi('/v1/items/' + kind + '/' + id + '/seasons/' + s.season, null, 20 * 60 * 1000).catch(() => null);
       const epsArr = (dd && (dd.episodes || (dd.season && dd.season.episodes))) || []; /* v311.1: anidan en season.episodes */
       for (const e of epsArr) {
-        if (!e.playable || !e.code) continue;
-        (codigos[e.season] = codigos[e.season] || {})[e.episode] = e.code; /* v321 */
+        if (!e.playable) continue; /* v360: la API nueva ya no manda code — el capítulo cuenta igual */
+        if (e.code) (codigos[e.season] = codigos[e.season] || {})[e.episode] = e.code; /* v321 */
         eps.push({ temporada: e.season, ep: e.episode, url: cqUrlEpDe(it, e.season, e.episode), titulo: String(e.title || ('Episodio ' + e.episode)).slice(0, 90), img: cqPoster(e.still_path, 'w300') });
       }
     }
     eps.sort((a, b) => a.temporada - b.temporada || a.ep - b.ep);
-    if (!eps.length) return null;
+    if (!eps.length) { const rBv = cqFichaDeBoveda(id); if (rBv) return rBv; return null; } /* v360 */
     const out = { ok: true, slug: String(id), titulo: String(it.title || it.original_title || '').slice(0, 80), poster: cqPoster(it.poster_path), episodios: eps };
     if (Object.keys(codigos).length) bovedaPon('cq:' + kind + ':' + id, { t: out.titulo, kind, eps: codigos, poster: cqPoster(it.poster_path), ts: seasons.length, y: it.year || '' }); /* v321+v322: con póster y total de temporadas */
     serieCache.set(clave, { at: Date.now(), d: out });
@@ -12578,7 +12597,7 @@ async function resolverCineCalidad(pageUrl) {
     }
     const d = await cqApi('/v1/items/' + m[1] + '/' + m[2] + '/seasons/' + m[3] + '/episodes/' + m[4], null, 15 * 60 * 1000).catch(() => null);
     const code = d && d.episode && d.episode.code;
-    if (!code) { console.log('[cq] ep sin code: ' + m[1] + '/' + m[2] + ' T' + m[3] + 'E' + m[4]); throw new Error('Este episodio no está disponible en CineCalidad — prueba otro capítulo'); }
+    if (!code) { if (!(await vimeosCanario().catch(() => false))) throw new Error('Los servidores de video andan en ventana mala — toca de nuevo en un momento'); /* v360.1 */ console.log('[cq] ep sin code: ' + m[1] + '/' + m[2] + ' T' + m[3] + 'E' + m[4]); throw new Error('Este episodio no está disponible en CineCalidad — prueba otro capítulo'); }
     const bvEp = BOVEDA.get(bkEp) || { t: '', kind: m[1] === 'anime' ? 'anime' : 'tvshow', eps: {} };
     bvEp.eps = bvEp.eps || {}; (bvEp.eps[m[3]] = bvEp.eps[m[3]] || {})[m[4]] = code;
     if (!bvEp.t && d && d.episode) bvEp.t = String(d.episode.title || bvEp.t || '').slice(0, 80);
@@ -12609,7 +12628,7 @@ async function resolverCineCalidad(pageUrl) {
         console.log('[boveda] cq peli ' + (m[1] || m[2]) + ' desde bóveda');
         return outPB;
       } catch (ePB) {
-        console.log('[boveda] código de peli vencido — camino normal');
+        console.log('[boveda] código de peli no abrió (' + String(ePB.message || ePB).slice(0, 50) + ') — camino normal'); /* v360.1: autopsia honesta */
         if (bP.alt && bP.alt.length) { /* v342: segundo enlace (otra infraestructura) antes de rendirse */
           try { const outA = await extraerStreamwishPeli(pageUrl, bP.alt); console.log('[boveda] cq peli ' + (m[1] || m[2]) + ' por SEGUNDO ENLACE (' + bP.alt.length + ' embeds)'); return outA; }
           catch (eA) { console.log('[boveda] segundo enlace tampoco sirvió (' + String(eA.message || eA).slice(0, 50) + ')'); }
@@ -12620,7 +12639,14 @@ async function resolverCineCalidad(pageUrl) {
     }
     const d = await cqApi('/v1/items/' + kind + '/' + (m[1] || m[2]), null, 15 * 60 * 1000).catch(() => null);
     const code = d && d.item && d.item.code;
-    if (!code) { console.log('[cq] título sin code: ' + kind + '/' + (m[1] || m[2])); throw new Error('Este título no está disponible en CineCalidad — prueba otro parecido'); }
+    if (!code) { /* v360: la API nueva ya no reparte codes — buscar el título en Cuevana antes de rendirse */
+      const tF = (d && d.item && d.item.title) || (BOVEDA.get('cq:' + kind + ':' + (m[1] || m[2])) || {}).t || '';
+      const rCv = tF ? await cqCuevanaFallback(tF).catch(() => null) : null;
+      if (rCv) { console.log('[boveda] cq ' + kind + ' ' + (m[1] || m[2]) + ' sin code → jugando por Cuevana'); return rCv; }
+      if (!(await vimeosCanario().catch(() => false))) throw new Error('Los servidores de video andan en ventana mala — toca de nuevo en un momento'); /* v360.1 */
+      console.log('[cq] título sin code: ' + kind + '/' + (m[1] || m[2]));
+      throw new Error('Este título no está disponible en CineCalidad — prueba otro parecido');
+    }
     try {
       const outCq = await resolverVimeos('https://vimeos.net/embed-' + code + '.html', CQ_WEB + '/');
       bodegaTag(bkP, outCq && outCq.m3u8); /* v355: censo */
@@ -13436,6 +13462,20 @@ async function pelisxdLatest() {
 }
 /* v235: Cuevana últimas películas para el feed */
 const cuevanaLatestCache = { at: 0, items: [] };
+/* v360: fila de Cuevana desde la BÓVEDA cv (7.5k títulos cosechados con póster)
+ * para cuando cuevana.mov protege sus sitemaps/WP-API contra servidores. */
+function cuevanaDeBoveda() {
+  try {
+    const rows = [];
+    for (const [k2, v2] of BOVEDA.entries()) {
+      if (!k2.startsWith('cv:') || CVM_OCULTAS.has(k2.slice(3))) continue;
+      rows.push({ t: v2.t || k2.slice(3), slug: k2.slice(3), poster: v2.poster || '', y: v2.y || '', at: Number(v2.at) || 0 });
+    }
+    rows.sort((a, b) => b.at - a.at);
+    return rows.slice(0, 18).map((r2) => ({ title: r2.t, url: 'https://cuevana.mov/pelicula/' + r2.slug, img: r2.poster, site: 'Cuevana', extra: r2.y }));
+  } catch { return []; }
+}
+
 async function cuevanaLatest() {
   if (Date.now() - cuevanaLatestCache.at < 3 * 3600 * 1000 && cuevanaLatestCache.items.length) return cuevanaLatestCache.items;
   try {
@@ -13449,9 +13489,11 @@ async function cuevanaLatest() {
       site: 'Cuevana',
       extra: p.year || '',
     }));
-    if (items.length) { cuevanaLatestCache.at = Date.now(); cuevanaLatestCache.items = items; }
-    return items;
-  } catch { return cuevanaLatestCache.items; }
+    if (items.length) { cuevanaLatestCache.at = Date.now(); cuevanaLatestCache.items = items; return items; }
+    const rBv = cuevanaDeBoveda(); /* v360 */
+    if (rBv.length) { cuevanaLatestCache.at = Date.now(); cuevanaLatestCache.items = rBv; }
+    return rBv;
+  } catch { return cuevanaLatestCache.items.length ? cuevanaLatestCache.items : cuevanaDeBoveda(); }
 }
 /* v269: AnimeFLV y D23 últimos para feed vivo intercalado */
 const afLatestCache = { at: 0, items: [] };

@@ -3906,3 +3906,38 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   bytes reales (incluida la variante &amp;) ✓✓✓.
 - Nota: /api/trending del Oracle servía 26 imgs www.pelisxd.com — todas
   _next/image: eran TODAS las pxd rotas del usuario.
+
+## v360/v360.1 (26 Sep 2026) — GRAN AUTOPSIA: CineCalidad cambió su API (schema v3)
+- Usuario reporta 4 cosas: (1) cero contenido de Cuevana en el feed;
+  (2) series de CineCalidad «sin capítulo» casi todas; (3) al reproducir
+  cq → «Este título no está disponible en CineCalidad»; (4) caricaturas sin
+  capítulos a veces. Pregunta: ¿se necesita más capacidad del server?
+- CAUSAS RAÍZ (todas upstream, CERO capacidad):
+  a) API cq (tmdb.cinecalidad.am, viva, 200/216ms) ELIMINÓ el campo `code`
+     de items/seasons/episodes (schema v3). El parser v311 exigía
+     e.playable && e.code → descartaba TODOS los eps → fichas null →
+     «No pude leer la serie»/«sin capítulos» y títulos «sin code» al jugar.
+  b) cuevana.mov protege sitemaps Y wp-json contra servidores (devuelven
+     HTML 200) → 0 slugs + cuevanaLatest vacía → fila Cuevana muerta.
+  c) vimeos con ventana mala HOY (todos los nodos sin master; canario
+     CAÍDO) — transitorio, igual que rpmvid. Los CÓDIGOS VIEJOS DE BÓVEDA
+     SIGUEN VIVOS (embed 200/49KB verificado).
+- FIX v360: (A) eps cuentan por playable (code opcional) + ficha de
+  emergencia cqFichaDeBoveda(id) cuando la API no da item/eps (usa
+  códigos cosechados; el resolutor casa sin slug); (B) peli cq sin code →
+  cqCuevanaFallback(título) antes del error; (C) cuevanaDeBoveda(): fila
+  Cuevana desde bóveda cv (7.5k títulos, sort por at) cuando el sitio está
+  protegido. FIX v360.1: si vimeos está en ventana mala, peli/ep sin code
+  → «Los servidores de video andan en ventana mala — toca de nuevo en un
+  momento» (v360.1) en vez de «no disponible» que engaña; log honesto
+  («código de peli no abrió (razón)»).
+- VERIFICADO en sandbox: Los Elegidos 40 eps (antes 502); fila Cuevana 18
+  clásicos con póster TMDB (antes 0); peli de bóveda con vimeos caído →
+  mensaje de ventana amable; código bóveda embed 200.
+- BÓVEDA cq/cv del Oracle: cq:movie ~7.9k, cq:tvshow 351, cv ~7.5k — replay
+  depende solo de la salud transitoria de vimeos. Caricaturas: Ben 10 con
+  episodios OK en sandbox (lo del usuario fue ventana del día — vigilar).
+- Cola futura: cosecha cq de codes NUEVA imposible (API no da codes) — el
+  relleno de bóveda cq ahora solo crece con títulos jugados vía fallback
+  Cuevana (cv:) y altEps Danimados. Vigilar si la web cq saca un player
+  nuevo (bundle /assets/app-*.js, hosters vimeos/goodstream/voe/dood).
