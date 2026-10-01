@@ -3958,3 +3958,23 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   sale completa. VERIFICADO: borré 4 pósters a propósito → 3 reparados y
   persistidos, fila 18/18 con carátula; Pinocho sin match seguro (queda
   abajo, no contamina la fila).
+
+## v360.3 (26 Sep 2026) — EXAMEN DE SANGRE: 19 títulos al azar contra el Oracle
+- Método: sorteo al azar de 19 títulos del feed EN VIVO del Oracle (7 fuentes)
+  → /api/solo real. Ronda 1 (urls de FICHA): 3/19 OK (pxd 3/3 ✓). Ronda 2
+  (urls de CAPÍTULO = flujo real): **4/4 OK** (Bob Esponja y Billy y Mandy
+  vía Danimados ✓, Betty la fea cap1 vía VK ✓, cap lct cosechado vía rpmvid
+  ✓ — la ventana de rpmvid pasó).
+- HALLAZGO MAYOR + FIX v360.3: pelis cq SIN code (schema v3) caían a
+  cqCuevanaFallback solo; VERIFICADO que los 5 fallados (Dos Papas,
+  Transformers Uno, Cursed Tapes, Cómo Entrenar Dragón 3, Demon Slayer peli)
+  EXISTEN en bóveda cv (4/5 exactos) → sin-code ahora: bovedaRespaldo(t)
+  PRIMERO (replay local cv/pxd, goodstream primero) → luego Cuevana →
+  luego mensaje honesto. Local llegó al rescate; el replay final depende de
+  vimeos (en ventana mala HOY en sandbox; canario del Oracle vivo).
+- Los fallos de Cuevana fresca ('sin embeds latinos') = embeds vimeos-family
+  en ventana; resolverCuevanaMov ya consulta bóveda cv primero (v321) ✓.
+- Lección del método: las tarjetas de FICHA (serie/anime/cartoons) no deben
+  pasar por /api/solo — el app real va ficha→capítulo. 'ya no está
+  disponible' genérico (12188) sale para fichas: NO es muerte real.
+- Pendiente menor: fila liveaction vino vacía en una toma del feed (vigilar).
