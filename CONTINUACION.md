@@ -3941,3 +3941,20 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   relleno de bóveda cq ahora solo crece con títulos jugados vía fallback
   Cuevana (cv:) y altEps Danimados. Vigilar si la web cq saca un player
   nuevo (bundle /assets/app-*.js, hosters vimeos/goodstream/voe/dood).
+
+## v360.2 (26 Sep 2026) — fila Cuevana SIN carátula: reparador de pósters
+- Radiografía del Oracle del usuario: **11 GB RAM (10 disponibles), 0 OOM
+  en 7 días, Huddle 306 MB, shape VM.Standard.A1.Flex** → memoria SOBRADA,
+  no ampliar nada, no swap (su «700 MB» era el --max-old-space-size=512 del
+  service, no la máquina). Caso memoria CERRADO.
+- Fila Cuevana en vivo del Oracle: 18/18 títulos SIN img — los cosechados
+  por auto-cv nuevo guardan SIN póster (el sandbox viejo tenía hornada con
+  póster, por eso allá se veía bien). 7,497/7,499 cv tienen póster en
+  sandbox; en el Oracle los recientes no.
+- v360.2: cuevanaDeBoveda ahora (a) REPARA hasta 50 títulos sin póster por
+  pasada contra el índice local cq (normaBv exacta → includes; guarda año
+  si ambos lo tienen) y el arreglo PERSISTE en bóveda (bovedaPon); (b) la
+  fila ordena CON-póster primero → mientras haya ≥18 con carátula, la fila
+  sale completa. VERIFICADO: borré 4 pósters a propósito → 3 reparados y
+  persistidos, fila 18/18 con carátula; Pinocho sin match seguro (queda
+  abajo, no contamina la fila).
