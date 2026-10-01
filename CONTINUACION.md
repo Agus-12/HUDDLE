@@ -3978,3 +3978,21 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   pasar por /api/solo — el app real va ficha→capítulo. 'ya no está
   disponible' genérico (12188) sale para fichas: NO es muerte real.
 - Pendiente menor: fila liveaction vino vacía en una toma del feed (vigilar).
+
+## v360.4 (26 Sep 2026) — «no está disponible en CineCalidad» aún con v360.3 → FASE 4: PelisXD
+- Usuario seguía viendo el toast en Solo Y en sala Juntos. Verificado:
+  su Oracle SÍ corre v360.3 (health) y sala Juntos usa el MISMO dispatch
+  (esCq → resolverCineCalidad). Conclusión: los títulos que intentaba no
+  están NI en bóveda cq NI cv, y cqCuevanaFallback solo mira CVM_CAT
+  (cuevana-cat, 683) → sin red de rescate para ellos.
+- FIX v360.4: cqPxdFallback(titulo) — FASE 4: busca el título en el índice
+  local de PelisXD (4,779 slugs, normaBv exacta → includes) y resuelve EN
+  VIVO con resolverPelisxd (byse sano). Conectada en AMBAS cadenas cq:
+  (a) sin-code (tras bovedaRespaldo y Cuevana), (b) code-vencido (tras
+  rbP y rF2). El mensaje final solo queda para títulos que no están en
+  NINGUNA parte.
+- VERIFICADO local: Demon Slayer peli (1311031, sin code, miss cv) →
+  FASE 4 → slug exacto en pxd → byse 1.5s → ok:true m3u8 ✓ + auto-cosecha
+  de embeds pxd a bóveda (replay instantáneo futuro).
+- Cadena cq final: bóveda cq → bóveda cv/pxd local → Cuevana (cat) →
+  PelisXD (vivo) → ventana-mala? msg honesto → 'no disponible' (raro).
