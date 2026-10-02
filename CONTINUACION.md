@@ -3996,3 +3996,26 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   de embeds pxd a bóveda (replay instantáneo futuro).
 - Cadena cq final: bóveda cq → bóveda cv/pxd local → Cuevana (cat) →
   PelisXD (vivo) → ventana-mala? msg honesto → 'no disponible' (raro).
+
+## v360.5 (26 Sep 2026) — RAÍZ: biblioteca cq 100% vimeos + dood bloqueado → COSECHA DE GEMELOS
+- Usuario: «casi todo lo de CineCalidad no resuelve». Saludómetro del ORACLE:
+  canario VIVO pero nodos flaky — s12 MUERTO (0/40, 530 títulos adentro),
+  s1/s13/s11 a medias; uptime 161s (usuario desplegando v360.4). RAÍZ en 3
+  capas: (1) códigos viejos viven en nodos vimeos que fallan a ratos (s12
+  entero); (2) títulos NUEVOS de cq nacen SIN code (schema v3) — dependen
+  100% de rescates; (3) doodstream bloquea datacenter (403) — gemelas
+  dood-hosted no rescatan sin relé; byseqekaho SÍ (verificado 1.1-1.5s).
+- FIX v360.5: cosechaGemelosPxdTick() — cada 90 s toma 2 cq:movie sin alt
+  con gemela en índice pxd, abre su ficha pxd y guarda embeds en
+  pxd:<slug> (byse primero; dood se guarda para el relé). El replay cae a
+  bovedaRespaldo (pxd loop YA usa extraerStreamwishPeli ✓) o FASE 4 y juega
+  sin vimeos. health += cdnRelay + gemelosPxd (visibles remotos).
+- VERIFICADO sandbox con vimeos ENFERMO: «Treinta días de noche» (cq 4513,
+  sin code) → FASE 4 → byse 0.4s → ok:true ✓. «BTS: El regreso» → byse ✓.
+  Contra-ejemplo: gemela dood-only (La Princesa Encantada) → 403 → mensaje
+  de ventana (ese SÍ requiere relé/Tailscale).
+- CADENA FINAL peli cq: bóveda cq (vimeos) → alt → bóveda cv/pxd local →
+  Cuevana cat → FASE 4 pxd vivo → ventana? msg honesto → no disponible.
+- PENDIENTE MAESTRO: relé de casa (Mac Mini ~/relay.js + Tailscale,
+  CDN-RELAY-STATUS.md) — es la llave para dood/goodstream/vimeos desde
+  datacenter. Ofrecer setup al usuario.
