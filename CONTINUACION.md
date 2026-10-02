@@ -4019,3 +4019,23 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - PENDIENTE MAESTRO: relé de casa (Mac Mini ~/relay.js + Tailscale,
   CDN-RELAY-STATUS.md) — es la llave para dood/goodstream/vimeos desde
   datacenter. Ofrecer setup al usuario.
+
+## CIERRE 26 Sep (noche) — RELÉ PERMANENTE RESTAURADO VÍA TAILSCALE
+- El «fantasma» 100.72.3.0:3128 en relay.txt era el RELÉ TAILSCALE REAL:
+  mac-mini (100.72.3.0) ↔ huddle (100.74.60.19), estado «active; direct».
+  Duelo de relés: Tailscale 200/1.1s vs túnel localhost.run 503 (se cae
+  solo). Restablecido relay.txt = http://100.72.3.0:3128 (set-relay v360.6
+  aplicó y persistió ✓).
+- PRUEBAS FINALES DEL ORACLE: Transformers Uno (sin code, gemela cv por
+  vimeos) → ok:true m3u8 s13.vimeos ✓; Los creyentes (código viejo) →
+  ok:true m3u8 p4.vimeos ✓. El usuario cierra la era del túnel SSH.
+- relay.js vive en ~/ de la mac-mini (NO tiene autostart: si reinician la
+  Mac, `cd ~ && node relay.js`). OFERTA PENDIENTE: launchd para autostart.
+- Cadena final peli cq: bóveda cq → alt → bóveda cv/pxd → Cuevana cat →
+  PelisXD vivo → todo ello con relé Tailscale de respaldo para vimeos/
+  goodstream (dood AÚN sin fetchRelay en extraerStreamwishPeli — mejora
+  futura: sus gemelas dood-hosted quedarían cubiertas por casa).
+- Sesión completa hoy: v359.2 (lct sin navegador) → v359.3/4 (carátulas
+  TMDB/_next) → v360.x (cq schema v3: fichas/capítulos, fila Cuevana desde
+  bóveda + reparador pósters, FASE 4 pxd, gemelos, set-relay fix) + examen
+  de sangre 19 títulos + relé Tailscale. Oracle en v360.6.
