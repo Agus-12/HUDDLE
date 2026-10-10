@@ -4039,3 +4039,29 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   TMDB/_next) → v360.x (cq schema v3: fichas/capítulos, fila Cuevana desde
   bóveda + reparador pósters, FASE 4 pxd, gemelos, set-relay fix) + examen
   de sangre 19 títulos + relé Tailscale. Oracle en v360.6.
+
+## v361 (10 Oct 2026) — NUEVA SERIE: «Más allá del jardín» (Over the Garden Wall)
+- Pedido del usuario: auditar xdlatino.blogspot.com/…/mas-alla-del-jardin-
+  capitulo-1-latino.html. AUDITORÍA: videos alojados en BLOGGER nativo
+  (video.g?token → pipeline interno YouTube/iframe_api, URL no extraíble
+  del HTML, frágil) → NO viable como fuente. Pero la pista llevó a ORO:
+  (a) Danimados TIENE la serie nativa: danimados.cc/episodios/
+  mas-alla-del-jardin-1x1…1x10 (10 caps, resolver Byse OK — probados caps
+  1/5/10 ✓); (b) archive.org ítem masalladeljardin: serie COMPLETA en
+  español latino (piloto + 10 caps en 6 mp4 + mkv HD) — datacenter OK.
+- INVESTIGACIÓN de la serie: Over the Garden Wall (Cartoon Network 2014),
+  MINISERIE = 1 temporada, 10 episodios (~11 min) + piloto «El tomo de lo
+  desconocido». Títulos oficiales latino: El Viejo Molino, Contratiempo en
+  la Cosecha, Disparates en la Escuela, Canciones de la Oscura Lámpara,
+  Locura de Amor, Nana en el País de las Ranas, El Sonido de la Campana…
+- v361 integración: (1) ARCH_SERIES registro local (slug
+  mas-alla-del-jardin, 6 bloques archive + piloto; datosSerieArchive como
+  capa de respaldo en datosCaricatura); (2) cariInyArchivo(): la serie
+  vive SIEMPRE EN PRIMERA POSICIÓN de la fila Caricaturas (re-inyectada
+  tras cada refresco del feed); (3) despacho: /archive\.org\/(embed|download)\/
+  → extraerArchive (mp4 directo); (4) /api/img allowlist += archive.org
+  (póster services/img ✓ 200). FICHA NATIVA de Danimados gana la ficha
+  (10 caps individuales) y mi bloque archive queda como respaldo/piloto.
+- VERIFICADO: ficha 10 caps ✓; caps 1/5/10 ok:true ✓; fila 1ª posición ✓;
+  búsqueda 'jardin' la encuentra ✓; piloto archive ok:true ✓ (no visible
+  en ficha — bonus futuro si se pide).
