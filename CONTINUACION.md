@@ -4065,3 +4065,21 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
 - VERIFICADO: ficha 10 caps ✓; caps 1/5/10 ok:true ✓; fila 1ª posición ✓;
   búsqueda 'jardin' la encuentra ✓; piloto archive ok:true ✓ (no visible
   en ficha — bonus futuro si se pide).
+
+## v361.1 (10 Oct 2026) — ANTI-TRABAS en Juntos: byse/acek raciona datacenters
+- Usuario: «Más allá del jardín» en modo Juntos se traba mucho. MEDIDO con
+  el flujo real: los segmentos del stream Byse (acek-cdn.com) llegan al
+  datacenter a ~120-165 KB/s por conexión (igual vía proxy o directo — el
+  CDN raciona por IP de datacenter; sp=500 en el token). El 1080p pide
+  ~175 KB/s sostenidos ⇒ buffering. En Solo igual pero menos notado.
+- El proxy /api/hls YA tenía relé pero SOLO como fallback cuando el directo
+  FALLA; aquí el directo «funciona» (lento) ⇒ el relé jamás entraba.
+- FIX v361.1 en proxearHls: (1) RELÉ-PRIMERO para la familia racionada
+  (acek-cdn/owphbf24/sprintcdn/byse + dood/myvidplay/playmogo) con timeout
+  6 s y FUSIBLE (3 fallos seguidos = 2 min de directo, verificado: seg4+
+  vuelven a 0.4-1.1 s); (2) SEG_CACHE LRU de .ts sin Range (220 MB/420):
+  la sala Juntos entera come del mismo buffer.
+- VERIFICADO sandbox: 2ª petición del mismo segmento 0.2 s/1.7 MB/s (RAM)
+  vs 1.2-8.9 s frío; 3 espectadores simultáneos 1.78 s total (antes ~7 s);
+  fusible del relé actuó y la reproducción siguió directa. El Oracle ya
+  tiene relé vivo (Tailscale) ⇒ beneficio inmediato.
