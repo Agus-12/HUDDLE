@@ -4083,3 +4083,17 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   vs 1.2-8.9 s frío; 3 espectadores simultáneos 1.78 s total (antes ~7 s);
   fusible del relé actuó y la reproducción siguió directa. El Oracle ya
   tiene relé vivo (Tailscale) ⇒ beneficio inmediato.
+
+## v361.2 (10 Oct 2026) — la serie sirve por ARCHIVE.ORG (fin de las trabas)
+- Usuario: seguía trabando/cortando en Juntos. Oracle ya en v361.1 con relé
+  configurado ✓, PERO segmentos medidos vía Oracle: 322/80/312 KB/s — el
+  racionado de acek fluctúa y el uplink de casa también ⇒ montaña rusa.
+- MEDIDO archive.org (misma serie, español latino): 1.53-4.07 MB/s (206,
+  redirect -L) = 10-40× más rápido que byse racionado.
+- FIX v361.2: en /api/caricaturas/:slug, datosSerieArchive ANTES de la rama
+  danimados ⇒ la ficha de «Más allá del jardín» sirve 6 episodios (Piloto +
+  5 pases originales CN de 2 cortos) todos mp4 archive directo (dispatch
+  v361 extraerArchive, Range OK para adelantar/atrás). Danimados queda como
+  camino alterno (links viejos siguen resolviendo).
+- VERIFICADO: ficha 6 eps ✓; play bloque 2 ok:true ✓; 5MB a mitad del
+  archivo vía server 3.7 MB/s ✓. Bonus: el PILOTO ya es episode E1.
