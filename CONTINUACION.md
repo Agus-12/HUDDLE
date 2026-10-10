@@ -4109,3 +4109,17 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   extraerArchive(url);` en resolverNativoInterno (tras danimados).
   Verificada regresión: solo/archive ok:true. Lección: cualquier fuente
   nueva debe entrar en AMBAS cadenas.
+
+## v361.4 (10 Oct 2026) — «toca para empezar» eterno: DOS bloqueos del proxy
+- Usuario: la serie en Juntos se queda en «toca para empezar» y la carátula
+  carga eterna. Causas reales en /api/hls (el cliente monta el mp4 como
+  /api/hls?u=…): (1) esProxeable() NO incluía archive.org → **403 «No
+  permitido»** en cada petición del video (el bloqueo letal);
+  (2) el cliente construye ?u= con encodeURIComponent sobre la URL de
+  archive YA codificada (%20) → %2520 → 404 fantasma tras el (1).
+- FIX: (1) esProxeable += archive.org; (2) en proxearHls, si el target es
+  archive y trae %25xx, una des-codificación.
+- VERIFICADO con la petición EXACTA del cliente (%2520 incluida): HTTP 206,
+  204801b video/mp4 real (firma ftyp) en 0.35 s ✓ — Range OK (adelantar).
+- Cadena archive completa: dispatch Solo ✓ (v361) + dispatch Sala ✓ (v361.3)
+  + ficha archive primero ✓ (v361.2) + proxy video ✓ (v361.4).
