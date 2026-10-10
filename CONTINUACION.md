@@ -4097,3 +4097,15 @@ Escaneo de TODAS las películas del sitemap verificando tipo de embed:
   camino alterno (links viejos siguen resolviendo).
 - VERIFICADO: ficha 6 eps ✓; play bloque 2 ok:true ✓; 5MB a mitad del
   archivo vía server 3.7 MB/s ✓. Bonus: el PILOTO ya es episode E1.
+
+## v361.3 (10 Oct 2026) — archive.org NATIVO en SALA (la trampa de las 2 cadenas)
+- Usuario en Juntos: «no se pudo espejear». CAUSA: Huddle tiene DOS
+  despachadores — el de Solo (línea ~1031, donde puse archive en v361) y
+  resolverNativoInterno (~3374, el de la SALA) con SU PROPIA lista de
+  fuentes nativas. archive.org no estaba en la de la sala → la URL caía
+  al espejo de navegador (no existe en el Oracle) → muere («nativo no
+  pudo → caemos al espejo de siempre», ~5318).
+- FIX: `if (/archive\.org\/(embed|download)\//i.test(url)) return
+  extraerArchive(url);` en resolverNativoInterno (tras danimados).
+  Verificada regresión: solo/archive ok:true. Lección: cualquier fuente
+  nueva debe entrar en AMBAS cadenas.
